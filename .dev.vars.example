@@ -1,0 +1,2 @@
+# Generate a strong value using node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+MCP_AUTH_SECRET=replace-with-a-random-secret

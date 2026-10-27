@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "recalloom",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-26",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "recalloom",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "migrations_dir": "migrations"
+  }],
+  "vectorize": [{ "binding": "VECTORIZE", "index_name": "recalloom" }],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["*/15 * * * *"] }
+}
