@@ -97,9 +97,10 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     (x)=>store.context(env,x.folderId??null,x.limit));
   register('changes','Get incremental record changes after an integer cursor.',z.object({cursor:z.number().int().nonnegative().optional(),limit}),false,
     (x)=>store.changesSince(env,x.cursor,x.limit));
-  register('search','Find records with metadata, literal text, semantic Vectorize or hybrid search. Returns stable record IDs and revisions; index may lag.',z.object({
+  register('search','Search by metadata, literal text, semantic Vectorize, or fused hybrid ranking. Semantic results default to minScore=0.43 (adjustable 0-1); index may lag.',z.object({
     query:z.string().min(1).max(4000),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).optional(),
-    folderId:uuid.optional(),tag:z.string().max(64).optional(),status:statuses.optional(),limit:z.number().int().min(1).max(30).optional()
+    folderId:uuid.optional(),tag:z.string().max(64).optional(),status:statuses.optional(),limit:z.number().int().min(1).max(30).optional(),
+    minScore:z.number().min(0).max(1).optional()
   }),false,(x)=>search(env,x));
   register('index_status','Check pending indexing jobs and failures without modifying the library.',z.object({}),false,
     async()=>env.DB.prepare('SELECT state,COUNT(*) AS count FROM index_jobs GROUP BY state').all().then(x=>x.results));
