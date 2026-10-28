@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {capChallenge,checkOrigin,cookie,WEB_COOKIE,session} from '../src/web-auth.js';
-import {deriveWebKey,webHmacHex,webLoginCredential} from '../src/web-keys.js';
-import {createHmac} from 'node:crypto';
+import {deriveWebKey,webHmacHex} from '../src/web-keys.js';
 import type {Env} from '../src/types.js';
 
 test('web browser mutations require same Origin and reject cross-site Fetch Metadata',()=>{
@@ -49,15 +48,13 @@ test('missing OAuth master secret or invalid session token never grants access',
   assert.equal(await session(req,{MCP_AUTH_SECRET:'a'.repeat(40)} as Env),null);
 });
 
-test('Web login credential matches HMAC and is distinct from OAuth master and sibling subkeys',async()=>{
+test('server-only HMAC derivation separates Cap, proof, session, rate and nonce keys',async()=>{
   const master='a very long and random test-only oauth master key';
-  const login=await webLoginCredential(master);
-  assert.equal(login,createHmac('sha256',master).update('recalloom:web:v1:login').digest('base64url'));
-  assert.notEqual(login,master);
-  assert.equal(login.length,43);
-  assert.notDeepEqual(await deriveWebKey(master,'login'),await deriveWebKey(master,'cap'));
-  assert.notDeepEqual(await deriveWebKey(master,'session'),await deriveWebKey(master,'proof'));
-  assert.notEqual(await webLoginCredential(master+'rotated'),login);
+  const purposes=['cap','proof','session','rate','nonce'] as const;
+  const derived=await Promise.all(purposes.map(p=>deriveWebKey(master,p)));
+  assert.equal(new Set(derived.map(x=>Buffer.from(x).toString('hex'))).size,purposes.length);
+  for(const key of derived)assert.notEqual(Buffer.from(key).toString('utf8'),master);
+  assert.notDeepEqual(await deriveWebKey(master+'rotated','session'),await deriveWebKey(master,'session'));
 });
 
 test('existing OAuth master keys shorter than 32 chars can still enable Web Cap without an extra Secret',async()=>{

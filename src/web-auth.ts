@@ -1,6 +1,6 @@
 import { generateChallenge, validateChallenge } from 'capjs-core';
 import type { Env } from './types.js';
-import { bytesToHex,deriveWebKey,webCryptoKey,webHmacHex,webLoginCredential } from './web-keys.js';
+import { bytesToHex,deriveWebKey,webCryptoKey,webHmacHex } from './web-keys.js';
 
 const utf8=new TextEncoder();
 const CAP_TTL=120_000, SESSION_ABSOLUTE=7*24*3600_000, SESSION_IDLE=12*3600_000;
@@ -9,7 +9,9 @@ const b64=(bytes:Uint8Array)=>btoa(Array.from(bytes,b=>String.fromCharCode(b)).j
 const unb64=(s:string)=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'=')),c=>c.charCodeAt(0));
 export const sha=async(data:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',utf8.encode(data)))).map(b=>b.toString(16).padStart(2,'0')).join('');
 // Every Web key is purpose-separated from the existing OAuth master secret.
-// Rotating MCP_AUTH_SECRET invalidates sessions, signed proofs and login credentials.
+// Users log in with the existing MCP_AUTH_SECRET directly. HMAC-derived keys are
+// used only server-side for Cap.js, proof signing, sessions and replay protection.
+// Rotating MCP_AUTH_SECRET invalidates signed proofs and all Web sessions.
 // Do not impose a new length gate on an already-configured OAuth secret.
 // HMAC works with any nonempty key; operators should still use a high-entropy master.
 const secretOk=(env:Env)=>typeof env.MCP_AUTH_SECRET==='string' && env.MCP_AUTH_SECRET.length>0 && env.MCP_AUTH_SECRET!=='replace-with-a-random-secret';
@@ -109,7 +111,7 @@ export async function webLogin(req:Request,env:Env,body:{secret:string;capToken:
   if(!await rateLimit(req,env,'login',15,15*60_000))return error('rate_limited',429);
   const proof=await parseProof(env,body.capToken);
   if(!proof||!await consume(env,'proof:'+proof.id,proof.expires))return error('invalid_proof',403);
-  if(!await equal(body.secret,await webLoginCredential(env.MCP_AUTH_SECRET)))return error('invalid_credentials',401);
+  if(!await equal(body.secret,env.MCP_AUTH_SECRET))return error('invalid_credentials',401);
   const token=b64(crypto.getRandomValues(new Uint8Array(32)));
   const id=crypto.randomUUID(),now=Date.now(),expiresAt=now+SESSION_ABSOLUTE;
   await env.DB.prepare('INSERT INTO web_sessions(id,token_hash,created_at,last_seen_at,expires_at,user_agent_hint) VALUES(?,?,?,?,?,?)')

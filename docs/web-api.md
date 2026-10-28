@@ -4,9 +4,9 @@
 
 ## 初始化
 
-Web 后端复用 Cloudflare Worker 现有的高熵运行时 Secret `MCP_AUTH_SECRET`（推荐至少 32 字符的高熵随机值；不强迫已有 OAuth 实例更换密钥），**不再需要 `WEB_ADMIN_SECRET`**。在本地运行 `pnpm web:key`，通过隐藏输入提供主密钥，生成一个专门用于 Web 登录的 HMAC 派生口令。**不要把 OAuth 主密钥直接输入浏览器**，也不要把派生口令提交到 GitHub、构建变量或前端代码。
+Web 登录与现有 MCP OAuth 授权使用同一个 `MCP_AUTH_SECRET`，**不需要 `WEB_ADMIN_SECRET`、另一个登录密码或 `pnpm web:key`**。登录时，用户将现有 OAuth 密钥直接输入 Web 登录表单，经同源 HTTPS 的 `POST /api/auth/login` 发送，服务端与运行时 Secret 验证。密钥仅在登录时提交，不存储于浏览器持久化存储、D1 或前端源码，不应被日志记录。推荐使用至少 32 字符的高熵随机主密钥，但不会要求现有实例立刻轮换。
 
-密钥派生采用 `HMAC-SHA256(master=MCP_AUTH_SECRET, message='recalloom:web:v1:'+purpose)`，用途包括 `login`、`cap`、`proof`、`session`、`rate` 和 `nonce`。不同用途的子密钥相互独立；提供给浏览器的只有 `login` 的 base64url 派生值，其他密钥只在 Worker 内部使用。主密钥轮换会使所有派生凭据和 Session 失效。
+服务器内部使用 `HMAC-SHA256(master=MCP_AUTH_SECRET, message='recalloom:web:v1:'+purpose)` 派生仅供服务端使用的 `cap`、`proof`、`session`、`rate`、`nonce` 子密钥；**不派生用户登录密码**。Session 由服务器签发随机 256-bit Token，仅将 `session` 子密钥参与计算的 Token HMAC 哈希存入 D1。轮换 OAuth 主密钥会使现有 Web 会话失效。
 
 `pnpm db:local` 负责本地数据库迁移；生产 `pnpm deploy` 会执行远程迁移 `0007_web_auth.sql`。生产只需像之前一样配置 `MCP_AUTH_SECRET`，无需添加新的 Secret。
 
@@ -14,7 +14,7 @@ Web 后端复用 Cloudflare Worker 现有的高熵运行时 Secret `MCP_AUTH_SEC
 
 1. POST /api/auth/cap/challenge，携带同源 Origin 和 JSON {}，接收 capjs-core 的 Challenge。
 2. POST /api/auth/cap/redeem，发送 Cap 求解结果 token、solutions，服务端通过 D1 原子消费 nonce，返回短期 capToken。
-3. POST /api/auth/login，JSON 包含 `secret`（通过 `pnpm web:key` 派生的专用 Web 口令，绝不是原始 OAuth 主密钥）和 `capToken`；capToken 使用一次即失效（错误口令也会消费）。成功后以 Set-Cookie 下发 256-bit 随机 Session Token。
+3. POST /api/auth/login，JSON 包含 `secret`（原始 `MCP_AUTH_SECRET`，与 OAuth 授权页输入相同）和 `capToken`；capToken 使用一次即失效（错误密钥也会消费）。成功后以 Set-Cookie 下发 256-bit 随机 Session Token；后续 CRUD 不再携带 OAuth 密钥。
 4. Cookie 名 __Host-recalloom_session，属性 HttpOnly、Secure、SameSite=Strict、Path=/；Token 不通过 JavaScript/localStorage 获取。后续 API 自动携带 Cookie，不再重复提交密钥。
 5. D1 只保存使用 `session` 子密钥计算的 HMAC Token 摘要和会话信息；OAuth 主密钥轮换后旧会话失效。会话最多持续 7 天，12 小时无访问过期；5 分钟节流 `last_seen_at` 更新。
 6. POST /api/auth/logout 注销当前会话；GET /api/auth/session 获取登录状态；GET /api/auth/sessions 列出会话；DELETE /api/auth/sessions/:id 撤销会话。
@@ -53,7 +53,7 @@ Cap PoW 加 D1 限速只能提高攻击成本。公网仍应通过 Cloudflare Ra
 
 ## 端到端测试（仅本地隔离环境）
 
-先运行 `pnpm db:local`，然后在本地启动带有**测试用** `MCP_AUTH_SECRET` 的 `wrangler dev` Worker，使用 `node scripts/web-api-e2e.mjs` 测试。脚本独立计算与服务端一致的派生 Web 口令，绝不上传实际 OAuth 主密钥。严禁针对生产数据库运行写入型测试。
+先运行 `pnpm db:local`，然后在本地启动带有**测试用** `MCP_AUTH_SECRET` 的 `wrangler dev` Worker，使用 `node scripts/web-api-e2e.mjs` 测试。脚本仅使用**固定的本地测试 OAuth 密钥**登录，严禁使用生产密钥运行，且严禁针对生产数据库运行写入型测试。
 测试覆盖：Challenge、PoW Proof 及重放限制、两个并发登录仅有一次成功、跨站写入防护、Cookie Session、目录/记录/标签/任务/检索、Revision 冲突、历史恢复、审计、Session 撤销和 MCP 授权隔离。
 
 本文件记录已实现的后端功能；尚未开发 CSR 页面。生产已经使用原有 `MCP_AUTH_SECRET`，不需要设置额外 Web Secret。

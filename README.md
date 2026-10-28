@@ -14,7 +14,7 @@ Recalloom 是一个基于 Cloudflare 的开源自部署 MCP 文本库，帮助 A
 - **Vectorize + Workers AI**：异步构建当前正文语义索引；正文与标签仍以 D1 为准。索引任务有租约和超时重试，避免 Worker 中断后永久滞留。
 - **备份与还原**：`recalloom-snapshot-v2` 分页导出有变更水位和每页 SHA-256，写入期间发生修改会中止备份；`import_snapshot` 必须收到所有页面，完整预检后在单个 D1 事务中恢复，默认 `dryRun`，不会覆盖已有 ID。
 - **Workers KV**：仅存放 OAuth 状态。无需 R2 或 Durable Objects。
-- **Web 管理 API（后端）**：Hono `/api/*`，Cap.js PoW + 从 OAuth 主密钥通过 HMAC 派生的 Web 登录口令、D1 可撤销 Token Session；文件夹、记录、TODO、版本与搜索共用 MCP 存储逻辑。React CSR 前端尚未实现，详见 [Web API 文档](docs/web-api.md)。
+- **Web 管理 API（后端）**：Hono `/api/*`，Cap.js PoW + 直接使用现有 `MCP_AUTH_SECRET` 登录、D1 可撤销 Token Session；HMAC 仅用于服务器内部的令牌签名与哈希；文件夹、记录、TODO、版本与搜索共用 MCP 存储逻辑。React CSR 前端尚未实现，详见 [Web API 文档](docs/web-api.md)。
 
 MCP 提供 25 个工具，涵盖目录/记录 CRUD、TODO、标签、历史差异、语义搜索、索引诊断及恢复；只读关联使用 `list_links`，修改关联使用 `manage_link`，项目上下文统一由 `project_context` 提供。原有重叠入口已经直接删除，不承诺旧工具列表兼容。
 
@@ -46,7 +46,7 @@ pnpm dev
 
 本地 MCP 地址：`http://localhost:8787/mcp`。运行 `pnpm check` 和 `pnpm test` 检查代码。
 
-Web 管理后端直接从已有的高强度 `MCP_AUTH_SECRET` 派生不同用途的 HMAC 密钥，**不需要 `WEB_ADMIN_SECRET`**。浏览器应输入本地通过 `pnpm web:key` 派生的专用 Web 登录口令（不是 OAuth 主密钥）；登录成功后收到 HttpOnly Session Cookie，后续 API 不再提交登录口令。Web 前端尚未开发，当前根路径仍返回服务信息 JSON。
+Web 管理后端与 OAuth 使用**同一个 `MCP_AUTH_SECRET` 作为登录密码**，不需要 `WEB_ADMIN_SECRET`、派生登录口令或 `pnpm web:key`。登录页面仅在登录时经 HTTPS 发送此密钥；服务器内部使用分用途 HMAC 派生 Cap.js/Proof/Session 等密钥，成功后下发 HttpOnly Session Cookie，后续 API 不再传密码。Web 前端尚未开发，当前根路径仍返回服务信息 JSON。
 
 OAuth 使用 DCR，而不依赖客户端 ID 元数据文档（CIMD）下载；部分客户端的元数据服务器可能拒绝 Worker 出站请求（HTTP 403）。如果从旧的 CIMD 配置升级，请在 MCP 客户端中删除原连接后重新建立，以便自动执行 DCR 注册。
 
