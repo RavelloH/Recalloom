@@ -2,6 +2,8 @@ import OAuthProvider, { AuthorizationError } from '@cloudflare/workers-oauth-pro
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
+import { webApi } from './web-api.js';
+import { cleanupWebAuth } from './web-auth.js';
 import type { Env } from './types.js';
 import { page, escapeHtml, consentForm } from './auth-page.js';
 
@@ -84,6 +86,7 @@ function provider(env:Env,request:Request){
     defaultHandler:{
       fetch(req:Request,e:Env){
         const path=new URL(req.url).pathname;
+        if(path.startsWith('/api/'))return webApi.fetch(req,e);
         if(path==='/authorize')return authorize(req,e);
         if(path==='/')return Response.json({name:'Recalloom',version:'0.1.0',mcp:origin+'/mcp',status:'production'},{headers:{'cache-control':'no-store'}});
         return new Response('Not Found',{status:404});
@@ -107,5 +110,6 @@ export default {
   },
   scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
     ctx.waitUntil(processIndexJobs(env,5).then(x=>console.log('Recalloom indexing',JSON.stringify(x))).catch(e=>console.error('Recalloom indexing failed',e)));
+    ctx.waitUntil(cleanupWebAuth(env).catch(e=>console.error('Recalloom Web auth cleanup failed',e)));
   }
 } satisfies ExportedHandler<Env>;

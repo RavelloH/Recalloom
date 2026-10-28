@@ -9,13 +9,16 @@
     "deploy": "node scripts/predeploy-check.mjs && wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc && wrangler deploy --config wrangler.deploy.jsonc",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
+    "test:web": "node scripts/web-api-e2e.mjs",
     "db:local": "wrangler d1 migrations apply recalloom --local",
     "db:remote": "wrangler d1 migrations apply recalloom --remote"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^1.2.4",
     "@modelcontextprotocol/server": "^2.4.0",
+    "capjs-core": "0.1.3",
     "diff": "^8.0.2",
+    "hono": "4.11.5",
     "text-version": "^2.1.0",
     "zod": "^4.1.12"
   },
