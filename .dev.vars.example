@@ -1,5 +1,4 @@
 # Generate a strong value using node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
 MCP_AUTH_SECRET=replace-with-a-random-secret
-# Separate browser console key (at least 32 characters); required to activate /api/auth/*.
-# In production set this as a Worker runtime Secret, not a Build Variable.
-WEB_ADMIN_SECRET=replace-with-a-random-secret
+# Web management uses purpose-separated HMAC keys derived from MCP_AUTH_SECRET.
+# Do not configure a second Web secret; derive the browser login credential locally.

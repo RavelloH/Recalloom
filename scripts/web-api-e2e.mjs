@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import {createHash} from 'node:crypto';
+import {createHash,createHmac} from 'node:crypto';
 import {generateChallenge} from 'capjs-core';
 
 const origin=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
 const secret='recalloom-local-web-test-secret-32-bytes-only';
-const key=createHash('sha256').update('recalloom:cap:v1:'+secret).digest('hex');
+const key=createHmac('sha256',secret).update('recalloom:web:v1:cap').digest('hex');
+const webCredential=createHmac('sha256',secret).update('recalloom:web:v1:login').digest('base64url');
 const headers={'content-type':'application/json','origin':origin};
 let cookie='';
 async function api(path,opts={}){
@@ -42,21 +43,24 @@ async function main(){
   const challenge=await post('/api/auth/cap/challenge',{});
   assertStatus(challenge,200,'production-strength Cap challenge issued');
   assert.equal(typeof challenge.data.token,'string');
-  const badLogin=await post('/api/auth/login',{secret});
+  const badLogin=await post('/api/auth/login',{secret:webCredential});
   assertStatus(badLogin,400,'login requires proof schema');
-  const badProof=await post('/api/auth/login',{secret,capToken:'invalid'});
+  const badProof=await post('/api/auth/login',{secret:webCredential,capToken:'invalid'});
   assertStatus(badProof,403,'login requires Cap proof');
   const p1=await proof();
   const replay=await post('/api/auth/cap/redeem',p1.body);
   assertStatus(replay,403,'Cap nonce cannot replay');
   const badSecret=await post('/api/auth/login',{secret:'wrong',capToken:p1.token});
   assertStatus(badSecret,401,'bad secret denied');
-  const usedProof=await post('/api/auth/login',{secret,capToken:p1.token});
+  const usedProof=await post('/api/auth/login',{secret:webCredential,capToken:p1.token});
   assertStatus(usedProof,403,'proof consumed even when secret wrong');
+  const rawMasterProof=await proof();
+  const rawMasterLogin=await post('/api/auth/login',{secret,capToken:rawMasterProof.token});
+  assertStatus(rawMasterLogin,401,'OAuth master secret must not be accepted as Web login credential');
   const p2=await proof();
   const simultaneous=await Promise.all([
-    post('/api/auth/login',{secret,capToken:p2.token}),
-    post('/api/auth/login',{secret,capToken:p2.token})
+    post('/api/auth/login',{secret:webCredential,capToken:p2.token}),
+    post('/api/auth/login',{secret:webCredential,capToken:p2.token})
   ]);
   assert.deepEqual(simultaneous.map(x=>x.status).sort(),[200,403],'concurrent proof must only create one session');
   const good=simultaneous.find(x=>x.status===200);

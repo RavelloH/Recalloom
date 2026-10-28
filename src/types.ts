@@ -7,7 +7,6 @@ export interface Env {
   VECTORIZE: VectorizeIndex;
   AI: Ai;
   MCP_AUTH_SECRET: string;
-  WEB_ADMIN_SECRET?: string;
   MCP_BASE_URL?: string;
 }
 export type RecordKind = 'document' | 'task_list' | 'checkpoint';

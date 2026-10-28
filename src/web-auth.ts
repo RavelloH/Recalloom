@@ -1,5 +1,6 @@
 import { generateChallenge, validateChallenge } from 'capjs-core';
 import type { Env } from './types.js';
+import { bytesToHex,deriveWebKey,webCryptoKey,webHmacHex,webLoginCredential } from './web-keys.js';
 
 const utf8=new TextEncoder();
 const CAP_TTL=120_000, SESSION_ABSOLUTE=7*24*3600_000, SESSION_IDLE=12*3600_000;
@@ -7,29 +8,25 @@ export const WEB_COOKIE='__Host-recalloom_session';
 const b64=(bytes:Uint8Array)=>btoa(Array.from(bytes,b=>String.fromCharCode(b)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
 const unb64=(s:string)=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'=')),c=>c.charCodeAt(0));
 export const sha=async(data:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',utf8.encode(data)))).map(b=>b.toString(16).padStart(2,'0')).join('');
-// Bind browser sessions to the configured administrator secret. Rotating it
-// invalidates all outstanding cookies even before D1 maintenance removes them.
-const sessionHash=(env:Env,token:string)=>sha('recalloom:session:v1:'+env.WEB_ADMIN_SECRET+':'+token);
-const secretOk=(env:Env)=>typeof env.WEB_ADMIN_SECRET==='string' && env.WEB_ADMIN_SECRET.length>=32 && env.WEB_ADMIN_SECRET!=='replace-with-a-random-secret';
-async function key(env:Env,purpose:string){
-  const secret=env.WEB_ADMIN_SECRET;
-  const raw=await crypto.subtle.digest('SHA-256',utf8.encode('recalloom:web:'+purpose+':v1:'+secret));
-  return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
-}
-async function capSecret(env:Env){return sha('recalloom:cap:v1:'+env.WEB_ADMIN_SECRET);}
+// Every Web key is purpose-separated from the existing OAuth master secret.
+// Rotating MCP_AUTH_SECRET invalidates sessions, signed proofs and login credentials.
+const secretOk=(env:Env)=>typeof env.MCP_AUTH_SECRET==='string' && env.MCP_AUTH_SECRET.length>=32 && env.MCP_AUTH_SECRET!=='replace-with-a-random-secret';
+const sessionHash=(env:Env,token:string)=>webHmacHex(env.MCP_AUTH_SECRET,'session',token);
+async function key(env:Env){return webCryptoKey(env.MCP_AUTH_SECRET,'proof');}
+async function capSecret(env:Env){return bytesToHex(await deriveWebKey(env.MCP_AUTH_SECRET,'cap'));}
 const error=(code:string,status=400)=>Response.json({code},{status,headers:{'cache-control':'no-store'}});
 type Proof={v:1;id:string;expires:number;purpose:'web-login'};
 async function signProof(env:Env,expires:number){
   const data:Proof={v:1,id:crypto.randomUUID(),expires,purpose:'web-login'};
   const payload=b64(utf8.encode(JSON.stringify(data)));
-  const sig=await crypto.subtle.sign('HMAC',await key(env,'proof'),utf8.encode(payload));
+  const sig=await crypto.subtle.sign('HMAC',await key(env),utf8.encode(payload));
   return payload+'.'+b64(new Uint8Array(sig));
 }
 async function parseProof(env:Env,token:unknown):Promise<Proof|null>{
   if(typeof token!=='string'||token.length>1024||!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))return null;
   try{
     const [payload,signature]=token.split('.') as [string,string];
-    const valid=await crypto.subtle.verify('HMAC',await key(env,'proof'),unb64(signature),utf8.encode(payload));
+    const valid=await crypto.subtle.verify('HMAC',await key(env),unb64(signature),utf8.encode(payload));
     if(!valid)return null;
     const proof=JSON.parse(new TextDecoder().decode(unb64(payload))) as Proof;
     if(proof.v!==1||proof.purpose!=='web-login'||!Number.isSafeInteger(proof.expires)||
@@ -40,13 +37,13 @@ async function parseProof(env:Env,token:unknown):Promise<Proof|null>{
 }
 async function consume(env:Env,raw:string,expires:number){
   if(expires<=Date.now())return false;
-  const hash=await sha('recalloom:nonce:'+raw);
+  const hash=await webHmacHex(env.MCP_AUTH_SECRET,'nonce',raw);
   const result=await env.DB.prepare('INSERT OR IGNORE INTO web_nonces(id_hash,expires_at) VALUES(?,?)').bind(hash,expires).run();
   return result.meta.changes===1;
 }
 async function rateLimit(request:Request,env:Env,scope:string,max:number,windowMs:number){
   const ip=request.headers.get('cf-connecting-ip')||'unknown';
-  const bucket=await sha('recalloom:rate:'+env.WEB_ADMIN_SECRET+':'+scope+':'+ip+':'+Math.floor(Date.now()/windowMs));
+  const bucket=await webHmacHex(env.MCP_AUTH_SECRET,'rate',scope+':'+ip+':'+Math.floor(Date.now()/windowMs));
   const res=await env.DB.prepare('INSERT INTO web_rate_limits(bucket_hash,attempts,expires_at) VALUES(?,1,?) ON CONFLICT(bucket_hash) DO UPDATE SET attempts=attempts+1 RETURNING attempts')
     .bind(bucket,Math.floor(Date.now()/windowMs+1)*windowMs).first<{attempts:number}>();
   return (res?.attempts??max+1)<=max;
@@ -110,7 +107,7 @@ export async function webLogin(req:Request,env:Env,body:{secret:string;capToken:
   if(!await rateLimit(req,env,'login',15,15*60_000))return error('rate_limited',429);
   const proof=await parseProof(env,body.capToken);
   if(!proof||!await consume(env,'proof:'+proof.id,proof.expires))return error('invalid_proof',403);
-  if(!await equal(body.secret,env.WEB_ADMIN_SECRET!))return error('invalid_credentials',401);
+  if(!await equal(body.secret,await webLoginCredential(env.MCP_AUTH_SECRET)))return error('invalid_credentials',401);
   const token=b64(crypto.getRandomValues(new Uint8Array(32)));
   const id=crypto.randomUUID(),now=Date.now(),expiresAt=now+SESSION_ABSOLUTE;
   await env.DB.prepare('INSERT INTO web_sessions(id,token_hash,created_at,last_seen_at,expires_at,user_agent_hint) VALUES(?,?,?,?,?,?)')

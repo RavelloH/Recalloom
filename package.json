@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:web": "node scripts/web-api-e2e.mjs",
+    "web:key": "node scripts/derive-web-key.mjs",
     "db:local": "wrangler d1 migrations apply recalloom --local",
     "db:remote": "wrangler d1 migrations apply recalloom --remote"
   },

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {checkOrigin,cookie,WEB_COOKIE,session,sha} from '../src/web-auth.js';
+import {checkOrigin,cookie,WEB_COOKIE,session} from '../src/web-auth.js';
+import {deriveWebKey,webHmacHex,webLoginCredential} from '../src/web-keys.js';
+import {createHmac} from 'node:crypto';
 import type {Env} from '../src/types.js';
 
 test('web browser mutations require same Origin and reject cross-site Fetch Metadata',()=>{
@@ -19,9 +21,9 @@ test('session cookie is HttpOnly, Secure, Strict and scoped to origin root',()=>
     assert.ok(value.includes(required));
   assert.match(cookie('',undefined),/Max-Age=0/);
 });
-test('Web session hashes are bound to admin secret, invalidated by secret rotation',async()=>{
+test('Web session hashes use OAuth-derived HMAC and are invalidated by master rotation',async()=>{
   const token='z'.repeat(43),firstSecret='a'.repeat(40),otherSecret='b'.repeat(40);
-  const expected=await sha('recalloom:session:v1:'+firstSecret+':'+token);
+  const expected=await webHmacHex(firstSecret,'session',token);
   let lookupCount=0;
   const db={prepare:(sql:string)=>({
     bind:(hash:string)=>({
@@ -36,13 +38,24 @@ test('Web session hashes are bound to admin secret, invalidated by secret rotati
     })
   })};
   const request=new Request('https://example.test/api/folders',{headers:{cookie:WEB_COOKIE+'='+token}});
-  const env={WEB_ADMIN_SECRET:firstSecret,DB:db} as unknown as Env;
+  const env={MCP_AUTH_SECRET:firstSecret,DB:db} as unknown as Env;
   assert.equal((await session(request,env))?.id,'session-id');
-  assert.equal(await session(request,{...env,WEB_ADMIN_SECRET:otherSecret}),null);
+  assert.equal(await session(request,{...env,MCP_AUTH_SECRET:otherSecret}),null);
   assert.equal(lookupCount,2);
 });
-test('missing web secret or invalid session token never grants access',async()=>{
+test('missing OAuth master secret or invalid session token never grants access',async()=>{
   const req=new Request('https://example.test/api/folders',{headers:{cookie:WEB_COOKIE+'=bad'}});
   assert.equal(await session(req,{} as Env),null);
-  assert.equal(await session(req,{WEB_ADMIN_SECRET:'a'.repeat(40)} as Env),null);
+  assert.equal(await session(req,{MCP_AUTH_SECRET:'a'.repeat(40)} as Env),null);
+});
+
+test('Web login credential matches HMAC and is distinct from OAuth master and sibling subkeys',async()=>{
+  const master='a very long and random test-only oauth master key';
+  const login=await webLoginCredential(master);
+  assert.equal(login,createHmac('sha256',master).update('recalloom:web:v1:login').digest('base64url'));
+  assert.notEqual(login,master);
+  assert.equal(login.length,43);
+  assert.notDeepEqual(await deriveWebKey(master,'login'),await deriveWebKey(master,'cap'));
+  assert.notDeepEqual(await deriveWebKey(master,'session'),await deriveWebKey(master,'proof'));
+  assert.notEqual(await webLoginCredential(master+'rotated'),login);
 });
