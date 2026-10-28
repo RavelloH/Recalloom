@@ -17,6 +17,20 @@ Recalloom 是一个基于 Cloudflare 的开源自部署 MCP 文本库，帮助 A
 
 MCP 提供 25 个工具，涵盖目录/记录 CRUD、TODO、标签、历史差异、语义搜索、索引诊断及恢复；只读关联使用 `list_links`，修改关联使用 `manage_link`，项目上下文统一由 `project_context` 提供。原有重叠入口已经直接删除，不承诺旧工具列表兼容。
 
+## MCP 给 Agent 的使用提示
+
+`src/mcp-guidance.ts` 集中维护可通过标准 MCP 初始化与工具发现提供的说明：
+
+- **Server Instructions**：在 `initialize` 响应中描述 Recalloom 的用途、项目恢复流程、checkpoint/TODO 的区别、修订并发保护、分页与续读规则，以及备份写入边界。
+- **Tool title / description**：25 个工具分别说明适用场景、相似工具的区别和关键风险，例如 `search` 的异步索引、`mutate_task` 的结构化版本管理、`import_snapshot` 的完整 v2 备份要求。
+- **Input Schema**：通过 Zod `.describe()` 提供参数的实际语义，包括 `expectedRevision`、`metadataRevision`、`page.nextCursor`、`offsetChars`、文本编辑模式与 `dryRun` 等。
+- **Tool annotations**：只读/可能造成数据改变的提示供客户端参考；OAuth scope 与服务端版本检查才是实际的访问及一致性控制。
+
+这些提示属于客户端可以获取的使用指导，不是更高优先级的指令，也不能保证所有 MCP 客户端都把服务器级 Instructions 展示给模型。没有强制的自动写入或同步机制；需要依据用户目的决定是否保存开发进度。
+
+执行 `pnpm test` 会通过内存 MCP 传输实际测试 `initialize` 和 `tools/list`，校验服务器说明、所有工具描述、关键字段注释和安全注解。
+
+
 ## 本地开发
 
 需要 Node.js 24 和 pnpm 11。
