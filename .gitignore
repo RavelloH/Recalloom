@@ -7,3 +7,11 @@ dist/
 *.log
 coverage/
 wrangler.deploy.jsonc
+
+# Local-only research, benchmarks and temporary development notes.
+# Keep persistent technical decisions/checkpoints in Recalloom instead.
+/notes/
+/scratch/
+/bench/
+/tmp/
+/docs/_local/
