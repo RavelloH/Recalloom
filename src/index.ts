@@ -3,20 +3,9 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
 import type { Env } from './types.js';
+import { page, escapeHtml } from './auth-page.js';
 
 const SCOPES=['notes:read','notes:write'];
-function escapeHtml(value:unknown):string{
-  return String(value??'').replace(/[&<>"']/g,ch=>'&#'+ch.charCodeAt(0)+';');
-}
-function page(title:string,body:string,status=200,callbackOrigin?:string):Response {
-  const allowed=callbackOrigin?'self '+callbackOrigin:"'self'";
-  return new Response('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
-    +escapeHtml(title)+'</title><style>body{max-width:660px;margin:8vh auto;padding:0 20px;font:16px/1.6 system-ui;color:#202635}main{padding:28px;border:1px solid #d1d7e0;border-radius:14px}input{font:inherit;padding:10px;width:95%;margin:10px 0}button{font:inherit;padding:10px 20px;margin-right:8px;cursor:pointer}</style><main>'+body+'</main></html>',{
-    status,headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff',
-      'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; form-action "+allowed+"; base-uri 'none'; frame-ancestors 'none'",
-      'referrer-policy':'no-referrer'}
-  });
-}
 function safeEqual(a:string,b:string):boolean{
   const x=new TextEncoder().encode(a),y=new TextEncoder().encode(b);
   let mismatch=x.length^y.length;
@@ -33,7 +22,6 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       const details=await oauth.describeConsent(parsed);
       const consent=await oauth.beginConsent(parsed);
       const scope=details.scope.length?details.scope:SCOPES;
-      const callbackOrigin=new URL(parsed.redirectUri).origin;
       const scopeInputs=scope.map(s=>'<input type="hidden" name="scope" value="'+escapeHtml(s)+'">').join('');
       const html='<h1>授权 Recalloom</h1><p>客户端 <strong>'+escapeHtml(details.clientName)+'</strong> 正在请求访问你的私人知识库。</p>'
         +'<p>回调域名：'+escapeHtml(details.redirectHost)+'</p>'
@@ -41,7 +29,7 @@ async function authorize(request:Request,env:Env):Promise<Response>{
         +'<form method="post"><input type="hidden" name="handle" value="'+escapeHtml(consent.handle)+'">'+scopeInputs
         +'<label>授权密钥<input type="password" name="secret" required autocomplete="current-password"></label>'
         +'<button name="decision" value="approve">授权</button><button name="decision" value="deny" formnovalidate>拒绝</button></form>';
-      const res=page('Recalloom OAuth',html,200,callbackOrigin);
+      const res=page('Recalloom OAuth',html);
       consent.headers.forEach((value,key)=>res.headers.append(key,value));
       return res;
     }
