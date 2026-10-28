@@ -6,7 +6,7 @@ Recalloom 是一个基于 Cloudflare 的开源自部署 MCP 文本库，帮助 A
 
 ## 功能与架构
 
-- **MCP + OAuth**：Streamable HTTP，使用授权密钥批准客户端；提供 `notes:read` / `notes:write` 权限。
+- **MCP + OAuth**：Streamable HTTP，使用授权密钥批准客户端；通过动态客户端注册（DCR）兼容 ChatGPT 等客户端，提供 `notes:read` / `notes:write` 权限。
 - **D1**：唯一的业务事实源；记录元数据、文件夹、当前文本、历史差分、TODO、增量变更。
 - **text-version**：最新快照与历史反向差分分表存储；历史恢复创建新修订，不破坏原历史。
 - **严格编辑**：全文、追加、精确替换、批量替换、Unified Diff、按行修改；支持 `expectedRevision` 和 `dryRun`。
@@ -28,6 +28,8 @@ pnpm dev
 ```
 
 本地 MCP 地址：`http://localhost:8787/mcp`。运行 `pnpm check` 和 `pnpm test` 检查代码。
+
+OAuth 使用 DCR，而不依赖客户端 ID 元数据文档（CIMD）下载；部分客户端的元数据服务器可能拒绝 Worker 出站请求（HTTP 403）。如果从旧的 CIMD 配置升级，请在 MCP 客户端中删除原连接后重新建立，以便自动执行 DCR 注册。
 
 Vectorize/Workers AI 需要远程资源才能进行真实语义检索；纯文本、D1、版本及 TODO 相关功能可以在本地测试。
 
@@ -72,7 +74,7 @@ pnpm exec wrangler vectorize create recalloom --dimensions=1024 --metric=cosine
 
 ### 3. 设置运行时密钥
 
-首次创建 Worker 后，在 Worker 的 **Settings → Variables and Secrets** 中添加类型为 **Secret** 的 `MCP_AUTH_SECRET`（高强度随机值），不要放在 Build Variables、GitHub 仓库或 `wrangler.jsonc`。此外推荐为 `/authorize` 配置 WAF Rate Limiting，避免对授权口令进行暴力尝试。
+首次创建 Worker 后，在 Worker 的 **Settings → Variables and Secrets** 中添加类型为 **Secret** 的 `MCP_AUTH_SECRET`（高强度随机值），不要放在 Build Variables、GitHub 仓库或 `wrangler.jsonc`。此外推荐为 `/authorize` 和 `/oauth/register` 配置 WAF Rate Limiting，分别防范授权口令猜测和恶意客户端注册造成的 KV 写入消耗。
 
 如需自定义域名，可在 Worker 中配置 Custom Domain，并设置 `MCP_BASE_URL` 为完整的公共 origin（不包含 `/mcp`）；否则使用默认 `workers.dev` 地址即可。
 

@@ -1,4 +1,4 @@
-import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
+import OAuthProvider, { AuthorizationError } from '@cloudflare/workers-oauth-provider';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
@@ -67,7 +67,6 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       if(e.redirectTo)return Response.redirect(e.redirectTo,302);
       return page('授权失败','<h1>授权错误</h1><p>'+escapeHtml(e.description)+'</p>',400);
     }
-    if(e instanceof CimdFetchError)return page('授权失败','<h1>无法验证 MCP 客户端</h1>',400);
     throw e;
   }
 }
@@ -99,7 +98,8 @@ function provider(env:Env,request:Request){
     scopesSupported:SCOPES,
     requiredScopes:SCOPES,
     resourceMetadata:{resource:origin+'/mcp',authorization_servers:[origin],resource_name:'Recalloom'},
-    clientIdMetadataDocumentEnabled:true,
+    // ChatGPT uses DCR when CIMD is not advertised. This avoids upstream 403s.
+    clientIdMetadataDocumentEnabled:false,
     refreshTokenTTL:90*24*3600,
     refreshTokenIdleTTL:30*24*3600
   });
