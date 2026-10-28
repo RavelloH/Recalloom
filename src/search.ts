@@ -94,7 +94,7 @@ export async function search(env:Env,input:{query:string;mode?:'metadata'|'liter
   }
   if(semantic) {
     const vector=(await embed(env,[query]))[0]!;
-    const result=await env.VECTORIZE.query(vector,{topK:Math.min(80,Math.max(20,limit*5)),returnMetadata:'all'});
+    const result=await env.VECTORIZE.query(vector,{topK:Math.min(50,Math.max(20,limit*5)),returnMetadata:'all'});
     const rows=result.matches.filter(m=>m.metadata&&typeof m.metadata.record_id==='string');
     for(const match of rows) {
       const recordId=String(match.metadata!.record_id), revision=Number(match.metadata!.revision);

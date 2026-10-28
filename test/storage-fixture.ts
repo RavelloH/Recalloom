@@ -21,6 +21,9 @@ export default {
       check(conflict,'stale edit must fail');
       const old=await store.readRecord(env,rec.id,{revision:1});
       check('content' in old && old.content==='','restore empty historical revision');
+      check(old.contentSha256===first.contentSha256,'historical revision hash must match original');
+      const oldMetadata=await store.readRecord(env,rec.id,{revision:1,metadataOnly:true});
+      check(oldMetadata.contentSha256===first.contentSha256,'metadata-only historical hash');
       const latest=await store.readRecord(env,rec.id,{revision:3});
       check('content' in latest && latest.content==='hello world','latest revision');
       const restored=await store.restoreRecord(env,rec.id,1,3,'integration');
@@ -54,7 +57,17 @@ export default {
       try {await store.createRecord(env,{name:'Renamed',folderId:folder.id});}
       catch(e){collision=String(e).includes('PATH_CONFLICT');}
       check(collision,'cannot reuse folder name as record name');
-      return Response.json({ok:true,folderId:folder.id,recordId:rec.id,taskListId:todo.id,versions:history.length,events:events.events.length,virtualPaths:true});
+      const indexJobCount=async()=>Number((await env.DB.prepare('SELECT COUNT(*) AS n FROM index_jobs WHERE record_id=?').bind(rec.id).first<{n:number}>())?.n??0);
+      const beforeIndex=await indexJobCount();
+      await store.updateMeta(env,rec.id,{status:'archived'},'integration');
+      check((await indexJobCount())===beforeIndex+1,'archive queues a cleanup job for same content revision');
+      await store.updateMeta(env,rec.id,{status:'active'},'integration');
+      check((await indexJobCount())===beforeIndex+2,'reactivate queues a rebuild job for same revision');
+      await store.updateMeta(env,rec.id,{name:'renamed.md'},'integration');
+      check((await indexJobCount())===beforeIndex+3,'rename queues a rebuild job');
+      await store.updateMeta(env,rec.id,{description:'description only'},'integration');
+      check((await indexJobCount())===beforeIndex+3,'description-only update does not create unnecessary index job');
+      return Response.json({ok:true,folderId:folder.id,recordId:rec.id,taskListId:todo.id,versions:history.length,events:events.events.length,virtualPaths:true,metadataIndexJobs:true,historicalHash:true});
     } catch(error){
       return Response.json({ok:false,error:String(error),stack:error instanceof Error?error.stack:null},{status:500});
     }

@@ -62,11 +62,19 @@ export async function readRecord(env:Env, id:string, options:{revision?:number;l
   const row=await getRecord(env,id);
   if (options.revision!==undefined && (!Number.isInteger(options.revision)||options.revision<1||options.revision>row.revision))
     throw new StorageError('REVISION_NOT_FOUND');
-  let content=options.revision && options.revision!==row.revision
-    ?historicalVersion({content:row.content,metadata:row.history_metadata},options.revision)
+  const targetRevision=options.revision??row.revision;
+  let contentSha256=row.content_sha256;
+  if(targetRevision!==row.revision) {
+    const historical=await env.DB.prepare('SELECT content_sha256 FROM revisions WHERE record_id=? AND revision=?')
+      .bind(id,targetRevision).first<{content_sha256:string}>();
+    if(!historical)throw new StorageError('REVISION_NOT_FOUND');
+    contentSha256=historical.content_sha256;
+  }
+  const metadata={id:row.id,name:row.name,folderId:row.folder_id,kind:row.kind,status:row.status,description:row.description,revision:targetRevision,currentRevision:row.revision,contentSha256,updatedAt:row.updated_at};
+  if(options.metadataOnly)return metadata;
+  let content=targetRevision!==row.revision
+    ?historicalVersion({content:row.content,metadata:row.history_metadata},targetRevision)
     :row.content;
-  const metadata={id:row.id,name:row.name,folderId:row.folder_id,kind:row.kind,status:row.status,description:row.description,revision:options.revision??row.revision,currentRevision:row.revision,contentSha256:row.content_sha256,updatedAt:row.updated_at};
-  if (options.metadataOnly) return metadata;
   const lines=content.split(/\r\n|\n|\r/),totalLines=lines.length;
   const start=options.lineStart===undefined?1:options.lineStart;
   if (!Number.isInteger(start)||start<1||start>totalLines+1) throw new StorageError('INVALID_LINE_RANGE');
@@ -136,12 +144,19 @@ export async function updateMeta(env:Env,id:string,updates:{name?:string;folderI
   const ts=now(),name=updates.name===undefined?row.name:nameCheck(updates.name);
   const folderId=updates.folderId===undefined?row.folder_id:updates.folderId;
   if(folderId && !(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
-  await env.DB.batch([
+  const status=updates.status??row.status;
+  const statements=[
     env.DB.prepare('UPDATE records SET name=?,folder_id=?,status=?,description=?,updated_at=? WHERE id=?')
-      .bind(name,folderId,updates.status??row.status,updates.description??row.description,ts,id),
+      .bind(name,folderId,status,updates.description??row.description,ts,id),
     env.DB.prepare('INSERT INTO change_events(record_id,event_type,revision,actor,created_at) VALUES(?,?,?,?,?)')
       .bind(id,'metadata',row.revision,actor,ts)
-  ]);
+  ];
+  // Search vectors contain the record name and are suppressed when archived.
+  // Reindex name/status changes even though they do not advance content revisions.
+  if(name!==row.name||status!==row.status)
+    statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
+      .bind(newId(),id,row.revision,ts));
+  await env.DB.batch(statements);
   return {id,name,folderId,status:updates.status??row.status};
 }
 export async function tagRecord(env:Env,id:string,tag:string,action:'add'|'remove',actor='agent') {
