@@ -3,9 +3,10 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
 import type { Env } from './types.js';
-import { page, escapeHtml } from './auth-page.js';
+import { page, escapeHtml, consentForm } from './auth-page.js';
 
 const SCOPES=['notes:read','notes:write'];
+
 function safeEqual(a:string,b:string):boolean{
   const x=new TextEncoder().encode(a),y=new TextEncoder().encode(b);
   let mismatch=x.length^y.length;
@@ -22,14 +23,13 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       const details=await oauth.describeConsent(parsed);
       const consent=await oauth.beginConsent(parsed);
       const scope=details.scope.length?details.scope:SCOPES;
-      const scopeInputs=scope.map(s=>'<input type="hidden" name="scope" value="'+escapeHtml(s)+'">').join('');
-      const html='<h1>授权 Recalloom</h1><p>客户端 <strong>'+escapeHtml(details.clientName)+'</strong> 正在请求访问你的私人知识库。</p>'
-        +'<p>回调域名：'+escapeHtml(details.redirectHost)+'</p>'
-        +'<p>权限：'+scope.map(s=>escapeHtml(s)).join(', ')+'</p>'
-        +'<form method="post"><input type="hidden" name="handle" value="'+escapeHtml(consent.handle)+'">'+scopeInputs
-        +'<label>授权密钥<input type="password" name="secret" required autocomplete="current-password"></label>'
-        +'<button name="decision" value="approve">授权</button><button name="decision" value="deny" formnovalidate>拒绝</button></form>';
-      const res=page('Recalloom OAuth',html);
+      const callbackOrigin = new URL(parsed.redirectUri).origin;
+      const res = page(
+        'Recalloom OAuth',
+        consentForm(request, details.clientName, details.redirectHost, consent.handle, scope),
+        200,
+        callbackOrigin
+      );
       consent.headers.forEach((value,key)=>res.headers.append(key,value));
       return res;
     }
@@ -41,8 +41,17 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       return new Response(null,{status:302,headers:denied.headers});
     }
     const supplied=String(form.get('secret')??'');
-    if(!safeEqual(supplied,env.MCP_AUTH_SECRET))
-      return page('授权失败','<h1>授权密钥不正确</h1><p>请重新从客户端发起授权。</p>',403);
+    if(!safeEqual(supplied,env.MCP_AUTH_SECRET)){
+      const parsed = await oauth.parseAuthRequest(request);
+      const details = await oauth.describeConsent(parsed);
+      const scopes = details.scope.length ? details.scope : SCOPES;
+      return page(
+        '授权密钥不正确',
+        consentForm(request, details.clientName, details.redirectHost, handle, scopes, '授权密钥不正确，请重试或取消。'),
+        401,
+        new URL(parsed.redirectUri).origin
+      );
+    }
     const approved=await oauth.approveConsent(request,handle,{scope:form.getAll('scope').map(String)});
     const {redirectTo}=await oauth.completeAuthorization({
       request:approved.request,userId:'owner',metadata:{},scope:approved.request.scope,
