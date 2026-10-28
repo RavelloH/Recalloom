@@ -1,7 +1,6 @@
 import type { Env, EditInput, RecordKind, RecordStatus, StoredRecord, Task, TaskStatus } from './types.js';
 import { StorageError } from './types.js';
 import { sha256, initialVersion, nextVersion, historicalVersion, editContent } from './version.js';
-import { createTwoFilesPatch } from 'diff';
 
 const now = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
@@ -37,17 +36,38 @@ export async function createFolder(env: Env, name: string, parentId: string|null
   ]);
   return {id,parentId,name,description,metadataRevision:1};
 }
-export async function browse(env: Env, folderId: string|null=null, limit=50, cursor=0) {
-  if (folderId && !(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))
-    throw new StorageError('FOLDER_NOT_FOUND');
-  const size=bounded(limit,200),offset=Math.max(0,Math.floor(cursor));
-  const [folders,records]=await Promise.all([
-    env.DB.prepare('SELECT id,parent_id,name,description,metadata_revision,updated_at FROM folders WHERE parent_id IS ? ORDER BY name,id LIMIT ? OFFSET ?').bind(folderId,size+1,offset).all(),
-    env.DB.prepare("SELECT r.id,r.folder_id,r.name,r.kind,r.status,r.description,r.metadata_revision,r.updated_at,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags_json FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? ORDER BY r.updated_at DESC,r.id LIMIT ? OFFSET ?")
-      .bind(folderId,size+1,offset).all()
+type BrowseCursor={folderId:string|null;folderDone:boolean;recordDone:boolean;lastFolder?:{name:string;id:string};lastRecord?:{updatedAt:string;id:string}};
+export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:string|null){
+  if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
+  const size=bounded(limit,100);
+  let state:BrowseCursor={folderId,folderDone:false,recordDone:false};
+  if(cursor){
+    try{
+      const value=JSON.parse(cursor) as BrowseCursor;
+      if(value.folderId!==folderId||typeof value.folderDone!=='boolean'||typeof value.recordDone!=='boolean')throw Error();
+      state=value;
+    }catch{throw new StorageError('INVALID_CURSOR');}
+  }
+  const [folderRows,recordRows]=await Promise.all([
+    state.folderDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
+      env.DB.prepare('SELECT id,parent_id AS parentId,name,description,metadata_revision AS metadataRevision,updated_at AS updatedAt FROM folders WHERE parent_id IS ? AND (? IS NULL OR name>? OR (name=? AND id>?)) ORDER BY name,id LIMIT ?')
+        .bind(folderId,state.lastFolder?.name??null,state.lastFolder?.name??'',state.lastFolder?.name??'',state.lastFolder?.id??'',size+1).all(),
+    state.recordDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
+      env.DB.prepare("SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND (? IS NULL OR r.updated_at<? OR (r.updated_at=? AND r.id>?)) ORDER BY r.updated_at DESC,r.id LIMIT ?")
+        .bind(folderId,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
   ]);
-  const hasMore=folders.results.length>size||records.results.length>size;
-  return {folderId,folders:folders.results.slice(0,size),records:(records.results as Array<{id:string;[key:string]:unknown}>).slice(0,size).map(row=>({...row,tags:JSON.parse(String(row.tags_json??'[]'))})),nextCursor:hasMore?offset+size:null,hasMore};
+  const folders=folderRows.results.slice(0,size) as Array<Record<string,unknown>>;
+  const records=recordRows.results.slice(0,size) as Array<Record<string,unknown>>;
+  const folderDone=state.folderDone||folderRows.results.length<=size,recordDone=state.recordDone||recordRows.results.length<=size;
+  const next:BrowseCursor={folderId,folderDone,recordDone,
+    lastFolder:folders.length?{name:String(folders.at(-1)?.name),id:String(folders.at(-1)?.id)}:state.lastFolder,
+    lastRecord:records.length?{updatedAt:String(records.at(-1)?.updatedAt),id:String(records.at(-1)?.id)}:state.lastRecord};
+  const items:Array<Record<string,unknown>>=[
+    ...folders.map(row=>({entityType:'folder',...row})),
+    ...records.map(row=>({entityType:'record',...row,tags:JSON.parse(String(row.tags??'[]'))}))
+  ];
+  const hasMore=!folderDone||!recordDone;
+  return {folderId,items,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null}};
 }
 export async function createRecord(env: Env, input:{name:string;folderId?:string|null;kind?:RecordKind;description?:string;content?:string}, actor='agent') {
   const id=newId(), ts=now(), name=nameCheck(input.name), folderId=input.folderId??null,kind=input.kind??'document';
@@ -73,7 +93,10 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
   return {id,name,kind,revision:1,contentSha256:digest};
 }
 export async function readRecord(env:Env, id:string, options:{revision?:number;lineStart?:number;maxLines?:number;metadataOnly?:boolean}={}) {
-  const row=await getRecord(env,id);
+  const row=options.metadataOnly
+    ?await env.DB.prepare('SELECT r.*,c.revision,c.content_sha256 FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.id=?').bind(id).first<StoredRecord>()
+    :await getRecord(env,id);
+  if(!row)throw new StorageError('RECORD_NOT_FOUND');
   if (options.revision!==undefined && (!Number.isInteger(options.revision)||options.revision<1||options.revision>row.revision))
     throw new StorageError('REVISION_NOT_FOUND');
   const targetRevision=options.revision??row.revision;
@@ -160,14 +183,14 @@ export async function restoreRecord(env:Env,id:string,targetRevision:number,expe
   }catch {throw new StorageError('INVALID_TASK_DOCUMENT','Historical task list cannot be projected safely');}
   return commitContent(env,row,historic,expectedRevision,'Restored task list revision '+targetRevision,actor,tasks,{action:'restore',targetRevision,taskCount:tasks.length});
 }
-export function listVersions(env:Env,id:string,limit?:number):Promise<Record<string,unknown>[]>;
-export function listVersions(env:Env,id:string,limit:number|undefined,beforeRevision:number):Promise<{versions:Record<string,unknown>[];nextCursor:number|null}>;
-export async function listVersions(env:Env,id:string,limit=50,beforeRevision?:number) {
+export async function listVersions(env:Env,id:string,limit=50,cursor?:number){
   await getRecord(env,id);
   const size=bounded(limit,200);
-  const res=await env.DB.prepare('SELECT revision,content_sha256,message,actor,created_at FROM revisions WHERE record_id=? AND revision<? ORDER BY revision DESC LIMIT ?')
-    .bind(id,beforeRevision||2147483647,size+1).all();
-  return beforeRevision===undefined?res.results.slice(0,size):{versions:res.results.slice(0,size),nextCursor:res.results.length>size?Number(res.results[size-1]?.revision):null};
+  if(cursor!==undefined&&(!Number.isInteger(cursor)||cursor<1))throw new StorageError('INVALID_CURSOR');
+  const rows=(await env.DB.prepare('SELECT revision,content_sha256 AS contentSha256,message,actor,created_at AS createdAt FROM revisions WHERE record_id=? AND revision<? ORDER BY revision DESC LIMIT ?')
+    .bind(id,cursor??2147483647,size+1).all()).results;
+  const items=rows.slice(0,size);
+  return {items,page:{hasMore:rows.length>size,nextCursor:rows.length>size?items.at(-1)?.revision??null:null}};
 }
 export async function updateMeta(env:Env,id:string,updates:{
   name?:string;folderId?:string|null;status?:RecordStatus;description?:string;expectedMetadataRevision?:number
@@ -244,34 +267,39 @@ export async function taskOperation(env:Env,recordId:string,expectedRevision:num
   const result=await commitContent(env,row,content,expectedRevision,message,actor,tasks,{action,taskId:affected?.id??taskId,title:affected?.title,changes});
   return {...result,tasks};
 }
-export function getTasks(env:Env,recordId?:string,status?:TaskStatus,limit?:number):Promise<Record<string,unknown>[]>;
-export function getTasks(env:Env,recordId:string|undefined,status:TaskStatus|undefined,limit:number|undefined,cursor:number):Promise<{tasks:Record<string,unknown>[];nextCursor:number|null}>;
-export async function getTasks(env:Env,recordId?:string,status?:TaskStatus,limit=100,cursor?:number) {
-  const where:string[]=[];const args:(string|number)[]=[];
-  if(recordId){where.push('t.record_id=?');args.push(recordId);}
-  if(status){where.push('t.status=?');args.push(status);}
-  const size=bounded(limit,200),offset=Math.max(0,Math.floor(cursor??0));
-  const rows=await env.DB.prepare('SELECT t.* FROM tasks t JOIN records r ON r.id=t.record_id WHERE r.status != \'archived\' '+(where.length?'AND '+where.join(' AND '):'')+' ORDER BY t.updated_at DESC,t.id LIMIT ? OFFSET ?')
-    .bind(...args,size+1,offset).all();
-  return cursor===undefined?rows.results.slice(0,size):{tasks:rows.results.slice(0,size),nextCursor:rows.results.length>size?offset+size:null};
-
-}
-export async function context(env:Env,folderId:string|null=null,limit=25) {
-  const info=folderId?await env.DB.prepare('SELECT id,parent_id,name,description FROM folders WHERE id=?').bind(folderId).first():null;
-  if(folderId&&!info)throw new StorageError('FOLDER_NOT_FOUND');
-  const list=await env.DB.prepare('SELECT r.id,r.name,r.kind,r.status,r.description,r.updated_at,c.revision FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND r.status != \'archived\' ORDER BY r.updated_at DESC LIMIT ?')
-    .bind(folderId,bounded(limit,80)).all();
-  const ids=list.results.map(r=>String(r.id));
-  const todo=ids.length?await env.DB.prepare('SELECT id,record_id,title,status,priority FROM tasks WHERE record_id IN ('+ids.map(()=>'?').join(',')+') AND status NOT IN (\'done\',\'cancelled\') ORDER BY priority DESC LIMIT 60').bind(...ids).all():{results:[]};
-  return {folder:info,records:list.results,openTasks:todo.results};
-}
-export async function changesSince(env:Env,cursor=0,limit=50) {
+type TaskCursor={recordId?:string;status?:TaskStatus;updatedAt:string;id:string};
+export async function getTasks(env:Env,recordId?:string,status?:TaskStatus,limit=100,cursor?:string){
   const size=bounded(limit,200);
-  const res=await env.DB.prepare('SELECT * FROM change_events WHERE seq>? ORDER BY seq LIMIT ?').bind(cursor,size+1).all();
-  const rows=res.results as Array<{seq:number;record_id:string|null;event_type:string;entity_type?:string;entity_id?:string;details_json?:string}>;
-  return {events:rows.slice(0,size).map(({details_json,...row})=>({...row,entityType:row.entity_type??(row.record_id?'record':null),entityId:row.entity_id??row.record_id,details:details_json?JSON.parse(details_json):null})),nextCursor:rows[Math.min(rows.length,size)-1]?.seq??cursor,hasMore:rows.length>size};
+  let next:TaskCursor|undefined;
+  if(cursor){
+    try{
+      next=JSON.parse(cursor) as TaskCursor;
+      if(next.recordId!==recordId||next.status!==status||typeof next.updatedAt!=='string'||typeof next.id!=='string')throw Error();
+    }catch{throw new StorageError('INVALID_CURSOR');}
+  }
+  const clauses=["r.status!='archived'"];
+  const bind:(string|number)[]=[];
+  if(recordId){clauses.push('t.record_id=?');bind.push(recordId);}
+  if(status){clauses.push('t.status=?');bind.push(status);}
+  if(next){clauses.push('(t.updated_at<? OR (t.updated_at=? AND t.id>?))');bind.push(next.updatedAt,next.updatedAt,next.id);}
+  const rows=(await env.DB.prepare('SELECT t.id,t.record_id AS recordId,t.title,t.details,t.status,t.priority,t.position,t.updated_at AS updatedAt FROM tasks t JOIN records r ON r.id=t.record_id WHERE '+clauses.join(' AND ')+' ORDER BY t.updated_at DESC,t.id LIMIT ?')
+    .bind(...bind,size+1).all()).results as Array<Record<string,unknown>>;
+  const items=rows.slice(0,size);
+  const hasMore=rows.length>size;
+  const last=items.at(-1);
+  return {items,page:{hasMore,nextCursor:hasMore?JSON.stringify({recordId,status,updatedAt:last?.updatedAt,id:last?.id}):null}};
 }
-
+export async function changesSince(env:Env,cursor=0,limit=50){
+  const size=bounded(limit,200);
+  const result=await env.DB.prepare('SELECT * FROM change_events WHERE seq>? ORDER BY seq LIMIT ?').bind(cursor,size+1).all();
+  const rows=result.results as Array<{seq:number;record_id:string|null;event_type:string;entity_type?:string;entity_id?:string;details_json?:string}>;
+  const items=rows.slice(0,size).map(({details_json,record_id,event_type,entity_type,entity_id,...rest})=>({
+    ...rest,entityType:entity_type??(record_id?'record':null),entityId:entity_id??record_id,
+    operation:event_type,details:details_json?JSON.parse(details_json):null
+  }));
+  const hasMore=rows.length>size;
+  return {items,page:{hasMore,nextCursor:items.at(-1)?.seq??cursor}};
+}
 export async function manageFolder(env:Env,id:string,changes:{
   name?:string;parentId?:string|null;description?:string;expectedMetadataRevision?:number
 },actor='agent'){

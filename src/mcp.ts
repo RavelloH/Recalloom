@@ -55,12 +55,15 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
         return {content:[{type:'text' as const,text:JSON.stringify(value)}],structuredContent:{result:value} as any};
       }catch(error) {
         const message=error instanceof Error?error.message:String(error);
-        const code=error instanceof StorageError?error.code:/PATH_CONFLICT|UNIQUE constraint failed: (?:records|folders)\./.test(message)?'PATH_CONFLICT':'OPERATION_FAILED';
-        return {content:[{type:'text' as const,text:JSON.stringify({code,message})}],structuredContent:{code,message},isError:true};
+        const code=error instanceof StorageError?error.code:error instanceof z.ZodError?'INVALID_ARGUMENT':/PATH_CONFLICT|UNIQUE constraint failed: (?:records|folders)\./.test(message)?'PATH_CONFLICT':/FOREIGN KEY constraint failed/.test(message)?'REFERENTIAL_CONFLICT':'OPERATION_FAILED';
+        const retryable=['VERSION_CONFLICT','METADATA_CONFLICT','SNAPSHOT_CHANGED'].includes(code);
+        const details=error instanceof z.ZodError?error.issues.map(issue=>({path:issue.path.join('.'),message:issue.message})):undefined;
+        const body={code,message,retryable,...(details?{details}:{})};
+        return {content:[{type:'text' as const,text:JSON.stringify(body)}],structuredContent:body,isError:true};
       }
     });
   };
-  register('browse','List child folders and records with stable IDs, latest revision, status and descriptions. Start here when the target folder is known.',z.object({folderId:uuid.nullable().optional(),limit,cursor:z.number().int().nonnegative().optional()}),false,
+  register('browse','List child folders and records with stable IDs, latest revision, status and descriptions. Start here when the target folder is known.',z.object({folderId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}),false,
     (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
   register('resolve_path','Resolve a human-readable absolute virtual path to a stable folder or record ID.',z.object({path:z.string().startsWith('/').max(2048)}),false,
     (x)=>store.resolvePath(env,x.path));
@@ -84,27 +87,23 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   register('tag_record','Add or remove a free-form tag from a record.',z.object({id:uuid,tag:z.string().min(1).max(64),action:z.enum(['add','remove'])}),true,
     (x)=>store.tagRecord(env,x.id,x.tag,x.action,actor));
   register('list_tasks','List current structured tasks, optionally filter by task-list record and task status.',z.object({
-    recordId:uuid.optional(),status:taskStatuses.optional(),limit,cursor:z.number().int().nonnegative().optional()
+    recordId:uuid.optional(),status:taskStatuses.optional(),limit,cursor:z.string().max(4096).optional()
   }),false,(x)=>store.getTasks(env,x.recordId,x.status,x.limit,x.cursor));
   register('mutate_task','Atomically add, update or remove tasks in a task_list with expectedRevision and version history.',z.object({
     action:z.enum(['add','update','remove']),recordId:uuid,taskId:uuid.optional(),
     expectedRevision:z.number().int().positive(),changes:taskFields.optional()
   }),true,(x)=>store.taskOperation(env,x.recordId,x.expectedRevision,x.action,x.taskId,x.changes??{},actor));
-  register('version_history','List immutable audit metadata for recent revisions of a record; pass beforeRevision=0 to begin paginated mode.',z.object({id:uuid,limit,beforeRevision:z.number().int().nonnegative().optional()}),false,
-    (x)=>store.listVersions(env,x.id,x.limit,x.beforeRevision));
+  register('version_history','Read revision audit entries via keyset pagination.',z.object({id:uuid,limit,cursor:z.number().int().positive().optional()}),false,
+    (x)=>store.listVersions(env,x.id,x.limit,x.cursor));
   register('restore_record','Append a new revision containing an older version. Supports documents, checkpoints, and task lists with atomic TODO projection restoration.',z.object({id:uuid,targetRevision:z.number().int().positive(),expectedRevision:z.number().int().positive()}),true,
     (x)=>store.restoreRecord(env,x.id,x.targetRevision,x.expectedRevision,actor));
-  register('context','Return concise record metadata and open tasks in a folder, for cross-session context restoration.',z.object({folderId:uuid.nullable().optional(),limit}),false,
-    (x)=>store.context(env,x.folderId??null,x.limit));
   register('changes','Get incremental record changes after an integer cursor.',z.object({cursor:z.number().int().nonnegative().optional(),limit}),false,
     (x)=>store.changesSince(env,x.cursor,x.limit));
   register('search','Search by metadata, literal text, semantic Vectorize, or fused hybrid ranking. Semantic results default to minScore=0.43 (adjustable 0-1); index may lag.',z.object({
     query:z.string().min(1).max(4000),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).optional(),
     folderId:uuid.optional(),tag:z.string().max(64).optional(),status:statuses.optional(),limit:z.number().int().min(1).max(30).optional(),
     minScore:z.number().min(0).max(1).optional()
-  }),false,(x)=>search(env,x));
-  register('index_status','Check pending indexing jobs and failures without modifying the library.',z.object({}),false,
-    async()=>env.DB.prepare('SELECT state,COUNT(*) AS count FROM index_jobs GROUP BY state').all().then(x=>x.results));
+  }),false,async (x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};});
   register('index_diagnostics','Summarize index queue, stale running leases and recently failed jobs for operational recovery.',z.object({}),false,
     async()=>{const [counts,failures]=await Promise.all([
       env.DB.prepare("SELECT state,COUNT(*) AS count, SUM(CASE WHEN state='running' AND (started_at IS NULL OR started_at<?) THEN 1 ELSE 0 END) AS stale FROM index_jobs GROUP BY state")
@@ -114,30 +113,27 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   register('index_pending','Process up to 10 pending semantic indexing jobs immediately. Normally the Cron scheduler handles them.',z.object({limit:z.number().int().min(1).max(10).optional()}),true,
     (x)=>processIndexJobs(env,x.limit??3));
   register('read_many','Read multiple records with a shared response character budget. Returns per-record errors without dropping other reads.',
-    z.object({ids:z.array(uuid).min(1).max(12),maxChars:z.number().int().min(1000).max(60000).optional()}),false,
-    (x)=>agent.readMany(env,x.ids,x.maxChars));
+    z.object({items:z.array(z.object({id:uuid,revision:z.number().int().positive().optional(),offsetChars:z.number().int().nonnegative().optional()})).min(1).max(12),maxChars:z.number().int().min(1000).max(60000).optional()}),false,
+    (x)=>agent.readMany(env,x.items,x.maxChars));
   register('diff_revisions','Compare two immutable text-version revisions and return a bounded unified diff.',
     z.object({id:uuid,fromRevision:z.number().int().positive(),toRevision:z.number().int().positive()}),false,
     (x)=>agent.diffRevisions(env,x.id,x.fromRevision,x.toRevision));
   register('list_tags','List known tags and how many records use each tag.',
-    z.object({limit:z.number().int().min(1).max(200).optional()}),false,
-    (x)=>agent.listTags(env,x.limit));
+    z.object({limit:z.number().int().min(1).max(200).optional(),cursor:z.string().max(4096).optional()}),false,
+    (x)=>agent.listTags(env,x.limit,x.cursor));
   register('list_links','Read existing incoming and outgoing links for a record without modifying data.',
-    z.object({id:uuid}),false,(x)=>agent.links(env,x.id,'list'));
+    z.object({id:uuid,cursor:z.string().max(4096).optional()}),false,(x)=>agent.links(env,x.id,'list',undefined,undefined,actor,x.cursor));
   register('manage_link','Add or remove a directed link between records with stable IDs.',
     z.object({id:uuid,action:z.enum(['add','remove']),targetId:uuid,relation:z.string().min(1).max(64).optional()}),true,
     (x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor));
-  register('record_links','List, add or remove directed links between records.',
-    z.object({id:uuid,action:z.enum(['list','add','remove']).optional(),targetId:uuid.optional(),relation:z.string().min(1).max(64).optional()}),true,
-    (x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor));
   register('project_context','Restore project context recursively with bounded content snippets and outstanding tasks.',
-    z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).optional(),budget:z.number().int().min(1000).max(30000).optional()}),false,
-    (x)=>agent.projectContext(env,x.folderId??null,x.depth,x.budget));
+    z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).optional(),budget:z.number().int().min(1000).max(30000).optional(),cursor:z.string().max(4096).optional()}),false,
+    (x)=>agent.projectContext(env,x.folderId??null,x.depth,x.budget,x.cursor));
   register('export_snapshot','Read a paged, version-preserving backup in recalloom-snapshot-v1 format, including archived records, folder hierarchy, links, tags and text-version history.',
-    z.object({cursor:z.number().int().nonnegative().optional(),limit:z.number().int().min(1).max(5).optional()}),false,
-    (x)=>agent.exportSnapshot(env,x.cursor,x.limit));
+    z.object({cursor:z.string().nullable().optional(),limit:z.number().int().min(1).max(5).optional()}),false,
+    (x)=>agent.exportSnapshot(env,x.cursor??null,x.limit));
   register('import_snapshot','Validate or import a version-preserving snapshot page. Dry-run is the safe default; existing records are never overwritten.',
-    z.object({snapshot:z.unknown(),dryRun:z.boolean().optional()}),true,
-    (x)=>agent.importSnapshot(env,x.snapshot,x.dryRun??true));
+    z.object({bundle:z.unknown(),dryRun:z.boolean().optional()}),true,
+    (x)=>agent.importSnapshot(env,x.bundle,x.dryRun??true,actor));
   return mcp;
 }

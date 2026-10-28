@@ -12,10 +12,10 @@ Recalloom 是一个基于 Cloudflare 的开源自部署 MCP 文本库，帮助 A
 - **严格编辑与恢复**：全文、追加、精确替换、批量替换、Unified Diff、按行修改；支持 `expectedRevision`、`dryRun`、版本差异查看；TODO 历史恢复同步重建任务投影。
 - **Agent 协作**：元数据独立修订号与冲突保护、结构化变更事件、批量读取、递归项目上下文、标签索引和记录关联。
 - **Vectorize + Workers AI**：异步构建当前正文语义索引；正文与标签仍以 D1 为准。索引任务有租约和超时重试，避免 Worker 中断后永久滞留。
-- **备份与还原**：分页 `export_snapshot` 输出包含历史差分与审计信息的 JSON；`import_snapshot` 默认 `dryRun`，不会覆盖已有 ID。
+- **备份与还原**：`recalloom-snapshot-v2` 分页导出有变更水位和每页 SHA-256，写入期间发生修改会中止备份；`import_snapshot` 必须收到所有页面，完整预检后在单个 D1 事务中恢复，默认 `dryRun`，不会覆盖已有 ID。
 - **Workers KV**：仅存放 OAuth 状态。无需 R2 或 Durable Objects。
 
-MCP 工具包括基础目录/文档管理、任务、标签、版本、语义搜索与索引状态；扩展工具提供 `read_many`、`diff_revisions`、`list_tags`、`list_links`、`manage_link`、`project_context`、`export_snapshot`、`import_snapshot` 和 `index_diagnostics`。
+MCP 提供 25 个工具，涵盖目录/记录 CRUD、TODO、标签、历史差异、语义搜索、索引诊断及恢复；只读关联使用 `list_links`，修改关联使用 `manage_link`，项目上下文统一由 `project_context` 提供。原有重叠入口已经直接删除，不承诺旧工具列表兼容。
 
 ## 本地开发
 
@@ -33,7 +33,7 @@ pnpm dev
 
 OAuth 使用 DCR，而不依赖客户端 ID 元数据文档（CIMD）下载；部分客户端的元数据服务器可能拒绝 Worker 出站请求（HTTP 403）。如果从旧的 CIMD 配置升级，请在 MCP 客户端中删除原连接后重新建立，以便自动执行 DCR 注册。
 
-Vectorize/Workers AI 需要远程资源才能进行真实语义检索；纯文本、D1、版本及 TODO 相关功能可以在本地测试。升级 MCP 工具后，客户端可能需要刷新或重新连接才能发现新工具和参数。
+Vectorize/Workers AI 需要远程资源才能进行真实语义检索；纯文本、D1、版本及 TODO 相关功能可以在本地测试。
 
 ## Cloudflare 部署和 GitHub 自动构建
 
@@ -97,11 +97,14 @@ pnpm deploy
 - 每个记录使用稳定 ID；移动和重命名不会改变记录身份。
 - 普通文本和结构化任务在同一次 D1 事务中提交当前状态与新修订；过期版本编辑会拒绝写入。
 - `manage_record` 和 `manage_folder` 可以携带 `expectedMetadataRevision`，以独立于正文的元数据修订号进行 CAS；无变化的操作不会产生额外事件。
-- 浏览、TODO 与版本历史支持分页；递归项目上下文可控制深度和字符预算。
+- `browse`、`list_tasks`、`list_tags`、`list_links`、`version_history`、`changes` 统一使用 `items` 和 `page` 返回；目录、TODO 与项目上下文使用 Keyset 游标。`read_many` 返回结构化正文片段、UTF-16 字符偏移和继续读取位置，而不是截断 JSON。
+- `project_context` 通过两组批量 SQL 加载记录与未完成任务，两者共享字符预算并支持继续翻页。
 - `record_contents` 保存当前全文，`record_histories` 保存差分数据，`revisions` 保存审计元数据。
 - 语义索引异步更新，可能短暂落后；搜索返回的向量命中会经过 D1 版本验证。
 - 本服务默认面向单一所有者，所有获授权的客户端访问同一个知识库。务必保护授权密钥，并定期备份 D1。
-- `export_snapshot` 需要沿 `nextCursor` 收集所有页面；恢复时先导入含文件夹的首页，再导入后续记录与关联。每页导入前建议使用 `dryRun` 检查；多个页面不构成跨请求原子事务，应在写入停止期间执行备份/恢复。
+- `export_snapshot` 首次不传 `cursor`，然后使用 `nextCursor` 读取所有页面；每一页包含 `pageHash`，同一份备份共用 `watermark`。发生 `SNAPSHOT_CHANGED` 必须丢弃整组页面重新导出。
+- `import_snapshot` 只接受 `{ "pages": [ ...所有导出页面 ] }`，先验证页序、哈希、修订 SHA、文件夹树、路径名称、关联和任务投影，再用单次事务导入并写入变更事件。默认 `dryRun=true`，不会覆盖已有记录 ID。
+- 当前原子恢复上限为 700 条 D1 SQL 语句且要求将全部页面作为一次工具调用传入。更大的知识库应配合 Cloudflare D1 官方备份恢复能力；此接口不应被当作任意规模数据库备份的替代品。
 - 数据备份包含历史内容和元数据，可能含敏感信息；请加密保存，不要上传到公开仓库。
 
 ## 运行注意事项
