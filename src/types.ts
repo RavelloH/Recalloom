@@ -21,6 +21,7 @@ export interface StoredRecord {
   description: string;
   created_at: string;
   updated_at: string;
+  metadata_revision: number;
   content: string;
   history_metadata: string;
   revision: number;

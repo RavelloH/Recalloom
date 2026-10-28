@@ -17,7 +17,11 @@ async function embed(env:Env,texts:string[]):Promise<number[][]> {
 }
 type IndexedRow={id:string;record_id:string;revision:number;name:string;status:string;content:string};
 export async function processIndexJobs(env:Env,limit=3) {
-  const jobs=(await env.DB.prepare('SELECT id,record_id,revision,attempts FROM index_jobs WHERE state IN (\'pending\',\'failed\') AND attempts<5 ORDER BY created_at LIMIT ?').bind(Math.min(10,Math.max(1,limit))).all()).results as Array<{id:string;record_id:string;revision:number;attempts:number}>;
+  const expired=new Date(Date.now()-5*60*1000).toISOString();
+  await env.DB.prepare("UPDATE index_jobs SET state='failed',started_at=NULL,last_error='Lease expired after maximum retries' WHERE state='running' AND attempts>=5 AND (started_at IS NULL OR started_at<?)")
+    .bind(expired).run();
+  const jobs=(await env.DB.prepare("SELECT id,record_id,revision,attempts FROM index_jobs WHERE attempts<5 AND (state IN ('pending','failed') OR (state='running' AND (started_at IS NULL OR started_at<?))) ORDER BY created_at LIMIT ?")
+    .bind(expired,Math.min(10,Math.max(1,limit))).all()).results as Array<{id:string;record_id:string;revision:number;attempts:number}>;
   const results=[];
   for(const job of jobs) {
     const record=await env.DB.prepare('SELECT r.id,r.name,r.status,c.content,c.revision FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.id=?').bind(job.record_id).first<IndexedRow>();
@@ -26,7 +30,9 @@ export async function processIndexJobs(env:Env,limit=3) {
       results.push({id:job.id,skipped:'stale'});continue;
     }
     try {
-      await env.DB.prepare('UPDATE index_jobs SET state=\'running\',attempts=attempts+1 WHERE id=?').bind(job.id).run();
+      const claimed=await env.DB.prepare("UPDATE index_jobs SET state='running',started_at=?,attempts=attempts+1 WHERE id=? AND attempts<5 AND (state IN ('pending','failed') OR (state='running' AND (started_at IS NULL OR started_at<?)))")
+        .bind(new Date().toISOString(),job.id,expired).run();
+      if(!claimed.meta.changes){results.push({id:job.id,skipped:'claimed_elsewhere'});continue;}
       const old=(await env.DB.prepare('SELECT chunk_id FROM search_chunks WHERE record_id=?').bind(job.record_id).all()).results.map(r=>String(r.chunk_id));
       const chunks=record.status==='archived'?[]:splitText(record.name+'\n'+record.content);
       const ids=chunks.map((_,i)=>record.id+':'+i);
@@ -55,7 +61,7 @@ export async function processIndexJobs(env:Env,limit=3) {
       results.push({id:job.id,chunks:chunks.length});
     } catch(error) {
       const message=error instanceof Error?error.message:String(error);
-      await env.DB.prepare('UPDATE index_jobs SET state=\'failed\',last_error=? WHERE id=?').bind(message.slice(0,800),job.id).run();
+      await env.DB.prepare("UPDATE index_jobs SET state='failed',started_at=NULL,last_error=? WHERE id=?").bind(message.slice(0,800),job.id).run();
       results.push({id:job.id,error:message});
     }
   }

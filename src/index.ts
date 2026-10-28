@@ -85,7 +85,7 @@ function provider(env:Env,request:Request){
       fetch(req:Request,e:Env){
         const path=new URL(req.url).pathname;
         if(path==='/authorize')return authorize(req,e);
-        if(path==='/')return Response.json({name:'Recalloom',version:'0.1.0',mcp:origin+'/mcp',status:'development'},{headers:{'cache-control':'no-store'}});
+        if(path==='/')return Response.json({name:'Recalloom',version:'0.1.0',mcp:origin+'/mcp',status:'production'},{headers:{'cache-control':'no-store'}});
         return new Response('Not Found',{status:404});
       }
     },
