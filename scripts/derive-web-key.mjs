@@ -25,7 +25,8 @@ async function readMasterSecret(){
 }
 try{
   const master=await readMasterSecret();
-  if(master.length<32||master==='replace-with-a-random-secret')throw Error('MCP_AUTH_SECRET must be a high-entropy secret with at least 32 characters.');
+  if(!master||master==='replace-with-a-random-secret')throw Error('MCP_AUTH_SECRET is missing or contains the example placeholder.');
+  if(master.length<32)console.error('Warning: the existing OAuth secret is shorter than 32 characters. Consider rotating it to a high-entropy random secret when practical.');
   const webKey=createHmac('sha256',master).update('recalloom:web:v1:login').digest('base64url');
   stdout.write('Derived Web login credential (keep private; enter this in the Web login form):\n'+webKey+'\n');
 }catch(error){

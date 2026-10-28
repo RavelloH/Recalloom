@@ -10,7 +10,9 @@ const unb64=(s:string)=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/
 export const sha=async(data:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',utf8.encode(data)))).map(b=>b.toString(16).padStart(2,'0')).join('');
 // Every Web key is purpose-separated from the existing OAuth master secret.
 // Rotating MCP_AUTH_SECRET invalidates sessions, signed proofs and login credentials.
-const secretOk=(env:Env)=>typeof env.MCP_AUTH_SECRET==='string' && env.MCP_AUTH_SECRET.length>=32 && env.MCP_AUTH_SECRET!=='replace-with-a-random-secret';
+// Do not impose a new length gate on an already-configured OAuth secret.
+// HMAC works with any nonempty key; operators should still use a high-entropy master.
+const secretOk=(env:Env)=>typeof env.MCP_AUTH_SECRET==='string' && env.MCP_AUTH_SECRET.length>0 && env.MCP_AUTH_SECRET!=='replace-with-a-random-secret';
 const sessionHash=(env:Env,token:string)=>webHmacHex(env.MCP_AUTH_SECRET,'session',token);
 async function key(env:Env){return webCryptoKey(env.MCP_AUTH_SECRET,'proof');}
 async function capSecret(env:Env){return bytesToHex(await deriveWebKey(env.MCP_AUTH_SECRET,'cap'));}

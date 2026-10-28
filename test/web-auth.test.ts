@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {checkOrigin,cookie,WEB_COOKIE,session} from '../src/web-auth.js';
+import {capChallenge,checkOrigin,cookie,WEB_COOKIE,session} from '../src/web-auth.js';
 import {deriveWebKey,webHmacHex,webLoginCredential} from '../src/web-keys.js';
 import {createHmac} from 'node:crypto';
 import type {Env} from '../src/types.js';
@@ -58,4 +58,15 @@ test('Web login credential matches HMAC and is distinct from OAuth master and si
   assert.notDeepEqual(await deriveWebKey(master,'login'),await deriveWebKey(master,'cap'));
   assert.notDeepEqual(await deriveWebKey(master,'session'),await deriveWebKey(master,'proof'));
   assert.notEqual(await webLoginCredential(master+'rotated'),login);
+});
+
+test('existing OAuth master keys shorter than 32 chars can still enable Web Cap without an extra Secret',async()=>{
+  const base='https://recalloom.example.test';
+  const req=new Request(base+'/api/auth/cap/challenge',{method:'POST',headers:{origin:base}});
+  const db={prepare:()=>({bind:()=>({first:async()=>({attempts:1})})})};
+  const env={MCP_AUTH_SECRET:'existing-legacy-secret',DB:db} as unknown as Env;
+  const response=await capChallenge(req,env);
+  assert.equal(response.status,200);
+  const body=await response.json() as {token?:string};
+  assert.equal(typeof body.token,'string');
 });

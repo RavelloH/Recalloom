@@ -4,7 +4,7 @@
 
 ## 初始化
 
-Web 后端复用 Cloudflare Worker 现有的高熵运行时 Secret `MCP_AUTH_SECRET`（至少 32 字符），**不再需要 `WEB_ADMIN_SECRET`**。在本地运行 `pnpm web:key`，通过隐藏输入提供主密钥，生成一个专门用于 Web 登录的 HMAC 派生口令。**不要把 OAuth 主密钥直接输入浏览器**，也不要把派生口令提交到 GitHub、构建变量或前端代码。
+Web 后端复用 Cloudflare Worker 现有的高熵运行时 Secret `MCP_AUTH_SECRET`（推荐至少 32 字符的高熵随机值；不强迫已有 OAuth 实例更换密钥），**不再需要 `WEB_ADMIN_SECRET`**。在本地运行 `pnpm web:key`，通过隐藏输入提供主密钥，生成一个专门用于 Web 登录的 HMAC 派生口令。**不要把 OAuth 主密钥直接输入浏览器**，也不要把派生口令提交到 GitHub、构建变量或前端代码。
 
 密钥派生采用 `HMAC-SHA256(master=MCP_AUTH_SECRET, message='recalloom:web:v1:'+purpose)`，用途包括 `login`、`cap`、`proof`、`session`、`rate` 和 `nonce`。不同用途的子密钥相互独立；提供给浏览器的只有 `login` 的 base64url 派生值，其他密钥只在 Worker 内部使用。主密钥轮换会使所有派生凭据和 Session 失效。
 
