@@ -82,6 +82,11 @@ webApi.get('/folders',async(c)=>{
   const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}));
   return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor));
 });
+webApi.get('/folders/:id',async(c)=>{
+  const id=idSchema.parse(c.req.param()).id;
+  const item=await c.env.DB.prepare('SELECT id,parent_id AS parentId,name,description,metadata_revision AS metadataRevision,updated_at AS updatedAt FROM folders WHERE id=?').bind(id).first();
+  return item?asJson(item):err('FOLDER_NOT_FOUND',404);
+});
 webApi.post('/folders',async(c)=>{
   const v=await body(z.object({name:z.string().trim().min(1).max(180),parentId:uuid.nullable().optional(),description:z.string().max(5000).optional()}).strict())(c.req.raw);
   return asJson(await store.createFolder(c.env,v.name,v.parentId??null,v.description,actor(c.get('webSession'))),201);

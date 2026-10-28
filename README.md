@@ -14,7 +14,7 @@ Recalloom 是一个可自部署的版本化知识库，通过 MCP 连接 ChatGPT
 - **备份与恢复**：提供知识库快照导出和恢复前检查，便于迁移与备份。
 - **安全连接**：使用 OAuth 授权 MCP 客户端，可分别授予读取与写入权限。
 
-Recalloom 也提供受保护的 Web 管理 API，可访问同一份记录与任务。**目前尚无可视化网页控制台**，日常管理主要通过 MCP 客户端完成。
+**Web 管理控制台**：可通过浏览器登录、浏览目录、编辑 Markdown 与结构化任务、查看版本历史和活动、搜索知识库及管理会话。提供亮色/暗色模式、移动端布局，以及 Tiptap 可视化编辑与 Markdown 源码编辑。与 MCP 客户端共享相同的内容和版本历史。
 
 ## 部署到 Cloudflare
 
@@ -92,7 +92,7 @@ pnpm db:local
 pnpm dev
 ```
 
-本地 MCP 地址为 `http://localhost:8787/mcp`。运行 `pnpm check` 和 `pnpm test` 验证更改。
+本地 MCP 地址为 `http://localhost:8787/mcp`。如需开发网页，在另一个终端运行 `pnpm dev:web`，打开 `http://localhost:5173`；它会将 API 请求代理到本地 Worker。运行 `pnpm check`、`pnpm test` 和 `pnpm build:web` 验证更改。
 
 如果要从本地手动部署，请先通过环境变量配置 `RECALLOOM_KV_ID` 和 `RECALLOOM_D1_ID`，再运行 `pnpm deploy`。部署脚本会执行所需的 D1 迁移。不要提交 `.dev.vars` 或本地生成的部署配置。
 
@@ -102,7 +102,7 @@ pnpm dev
 - 修改会保留版本历史；如果记录已被其他客户端更新，旧版本上的编辑会被拒绝。
 - 语义搜索索引异步更新，因此刚保存的记录可能需要稍后才能通过语义搜索找到；精确查找可使用关键词或路径。
 - 备份可能包含全部历史内容和敏感数据，请安全存储。快照恢复默认先检查数据；大型数据库仍建议配合 Cloudflare D1 的备份机制。
-- Web 管理 API 需要 Cap.js 验证和与 OAuth 相同的密钥登录，成功后使用可撤销的浏览器会话。**目前不提供独立的 Web 登录界面。**
+- Web 控制台入口为 `https://<你的 Worker 域名>/login`，使用与 MCP OAuth 授权相同的 `MCP_AUTH_SECRET` 登录。先完成 Cap.js 验证，成功后使用可撤销的浏览器会话，后续操作无需重复输入密钥。
 
 ## License
 

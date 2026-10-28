@@ -32,8 +32,9 @@ async function proof(){
 }
 async function main(){
   const root=await api('/');
-  assertStatus(root,200,'MCP root');
-  assert.equal(root.data.name,'Recalloom');
+  assertStatus(root,200,'Worker root');
+  if(typeof root.data==='string')assert.match(root.data,/Recalloom/,'SPA shell delivered');
+  else assert.equal(root.data.name,'Recalloom');
   const unauth=await api('/api/folders');
   assertStatus(unauth,401,'unauthenticated request denied');
   const noOrigin=await api('/api/auth/cap/challenge',{method:'POST',headers:{origin:''}});
@@ -80,6 +81,9 @@ async function main(){
   const folder=await post('/api/folders',{name:'api-e2e-'+crypto.randomUUID(),description:'Web API test folder'});
   assertStatus(folder,201,'create folder');
   const folderId=folder.data.id;
+  const folderInfo=await api('/api/folders/'+folderId);
+  assertStatus(folderInfo,200,'folder details');
+  assert.equal(folderInfo.data.id,folderId);
   const list=await api('/api/folders?parentId='+folderId);
   assertStatus(list,200,'browse');
   const record=await post('/api/records',{name:'checkpoint.md',kind:'checkpoint',folderId,content:'# Web checkpoint\nInitial state'});

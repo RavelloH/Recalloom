@@ -15,3 +15,5 @@ wrangler.deploy.jsonc
 /bench/
 /tmp/
 /docs/_local/
+/web/.tanstack/
+/web/public/cap-wasm/

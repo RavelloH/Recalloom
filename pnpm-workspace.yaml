@@ -1,4 +1,5 @@
 allowBuilds:
+  '@astryxdesign/core': true
   esbuild: true
   workerd: true
 minimumReleaseAgeExclude:

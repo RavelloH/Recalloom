@@ -88,7 +88,7 @@ function provider(env:Env,request:Request){
         const path=new URL(req.url).pathname;
         if(path.startsWith('/api/'))return webApi.fetch(req,e);
         if(path==='/authorize')return authorize(req,e);
-        if(path==='/')return Response.json({name:'Recalloom',version:'0.1.0',mcp:origin+'/mcp',status:'production'},{headers:{'cache-control':'no-store'}});
+        if(path==='/health'||path==='/')return Response.json({name:'Recalloom',version:'0.1.0',mcp:origin+'/mcp',status:'production'},{headers:{'cache-control':'no-store'}});
         return new Response('Not Found',{status:404});
       }
     },
