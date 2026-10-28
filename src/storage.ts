@@ -57,8 +57,10 @@ export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:
         .bind(folderId,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
   ]);
   const folders=folderRows.results.slice(0,size) as Array<Record<string,unknown>>;
-  const records=recordRows.results.slice(0,size) as Array<Record<string,unknown>>;
-  const folderDone=state.folderDone||folderRows.results.length<=size,recordDone=state.recordDone||recordRows.results.length<=size;
+  const recordAllowance=Math.max(0,size-folders.length);
+  const records=recordRows.results.slice(0,recordAllowance) as Array<Record<string,unknown>>;
+  const folderDone=state.folderDone||folderRows.results.length<=size;
+  const recordDone=state.recordDone||recordRows.results.length===0||(recordAllowance>0&&recordRows.results.length<=recordAllowance);
   const next:BrowseCursor={folderId,folderDone,recordDone,
     lastFolder:folders.length?{name:String(folders.at(-1)?.name),id:String(folders.at(-1)?.id)}:state.lastFolder,
     lastRecord:records.length?{updatedAt:String(records.at(-1)?.updatedAt),id:String(records.at(-1)?.id)}:state.lastRecord};
@@ -291,8 +293,8 @@ export async function getTasks(env:Env,recordId?:string,status?:TaskStatus,limit
 }
 export async function changesSince(env:Env,cursor=0,limit=50){
   const size=bounded(limit,200);
-  const result=await env.DB.prepare('SELECT * FROM change_events WHERE seq>? ORDER BY seq LIMIT ?').bind(cursor,size+1).all();
-  const rows=result.results as Array<{seq:number;record_id:string|null;event_type:string;entity_type?:string;entity_id?:string;details_json?:string}>;
+  const result=await env.DB.prepare('SELECT seq,revision,actor,created_at AS createdAt,record_id,event_type,entity_type,entity_id,details_json FROM change_events WHERE seq>? ORDER BY seq LIMIT ?').bind(cursor,size+1).all();
+  const rows=result.results as Array<{seq:number;revision:number|null;actor:string;createdAt:string;record_id:string|null;event_type:string;entity_type?:string;entity_id?:string;details_json?:string}>;
   const items=rows.slice(0,size).map(({details_json,record_id,event_type,entity_type,entity_id,...rest})=>({
     ...rest,entityType:entity_type??(record_id?'record':null),entityId:entity_id??record_id,
     operation:event_type,details:details_json?JSON.parse(details_json):null

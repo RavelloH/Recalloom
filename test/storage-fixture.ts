@@ -57,12 +57,12 @@ export default {
       const context=await agent.projectContext(env,folder.id);
       check(context.records.length===2,'context metadata');
       const events=await store.changesSince(env,0);
-      check(events.items.length>=7,'change cursor');
+      check(events.items.length>=7&&typeof events.items[0]?.createdAt==='string','change cursor and camelCase timestamp');
       const path=await store.resolvePath(env,'/'+folder.name+'/empty.md');
       check(path.kind==='record'&&path.id===rec.id,'resolve stable virtual path');
       const sub=await store.createFolder(env,'Subfolder',folder.id);
       const page=await store.browse(env,folder.id,1);
-      check(page.page.hasMore&&typeof page.page.nextCursor==='string','browse cursor pagination');
+      check(page.items.length<=1&&page.page.hasMore&&typeof page.page.nextCursor==='string','browse cursor pagination with strict overall limit');
       const next=await store.browse(env,folder.id,1,page.page.nextCursor);
       check(next.items.length>=1,'browse second page');
       const movedFolder=await store.manageFolder(env,sub.id,{name:'Renamed',expectedMetadataRevision:1});
