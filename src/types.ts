@@ -9,7 +9,7 @@ export interface Env {
   MCP_AUTH_SECRET: string;
   MCP_BASE_URL?: string;
 }
-export type RecordKind = 'document' | 'task_list' | 'checkpoint';
+export type RecordKind = 'document' | 'task_list';
 export type RecordStatus = 'draft' | 'active' | 'completed' | 'superseded' | 'archived';
 export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
 export interface StoredRecord {

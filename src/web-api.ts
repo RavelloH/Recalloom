@@ -14,7 +14,7 @@ const uuid=z.string().uuid();
 const limit=z.coerce.number().int().min(1).max(200).optional();
 const status=z.enum(['draft','active','completed','superseded','archived']);
 const taskStatus=z.enum(['todo','in_progress','blocked','done','cancelled']);
-const recordKind=z.enum(['document','task_list','checkpoint']);
+const recordKind=z.enum(['document','task_list']);
 const idSchema=z.object({id:uuid});
 const noStore={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'};
 const err=(code:string,status:400|401|403|404|405|409|413|429|500|503=400,message?:string)=>Response.json({code,...(message?{message}:{})},{status,headers:noStore});
@@ -102,7 +102,7 @@ webApi.get('/paths',async(c)=>{
   return asJson(await store.resolvePath(c.env,q.path));
 });
 webApi.post('/records',async(c)=>{
-  const v=await body(z.object({folderId:uuid.nullable().optional(),name:z.string().trim().min(1).max(180),kind:recordKind.optional(),description:z.string().max(5000).optional(),content:z.string().max(500000).optional()}).strict())(c.req.raw);
+  const v=await body(z.object({folderId:uuid.nullable().optional(),name:z.string().trim().min(1).max(180),kind:recordKind.optional(),description:z.string().max(5000).optional(),content:z.string().max(500000).optional(),tags:z.array(z.string().min(1).max(64)).max(32).optional()}).strict())(c.req.raw);
   return asJson(await store.createRecord(c.env,v,actor(c.get('webSession'))),201);
 });
 webApi.get('/records/:id',async(c)=>{
@@ -124,6 +124,11 @@ webApi.post('/records/:id/tags',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
   const v=await body(z.object({tag:z.string().trim().min(1).max(64),action:z.enum(['add','remove'])}).strict())(c.req.raw);
   return asJson(await store.tagRecord(c.env,id,v.tag,v.action,actor(c.get('webSession'))));
+});
+webApi.get('/records/:id/outline',async(c)=>{
+  const id=idSchema.parse(c.req.param()).id;
+  const q=parseQuery(c.req.url,z.object({revision:z.coerce.number().int().positive().optional(),limit:z.coerce.number().int().min(1).max(200).optional(),cursor:z.coerce.number().int().nonnegative().optional()}));
+  return asJson(await agent.getOutline(c.env,id,q.revision,q.limit,q.cursor));
 });
 webApi.get('/records/:id/versions',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
@@ -174,9 +179,9 @@ webApi.get('/tags',async(c)=>{
   const q=parseQuery(c.req.url,z.object({cursor:z.string().max(4096).optional(),limit}));
   return asJson(await agent.listTags(c.env,q.limit,q.cursor));
 });
-webApi.get('/context',async(c)=>{
+webApi.get('/overview',async(c)=>{
   const q=parseQuery(c.req.url,z.object({folderId:uuid.optional(),depth:z.coerce.number().int().min(0).max(5).optional(),budget:z.coerce.number().int().min(1000).max(30000).optional(),cursor:z.string().max(4096).optional()}));
-  return asJson(await agent.projectContext(c.env,q.folderId??null,q.depth,q.budget,q.cursor));
+  return asJson(await agent.getOverview(c.env,q.folderId??null,q.depth,q.budget,q.cursor));
 });
 webApi.get('/index',async(c)=>{
   const [counts,errors]=await Promise.all([

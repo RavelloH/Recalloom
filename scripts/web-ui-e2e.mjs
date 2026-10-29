@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import {existsSync,mkdirSync} from 'node:fs';
 const url=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
-const secret='recalloom-local-web-test-secret-32-bytes-only';
+const secret=process.env.RECALLOOM_TEST_SECRET||'recalloom-local-web-test-secret-32-bytes-only';
 const browserPath=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(path=>path&&existsSync(path));
 if(!browserPath)throw Error('Install Edge/Chrome or set RECALLOOM_BROWSER_PATH for browser E2E tests.');
 const browser=await chromium.launch({executablePath:browserPath,headless:true,args:['--no-first-run','--disable-extensions']});
@@ -27,6 +27,7 @@ try{
  await page.getByText(folderName,{exact:true}).waitFor();
  await page.getByText(folderName,{exact:true}).click();
  await page.getByRole('heading',{name:'目录内容'}).waitFor();
+ const folderUrl=page.url();
  await page.getByRole('button',{name:'新建记录'}).click();
  await page.getByRole('textbox',{name:'名称'}).fill('First note');
  await page.getByRole('button',{name:'创建',exact:true}).click();
@@ -35,6 +36,12 @@ try{
  await page.locator('.cm-content').fill('# UI e2e\n\nDocument updated from source editor.');
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByText('R2').waitFor({timeout:15000});
+ await page.getByRole('button',{name:'详情'}).click();
+ await page.locator('.outline-item').first().waitFor();
+ assert.ok((await page.locator('.outline-item').first().innerText()).includes('UI e2e'),'outline has Markdown heading');
+ await page.locator('.outline-item').first().click();
+ await page.locator('.cm-content').waitFor();
+ await page.getByRole('button',{name:'详情'}).click();
  await page.getByRole('button',{name:'历史'}).click();
  await page.getByText('Revision 2').first().waitFor();
  await page.getByRole('button',{name:'历史',exact:true}).click();
@@ -102,6 +109,20 @@ try{
  await mobilePage.screenshot({path:'tmp/recalloom-mobile.png',fullPage:true});
  assert.ok(await mobilePage.getByRole('link',{name:'任务'}).first().isVisible());
  await mobile.close();
+ // A checkpoint is now an ordinary document template carrying regular tags.
+ await page.goto(folderUrl);
+ await page.getByRole('button',{name:'新建记录'}).click();
+ await page.getByRole('combobox',{name:'类型'}).selectOption('checkpoint_template');
+ await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
+ await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
+ await page.getByRole('button',{name:'创建',exact:true}).click();
+ await page.getByRole('heading',{name:'Phase summary'}).waitFor();
+ await page.getByRole('button',{name:'详情'}).click();
+ await page.locator('.record-inspector dd').filter({hasText:'checkpoint'}).waitFor();
+ await page.locator('.outline-item').first().waitFor();
+ await page.locator('.outline-item').nth(1).click();
+ await page.locator('.cm-content').waitFor();
+ assert.ok(page.url().includes('mode=source'),'outline navigation switches to source editor');
  assert.equal(faults.length,0,'browser errors: '+faults.join('\n'));
  console.log('PASS browser UI: Cap PoW login, SPA routing, folder/document CRUD, Markdown editor, revision history, desktop+mobile rendering');
 }catch(e){console.error('Browser UI E2E failed',e);console.error('page=',page.url());console.error('errors=',faults.slice(0,12));await page.screenshot({path:'tmp/recalloom-failed.png'}).catch(()=>{});process.exitCode=1;}

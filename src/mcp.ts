@@ -80,7 +80,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     id:uuid,name:z.string().min(1).max(180).optional(),
     parentId:uuid.nullable().optional(),description:z.string().max(5000).optional(),expectedMetadataRevision:expectedMetadataRevision.optional()
   }),true,(x)=>store.manageFolder(env,x.id,x,actor));
-  register('create_record',z.object({name:z.string().min(1).max(180),folderId:uuid.nullable().optional(),kind:z.enum(['document','task_list','checkpoint']).optional(),content:z.string().max(500000).optional(),description:z.string().max(5000).optional()}),true,
+  register('create_record',z.object({name:z.string().min(1).max(180),folderId:uuid.nullable().optional(),kind:z.enum(['document','task_list']).optional(),content:z.string().max(500000).optional(),description:z.string().max(5000).optional(),tags:z.array(z.string().min(1).max(64)).max(32).optional()}),true,
     (x)=>store.createRecord(env,x,actor));
   register('read_record',z.object({id:uuid,revision:z.number().int().positive().optional(),metadataOnly:z.boolean().optional(),lineStart:z.number().int().positive().optional(),maxLines:z.number().int().min(1).max(2000).optional()}),false,
     (x)=>store.readRecord(env,x.id,x));
@@ -133,9 +133,12 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   register('manage_link',
     z.object({id:uuid,action:z.enum(['add','remove']),targetId:uuid,relation:z.string().min(1).max(64).optional()}),true,
     (x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor));
-  register('project_context',
-    z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).describe('Descendant folder depth, 0 = given folder only.').optional(),budget:z.number().int().min(1000).max(30000).describe('Shared character budget for all excerpts and open tasks.').optional(),cursor:pageCursor}),false,
-    (x)=>agent.projectContext(env,x.folderId??null,x.depth,x.budget,x.cursor));
+  register('get_overview',
+    z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).describe('Descendant folder depth, 0 = selected folder only.').optional(),budget:z.number().int().min(1000).max(30000).describe('Shared character budget for record excerpts and open tasks.').optional(),cursor:pageCursor}),false,
+    (x)=>agent.getOverview(env,x.folderId??null,x.depth,x.budget,x.cursor));
+  register('get_outline',
+    z.object({id:uuid,revision:z.number().int().positive().optional(),limit:z.number().int().min(1).max(200).optional(),cursor:z.number().int().nonnegative().describe('Zero-based heading index from page.nextCursor; omit to start.').optional()}),false,
+    (x)=>agent.getOutline(env,x.id,x.revision,x.limit,x.cursor));
   register('export_snapshot',
     z.object({cursor:z.string().nullable().describe('Export page.nextCursor from the previous page; omit to start.').optional(),limit:z.number().int().min(1).max(5).describe('Maximum record entries in a backup page.').optional()}),false,
     (x)=>agent.exportSnapshot(env,x.cursor??null,x.limit));

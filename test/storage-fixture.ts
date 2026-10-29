@@ -54,7 +54,7 @@ export default {
       check(restoredTasks.items[0]!.status==='todo'&&restoredTasks.items[0]!.id===taskId,'task projection restored with same stable task id');
       const taskHistory=await store.listVersions(env,todo.id);
       check(taskHistory.items.length===4&&String(taskHistory.items[0]!.message).includes('Restored task list'),'task history restored');
-      const context=await agent.projectContext(env,folder.id);
+      const context=await agent.getOverview(env,folder.id);
       check(context.records.length===2,'context metadata');
       const events=await store.changesSince(env,0);
       check(events.items.length>=7&&typeof events.items[0]?.createdAt==='string','change cursor and camelCase timestamp');
@@ -102,7 +102,7 @@ export default {
       check(listLinks.items?.length===1,'read record links');
       const tagSummary=await agent.listTags(env);
       check(tagSummary.items.some((t:any)=>t.name==='testing'),'tag statistics');
-      const project=await agent.projectContext(env,folder.id,2,10000);
+      const project=await agent.getOverview(env,folder.id,2,10000);
       check(project.records.length>=2,'project context');
       const versionsPage=await store.listVersions(env,rec.id,2);
       check(versionsPage.items.length===2&&versionsPage.page.nextCursor!==null,'version history pagination');
@@ -145,7 +145,7 @@ export default {
       check(JSON.stringify(bounded).length<=1100,'read_many enforces overall response budget');
       const resumed=await agent.readMany(env,[{id:long.id,offsetChars:Number(part.nextOffsetChars)}],1100);
       check(String(resumed.items[0]?.content).length>0,'continuation can read remaining content');
-      const budgeted=await agent.projectContext(env,folder.id,2,1200);
+      const budgeted=await agent.getOverview(env,folder.id,2,1200);
       check(budgeted.usedChars<=1200,'project context task and excerpt budget');
 
       // Validation cannot mutate data. Corruption and name collisions must fail early.
@@ -160,9 +160,9 @@ export default {
       check(duplicateRejected,'dryRun catches real path conflicts');
 
       // Context and browse both support repeatable, explicit continuation.
-      const contextPage=await agent.projectContext(env,folder.id,2,1000);
+      const contextPage=await agent.getOverview(env,folder.id,2,1000);
       check(contextPage.page.hasMore&&typeof contextPage.page.nextCursor==='string','context has a usable continuation cursor');
-      const contextPage2=await agent.projectContext(env,folder.id,2,1000,contextPage.page.nextCursor!);
+      const contextPage2=await agent.getOverview(env,folder.id,2,1000,contextPage.page.nextCursor!);
       const firstContextIds=new Set([...contextPage.records,...contextPage.openTasks].map(x=>x.id));
       check(![...contextPage2.records,...contextPage2.openTasks].some(x=>firstContextIds.has(x.id)),'context keyset page never repeats records or tasks');
       const browsePage=await store.browse(env,folder.id,1);
@@ -184,6 +184,31 @@ export default {
       let changedRejected=false;
       try{await agent.exportSnapshot(env,firstPage.nextCursor,1);}catch(e){changedRejected=e instanceof Error && /Library changed/.test(e.message);}
       check(changedRejected,'changed library invalidates all in-flight export pages');
+      // Tags are created atomically, normalized and returned as document metadata.
+      const tagged=await store.createRecord(env,{name:'stage-'+crypto.randomUUID()+'.md',folderId:folder.id,
+        content:'# Overview\n\n## Architecture\nDetails\n',tags:['Checkpoint','Release','checkpoint']},'integration');
+      const taggedRead=await store.readRecord(env,tagged.id);
+      check(tagged.kind==='document'&&tagged.revision===1&&tagged.tags?.length===2,'tagged document creation');
+      check(taggedRead.kind==='document'&&taggedRead.tags.includes('checkpoint')&&taggedRead.tags.includes('release'),'tags persist in metadata');
+      const outline=await agent.getOutline(env,tagged.id);
+      check(outline.headings.length===2&&outline.headings[1]!.lineStart===3&&outline.revision===1,'outline reflects Markdown source lines');
+      const overview=await agent.getOverview(env,folder.id);
+      check(overview.folder?.name===folder.name&&overview.records.some(r=>r.id===tagged.id),'general folder overview');
+      // Historical snapshot-v2 checkpoint records can still be imported without altering their revisions.
+      const legacyId=crypto.randomUUID();
+      const legacyRecord={...originalRow,id:legacyId,name:'legacy-'+legacyId+'.md',kind:'checkpoint'};
+      const legacyPayload={...payload,records:[{record:legacyRecord,
+        revisions:originalVersions.items.map(v=>({record_id:legacyId,revision:v.revision,
+          content_sha256:v.contentSha256,message:v.message,actor:v.actor,created_at:v.createdAt})).reverse(),
+        tags:['Testing']}]};
+      const legacyPage={...legacyPayload,pageHash:await (await import('../src/backup.js')).pageHash(legacyPayload)};
+      const legacyDry=await agent.importSnapshot(env,{pages:[legacyPage]},true);
+      check(legacyDry.validated,'legacy checkpoint snapshot validates');
+      await agent.importSnapshot(env,{pages:[legacyPage]},false);
+      const legacyRead=await store.readRecord(env,legacyId,{revision:3});
+      check(legacyRead.kind==='document'&&legacyRead.tags.includes('checkpoint')&&legacyRead.tags.includes('testing'),'legacy checkpoint converted to tagged document');
+      check(legacyRead.revision===3&&legacyRead.contentSha256===originalVersions.items.find(x=>x.revision===3)?.contentSha256,
+        'legacy snapshot preserves original history SHA');
       return Response.json({ok:true,folderId:folder.id,recordId:rec.id,taskListId:todo.id,versions:history.items.length,events:events.items.length,virtualPaths:true,metadataIndexJobs:true,historicalHash:true,taskRestored:true,metadataCas:true,links:true,backup:true,pagination:true});
     } catch(error){
       return Response.json({ok:false,error:String(error),stack:error instanceof Error?error.stack:null},{status:500});

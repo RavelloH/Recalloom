@@ -150,8 +150,10 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
       const text=index+1===revision?content:historicalVersion({content,metadata:history},index+1);
       if(await sha256(text)!==v.content_sha256)fail('SNAPSHOT_HASH_MISMATCH','Revision '+(index+1)+' of '+recordId+' did not match the archived hash');
     }
+    const legacyCheckpoint=row.kind==='checkpoint';
+    const restoredKind=legacyCheckpoint?'document':row.kind;
     statements.push(env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,metadata_revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
-      .bind(recordId,folder,recordName,row.kind,row.status,row.description,row.metadata_revision??1,row.created_at,row.updated_at));
+      .bind(recordId,folder,recordName,restoredKind,row.status,row.description,Number(row.metadata_revision??1)+(legacyCheckpoint?1:0),row.created_at,row.updated_at));
     statements.push(env.DB.prepare('INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES(?,?,?,?)')
       .bind(recordId,content,revision,row.content_sha256));
     statements.push(env.DB.prepare('INSERT INTO record_histories(record_id,history_metadata) VALUES(?,?)').bind(recordId,history));
@@ -172,14 +174,15 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
           .bind(tid,recordId,task.title,task.details,task.status,task.priority,position,row.updated_at));
       }
     }
-    for(const tag of item.tags){
+    // Legacy snapshot-v2 checkpoint rows are imported as documents with the checkpoint tag.
+    for(const tag of [...new Set([...item.tags, ...(legacyCheckpoint?['checkpoint']:[])].map(t=>typeof t==='string'?t.trim().toLowerCase():t))]){
       if(typeof tag!=='string'||!tag.trim()||tag.length>64)fail('INVALID_TAG');
       statements.push(env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(crypto.randomUUID(),tag));
       statements.push(env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(recordId,tag));
     }
     if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
       .bind(crypto.randomUUID(),recordId,revision,new Date().toISOString()));
-    statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:folder,kind:row.kind}));
+    statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:folder,kind:restoredKind,legacyCheckpoint}));
   }
   for(const link of links){
     const source=id(link.source_id),target=id(link.target_id),relation=string(link.relation,64);

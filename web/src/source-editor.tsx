@@ -1,4 +1,17 @@
-import React,{useMemo} from 'react';
+import React,{useEffect,useMemo,useRef} from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import {markdown} from '@codemirror/lang-markdown';
-export default function SourceEditor({value,onChange,dark}:{value:string;onChange:(v:string)=>void;dark:boolean}){const extensions=useMemo(()=>[markdown()],[]);return <CodeMirror value={value} height="min(64vh, 760px)" extensions={extensions} theme={dark?'dark':'light'} basicSetup={{foldGutter:true,highlightActiveLine:true}} onChange={onChange} aria-label="Markdown 源码编辑器"/>;}
+import {EditorView} from '@codemirror/view';
+
+export default function SourceEditor({value,onChange,dark,focusLine,focusToken}:{value:string;onChange:(v:string)=>void;dark:boolean;focusLine?:number;focusToken?:number}){
+ const extensions=useMemo(()=>[markdown()],[]);
+ const view=useRef<EditorView|null>(null);
+ const jump=(v:EditorView|null)=>{
+  if(!v||!focusLine)return;
+  const line=v.state.doc.line(Math.min(Math.max(focusLine,1),v.state.doc.lines));
+  v.dispatch({selection:{anchor:line.from},effects:EditorView.scrollIntoView(line.from,{y:'center'})});
+  v.focus();
+ };
+ useEffect(()=>{jump(view.current);},[focusLine,focusToken]);
+ return <CodeMirror value={value} height="min(64vh, 760px)" extensions={extensions} theme={dark?'dark':'light'} basicSetup={{foldGutter:true,highlightActiveLine:true}} onCreateEditor={v=>{view.current=v;jump(v);}} onChange={onChange} aria-label="Markdown 源码编辑器"/>;
+}

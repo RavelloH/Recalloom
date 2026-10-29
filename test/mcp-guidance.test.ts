@@ -35,11 +35,11 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     });
     assert.equal(init.instructions,SERVER_INSTRUCTIONS);
     assert.match(init.instructions,/expectedRevision/);
-    assert.match(init.instructions,/project_context/);
+    assert.match(init.instructions,/get_overview/);
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
-    assert.equal(tools.length,25);
+    assert.equal(tools.length,26);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){
       const guidance=TOOL_GUIDANCE[tool.name as keyof typeof TOOL_GUIDANCE];
@@ -58,6 +58,9 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     assert.match(tool('read_many').inputSchema.properties?.maxChars?.description??'',/budget/);
     assert.match(tool('export_snapshot').description,/snapshot-v2/);
     assert.match(tool('import_snapshot').description,/complete/);
+    assert.ok(tool('get_overview').description.includes('folder'));
+    assert.ok(tool('get_outline').description.includes('heading'));
+    assert.equal(tool('get_outline').annotations?.readOnlyHint,true);
     assert.equal(tool('mutate_task').annotations?.destructiveHint,true);
     assert.equal(tool('manage_record').annotations?.destructiveHint,true);
     assert.equal(tool('index_pending').annotations?.destructiveHint,false);

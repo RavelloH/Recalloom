@@ -14,6 +14,12 @@ async function recordExtras(env:Env,folderId:string|null,recordId:string){
   ]);
   return {tags:tags.results.map(t=>t.name),path:'/'+[...parents.results.map(p=>p.name)].join('/')};
 }
+const normalizeTags=(values: string[] = []): string[] => {
+  if(values.length>32)throw new StorageError('INVALID_TAG','At most 32 tags per record');
+  const tags=values.map(value=>value.trim().toLowerCase());
+  if(tags.some(tag=>!tag||tag.length>64))throw new StorageError('INVALID_TAG');
+  return [...new Set(tags)];
+};
 const bounded = (n: number, max=100) => Math.min(max,Math.max(1,Math.floor(n||20)));
 const nameCheck = (name: string) => {
   if (!name.trim() || name.includes('/') || name.includes('\\') || name.length > 180)
@@ -71,8 +77,8 @@ export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:
   const hasMore=!folderDone||!recordDone;
   return {folderId,items,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null}};
 }
-export async function createRecord(env: Env, input:{name:string;folderId?:string|null;kind?:RecordKind;description?:string;content?:string}, actor='agent') {
-  const id=newId(), ts=now(), name=nameCheck(input.name), folderId=input.folderId??null,kind=input.kind??'document';
+export async function createRecord(env: Env, input:{name:string;folderId?:string|null;kind?:RecordKind;description?:string;content?:string;tags?:string[]}, actor='agent') {
+  const id=newId(), ts=now(), name=nameCheck(input.name), folderId=input.folderId??null,kind=input.kind??'document',tags=normalizeTags(input.tags);
   if (folderId && !(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))
     throw new StorageError('FOLDER_NOT_FOUND');
   const content = kind==='task_list' ? JSON.stringify({tasks:[]},null,2) : (input.content??'');
@@ -80,7 +86,7 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
     throw new StorageError('TASK_LIST_CONTENT_MANAGED','Use tasks to modify task lists');
   if (content.length > 500_000) throw new StorageError('CONTENT_TOO_LARGE');
   const version=initialVersion(content),digest=await sha256(content);
-  await env.DB.batch([
+  const statements=[
     env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)')
       .bind(id,folderId,name,kind,'active',input.description??'',ts,ts),
     env.DB.prepare('INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES(?,?,?,?)')
@@ -90,9 +96,14 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
       .bind(id,1,digest,'Created',actor,ts),
     env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
       .bind(newId(),id,1,ts),
-    event(env,'record',id,'create',1,actor,{name,folderId,kind})
-  ]);
-  return {id,name,kind,revision:1,contentSha256:digest};
+    ...tags.flatMap(tag=>[
+      env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(newId(),tag),
+      env.DB.prepare('INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(id,tag)
+    ]),
+    event(env,'record',id,'create',1,actor,{name,folderId,kind,tags})
+  ];
+  await env.DB.batch(statements);
+  return {id,name,kind,tags,revision:1,contentSha256:digest};
 }
 export async function readRecord(env:Env, id:string, options:{revision?:number;lineStart?:number;maxLines?:number;metadataOnly?:boolean}={}) {
   const row=options.metadataOnly

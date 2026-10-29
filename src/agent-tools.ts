@@ -3,6 +3,7 @@ import { StorageError } from './types.js';
 import { readRecord, getRecord } from './storage.js';
 import { historicalVersion } from './version.js';
 import { createTwoFilesPatch } from 'diff';
+export { getOutline } from './outline.js';
 
 const capped=(n:number|undefined,max:number,defaultValue:number)=>Math.min(max,Math.max(1,n??defaultValue));
 type ReadSpec={id:string;revision?:number;offsetChars?:number};
@@ -99,7 +100,7 @@ export async function links(env:Env,id:string,action:'list'|'add'|'remove'='list
   return {id,targetId,relation,changed:true};
 }
 type ContextCursor={folderId:string|null;depth:number;recordDone:boolean;taskDone:boolean;record?:{rank:number;updatedAt:string;id:string};task?:{priority:number;id:string}};
-export async function projectContext(env:Env,folderId:string|null=null,depth=2,budget=12000,cursor?:string){
+export async function getOverview(env:Env,folderId:string|null=null,depth=2,budget=12000,cursor?:string){
   const maxDepth=Math.min(5,Math.max(0,depth)),maxBudget=Math.min(30000,Math.max(1000,budget));
   if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
   let state:ContextCursor={folderId,depth:maxDepth,recordDone:false,taskDone:false};
@@ -113,12 +114,16 @@ export async function projectContext(env:Env,folderId:string|null=null,depth=2,b
   const tree="WITH RECURSIVE tree(id,depth) AS (SELECT id,CASE WHEN ? IS NULL THEN 1 ELSE 0 END FROM folders WHERE (? IS NULL AND parent_id IS NULL) OR id=? UNION ALL SELECT f.id,t.depth+1 FROM folders f JOIN tree t ON f.parent_id=t.id WHERE t.depth<?) ";
   const membership="((? IS NULL AND r.folder_id IS NULL) OR r.folder_id IN (SELECT id FROM tree))";
   const args=[folderId,folderId,folderId,maxDepth,folderId];
-  const rank="CASE WHEN r.kind='checkpoint' THEN 0 WHEN r.kind='task_list' THEN 1 ELSE 2 END";
+  // No special checkpoint/project ordering in a general knowledge library.
+  const rank="0";
+  const folder=folderId
+    ?await env.DB.prepare('SELECT id,name,description FROM folders WHERE id=?').bind(folderId).first<{id:string;name:string;description:string}>()
+    :{id:null,name:'Library',description:''};
   const recCursor=state.record;
   const taskCursor=state.task;
   const [recRows,taskRows]=await Promise.all([
     state.recordDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
-      env.DB.prepare(tree+"SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,substr(r.description,1,200) AS description,c.revision,r.updated_at AS updatedAt,"+rank+" AS rank,substr(c.content,1,1200) AS excerpt FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.status!='archived' AND "+membership+
+      env.DB.prepare(tree+"SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,substr(r.description,1,200) AS description,c.revision,r.updated_at AS updatedAt,"+rank+" AS rank,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags,substr(c.content,1,1200) AS excerpt FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.status!='archived' AND "+membership+
       " AND (? IS NULL OR "+rank+">? OR ("+rank+"=? AND (r.updated_at<? OR (r.updated_at=? AND r.id>?)))) ORDER BY rank,r.updated_at DESC,r.id LIMIT 81")
         .bind(...args,recCursor?.id??null,recCursor?.rank??0,recCursor?.rank??0,recCursor?.updatedAt??'',recCursor?.updatedAt??'',recCursor?.id??'').all(),
     state.taskDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
@@ -128,14 +133,14 @@ export async function projectContext(env:Env,folderId:string|null=null,depth=2,b
   ]);
   const records:Array<Record<string,unknown>>=[],openTasks:Array<Record<string,unknown>>=[];
   const rs=recRows.results,ts=taskRows.results;
-  let remaining=maxBudget-300,taskBudget=Math.floor(maxBudget*0.4);
+  let remaining=maxBudget-300-JSON.stringify(folder).length,taskBudget=Math.floor(maxBudget*0.4);
   for(const task of ts){
     const size=JSON.stringify(task).length+1;
     if(size>taskBudget||size>remaining)break;
     openTasks.push(task);remaining-=size;taskBudget-=size;
   }
   for(const record of rs){
-    const item={...record} as Record<string,unknown>;
+    const item={...record,tags:JSON.parse(String(record.tags??'[]'))} as Record<string,unknown>;
     const overhead=JSON.stringify({...item,excerpt:''}).length+2;
     if(overhead>=remaining)break;
     item.excerpt=String(item.excerpt??'').slice(0,Math.floor((remaining-overhead)/6));
@@ -151,6 +156,6 @@ export async function projectContext(env:Env,folderId:string|null=null,depth=2,b
     task:lastTask?{priority:Number(lastTask.priority),id:String(lastTask.id)}:state.task
   };
   const hasMore=!recordDone||!taskDone;
-  return {folderId,depth:maxDepth,records,openTasks,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null},budgetChars:maxBudget,usedChars:maxBudget-remaining};
+  return {folder,folderId,depth:maxDepth,records,openTasks,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null},budgetChars:maxBudget,usedChars:maxBudget-remaining};
 }
 export { exportSnapshot, importSnapshot } from './backup.js';
