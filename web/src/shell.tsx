@@ -3,6 +3,8 @@ import {Link,useNavigate} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {SideNav} from '@astryxdesign/core/SideNav';
+import {Dialog} from '@astryxdesign/core/Dialog';
 import {PanelLeft,FileText,FolderOpen,ListTodo,Search,History,Settings,LogOut,Menu,X,ChevronRight,SunMoon,Command,LayoutDashboard,Plus} from 'lucide-react';
 import {api,browse} from './api';
 import type {Entry} from './types';
@@ -19,17 +21,13 @@ export function Shell({children}:{children:React.ReactNode}){
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommands(v=>!v);}if(event.key==='Escape'){setCommands(false);setMobileOpen(false);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
  const logout=async()=>{await api('/auth/logout',{method:'POST'});qc.clear();navigate({to:'/login'});};
  return <div className={'shell'+(collapsed?' sidebar-collapsed':'')}>
- <aside className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏">
-  <div className="brand"><div className="brand-mark">R</div><span className="brand-name">Recalloom</span><IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<X size={18}/>} onClick={()=>setMobileOpen(false)}/></div>
-  <div className="sidebar-content"><Navigation onNavigate={()=>setMobileOpen(false)}/></div>
-  <div className="sidebar-footer"><Button className="nav-link" width="100%" variant="ghost" label="切换主题" icon={<SunMoon size={16}/>} onClick={()=>setMode(mode==='dark'?'light':'dark')}/><Button className="nav-link" width="100%" variant="ghost" label="退出登录" icon={<LogOut size={16}/>} onClick={logout}/></div>
- </aside>
+ <SideNav className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏" header={<div className="brand"><div className="brand-mark">R</div><span className="brand-name">Recalloom</span><IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<X size={18}/>} onClick={()=>setMobileOpen(false)}/></div>} footer={<div className="sidebar-footer"><Button className="nav-link" width="100%" variant="ghost" label="切换主题" icon={<SunMoon size={16}/>} onClick={()=>setMode(mode==='dark'?'light':'dark')}/><Button className="nav-link" width="100%" variant="ghost" label="退出登录" icon={<LogOut size={16}/>} onClick={logout}/></div>}><Navigation onNavigate={()=>setMobileOpen(false)}/></SideNav>
  {mobileOpen&&<button className="mobile-scrim" aria-label="关闭导航" onClick={()=>setMobileOpen(false)}/>}
  <div className="workspace"><header className="topbar">
   <div className="topbar-left"><IconButton className="mobile-menu" variant="ghost" label="打开导航" icon={<Menu size={19}/>} onClick={()=>setMobileOpen(true)}/><IconButton className="desktop-toggle" variant="ghost" label="折叠侧边栏" icon={<PanelLeft size={18}/>} onClick={()=>setCollapsed(v=>!v)}/><span className="topbar-title">Recalloom</span></div>
   <div className="topbar-actions"><Button className="search-trigger" variant="ghost" label="快速跳转" icon={<Search size={15}/>} endContent={<kbd>⌘ K</kbd>} onClick={()=>setCommands(true)}/><IconButton variant="ghost" label="外观设置" icon={<SunMoon size={17}/>} onClick={()=>navigate({to:'/settings/appearance'})}/></div>
  </header><main className="main-content">{children}</main></div>
  <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon:Icon})=><Link key={to} to={to} className="bottom-link"><Icon size={19}/><span>{name}</span></Link>)}</div>
- {commands&&<div className="modal-backdrop" onClick={()=>setCommands(false)}><div className="command-dialog" role="dialog" aria-modal="true" aria-label="快速导航" onClick={e=>e.stopPropagation()}><div className="command-title"><Command size={17}/>快速跳转 <IconButton variant="ghost" label="关闭" icon={<X size={16}/>} onClick={()=>setCommands(false)}/></div>{menu.map(({to,name,icon:Icon})=><Button key={to} variant="ghost" width="100%" label={name} className="command-item" onClick={()=>{navigate({to});setCommands(false);}} icon={<Icon size={16}/>}/>)}</div></div>}
+ <Dialog isOpen={commands} onOpenChange={setCommands} width={440} padding={4} purpose="info" aria-label="快速导航"><div className="command-surface"><div className="command-title"><Command size={18}/><strong>快速跳转</strong><IconButton variant="ghost" label="关闭" icon={<X size={18}/>} onClick={()=>setCommands(false)}/></div><div className="command-items">{menu.map(({to,name,icon:Icon})=><Button key={to} variant="ghost" width="100%" label={name} className="command-item" onClick={()=>{navigate({to});setCommands(false);}} icon={<Icon size={17}/>}/>)}</div></div></Dialog>
  </div>;
 }

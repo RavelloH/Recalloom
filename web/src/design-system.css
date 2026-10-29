@@ -1,0 +1,208 @@
+/* Recalloom presentation layer.
+   Astryx owns primitive controls, focus states, colour tokens and surface chrome.
+   These selectors own only the application layout and content density. */
+:root {
+  font-synthesis: none;
+  --rk-page-max: 1192px;
+  --rk-radius: 12px;
+  --rk-space: 16px;
+}
+body { font-size: 14px; line-height: 1.5; }
+.shell { --aside: 244px; }
+.workspace { min-width: 0; }
+.sidebar {
+  width: var(--aside);
+  min-width: var(--aside);
+  background: var(--color-background-muted, #f8f8f8);
+  border-inline-end: 1px solid var(--color-border, #e5e5e5);
+}
+.sidebar-collapsed .sidebar { min-width: 0; width: 0; }
+.brand { height: 66px; padding-inline: 18px; gap: 11px; }
+.brand-mark, .login-logo { border-radius: 10px; }
+.brand-mark { width: 32px; height: 32px; font-size: 17px; }
+.brand-name { font-size: 16px; letter-spacing: -.035em; }
+.nav-label { font-size: 11px; letter-spacing: .065em; padding-top: 16px; }
+.nav-link, .folder-link { font-size: 13px; border-radius: 9px; }
+.nav-list { gap: 3px; }
+.topbar { height: 62px; padding-inline: 26px; }
+.topbar-title { font-size: 14px; font-weight: 650; }
+.topbar-actions { gap: 8px; }
+.search-trigger { border: 0; background: none; padding: 0; }
+.main-content { width: 100%; }
+.page {
+  max-width: var(--rk-page-max);
+  padding: 34px clamp(22px, 3.3vw, 48px) 80px;
+  margin-inline: auto;
+}
+.page-header {
+  margin-bottom: 26px;
+  gap: 20px;
+  align-items: center;
+}
+.page-title-copy { min-width: 0; }
+.page-title-copy h1 {
+  margin: 0;
+  font-size: clamp(24px, 2.2vw, 29px);
+  line-height: 1.25;
+  font-weight: 720;
+  letter-spacing: -.035em;
+}
+.page-header p {
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 7px 0 0;
+}
+.page-actions { gap: 8px; }
+.breadcrumbs { font-size: 12px; margin-bottom: 16px; }
+.panel-heading { gap: 14px; margin-bottom: 14px; }
+.panel-heading h2, .panel h2 { font-size: 15px; font-weight: 690; letter-spacing: -.012em; }
+.panel-heading > a { font-size: 12px; }
+.dashboard-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  min-height: 116px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.stat-card > svg { color: var(--color-text-secondary, #888); }
+.stat-card strong { font-size: 17px; letter-spacing: -.02em; }
+.stat-card > span { margin-top: auto; font-size: 12px; }
+a.stat:hover .stat-card { transform: translateY(-1px); }
+.dashboard-grid { gap: 14px; align-items: start; }
+.home-card { font-size: 13px; min-width: 0; border-radius: var(--rk-radius); }
+.home-card h2 { font-size: 15px; }
+.home-card .panel-heading { margin-bottom: 15px; }
+.compact-row { min-height: 50px; font-size: 13px; gap: 12px; }
+.compact-row .tiny { font-size: 11px; }
+.recent-entry { min-height: 62px; gap: 12px; }
+.activity-summary { font-size: 13px; line-height: 1.55; }
+.recent-entry time { font-size: 11px; }
+.knowledge-empty { min-height: 168px; }
+.file-table { overflow: hidden; min-width: 0; }
+.file-table-head, .file-row {
+  grid-template-columns: minmax(0, 1fr) 108px 132px;
+  padding: 14px 20px;
+  gap: 12px;
+}
+.file-table-head { font-size: 12px; background: var(--color-background-muted, #f8f8f8); }
+.file-row { min-height: 60px; font-size: 14px; }
+.file-row > span:first-child { font-weight: 570; gap: 12px; }
+.file-row > span:not(:first-child) { font-size: 12px; }
+.file-row:hover { background: var(--color-background-muted, #f8f8f8); }
+.inline-form { margin-bottom: 22px; }
+.create-surface { min-width: 0; }
+.create-form { display: flex; flex-direction: column; gap: 18px; }
+.create-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, .75fr) minmax(200px, 1.4fr) minmax(190px, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+.inline-selector, .inline-field { min-width: 0; width: 100%; flex: none; }
+.inline-selector > *, .inline-field > * { width: 100%; max-width: 100%; }
+.create-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.search-surface { margin-bottom: 22px; }
+.search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
+  align-items: end;
+  gap: 12px;
+}
+.search-query-field, .search-mode-field { min-width: 0; width: 100%; flex: none; }
+.search-query-field > *, .search-mode-field > * { width: 100%; max-width: 100%; }
+.search-note { margin: 0 0 18px; line-height: 1.6; }
+.search-results { gap: 10px; }
+.search-result { padding: 20px; border-radius: var(--rk-radius); }
+.search-result strong { font-size: 14px; }
+.search-result p { line-height: 1.6; }
+.toolbar { display: flex; align-items: center; gap: 14px; margin-block: 0 16px; }
+.toolbar > * { flex: none; }
+.task-item { gap: 15px; padding: 14px 16px; }
+.task-title { font-size: 14px; line-height: 1.5; }
+.task-content { min-width: 0; flex: 1; }
+.task-status { min-width: 118px; flex-basis: 118px; }
+.settings-panel { min-width: 0; max-width: 760px; }
+.settings-panel h2 { font-size: 17px; letter-spacing: -.015em; margin: 0 0 18px; }
+.settings-panel .settings-field { margin: 18px 0; max-width: 520px; }
+.settings-panel .settings-field:last-child { margin-bottom: 0; }
+.settings-panel p { font-size: 13px; line-height: 1.7; }
+.settings-nav { gap: 6px; margin-bottom: 22px; }
+.settings-tab { font-size: 13px; border-radius: 9px; }
+.activity-list { min-width: 0; }
+.activity-row { padding-block: 14px; }
+.record-inspector { width: 292px; min-width: 0; }
+.record-inspector dl { font-size: 13px; }
+.editor-section { border-radius: var(--rk-radius); }
+.editor-topline { padding: 14px 18px; gap: 12px; }
+.wysiwyg-toolbar { padding: 10px 14px; gap: 4px; }
+.login-panel { width: min(100%, 424px); border-radius: 16px; }
+.login-panel h1 { font-size: 24px; letter-spacing: -.025em; }
+.command-surface { display: grid; gap: 12px; min-width: 0; }
+.command-title { display: flex; gap: 10px; align-items: center; font-size: 16px; }
+.command-title > :last-child { margin-inline-start: auto; }
+.command-items { display: grid; gap: 4px; }
+.command-item { justify-content: flex-start; }
+@media (max-width: 1000px) {
+  .page { padding: 28px 24px 65px; }
+  .create-fields { grid-template-columns: 1fr 1.5fr; }
+  .create-fields > :last-child { grid-column: 1 / -1; }
+  .dashboard-grid { grid-template-columns: minmax(0,1fr); }
+  .record-inspector { width: 250px; }
+}
+@media (max-width: 720px) {
+  .sidebar { min-width: 0; width: min(290px,85vw); }
+  .sidebar-collapsed .sidebar { width: min(290px,85vw); }
+  .topbar { height: 54px; padding-inline: 15px; }
+  .topbar-title { font-size: 14px; }
+  .page {
+    padding: 23px max(16px, env(safe-area-inset-left,0px), env(safe-area-inset-right,0px)) 50px;
+    max-width: 100%;
+  }
+  .page-header { gap: 14px; margin-bottom: 22px; align-items: flex-start; flex-wrap: wrap; }
+  .page-title-copy { width: 100%; }
+  .page-actions { width: 100%; justify-content: flex-start; }
+  .page-title-copy h1 { font-size: 24px; }
+  .page-header p { font-size: 13px; margin-top: 5px; }
+  .page-actions { justify-content: flex-end; }
+  .dashboard-stats { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+  .dashboard-stats > .stat:last-child { grid-column: span 2; }
+  .stat-card { min-height: 110px; }
+  .dashboard-grid { gap: 12px; }
+  .home-card { font-size: 13px; }
+  .home-card .panel-heading { margin-bottom: 10px; }
+  .file-table-head, .file-row { grid-template-columns: minmax(0,1fr) 72px; padding: 14px; gap: 6px; }
+  .file-row { font-size: 13px; min-height: 58px; }
+  .file-table-head { font-size: 11px; }
+  .create-fields { grid-template-columns: minmax(0,1fr); gap: 14px; }
+  .create-fields > :last-child { grid-column: auto; }
+  .create-actions { justify-content: stretch; }
+  .create-actions > * { flex: 1 1 0; }
+  .search-form { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .search-form > button { width: 100%; }
+  .search-surface { margin-bottom: 18px; }
+  .search-query-field, .search-mode-field { width: 100%; }
+  .settings-panel { max-width: 100%; }
+  .settings-nav { overflow-x: auto; flex-wrap: nowrap; margin-inline: -4px; padding: 0 4px 5px; }
+  .settings-tab { white-space: nowrap; }
+  .task-item { padding: 12px 10px; gap: 10px; }
+  .task-status { min-width: 100px; flex: 0 0 100px; }
+  .record-inspector { width: 100%; }
+  .editor-topline { padding: 11px 12px; }
+  .bottom-nav { padding-inline: 10px; }
+}
+@media (max-width: 359px) {
+  .page-actions { width: 100%; justify-content: flex-start; }
+  .page-header { flex-wrap: wrap; }
+  .dashboard-stats { gap: 8px; }
+  .stat-card { min-height: 112px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-card { transition: none; }
+}

@@ -21,6 +21,12 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'工作台'}).waitFor({timeout:18000});
+ await page.keyboard.press('Control+k');
+ await page.getByRole('dialog',{name:'快速导航'}).waitFor();
+ await page.getByRole('dialog',{name:'快速导航'}).getByRole('button',{name:'搜索'}).click();
+ await page.getByRole('heading',{name:'搜索',level:1}).waitFor();
+ await page.goto(url+'/');
+ await page.getByRole('heading',{name:'工作台'}).waitFor();
  // Mobile grids must not widen to min-content when activity names or tasks are long.
  for(const width of [320,390,414,430]){
    const probe=await browser.newContext({viewport:{width,height:844},isMobile:true,deviceScaleFactor:2,hasTouch:true});
@@ -42,6 +48,11 @@ try{
    assert.ok(Math.abs(result.left-result.right)<=1,'symmetric dashboard gutters: '+JSON.stringify(result));
    assert.ok(result.left>=14,'mobile gutters: '+JSON.stringify(result));
    assert.ok(result.scroll<=result.viewport,'no horizontal overflow: '+JSON.stringify(result));
+   for(const path of ['/search','/library','/settings/appearance']){
+     await screen.goto(url+path,{waitUntil:'networkidle'});
+     const fit=await screen.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
+     assert.ok(fit.scroll<=fit.viewport,'no horizontal overflow '+path+'@'+width+': '+JSON.stringify(fit));
+   }
    await probe.close();
  }
  assert.equal((await context.cookies()).some(c=>c.name==='__Host-recalloom_session'),true,'session should use secure cookie');
@@ -49,6 +60,9 @@ try{
  await page.getByRole('heading',{name:'知识库'}).waitFor();
  const folderName='UI test '+Date.now();
  await page.getByRole('button',{name:'新建文件夹'}).click();
+ const field=page.getByRole('textbox',{name:'名称'});
+ const inputStyle=await field.evaluate(el=>({border:getComputedStyle(el).borderStyle,padding:getComputedStyle(el).padding}));
+ assert.equal(inputStyle.border,'none','Astryx TextInput must not receive a duplicate native border');
  await page.getByRole('textbox',{name:'名称'}).fill(folderName);
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.getByText(folderName,{exact:true}).waitFor();
