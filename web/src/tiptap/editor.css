@@ -1,0 +1,34 @@
+/* NeutralPress-derived Tiptap formatting, presented with Astryx controls. */
+.wysiwyg-toolbar {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: center;
+ gap: 5px 12px;
+ padding: 10px 12px;
+ background: var(--color-background-body,inherit);
+}
+.wysiwyg-tools {display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-width:0;}
+.wysiwyg-tools + .wysiwyg-tools {
+ padding-left:10px;
+ border-left:1px solid var(--color-border,rgba(128,128,128,.22));
+}
+.wysiwyg-tools button {min-width:34px;min-height:34px;}
+.toolbar-highlight {background:#f7dc6f;color:#242424;border-radius:2px;padding:0 2px;}
+.tiptap p.is-editor-empty:first-child::before {
+ color:var(--color-text-tertiary,#888);
+ content:attr(data-placeholder);
+ float:left;
+ height:0;
+ pointer-events:none;
+}
+.tiptap [style*="text-align: center"] {text-align:center;}
+.tiptap [style*="text-align: right"] {text-align:right;}
+.tiptap mark {padding:0 .1em;background:#f5d870;color:#251e0e;border-radius:2px;}
+.tiptap table th[style*="text-align:center"],.tiptap table td[style*="text-align:center"]{text-align:center;}
+.tiptap table th[style*="text-align:right"],.tiptap table td[style*="text-align:right"]{text-align:right;}
+@media(max-width:720px){
+ .wysiwyg-toolbar {padding:9px;gap:7px;}
+ .wysiwyg-tools + .wysiwyg-tools {border-left:0;padding-left:0;}
+ .wysiwyg-tools {flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;}
+ .wysiwyg-tools::-webkit-scrollbar {display:none;}
+}

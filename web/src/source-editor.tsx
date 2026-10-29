@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useRef} from 'react';
+import React,{useEffect,useLayoutEffect,useMemo,useRef} from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import {markdown} from '@codemirror/lang-markdown';
 import {EditorView} from '@codemirror/view';
@@ -13,5 +13,6 @@ export default function SourceEditor({value,onChange,dark,focusLine,focusToken}:
   v.focus();
  };
  useEffect(()=>{jump(view.current);},[focusLine,focusToken]);
+ useLayoutEffect(()=>{const v=view.current;if(!v)return;const current=v.state.doc.toString();if(current!==value)v.dispatch({changes:{from:0,to:v.state.doc.length,insert:value}});},[value]);
  return <CodeMirror value={value} height="min(64vh, 760px)" extensions={extensions} theme={dark?'dark':'light'} basicSetup={{foldGutter:true,highlightActiveLine:true}} onCreateEditor={v=>{view.current=v;jump(v);}} onChange={onChange} aria-label="Markdown 源码编辑器"/>;
 }

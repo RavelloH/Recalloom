@@ -127,8 +127,8 @@ try{
  assert.equal(inputStyle.border,'none','Astryx TextInput must not receive a duplicate native border');
  await page.getByRole('textbox',{name:'名称'}).fill(folderName);
  await page.getByRole('button',{name:'创建',exact:true}).click();
- await page.getByText(folderName,{exact:true}).waitFor();
- await page.getByText(folderName,{exact:true}).click();
+ await page.locator('.file-row').getByText(folderName,{exact:true}).first().waitFor();
+ await page.locator('.file-row').getByText(folderName,{exact:true}).first().click();
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  const folderUrl=page.url();
  await page.getByRole('button',{name:'新建记录'}).click();
