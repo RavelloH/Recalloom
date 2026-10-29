@@ -5,6 +5,10 @@ const url=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
 const secret=process.env.RECALLOOM_TEST_SECRET||'recalloom-local-web-test-secret-32-bytes-only';
 const browserPath=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(path=>path&&existsSync(path));
 if(!browserPath)throw Error('Install Edge/Chrome or set RECALLOOM_BROWSER_PATH for browser E2E tests.');
+async function chooseOption(page,label,value){
+ await page.getByRole('combobox',{name:label}).click();
+ await page.getByRole('option',{name:value,exact:true}).click();
+}
 const browser=await chromium.launch({executablePath:browserPath,headless:true,args:['--no-first-run','--disable-extensions']});
 const context=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:1});
 const page=await context.newPage();const faults=[];
@@ -30,7 +34,7 @@ try{
      const task=document.querySelector('.compact-row a');
      if(activity)activity.textContent=longName;
      if(task)task.textContent=longName;
-     const panel=document.querySelector('.dashboard-grid>.panel');
+     const panel=document.querySelector('.dashboard-grid>.home-card');
      if(!panel)throw Error('dashboard panel missing');
      const box=panel.getBoundingClientRect();
      return {left:box.left,right:innerWidth-box.right,viewport:innerWidth,scroll:document.documentElement.scrollWidth};
@@ -73,6 +77,11 @@ try{
  await page.locator('.tiptap').click();
  await page.keyboard.press('End');
  await page.keyboard.type(' Additional visual edit.');
+ const boldButton=page.getByRole('button',{name:'粗体'});
+ await boldButton.click();
+ assert.equal(await boldButton.getAttribute('aria-pressed'),'true','Astryx ToggleButton reflects formatting state');
+ await boldButton.click();
+ assert.equal(await boldButton.getAttribute('aria-pressed'),'false','formatting can be toggled off');
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByText('R3').waitFor({timeout:15000});
  await page.getByRole('button',{name:'Markdown'}).click();
@@ -89,9 +98,9 @@ try{
  const recUrl=page.url();
  await page.goto(url+'/settings/appearance');
  await page.getByRole('heading',{name:'外观',level:1}).waitFor();
- await page.getByLabel('主题').selectOption('dark');
+ await chooseOption(page,'主题','深色');
  assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
- await page.getByLabel('主题').selectOption('light');
+ await chooseOption(page,'主题','浅色');
  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
  for(const [path,title] of [['/tasks','任务'],['/search','搜索'],['/activity','活动'],['/settings/sessions','登录会话'],['/settings/indexing','索引状态']]){
   await page.goto(url+path);
@@ -103,7 +112,7 @@ try{
  assert.ok((await page.locator('.recent-entry').first().innerText()).includes('本人（Web）'),'activity displays owner');
  await page.goto(url+'/search');
  await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
- await page.getByLabel('搜索模式').selectOption('literal');
+ await chooseOption(page,'搜索模式','精确文本');
  await page.getByRole('button',{name:'搜索',exact:true}).click();
  await page.locator('.search-highlight').first().waitFor({timeout:15000});
  await page.goto(recUrl);
@@ -122,10 +131,10 @@ try{
  await mobilePage.getByRole('heading',{name:'活动',level:1}).waitFor();
  await mobilePage.getByRole('link',{name:'设置',exact:true}).last().tap();
  await mobilePage.getByRole('link',{name:'外观'}).tap();
- await mobilePage.getByLabel('主题').selectOption('dark');
+ await chooseOption(mobilePage,'主题','深色');
  assert.equal(await mobilePage.locator('html').getAttribute('data-effective-theme'),'dark');
  assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#111113');
- await mobilePage.getByLabel('主题').selectOption('light');
+ await chooseOption(mobilePage,'主题','浅色');
  assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#ffffff');
  await mobilePage.goto(recUrl);
  await mobilePage.getByRole('heading',{name:'First note'}).waitFor();
@@ -135,11 +144,11 @@ try{
  // A checkpoint is now an ordinary document template carrying regular tags.
  await page.goto(folderUrl);
  await page.getByRole('button',{name:'新建记录'}).click();
- await page.getByRole('combobox',{name:'类型'}).selectOption('checkpoint_template');
+ await chooseOption(page,'类型','阶段总结（文档模板）');
  await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
  await page.getByRole('button',{name:'创建',exact:true}).click();
- await page.getByRole('heading',{name:'Phase summary'}).waitFor();
+ await page.locator('.page-header').getByRole('heading',{name:'Phase summary'}).waitFor();
  await page.getByRole('button',{name:'详情'}).click();
  await page.locator('.record-inspector dd').filter({hasText:'checkpoint'}).waitFor();
  await page.locator('.outline-item').first().waitFor();

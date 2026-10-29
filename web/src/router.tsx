@@ -1,3 +1,4 @@
+import {Button} from '@astryxdesign/core/Button';
 import React from 'react';
 import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -8,7 +9,7 @@ export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authe
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
  if(onLogin)return <Outlet/>;
  if(state.isPending)return <div className="center-screen"><span className="spin"/>正在连接…</div>;
- if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><button onClick={()=>state.refetch()}>重试</button></div></div>;}
+ if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
  return <Shell><Outlet/></Shell>;
 }
 const root=createRootRoute({component:Root,notFoundComponent:()=> <div className="page"><h2>页面不存在</h2><a href="/library">返回知识库</a></div>});
