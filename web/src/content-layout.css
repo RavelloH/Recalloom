@@ -1,0 +1,131 @@
+/* Shared data geometry: placeholders use the exact same grid/flex layout as content. */
+.skeleton-files { display: block; }
+.skeleton-files .file-row {
+  pointer-events: none;
+  min-height: 60px;
+  border-bottom: 1px solid var(--color-border,rgba(128,128,128,.12));
+}
+.skeleton-name { display: flex; align-items: center; min-width: 0; gap: 12px; }
+.skeleton-files .file-row > span:not(:first-child) { display: flex; align-items: center; min-width: 0; }
+.skeleton-files .file-row > span > * { max-width: 100%; }
+.skeleton-tasks .task-item { pointer-events: none; }
+.skeleton-activity, .skeleton-compact { display: grid; }
+.skeleton-activity .loading-lines { flex: 1; min-width: 0; display: grid; gap: 7px; }
+.skeleton-compact .compact-row { display: flex; gap: 12px; }
+.skeleton-compact .compact-row > :nth-child(2) { flex: 1; }
+.skeleton-activity .recent-entry > :nth-child(3) { flex: none; }
+
+/* A task owns its full horizontal writing area. Controls live on their own row. */
+.task-list { min-width: 0; width: 100%; }
+.task-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 9px;
+  padding: 18px 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+.task-heading { display: flex; align-items: flex-start; gap: 12px; min-width: 0; width: 100%; }
+.task-check { flex: none; min-width: 24px; }
+.task-heading .task-title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.55; }
+.task-heading .priority { flex: none; padding-top: 3px; }
+.task-details {
+  margin: 0 0 0 36px;
+  padding: 0;
+  min-width: 0;
+  max-width: none;
+  width: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.task-footer {
+  margin-left: 36px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.task-footer > .small { font-size: 12px; }
+.task-status { flex: 0 0 130px; min-width: 0; }
+.task-footer .task-status { margin-left: auto; }
+.skeleton-tasks .task-details { display: grid; gap: 7px; }
+.skeleton-tasks .task-footer { min-height: 35px; }
+
+/* Search results wrap by content, not by badges and control chrome. */
+.search-results { width: 100%; min-width: 0; gap: 12px; }
+.search-result {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 18px 20px;
+}
+.search-result-heading {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+  line-height: 1.45;
+}
+.search-result-heading > svg { flex: none; margin-top: 2px; }
+.search-result-heading > strong {
+  flex: 1 1 230px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.48;
+}
+.search-result-heading > .small, .search-result-heading > .semantic-label { flex: none; }
+.search-result p {
+  width: 100%;
+  max-width: none;
+  overflow-wrap: anywhere;
+  margin: 10px 0 0;
+  line-height: 1.65;
+}
+.search-snippet {
+  max-height: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.search-result .muted.tiny { font-size: 12px; }
+
+/* Use consistent control heights at comparable hierarchy levels, without restyling Astryx internals. */
+.toolbar { gap: 12px; align-items: center; flex-wrap: wrap; }
+.toolbar > .muted { font-size: 12px; }
+.grant-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid var(--color-border,rgba(128,128,128,.15)); }
+.grant-row:first-of-type { border-top: 0; }
+.grant-details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.grant-details strong { font-size: 14px; font-weight: 620; }
+.grant-details p { margin: 6px 0 0; }
+.grant-scopes { color: var(--color-text-secondary,#888); font-size: 12px; word-break: break-word; }
+.oauth-panel { width: 100%; max-width: none; }
+.oauth-panel .knowledge-empty { min-height: 120px; }
+
+@media (max-width: 720px) {
+ .task-item { padding: 16px 14px; gap: 9px; }
+ .task-heading { gap: 10px; }
+ .task-heading .task-title { font-size: 14px; }
+ .task-details { margin-left: 34px; font-size: 13px; line-height: 1.65; }
+ .task-footer { margin-left: 34px; }
+ .task-status { flex: 0 0 122px; min-width: 0; }
+ .search-result { padding: 16px 14px; }
+ .search-result-heading > strong { flex-basis: calc(100% - 40px); }
+ .search-result-heading > .small, .search-result-heading > .semantic-label { margin-left: 27px; }
+ .grant-row { align-items: flex-start; flex-direction: column; gap: 10px; }
+ .grant-row > button { align-self: flex-end; }
+ .skeleton-files .file-row > span:last-child { display: none; }
+}
+
+/* The document canvas should use the available workspace, not a fixed text-column cap. */
+.page.record-page { max-width: none; width: 100%; }
+.record-main, .editor-section, .editor-body, .wysiwyg { min-width: 0; width: 100%; }
+.record-main .tiptap, .record-main .markdown-preview { max-width: none; width: 100%; margin-inline: 0; box-sizing: border-box; }
+.record-main .cm-editor { max-width: none; width: 100%; }

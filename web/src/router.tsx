@@ -23,7 +23,8 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage}),
  createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage}),
- createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:SettingsPage}),
+ createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:()=> <Navigate to="/settings" replace/>}),
+ createRoute({getParentRoute:()=>root,path:'/settings/oauth',component:SettingsPage}),
  createRoute({getParentRoute:()=>root,path:'/settings/sessions',component:SettingsPage}),
  createRoute({getParentRoute:()=>root,path:'/settings/indexing',component:SettingsPage}),
  createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage})

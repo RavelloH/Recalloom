@@ -79,6 +79,32 @@ webApi.delete('/auth/sessions/:id',async(c)=>{
   if(id===c.get('webSession').id)response.headers.append('set-cookie',cookie('',undefined));
   return response;
 });
+/** The Web owner can manage only their own OAuth grants; never expose token material. */
+webApi.get('/auth/oauth-grants',async(c)=>{
+  const query=parseQuery(c.req.url,z.object({cursor:z.string().max(2048).optional()}));
+  const grants=await c.env.OAUTH_PROVIDER.listUserGrants('owner',{limit:50,cursor:query.cursor});
+  const clients=await c.env.OAUTH_PROVIDER.listClients({limit:200});
+  const names=new Map(clients.items.map(x=>[x.clientId,x.clientName]));
+  return asJson({items:grants.items.map(g=>({
+    id:g.id,clientId:g.clientId,clientName:names.get(g.clientId)||'未命名 Agent',
+    scope:g.scope,createdAt:g.createdAt,expiresAt:g.expiresAt??null,
+    redirectHost:(()=>{try{return new URL(g.redirectUri??'').hostname;}catch{return null;}})()
+  })),cursor:grants.cursor??null});
+});
+webApi.delete('/auth/oauth-grants/:id',async(c)=>{
+  const id=z.string().min(1).max(256).regex(/^[a-zA-Z0-9_-]+$/).parse(c.req.param('id'));
+  // A grant must be verified as owned by the current instance owner before revocation.
+  let cursor:string|undefined,found=false;
+  for(let page=0;page<20;page++){
+    const result=await c.env.OAUTH_PROVIDER.listUserGrants('owner',{limit:100,cursor});
+    if(result.items.some(g=>g.id===id)){found=true;break;}
+    cursor=result.cursor;
+    if(!cursor)break;
+  }
+  if(!found)return err('GRANT_NOT_FOUND',404);
+  await c.env.OAUTH_PROVIDER.revokeGrant(id,'owner');
+  return asJson({revoked:true,id});
+});
 webApi.get('/folders',async(c)=>{
   const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}));
   return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor));

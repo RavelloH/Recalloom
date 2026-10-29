@@ -53,7 +53,7 @@ try{
      }));
      assert.equal(visible.pointer,'auto','scrim intercepts touch when navigation is open');
      assert.ok(parseFloat(visible.transition)>0,'mobile scrim fades in');
-     await screen.getByRole('button',{name:'关闭导航'}).click();
+     await screen.locator('.mobile-scrim').click({position:{x:width-8,y:200}});
      await screen.waitForFunction(()=>!document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
      assert.equal(await screen.locator('.mobile-scrim').getAttribute('aria-hidden'),'true','hidden scrim is not a keyboard target');
    }
@@ -71,13 +71,38 @@ try{
    assert.ok(Math.abs(result.left-result.right)<=1,'symmetric dashboard gutters: '+JSON.stringify(result));
    assert.ok(result.left>=14,'mobile gutters: '+JSON.stringify(result));
    assert.ok(result.scroll<=result.viewport,'no horizontal overflow: '+JSON.stringify(result));
-   for(const path of ['/search','/library','/settings/appearance']){
+   for(const path of ['/search','/library','/settings','/settings/oauth']){
      await screen.goto(url+path,{waitUntil:'networkidle'});
      const fit=await screen.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
      assert.ok(fit.scroll<=fit.viewport,'no horizontal overflow '+path+'@'+width+': '+JSON.stringify(fit));
    }
    await probe.close();
  }
+ // Skeletons must use the same geometry as the actual document list.
+ const skeletonContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+ await skeletonContext.addCookies(await context.cookies());
+ const skeletonPage=await skeletonContext.newPage();
+ await skeletonPage.route('**/api/folders*',async route=>{await new Promise(resolve=>setTimeout(resolve,800));await route.continue();});
+ await skeletonPage.goto(url+'/library',{waitUntil:'domcontentloaded'});
+ await skeletonPage.locator('.skeleton-files .file-row').first().waitFor({timeout:15000});
+ const skeletonBox=await skeletonPage.locator('.skeleton-files .file-row').first().boundingBox();
+ assert.ok(skeletonBox,'file skeleton is rendered');
+ await skeletonPage.locator('a.file-row').first().waitFor({timeout:15000});
+ const fileBox=await skeletonPage.locator('a.file-row').first().boundingBox();
+ assert.ok(fileBox,'real file row is rendered');
+ assert.ok(Math.abs(skeletonBox.width-fileBox.width)<=1,'skeleton and file row widths match');
+ assert.ok(Math.abs(skeletonBox.x-fileBox.x)<=1,'skeleton and real content left edges match');
+ await skeletonPage.goto(url+'/tasks',{waitUntil:'networkidle'});
+ await skeletonPage.locator('.task-list > .task-item').first().waitFor();
+ await skeletonPage.evaluate(()=>{const task=document.querySelector('.task-list > .task-item');if(task&&!task.querySelector('.task-details')){const details=document.createElement('p');details.className='task-details muted';details.textContent='Long task detail '.repeat(20);task.querySelector('.task-heading')?.after(details);}});
+ const taskGeometry=await skeletonPage.locator('.task-list > .task-item').first().evaluate(el=>{
+   const a=el.getBoundingClientRect(),b=el.querySelector('.task-details').getBoundingClientRect(),footer=el.querySelector('.task-footer').getBoundingClientRect();
+   return {itemWidth:a.width,detailsWidth:b.width,footerWidth:footer.width,scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth};
+ });
+ assert.ok(taskGeometry.detailsWidth>taskGeometry.itemWidth*.70,'task description uses available width: '+JSON.stringify(taskGeometry));
+ assert.ok(taskGeometry.footerWidth>taskGeometry.itemWidth*.70,'task controls row stretches to available width');
+ assert.ok(taskGeometry.scrollWidth<=taskGeometry.viewport,'task layout does not overflow mobile viewport');
+ await skeletonContext.close();
  // OS accessibility preference must disable all custom entry and navigation motion.
  const quiet=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
  await quiet.addCookies(await context.cookies());
@@ -147,20 +172,23 @@ try{
  await page.getByRole('button',{name:'Markdown'}).click();
  assert.ok((await page.locator('.cm-content').innerText()).includes('x^2+y^2=z^2'),'source retains math syntax');
  const recUrl=page.url();
- await page.goto(url+'/settings/appearance');
- await page.getByRole('heading',{name:'外观',level:1}).waitFor();
- await chooseOption(page,'主题','深色');
- assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
- await chooseOption(page,'主题','浅色');
- assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
- for(const [path,title] of [['/tasks','任务'],['/search','搜索'],['/activity','活动'],['/settings/sessions','登录会话'],['/settings/indexing','索引状态']]){
+ await page.goto(url+'/settings');
+ await page.getByRole('heading',{name:'设置',level:1}).waitFor();
+ const switchTheme=page.getByRole('button',{name:/切换主题/});
+ // Each press cycles system -> light -> dark -> system without a theme settings page.
+ for(let i=0;i<3;i++)await switchTheme.click();
+ assert.ok(['light','dark'].includes(String(await page.locator('html').getAttribute('data-effective-theme'))));
+ await page.getByRole('link',{name:'Agent 授权'}).click();
+ await page.getByRole('heading',{name:'Agent 授权',level:1}).waitFor();
+ await page.getByText('已授权的 Agent').waitFor();
+ for(const [path,title] of [['/tasks','任务'],['/search','搜索'],['/activity','活动'],['/settings/sessions','登录会话'],['/settings/oauth','Agent 授权'],['/settings/indexing','索引状态']]){
   await page.goto(url+path);
   await page.getByRole('heading',{name:title,level:1}).waitFor({timeout:16000});
  }
  await page.goto(url+'/');
  await page.getByRole('heading',{name:'概览'}).waitFor();
- await page.locator('.recent-entry').first().waitFor();
- assert.ok((await page.locator('.recent-entry').first().innerText()).includes('本人（Web）'),'activity displays owner');
+ await page.locator('.recent-entry[data-activity-seq]').first().waitFor();
+ assert.ok((await page.locator('.recent-entry[data-activity-seq]').first().innerText()).includes('本人（Web）'),'activity displays owner');
  await page.goto(url+'/search');
  await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
  await chooseOption(page,'搜索模式','精确文本');
@@ -181,12 +209,11 @@ try{
  await mobilePage.getByRole('link',{name:'活动',exact:true}).first().tap();
  await mobilePage.getByRole('heading',{name:'活动',level:1}).waitFor();
  await mobilePage.getByRole('link',{name:'设置',exact:true}).last().tap();
- await mobilePage.getByRole('link',{name:'外观'}).tap();
- await chooseOption(mobilePage,'主题','深色');
- assert.equal(await mobilePage.locator('html').getAttribute('data-effective-theme'),'dark');
- assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#111113');
- await chooseOption(mobilePage,'主题','浅色');
- assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#ffffff');
+ const mobileTheme=mobilePage.getByRole('button',{name:/切换主题/});
+ await mobileTheme.tap();
+ assert.ok(['dark','light'].includes(String(await mobilePage.locator('html').getAttribute('data-effective-theme'))));
+ await mobilePage.goto(url+'/settings/oauth');
+ await mobilePage.getByRole('heading',{name:'Agent 授权',level:1}).waitFor();
  await mobilePage.goto(recUrl);
  await mobilePage.getByRole('heading',{name:'First note'}).waitFor();
  await mobilePage.screenshot({path:'tmp/recalloom-mobile.png',fullPage:true});

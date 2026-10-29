@@ -75,6 +75,18 @@ async function main(){
   const session=await api('/api/auth/session');
   assertStatus(session,200,'session protected');
   const sessionId=session.data.session.id;
+  const oauthList=await api('/api/auth/oauth-grants');
+  assertStatus(oauthList,200,'owner may list OAuth grants');
+  assert.ok(Array.isArray(oauthList.data.items));
+  for(const grant of oauthList.data.items){
+    assert.ok(typeof grant.id==='string'&&typeof grant.clientName==='string');
+    assert.equal(Object.hasOwn(grant,'accessToken'),false,'never expose tokens');
+    assert.equal(Object.hasOwn(grant,'refreshToken'),false,'never expose refresh credentials');
+  }
+  const invalidGrant=await api('/api/auth/oauth-grants/unknown-test',{method:'DELETE'});
+  assertStatus(invalidGrant,404,'cannot revoke unknown OAuth grant');
+  const crossGrant=await api('/api/auth/oauth-grants/unknown-test',{method:'DELETE',headers:{origin:'https://attacker.test'}});
+  assertStatus(crossGrant,403,'OAuth revoke protected from CSRF');
   // Explicitly test cross-origin mutation with an actual HTTP request.
   const cross=await api('/api/folders',{method:'POST',body:JSON.stringify({name:'intruder'}),headers:{origin:'https://attacker.test'}});
   assertStatus(cross,403,'authenticated CSRF mutation rejected');
