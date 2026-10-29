@@ -21,6 +21,12 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'工作台'}).waitFor({timeout:18000});
+ const entryMotion=await page.locator('.route-stage').evaluate(el=>({
+   name:getComputedStyle(el).animationName,
+   duration:getComputedStyle(el).animationDuration
+ }));
+ assert.ok(entryMotion.name.includes('rk-page-enter'),'route entrance uses short motion: '+JSON.stringify(entryMotion));
+ assert.ok(parseFloat(entryMotion.duration)>0&&parseFloat(entryMotion.duration)<.5,'entry motion under half a second');
  await page.keyboard.press('Control+k');
  await page.getByRole('dialog',{name:'快速导航'}).waitFor();
  await page.getByRole('dialog',{name:'快速导航'}).getByRole('button',{name:'搜索'}).click();
@@ -34,6 +40,20 @@ try{
    const screen=await probe.newPage();
    await screen.goto(url+'/',{waitUntil:'networkidle'});
    await screen.getByRole('heading',{name:'工作台'}).waitFor();
+   if(width===390){
+     await screen.getByRole('button',{name:'打开导航'}).click();
+     await screen.waitForFunction(()=>document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
+     const visible=await screen.locator('.mobile-scrim').evaluate(el=>({
+       opacity:getComputedStyle(el).opacity,
+       transition:getComputedStyle(el).transitionDuration,
+       pointer:getComputedStyle(el).pointerEvents
+     }));
+     assert.equal(visible.pointer,'auto','scrim intercepts touch when navigation is open');
+     assert.ok(parseFloat(visible.transition)>0,'mobile scrim fades in');
+     await screen.getByRole('button',{name:'关闭导航'}).click();
+     await screen.waitForFunction(()=>!document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
+     assert.equal(await screen.locator('.mobile-scrim').getAttribute('aria-hidden'),'true','hidden scrim is not a keyboard target');
+   }
    const result=await screen.evaluate(()=>{
      const longName='LongUnbrokenFileName'.repeat(30);
      const activity=document.querySelector('.recent-entry .activity-resource');
@@ -55,6 +75,20 @@ try{
    }
    await probe.close();
  }
+ // OS accessibility preference must disable all custom entry and navigation motion.
+ const quiet=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+ await quiet.addCookies(await context.cookies());
+ const quietPage=await quiet.newPage();
+ await quietPage.goto(url+'/library',{waitUntil:'networkidle'});
+ await quietPage.getByRole('heading',{name:'知识库'}).waitFor();
+ const quietStyles=await quietPage.evaluate(()=>({
+  route:getComputedStyle(document.querySelector('.route-stage')).animationName,
+  sidebar:getComputedStyle(document.querySelector('.sidebar')).transitionDuration,
+  row:getComputedStyle(document.querySelector('.file-row')||document.querySelector('.file-table')).transitionDuration
+ }));
+ assert.equal(quietStyles.route,'none','reduced motion disables route entrance');
+ assert.equal(quietStyles.sidebar.split(',')[0].trim(),'0s','reduced motion disables sidebar transitions');
+ await quiet.close();
  assert.equal((await context.cookies()).some(c=>c.name==='__Host-recalloom_session'),true,'session should use secure cookie');
  await page.goto(url+'/library');
  await page.getByRole('heading',{name:'知识库'}).waitFor();
