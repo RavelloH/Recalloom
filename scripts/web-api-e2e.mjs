@@ -119,11 +119,12 @@ async function main(){
   const search=await api('/api/search?mode=literal&query=Updated%20state');
   assertStatus(search,200,'search');
   assert.ok(search.data.items.find(x=>x.id===id));
-  let eventCursor=0,foundActor=false;
+  let eventCursor,foundActor=false;
   for(let page=0;page<25&&!foundActor;page++){
-    const activity=await api('/api/activity?limit=200&cursor='+eventCursor);
+    const activity=await api('/api/activity?limit=200'+(eventCursor===undefined?'':'&cursor='+eventCursor));
     assertStatus(activity,200,'activity');
-    foundActor=activity.data.items.some(e=>e.actor==='web:owner:'+sessionId);
+    assert.ok(activity.data.items.every((e,i,a)=>i===0||a[i-1].seq>e.seq),'activity must be newest first');
+    foundActor=activity.data.items.some(e=>e.actor==='web:owner:'+sessionId&&e.resourceName==='checkpoint.md'&&e.actorName==='本人（Web）');
     if(!activity.data.page.hasMore)break;
     eventCursor=activity.data.page.nextCursor;
   }

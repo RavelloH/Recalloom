@@ -5,4 +5,4 @@ export type RecordDetail=Entry&{kind:'document'|'task_list'|'checkpoint';revisio
 export type Task={id:string;recordId:string;title:string;details?:string;status:'todo'|'in_progress'|'blocked'|'done'|'cancelled';priority:number};
 export type Session={id:string;createdAt:number;lastSeenAt:number;expiresAt:number;userAgent:string};
 export type Version={revision:number;message?:string;actor?:string;createdAt?:string;contentSha256?:string};
-export type Event={id?:string;seq?:number;actor?:string;operation?:string;entityType?:string;entityId?:string;createdAt?:string;revision?:number};
+export type Event={id?:string;seq?:number;actor?:string;actorName?:string;clientName?:string|null;operation?:string;resourceName?:string;recordId?:string|null;entityType?:string;entityId?:string;createdAt?:string;revision?:number};

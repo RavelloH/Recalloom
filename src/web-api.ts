@@ -5,6 +5,7 @@ import { StorageError } from './types.js';
 import * as store from './storage.js';
 import * as agent from './agent-tools.js';
 import { search } from './search.js';
+import { recentActivity } from './web-activity.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
 type Vars={webSession:WebSession};
@@ -167,7 +168,7 @@ webApi.get('/search',async(c)=>{
 });
 webApi.get('/activity',async(c)=>{
   const q=parseQuery(c.req.url,z.object({cursor:z.coerce.number().int().nonnegative().optional(),limit}));
-  return asJson(await store.changesSince(c.env,q.cursor,q.limit));
+  return asJson(await recentActivity(c.env,q.cursor,q.limit));
 });
 webApi.get('/tags',async(c)=>{
   const q=parseQuery(c.req.url,z.object({cursor:z.string().max(4096).optional(),limit}));

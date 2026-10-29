@@ -4,6 +4,7 @@ import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
 import { webApi } from './web-api.js';
 import { cleanupWebAuth } from './web-auth.js';
+import { rememberOAuthActor } from './web-activity.js';
 import type { Env } from './types.js';
 import { page, escapeHtml, consentForm } from './auth-page.js';
 
@@ -54,10 +55,14 @@ async function authorize(request:Request,env:Env):Promise<Response>{
         new URL(parsed.redirectUri).origin
       );
     }
+    const details=await oauth.describeConsent(await oauth.parseAuthRequest(request));
     const approved=await oauth.approveConsent(request,handle,{scope:form.getAll('scope').map(String)});
+    const actorId=crypto.randomUUID();
+    await env.DB.prepare('INSERT INTO oauth_actor_names(actor_id,client_name,created_at) VALUES(?,?,?)')
+      .bind(actorId,details.clientName.trim().slice(0,200)||'Unnamed Agent',new Date().toISOString()).run();
     const {redirectTo}=await oauth.completeAuthorization({
       request:approved.request,userId:'owner',metadata:{},scope:approved.request.scope,
-      props:{actorId:crypto.randomUUID()}
+      props:{actorId,clientName:details.clientName.trim().slice(0,200)}
     });
     approved.headers.set('location',redirectTo);
     return new Response(null,{status:302,headers:approved.headers});
@@ -74,11 +79,12 @@ function provider(env:Env,request:Request){
   return new OAuthProvider<Env>({
     apiRoute:'/mcp',
     apiHandler:{
-      async fetch(mcpRequest:Request,requestEnv:Env,ctx:ExecutionContext & {props?:unknown;auth?:{scope?:string[]}}){
+      async fetch(mcpRequest:Request,requestEnv:Env,ctx:ExecutionContext & {props?:unknown;auth?:{scope?:string[];clientId?:string}}){
         if(new URL(mcpRequest.url).pathname!=='/mcp')return new Response('Not Found',{status:404});
         const scopes=ctx.auth?.scope??[];
         if(!scopes.includes('notes:read'))return Response.json({error:'insufficient_scope'},{status:403});
-        const props=ctx.props&&typeof ctx.props==='object'?ctx.props as {actorId?:string}:{};
+        const props=ctx.props&&typeof ctx.props==='object'?ctx.props as {actorId?:string;clientName?:string}:{};
+        if(props.actorId)ctx.waitUntil(rememberOAuthActor(requestEnv,props.actorId,ctx.auth?.clientId,props.clientName).catch(e=>console.error('Agent name sync failed',e)));
         const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown')),{legacy:'stateless'});
         return handler.fetch(mcpRequest);
       }

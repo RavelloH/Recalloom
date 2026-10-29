@@ -45,6 +45,17 @@ try{
  await page.keyboard.type(' Additional visual edit.');
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByText('R3').waitFor({timeout:15000});
+ await page.getByRole('button',{name:'Markdown'}).click();
+ const extended=['# UI e2e','','- [x] Completed','- [ ] Pending','','| Item | Value |','| --- | --- |','| Test | 42 |','','$$x^2+y^2=z^2$$','','~~removed~~ **bold** and `inline`'].join(String.fromCharCode(10));
+ await page.locator('.cm-content').fill(extended);
+ await page.getByRole('button',{name:'保存'}).click();
+ await page.getByText('R4').waitFor({timeout:15000});
+ await page.getByRole('button',{name:'预览'}).click();
+ await page.locator('.markdown-preview table').waitFor({timeout:15000});
+ await page.locator('.markdown-preview .katex').first().waitFor({timeout:15000});
+ assert.ok(await page.locator('.markdown-preview input[type=checkbox]').count()>=2,'GFM task lists render');
+ await page.getByRole('button',{name:'Markdown'}).click();
+ assert.ok((await page.locator('.cm-content').innerText()).includes('x^2+y^2=z^2'),'source retains math syntax');
  const recUrl=page.url();
  await page.goto(url+'/settings/appearance');
  await page.getByRole('heading',{name:'外观',level:1}).waitFor();
@@ -56,6 +67,15 @@ try{
   await page.goto(url+path);
   await page.getByRole('heading',{name:title,level:1}).waitFor({timeout:16000});
  }
+ await page.goto(url+'/');
+ await page.getByRole('heading',{name:'工作台'}).waitFor();
+ await page.locator('.recent-entry').first().waitFor();
+ assert.ok((await page.locator('.recent-entry').first().innerText()).includes('本人（Web）'),'activity displays owner');
+ await page.goto(url+'/search');
+ await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
+ await page.getByLabel('搜索模式').selectOption('literal');
+ await page.getByRole('button',{name:'搜索',exact:true}).click();
+ await page.locator('.search-highlight').first().waitFor({timeout:15000});
  await page.goto(recUrl);
  await page.getByRole('heading',{name:'First note'}).waitFor();
  console.log('DESKTOP_SHELL',await page.locator('.shell').evaluate(el=>({className:el.className,sidebarWidth:el.querySelector('.sidebar')?.getBoundingClientRect().width,shellWidth:el.getBoundingClientRect().width,viewportWidth:innerWidth})));
@@ -65,6 +85,19 @@ try{
  // Reuse the session cookie for an authenticated mobile render in the same isolated test environment.
  await mobile.addCookies(await context.cookies());
  await mobilePage.goto(recUrl,{waitUntil:'networkidle'});
+ await mobilePage.getByRole('heading',{name:'First note'}).waitFor();
+ await mobilePage.getByRole('button',{name:'打开导航'}).tap();
+ await mobilePage.locator('.sidebar.mobile-open').waitFor();
+ await mobilePage.getByRole('link',{name:'活动',exact:true}).first().tap();
+ await mobilePage.getByRole('heading',{name:'活动',level:1}).waitFor();
+ await mobilePage.getByRole('link',{name:'设置',exact:true}).last().tap();
+ await mobilePage.getByRole('link',{name:'外观'}).tap();
+ await mobilePage.getByLabel('主题').selectOption('dark');
+ assert.equal(await mobilePage.locator('html').getAttribute('data-effective-theme'),'dark');
+ assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#111113');
+ await mobilePage.getByLabel('主题').selectOption('light');
+ assert.equal(await mobilePage.locator('meta[name="theme-color"]').getAttribute('content'),'#ffffff');
+ await mobilePage.goto(recUrl);
  await mobilePage.getByRole('heading',{name:'First note'}).waitFor();
  await mobilePage.screenshot({path:'tmp/recalloom-mobile.png',fullPage:true});
  assert.ok(await mobilePage.getByRole('link',{name:'任务'}).first().isVisible());
