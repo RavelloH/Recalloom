@@ -35,6 +35,37 @@ async function main(){
   assertStatus(root,200,'Worker root');
   if(typeof root.data==='string')assert.match(root.data,/Recalloom/,'SPA shell delivered');
   else assert.equal(root.data.name,'Recalloom');
+
+  const oauthMetadata=await api('/.well-known/oauth-authorization-server');
+  assertStatus(oauthMetadata,200,'OAuth discovery available');
+  assert.equal(oauthMetadata.data.client_id_metadata_document_supported,false,'DCR stays preferred while ChatGPT CIMD metadata is blocked from Workers');
+  assert.equal(oauthMetadata.data.registration_endpoint,origin+'/oauth/register','DCR stays available for older clients');
+  const resourceMetadata=await api('/.well-known/oauth-protected-resource/mcp');
+  assertStatus(resourceMetadata,200,'MCP resource metadata');
+  assert.equal(resourceMetadata.data.resource,origin+'/mcp');
+  const dcr=await post('/oauth/register',{
+    client_name:'Recalloom compatibility E2E',
+    redirect_uris:['http://127.0.0.1:7365/oauth/callback'],
+    response_types:['code'],grant_types:['authorization_code','refresh_token'],
+    token_endpoint_auth_method:'none'
+  });
+  assertStatus(dcr,201,'DCR still registers public localhost OAuth clients');
+  assert.equal(typeof dcr.data.client_id,'string');
+  assert.equal(dcr.data.token_endpoint_auth_method,'none');
+  const consentUrl=new URL('/authorize',origin);
+  for(const [key,value] of Object.entries({
+    client_id:dcr.data.client_id,
+    redirect_uri:'http://127.0.0.1:7365/oauth/callback',
+    response_type:'code',
+    scope:'notes:read notes:write',
+    resource:origin+'/mcp',
+    code_challenge:'A'.repeat(43),
+    code_challenge_method:'S256',
+    state:'oauth-compatibility-e2e'
+  }))consentUrl.searchParams.set(key,value);
+  const consent=await api(consentUrl.pathname+consentUrl.search);
+  assertStatus(consent,200,'DCR registered client can reach OAuth consent page');
+  assert.match(String(consent.data),/授权 Recalloom/,'OAuth form rendered after DCR');
   const unauth=await api('/api/folders');
   assertStatus(unauth,401,'unauthenticated request denied');
   const noOrigin=await api('/api/auth/cap/challenge',{method:'POST',headers:{origin:''}});

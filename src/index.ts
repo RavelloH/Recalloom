@@ -104,7 +104,10 @@ function provider(env:Env,request:Request){
     scopesSupported:SCOPES,
     requiredScopes:SCOPES,
     resourceMetadata:{resource:origin+'/mcp',authorization_servers:[origin],resource_name:'Recalloom'},
-    // ChatGPT uses DCR when CIMD is not advertised. This avoids upstream 403s.
+    // Keep DCR for ChatGPT/Codex: Cloudflare Worker fetches of chatgpt.com CIMD JSON
+    // currently return HTTP 403, even though a browser fetch may return 200.
+    // Enabling CIMD here makes these clients prefer a failing authorization path.
+    // Re-evaluate when upstream Worker-to-ChatGPT metadata fetching is fixed.
     clientIdMetadataDocumentEnabled:false,
     refreshTokenTTL:90*24*3600,
     refreshTokenIdleTTL:30*24*3600
