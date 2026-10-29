@@ -20,26 +20,29 @@ try{
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
- await page.getByRole('heading',{name:'工作台'}).waitFor({timeout:18000});
+ await page.getByRole('heading',{name:'概览'}).waitFor({timeout:18000});
  const entryMotion=await page.locator('.route-stage').evaluate(el=>({
    name:getComputedStyle(el).animationName,
    duration:getComputedStyle(el).animationDuration
  }));
  assert.ok(entryMotion.name.includes('rk-page-enter'),'route entrance uses short motion: '+JSON.stringify(entryMotion));
  assert.ok(parseFloat(entryMotion.duration)>0&&parseFloat(entryMotion.duration)<.5,'entry motion under half a second');
+ assert.equal(await page.locator('.overview-link').count(),3,'quiet quick links replace oversized cards');
+ assert.equal(await page.locator('.stat-card').count(),0,'no large nested navigation cards');
+ assert.equal(await page.locator('.route-stage').evaluate(el=>getComputedStyle(el).transform),'none','no page slide transform');
  await page.keyboard.press('Control+k');
  await page.getByRole('dialog',{name:'快速导航'}).waitFor();
  await page.getByRole('dialog',{name:'快速导航'}).getByRole('button',{name:'搜索'}).click();
  await page.getByRole('heading',{name:'搜索',level:1}).waitFor();
  await page.goto(url+'/');
- await page.getByRole('heading',{name:'工作台'}).waitFor();
+ await page.getByRole('heading',{name:'概览'}).waitFor();
  // Mobile grids must not widen to min-content when activity names or tasks are long.
  for(const width of [320,390,414,430]){
    const probe=await browser.newContext({viewport:{width,height:844},isMobile:true,deviceScaleFactor:2,hasTouch:true});
    await probe.addCookies(await context.cookies());
    const screen=await probe.newPage();
    await screen.goto(url+'/',{waitUntil:'networkidle'});
-   await screen.getByRole('heading',{name:'工作台'}).waitFor();
+   await screen.getByRole('heading',{name:'概览'}).waitFor();
    if(width===390){
      await screen.getByRole('button',{name:'打开导航'}).click();
      await screen.waitForFunction(()=>document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
@@ -101,7 +104,7 @@ try{
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.getByText(folderName,{exact:true}).waitFor();
  await page.getByText(folderName,{exact:true}).click();
- await page.getByRole('heading',{name:'目录内容'}).waitFor();
+ await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  const folderUrl=page.url();
  await page.getByRole('button',{name:'新建记录'}).click();
  await page.getByRole('textbox',{name:'名称'}).fill('First note');
@@ -155,7 +158,7 @@ try{
   await page.getByRole('heading',{name:title,level:1}).waitFor({timeout:16000});
  }
  await page.goto(url+'/');
- await page.getByRole('heading',{name:'工作台'}).waitFor();
+ await page.getByRole('heading',{name:'概览'}).waitFor();
  await page.locator('.recent-entry').first().waitFor();
  assert.ok((await page.locator('.recent-entry').first().innerText()).includes('本人（Web）'),'activity displays owner');
  await page.goto(url+'/search');

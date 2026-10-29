@@ -1,76 +1,57 @@
-/* Recalloom motion layer. Astryx owns primitive animations; these transitions
-   cover navigation, content changes and business surfaces only. */
+/* Recalloom motion: restrained and functional.
+   Astryx controls retain their own hover, press and focus behavior. */
 :root {
-  --rk-ease-out: cubic-bezier(.22,1,.36,1);
-  --rk-ease-standard: cubic-bezier(.2,.8,.2,1);
-  --rk-motion-fast: 140ms;
-  --rk-motion-normal: 220ms;
-  --rk-motion-panel: 270ms;
+  --rk-motion-fast: 120ms;
+  --rk-motion-panel: 190ms;
 }
 @keyframes rk-page-enter {
-  from { opacity: 0; transform: translate3d(0,9px,0); }
-  to { opacity: 1; transform: none; }
+  from { opacity: .86; }
+  to { opacity: 1; }
 }
-@keyframes rk-content-enter {
-  from { opacity: 0; transform: translate3d(0,7px,0); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes rk-surface-enter {
-  from { opacity: 0; transform: translate3d(0,-8px,0) scale(.99); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes rk-appear {
+@keyframes rk-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-/* Route view changes are short and compositor-only. No animation on keystrokes. */
+/* Changes of location remain perceptible without shifting the document. */
 .route-stage {
   min-width: 0;
-  animation: rk-page-enter var(--rk-motion-panel) var(--rk-ease-out) both;
+  animation: rk-page-enter 140ms ease-out both;
 }
-/* Cross-page navigation and desktop shell */
 .sidebar {
-  transition: width var(--rk-motion-panel) var(--rk-ease-standard),
-              min-width var(--rk-motion-panel) var(--rk-ease-standard),
-              border-color var(--rk-motion-fast) ease;
+  transition: width var(--rk-motion-panel) ease,
+              min-width var(--rk-motion-panel) ease;
 }
-.nav-link, .folder-link, .settings-tab {
+.nav-link, .folder-link, .settings-tab,
+.overview-link, .file-row, .task-item, .search-result,
+.compact-row, .recent-entry, .outline-item {
   transition: background-color var(--rk-motion-fast) ease,
               color var(--rk-motion-fast) ease;
 }
-.nav-link > svg, .folder-link > svg, .settings-tab > svg {
-  transition: transform var(--rk-motion-normal) var(--rk-ease-out);
+@media (hover: hover) and (pointer: fine) {
+  .file-row:hover, .task-item:hover,
+  .overview-link:hover, .search-result:hover {
+    background-color: var(--color-background-muted, rgba(128,128,128,.06));
+  }
 }
-.nav-link.active > svg, .nav-link:hover > svg,
-.folder-link:hover > svg { transform: translateX(2px); }
+.file-row:active, .overview-link:active,
+.search-result:active, .bottom-link:active {
+  background-color: var(--color-background-muted, rgba(128,128,128,.12));
+}
 .bottom-link {
-  position: relative;
   transition: color var(--rk-motion-fast) ease;
 }
-.bottom-link::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  height: 2px;
-  width: 23px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0;
-  transform: scaleX(.35);
-  transition: opacity var(--rk-motion-normal) ease,
-              transform var(--rk-motion-normal) var(--rk-ease-out);
+.bottom-link.active {
+  color: var(--color-text-primary, inherit);
 }
-.bottom-link.active { color: var(--color-text-primary,inherit); }
-.bottom-link.active::before { opacity: .86; transform: scaleX(1); }
-.bottom-link svg { transition: transform var(--rk-motion-fast) var(--rk-ease-out); }
-.bottom-link:active svg { transform: scale(.9); }
-/* Keep the mobile scrim mounted so closing also fades rather than disappearing. */
-@media (max-width:720px) {
+.create-surface, .record-inspector, .history-panel,
+.error-banner, .warning-banner {
+  animation: rk-fade-in 150ms ease-out both;
+}
+/* Keep the scrim mounted for matching entry/exit transitions. */
+@media (max-width: 720px) {
   .sidebar {
-    transition: transform var(--rk-motion-panel) var(--rk-ease-standard),
-                box-shadow var(--rk-motion-normal) ease;
+    transition: transform var(--rk-motion-panel) ease;
   }
-  .sidebar.mobile-open { box-shadow: 10px 0 45px rgba(0,0,0,.16); }
   .mobile-scrim {
     display: block;
     opacity: 0;
@@ -86,99 +67,29 @@
     transition: opacity var(--rk-motion-panel) ease, visibility 0s;
   }
 }
-/* Card and row feedback. Never override Astryx Button/TextInput internals. */
-.stat-card, .home-card {
-  transition: transform var(--rk-motion-normal) var(--rk-ease-out),
-              box-shadow var(--rk-motion-normal) ease;
-}
-.file-row, .task-item, .search-result, .compact-row, .recent-entry,
-.history-row, .session-row, .outline-item {
-  transition: background-color var(--rk-motion-fast) ease,
-              border-color var(--rk-motion-fast) ease;
-}
-.file-row > span:first-child svg,
-.search-result > .row svg {
-  transition: transform var(--rk-motion-normal) var(--rk-ease-out);
-}
-.page-header, .breadcrumbs { min-width: 0; }
-@media (hover:hover) and (pointer:fine) {
-  a.stat:hover .stat-card {
-    transform: translate3d(0,-3px,0);
-    box-shadow: 0 7px 22px rgba(0,0,0,.055);
-  }
-  .home-card:hover { box-shadow: 0 4px 19px rgba(0,0,0,.04); }
-  .file-row:hover > span:first-child svg,
-  .search-result:hover > .row svg { transform: translateX(3px); }
-  .task-item:hover, .compact-row:hover, .recent-entry:hover {
-    background-color: var(--color-background-muted,rgba(128,128,128,.045));
-  }
-  .search-result:hover { transform: translateY(-2px); }
-  .outline-item:hover { background-color: var(--color-background-muted,rgba(128,128,128,.08)); }
-}
-.search-result {
-  transition: transform var(--rk-motion-normal) var(--rk-ease-out),
-              background-color var(--rk-motion-fast) ease,
-              box-shadow var(--rk-motion-fast) ease;
-}
-.file-row:active, .search-result:active, .bottom-link:active,
-.settings-tab:active { background-color: var(--color-background-muted,rgba(128,128,128,.12)); }
-.file-row:focus-visible, .search-result:focus-visible {
-  outline: 2px solid var(--color-text-primary,currentColor);
-  outline-offset: -3px;
-}
-/* New content, loading and expanded details get gentle, bounded entrance motion. */
-.create-surface, .record-inspector, .history-panel {
-  animation: rk-surface-enter var(--rk-motion-panel) var(--rk-ease-out) both;
-}
-.editor-view {
-  animation: rk-content-enter 180ms var(--rk-ease-out) both;
-}
-.error-banner, .warning-banner {
-  animation: rk-content-enter var(--rk-motion-normal) var(--rk-ease-out) both;
-}
-.search-result:nth-child(-n+8), .file-row:nth-child(n+2):nth-child(-n+8),
-.activity-row:nth-child(-n+6), .loading-row {
-  animation: rk-content-enter var(--rk-motion-normal) var(--rk-ease-out) both;
-}
-.search-result:nth-child(2), .file-row:nth-child(3),
-.activity-row:nth-child(2), .loading-row:nth-child(2) { animation-delay: 28ms; }
-.search-result:nth-child(3), .file-row:nth-child(4),
-.activity-row:nth-child(3), .loading-row:nth-child(3) { animation-delay: 56ms; }
-.search-result:nth-child(4), .file-row:nth-child(5),
-.activity-row:nth-child(4), .loading-row:nth-child(4) { animation-delay: 84ms; }
-.search-result:nth-child(5), .file-row:nth-child(6),
-.activity-row:nth-child(5), .loading-row:nth-child(5) { animation-delay: 112ms; }
-.search-result:nth-child(6), .file-row:nth-child(7),
-.activity-row:nth-child(6) { animation-delay: 140ms; }
+/* Astryx Skeleton animates itself; placeholders should not also slide in. */
 .loading-rows { display: grid; gap: 0; min-width: 0; }
 .loading-row {
   display: flex;
   align-items: center;
   gap: 14px;
   min-height: 58px;
-  border-top: 1px solid var(--color-border,rgba(128,128,128,.12));
+  border-top: 1px solid var(--color-border, rgba(128,128,128,.12));
   padding: 10px 2px;
 }
 .loading-row:first-child { border: 0; }
-.loading-lines { display: grid; gap: 8px; flex: 1; min-width: 0; }
-@media (hover:none) {
-  a.stat:hover .stat-card { transform: none; }
+.loading-lines {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
-/* Motion is progressive enhancement. Respect both OS setting and forced-colors. */
-@media (prefers-reduced-motion:reduce) {
+@media (prefers-reduced-motion: reduce) {
   .route-stage, .create-surface, .record-inspector, .history-panel,
-  .editor-view, .error-banner, .warning-banner,
-  .search-result, .file-row, .activity-row, .loading-row {
-    animation: none !important;
-  }
-  .sidebar, .mobile-scrim, .stat-card, .home-card, .nav-link, .folder-link,
-  .settings-tab, .bottom-link, .bottom-link::before, .bottom-link svg,
-  .file-row, .task-item, .search-result, .compact-row, .recent-entry,
-  .history-row, .session-row, .outline-item, .file-row svg,
-  .search-result svg {
+  .error-banner, .warning-banner { animation: none !important; }
+  .sidebar, .mobile-scrim, .nav-link, .folder-link, .settings-tab,
+  .overview-link, .file-row, .task-item, .search-result,
+  .compact-row, .recent-entry, .outline-item, .bottom-link {
     transition: none !important;
-  }
-  a.stat:hover .stat-card, .search-result:hover, .file-row svg {
-    transform: none !important;
   }
 }
