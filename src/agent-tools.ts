@@ -99,14 +99,14 @@ export async function links(env:Env,id:string,action:'list'|'add'|'remove'='list
   await env.DB.batch([stmt.bind(id,targetId,relation),event]);
   return {id,targetId,relation,changed:true};
 }
-type ContextCursor={folderId:string|null;depth:number;recordDone:boolean;taskDone:boolean;record?:{rank:number;updatedAt:string;id:string};task?:{priority:number;id:string}};
+type OverviewCursor={folderId:string|null;depth:number;recordDone:boolean;taskDone:boolean;record?:{rank:number;updatedAt:string;id:string};task?:{priority:number;id:string}};
 export async function getOverview(env:Env,folderId:string|null=null,depth=2,budget=12000,cursor?:string){
   const maxDepth=Math.min(5,Math.max(0,depth)),maxBudget=Math.min(30000,Math.max(1000,budget));
   if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
-  let state:ContextCursor={folderId,depth:maxDepth,recordDone:false,taskDone:false};
+  let state:OverviewCursor={folderId,depth:maxDepth,recordDone:false,taskDone:false};
   if(cursor){
     try{
-      const parsed=JSON.parse(cursor) as ContextCursor;
+      const parsed=JSON.parse(cursor) as OverviewCursor;
       if(parsed.folderId!==folderId||parsed.depth!==maxDepth||typeof parsed.recordDone!=='boolean'||typeof parsed.taskDone!=='boolean')throw Error();
       state=parsed;
     }catch{throw new StorageError('INVALID_CURSOR');}
@@ -133,24 +133,27 @@ export async function getOverview(env:Env,folderId:string|null=null,depth=2,budg
   ]);
   const records:Array<Record<string,unknown>>=[],openTasks:Array<Record<string,unknown>>=[];
   const rs=recRows.results,ts=taskRows.results;
-  let remaining=maxBudget-300-JSON.stringify(folder).length,taskBudget=Math.floor(maxBudget*0.4);
-  for(const task of ts){
-    const size=JSON.stringify(task).length+1;
-    if(size>taskBudget||size>remaining)break;
-    openTasks.push(task);remaining-=size;taskBudget-=size;
-  }
+  let remaining=maxBudget-300-JSON.stringify(folder).length;
+  const taskBudget=ts.length?Math.floor(Math.max(0,remaining)*0.2):0;
+  // The main purpose of a knowledge overview is navigation, not task reporting.
   for(const record of rs){
     const item={...record,tags:JSON.parse(String(record.tags??'[]'))} as Record<string,unknown>;
     const overhead=JSON.stringify({...item,excerpt:''}).length+2;
-    if(overhead>=remaining)break;
-    item.excerpt=String(item.excerpt??'').slice(0,Math.floor((remaining-overhead)/6));
+    if(overhead>=remaining-taskBudget)break;
+    item.excerpt=String(item.excerpt??'').slice(0,Math.floor((remaining-taskBudget-overhead)/6));
     const size=JSON.stringify(item).length+1;
-    if(size>remaining)break;
+    if(size>remaining-taskBudget)break;
     records.push(item);remaining-=size;
+  }
+  let remainingTasks=taskBudget;
+  for(const task of ts){
+    const size=JSON.stringify(task).length+1;
+    if(size>remainingTasks||size>remaining)break;
+    openTasks.push(task);remaining-=size;remainingTasks-=size;
   }
   const lastRecord=records.at(-1),lastTask=openTasks.at(-1);
   const recordDone=state.recordDone||records.length===rs.length,taskDone=state.taskDone||openTasks.length===ts.length;
-  const next:ContextCursor={
+  const next:OverviewCursor={
     folderId,depth:maxDepth,recordDone,taskDone,
     record:lastRecord?{rank:Number(lastRecord.rank),updatedAt:String(lastRecord.updatedAt),id:String(lastRecord.id)}:state.record,
     task:lastTask?{priority:Number(lastTask.priority),id:String(lastTask.id)}:state.task

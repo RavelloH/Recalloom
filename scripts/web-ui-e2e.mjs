@@ -17,6 +17,29 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'工作台'}).waitFor({timeout:18000});
+ // Mobile grids must not widen to min-content when activity names or tasks are long.
+ for(const width of [320,390,414,430]){
+   const probe=await browser.newContext({viewport:{width,height:844},isMobile:true,deviceScaleFactor:2,hasTouch:true});
+   await probe.addCookies(await context.cookies());
+   const screen=await probe.newPage();
+   await screen.goto(url+'/',{waitUntil:'networkidle'});
+   await screen.getByRole('heading',{name:'工作台'}).waitFor();
+   const result=await screen.evaluate(()=>{
+     const longName='LongUnbrokenFileName'.repeat(30);
+     const activity=document.querySelector('.recent-entry .activity-resource');
+     const task=document.querySelector('.compact-row a');
+     if(activity)activity.textContent=longName;
+     if(task)task.textContent=longName;
+     const panel=document.querySelector('.dashboard-grid>.panel');
+     if(!panel)throw Error('dashboard panel missing');
+     const box=panel.getBoundingClientRect();
+     return {left:box.left,right:innerWidth-box.right,viewport:innerWidth,scroll:document.documentElement.scrollWidth};
+   });
+   assert.ok(Math.abs(result.left-result.right)<=1,'symmetric dashboard gutters: '+JSON.stringify(result));
+   assert.ok(result.left>=14,'mobile gutters: '+JSON.stringify(result));
+   assert.ok(result.scroll<=result.viewport,'no horizontal overflow: '+JSON.stringify(result));
+   await probe.close();
+ }
  assert.equal((await context.cookies()).some(c=>c.name==='__Host-recalloom_session'),true,'session should use secure cookie');
  await page.goto(url+'/library');
  await page.getByRole('heading',{name:'知识库'}).waitFor();

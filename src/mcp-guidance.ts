@@ -20,7 +20,7 @@ export const TOOL_GUIDANCE = {
   },
   resolve_path: {
     title: 'Resolve a virtual path',
-    description: 'Resolve an exact absolute Recalloom virtual path such as /Projects/Example/file.md into a stable folder or record UUID. This does not access local filesystem paths.',
+    description: 'Resolve an exact absolute Recalloom virtual path such as /Notes/Example/file.md into a stable folder or record UUID. This does not access local filesystem paths.',
     destructive: false,
   },
   create_folder: {

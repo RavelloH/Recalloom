@@ -21,3 +21,15 @@ html[data-effective-theme="dark"] .search-highlight{background:#715c16;color:#ff
 .outline-item:hover,.outline-item:focus-visible{background:rgba(127,127,127,.13)}
 .outline-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .outline-item small{flex:none;opacity:.6}
+
+/* Prevent mobile Safari's auto-minimum 1fr grid track from widening cards. */
+.dashboard-grid>.panel,.dashboard-stats>.stat{min-width:0;max-width:100%}
+@media(max-width:1000px){.dashboard-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:720px){
+  .page{width:100%;min-width:0;padding-inline:max(15px,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))}
+  .dashboard-grid{grid-template-columns:minmax(0,1fr);min-width:0}
+  .dashboard-grid>.panel{min-width:0;max-width:100%}
+  .compact-row,.recent-entry{min-width:0;max-width:100%}
+  .recent-entry .activity-main{min-width:0}
+  .activity-summary,.activity-resource{overflow-wrap:anywhere;word-break:normal}
+}

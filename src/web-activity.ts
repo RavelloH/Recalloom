@@ -1,6 +1,6 @@
 import type {Env} from './types.js';
 
-export type ActivityItem={seq:number;revision:number|null;actor:string;actorName:string;actorKind:'user'|'agent'|'unknown';clientName:string|null;createdAt:string;entityType:string;entityId:string;recordId:string|null;operation:string;resourceName:string;details:Record<string,unknown>|null};
+export type ActivityItem={seq:number;revision:number|null;actor:string;actorName:string;actorKind:'user'|'agent'|'system'|'unknown';clientName:string|null;createdAt:string;entityType:string;entityId:string;recordId:string|null;operation:string;resourceName:string;details:Record<string,unknown>|null};
 /** UI-facing newest-first activity; the existing MCP incremental changes endpoint stays ascending. */
 export async function recentActivity(env:Env,cursor?:number,limit=50){
  const size=Math.max(1,Math.min(limit,200));
@@ -18,12 +18,13 @@ export async function recentActivity(env:Env,cursor?:number,limit=50){
   if(row.detailsJson){try{const v:unknown=JSON.parse(row.detailsJson);if(v&&typeof v==='object'&&!Array.isArray(v))details=v as Record<string,unknown>;}catch{/* old malformed details */}}
   const isOwner=row.actor.startsWith('web:owner:');
   const agent=row.actor.startsWith('grant:');
+  const system=row.actor.startsWith('system:');
   const clientName=row.clientName?.trim()||null;
   const fallbackName=typeof details?.name==='string'?details.name:typeof details?.title==='string'?details.title:null;
   const entityId=row.entityId||row.recordId||'';
   return {seq:row.seq,revision:row.revision,actor:row.actor,
-    actorName:isOwner?'本人（Web）':agent?(clientName||'未识别 Agent'):'未知操作方',
-    actorKind:isOwner?'user':agent?'agent':'unknown',clientName,
+    actorName:isOwner?'本人（Web）':agent?(clientName||'未识别 Agent'):system?(row.actor==='system:migration'?'系统迁移':'系统'):'未识别的历史操作方',
+    actorKind:isOwner?'user':agent?'agent':system?'system':'unknown',clientName,
     createdAt:row.createdAt,recordId:row.recordId,entityType:row.entityType??(row.recordId?'record':'unknown'),entityId,
     operation:row.operation,resourceName:row.recordName||row.folderName||fallbackName||'已移除的资源',details} as ActivityItem;
  });

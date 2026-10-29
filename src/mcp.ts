@@ -72,7 +72,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   };
   register('browse',z.object({folderId:uuid.nullable().describe('Folder UUID; omit or null to browse root.').optional(),limit,cursor:pageCursor}),false,
     (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
-  register('resolve_path',z.object({path:z.string().startsWith('/').max(2048).describe('Absolute Recalloom virtual path such as /Projects/Example/checkpoint.md, not a local disk path.')}),false,
+  register('resolve_path',z.object({path:z.string().startsWith('/').max(2048).describe('Absolute Recalloom virtual path such as /Notes/Example/note.md, not a local disk path.')}),false,
     (x)=>store.resolvePath(env,x.path));
   register('create_folder',z.object({name:z.string().min(1).max(180),parentId:uuid.nullable().optional(),description:z.string().max(5000).optional()}),true,
     (x)=>store.createFolder(env,x.name,x.parentId??null,x.description,actor));
