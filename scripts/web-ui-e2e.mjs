@@ -78,6 +78,11 @@ try{
    }
    await probe.close();
  }
+ // Create a real file row fixture so skeleton geometry tests work on empty D1.
+ await page.evaluate(async()=>{
+  const res=await fetch('/api/records',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({name:'UI file skeleton fixture '+Date.now(),kind:'document'})});
+  if(!res.ok)throw new Error('File layout fixture failed: '+res.status+' '+(await res.text()));
+ });
  // Skeletons must use the same geometry as the actual document list.
  const skeletonContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  await skeletonContext.addCookies(await context.cookies());
@@ -92,6 +97,16 @@ try{
  assert.ok(fileBox,'real file row is rendered');
  assert.ok(Math.abs(skeletonBox.width-fileBox.width)<=1,'skeleton and file row widths match');
  assert.ok(Math.abs(skeletonBox.x-fileBox.x)<=1,'skeleton and real content left edges match');
+  // A deterministic fixture avoids dependence on leftovers in local D1.
+  await skeletonPage.evaluate(async()=>{
+    const post=async(path,body)=>{
+      const response=await fetch('/api'+path,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+      if(!response.ok)throw new Error('Fixture '+path+': '+response.status+' '+(await response.text()));
+      return response.json();
+    };
+    const list=await post('/records',{name:'UI layout task fixture '+Date.now(),kind:'task_list'});
+    await post('/tasks/mutate',{recordId:list.id,action:'add',expectedRevision:1,changes:{title:'UI layout task',details:'Check long task text for mobile geometry.',status:'todo',priority:0}});
+  });
  await skeletonPage.goto(url+'/tasks',{waitUntil:'networkidle'});
  await skeletonPage.locator('.task-list > .task-item').first().waitFor();
  await skeletonPage.evaluate(()=>{const task=document.querySelector('.task-list > .task-item');if(task&&!task.querySelector('.task-details')){const details=document.createElement('p');details.className='task-details muted';details.textContent='Long task detail '.repeat(20);task.querySelector('.task-heading')?.after(details);}});
@@ -144,10 +159,10 @@ try{
  assert.ok((await page.locator('.outline-item').first().innerText()).includes('UI e2e'),'outline has Markdown heading');
  await page.locator('.outline-item').first().click();
  await page.locator('.cm-content').waitFor();
- await page.getByRole('button',{name:'详情'}).click();
+ await page.getByRole('dialog',{name:'记录信息'}).waitFor({state:'hidden'});
  await page.getByRole('button',{name:'历史'}).click();
  await page.getByText('Revision 2').first().waitFor();
- await page.getByRole('button',{name:'历史',exact:true}).click();
+ await page.getByRole('dialog',{name:'版本历史'}).getByRole('button',{name:'关闭历史'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap').waitFor({timeout:14000});
  await page.locator('.tiptap').click();
