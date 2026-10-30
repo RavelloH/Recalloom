@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {canonicalMarkdown,markdownRoundTripSafe} from '../web/src/tiptap/fidelity';
+import {canonicalMarkdown,markdownRoundTripSafe,prepareVisualMarkdown} from '../web/src/tiptap/fidelity';
 import {postProcessTableAlignment} from '../web/src/tiptap/table-alignment';
 import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
@@ -65,6 +65,23 @@ test('semantic Markdown admits harmless whitespace and link normalization but re
 test('literal identifier placeholders are safely escaped without losing their text',()=>{
  assert.ok(markdownRoundTripSafe('Actor web:owner:<sessionId>','Actor web:owner:\\<sessionId\\>'));
  assert.ok(markdownRoundTripSafe('MCP grant:<actorId>','MCP grant:\\<actorId\\>'));
- assert.equal(markdownRoundTripSafe('React <mark> text','React \\<mark\\> text'),false);
+ assert.equal(markdownRoundTripSafe('React <mark> text','React \\<mark\\> text'),true);
  assert.equal(markdownRoundTripSafe('<sessionId>text</sessionId>','\\<sessionId\\>text\\</sessionId\\>'),false);
+});
+
+test('literal orphan mark in prose renders as text without blocking visual editing',()=>{
+ const literal='React <mark> 安全渲染';
+ assert.equal(prepareVisualMarkdown(literal),'React \\<mark> 安全渲染');
+ assert.ok(markdownRoundTripSafe(literal,'React \\<mark> 安全渲染'));
+ assert.ok(markdownRoundTripSafe(literal,'React &lt;mark&gt; 安全渲染'));
+ assert.equal(prepareVisualMarkdown('React <mark>黄色</mark> 安全渲染'),'React <mark>黄色</mark> 安全渲染');
+ assert.ok(markdownRoundTripSafe('<mark>黄色</mark>','<mark>黄色</mark>'));
+ assert.equal(markdownRoundTripSafe('React <mark>黄色</mark>','React \\<mark\\>黄色\\</mark\\>'),false);
+ assert.equal(prepareVisualMarkdown('React `\u003cmark>`'),'React `\u003cmark>`');
+ assert.equal(prepareVisualMarkdown('React \\<mark> 安全渲染'),'React \\<mark> 安全渲染');
+ assert.equal(prepareVisualMarkdown('React <mark class="test"> 安全渲染'),'React <mark class="test"> 安全渲染');
+ assert.equal(prepareVisualMarkdown('<mark>独立未闭合'),'\u003cmark>独立未闭合');
+ assert.equal(prepareVisualMarkdown('React <mark> A\n\nOther </mark> B'),'React <mark> A\n\nOther </mark> B');
+ assert.equal(prepareVisualMarkdown('```html\n<mark>\n```'),'```html\n<mark>\n```');
+ assert.equal(markdownRoundTripSafe('React <mark class="x">text','React text'),false);
 });

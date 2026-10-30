@@ -54,6 +54,38 @@ function normalizePlaceholders(tree:TreeValue,source:string):TreeValue{
 export function markdownSemantics(source:string):TreeValue{
  return normalizePlaceholders(structuralValue(parser.parse(source.replace(/\r\n/g,'\n'))),source);
 }
+/**
+ * Escape only unmatched bare <mark> inside prose for Tiptap's temporary input.
+ * Complete <mark>text</mark>, standalone HTML and attributed tags are unchanged.
+ * This never rewrites the original document until an actual user edit.
+ */
+export function prepareVisualMarkdown(source:string):string{
+ type NodeInfo={type?:string;value?:unknown;children?:NodeInfo[];position?:{start?:{offset?:number};end?:{offset?:number}}};
+ const tree=parser.parse(source) as NodeInfo;
+ const tokens:Array<{offset:number;opening:boolean;eligible:boolean}>=[];
+ const walk=(node:NodeInfo,parent?:NodeInfo)=>{
+  if(node.type==='html'&&(node.value==='<mark>'||node.value==='</mark>')){
+   const offset=node.position?.start?.offset;
+   if(offset!==undefined){
+    const preceding=parent?.children?.some(sibling=>
+     sibling.type==='text'&&typeof sibling.value==='string'&&sibling.value.trim().length>0&&
+     (sibling.position?.end?.offset??Infinity)<=offset
+    )??false;
+    tokens.push({offset,opening:node.value==='<mark>',eligible:node.value==='<mark>'&&
+     (parent?.type==='paragraph'||parent?.type==='heading'||parent?.type==='tableCell')&&preceding});
+   }
+  }
+  for(const child of node.children??[])walk(child,node);
+ };
+ walk(tree);
+ const stack:number[]=[],paired=new Set<number>();
+ tokens.forEach((token,i)=>{if(token.opening)stack.push(i);else{const open=stack.pop();if(open!==undefined)paired.add(open);}});
+ const locations=tokens.filter((tag,i)=>tag.opening&&tag.eligible&&!paired.has(i)).map(t=>t.offset).sort((a,b)=>b-a);
+ let result=source;
+ for(const offset of locations)result=result.slice(0,offset)+'\\'+result.slice(offset);
+ return result;
+}
+
 /** Preserve NeutralPress's legacy ++underlined++ syntax on comparison. */
 export function canonicalMarkdown(input:string):string{
  const lines=input.replace(/\r\n/g,'\n').trimEnd().split('\n');
@@ -77,7 +109,7 @@ export function canonicalMarkdown(input:string):string{
 export function markdownRoundTripSafe(original:string,rendered:string):boolean{
  // Front Matter is metadata, even when generic Markdown calls it a horizontal rule.
  if(/^\uFEFF?(?:---|\+\+\+)[ \t]*\r?\n[\s\S]*?\r?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?:\r?\n|$)/.test(original))return false;
- const before=canonicalMarkdown(original),after=canonicalMarkdown(rendered);
+ const before=canonicalMarkdown(prepareVisualMarkdown(original)),after=canonicalMarkdown(prepareVisualMarkdown(rendered));
  if(before===after)return true;
  try{return JSON.stringify(markdownSemantics(before))===JSON.stringify(markdownSemantics(after));}
  catch{return false;}

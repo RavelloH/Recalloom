@@ -17,7 +17,7 @@ import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {postProcessTableAlignment} from './tiptap/table-alignment';
-import {markdownRoundTripSafe} from './tiptap/fidelity';
+import {markdownRoundTripSafe,prepareVisualMarkdown} from './tiptap/fidelity';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 
@@ -25,6 +25,7 @@ export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
 const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;onUnsafe:()=>void}>(function VisualEditor({value,onChange,onUnsafe},ref){
  const checked=useRef(false);
+ const [initialSource]=useState(()=>prepareVisualMarkdown(value));
  const [ready,setReady]=useState(false);
  const applying=useRef(false);
  const edited=useRef(false);
@@ -47,7 +48,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   Placeholder.configure({placeholder:'开始写作…'}),
  ],[]);
  const editor=useEditor({
-  extensions,content:value,contentType:'markdown',immediatelyRender:false,
+  extensions,content:initialSource,contentType:'markdown',immediatelyRender:false,
   onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}},
  },[]);
  const active=useEditorState({editor,selector:({editor:e})=>({
@@ -74,7 +75,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   checked.current=true;
   applying.current=true;
   try{
-   const parsed=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent}}).markdown.parse(value);
+   const parsed=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent}}).markdown.parse(initialSource);
    const aligned=postProcessTableAlignment(parsed,value);
    if(JSON.stringify(aligned)!==JSON.stringify(editor.getJSON()))editor.commands.setContent(aligned,{emitUpdate:false});
    if(!markdownRoundTripSafe(value,editor.getMarkdown()))onUnsafe();

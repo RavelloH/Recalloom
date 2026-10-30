@@ -23,7 +23,8 @@ const samples=[
  ['extra-blank-lines','# Title\n\nFirst paragraph.\n\n\nSecond paragraph.',true,{}],
  ['auto-link','Visit <https://example.com> for docs.',true,{}],
  ['identifier-placeholder','Owner web:owner:<sessionId> and grant:<actorId>.',true,{}],
- ['unclosed-html-tag','The <mark> element should not be dropped.',false,{}],
+ ['literal-inline-mark','The <mark> element should not be dropped.',true,{mark:0}],
+ ['standalone-unclosed-mark','<mark> the rest of the document',false,{}],
  ['unsupported-footnote','A detail[^note].\n\n[^note]: Important footnote text.',false,{}],
  ['unsupported-reference-link','[Read this][docs]\n\n[docs]: https://example.com "Docs"',false,{}],
  ['unsupported-html','<div class="notice">Careful HTML</div>',false,{}],
@@ -74,7 +75,7 @@ try{
  await page.locator('.cm-content').fill(ext);
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
- await page.locator('.tiptap').click();
+ await page.locator('.tiptap p').last().click();
  await page.locator('.tiptap').focus();
  await page.keyboard.press('End');
  await page.locator('.tiptap').pressSequentially(' Continued.',{delay:8});
@@ -100,6 +101,27 @@ try{
  const editedTable=(await page.locator('.cm-line').allTextContents()).join('\n');
  assert.ok(editedTable.includes('updated'),'visual table cell edit exported: '+JSON.stringify({editedTable,tableDOM,tableFocus}));
  assert.match(editedTable,/\| -------- \| -------: \| :------: \|/,'table alignment preserved after edit');
+ // A literal unmatched <mark> must remain plain text after a real visual edit.
+ await page.locator('.cm-content').fill('React <mark> 安全渲染');
+ await page.getByRole('button',{name:'保存'}).click();
+ await page.getByRole('button',{name:'可视化'}).click();
+ await page.locator('.tiptap').waitFor();
+ assert.equal(await page.locator('.tiptap mark').count(),0,'orphan mark should not highlight prose');
+ assert.ok((await page.locator('.tiptap').innerText()).includes('<mark>'),'orphan mark text should be visible');
+ await page.locator('.tiptap p').last().click();
+ await page.locator('.tiptap').focus();
+ await page.locator('.tiptap').pressSequentially(' 已更新',{delay:8});
+ const orphanVisual=await page.locator('.tiptap').innerText();
+ await page.getByRole('button',{name:'Markdown'}).click();
+ await page.locator('.cm-line').first().waitFor({timeout:15000});
+ const orphanEdited=(await page.locator('.cm-line').allTextContents()).join('\n');
+ assert.ok((orphanEdited.includes('&lt;mark&gt;')||orphanEdited.includes('\\<mark>'))&&orphanEdited.includes('已更新'),'literal mark safely escaped after visual edit: '+JSON.stringify({orphanVisual,orphanEdited}));
+ await page.getByRole('button',{name:'保存'}).click();
+ await page.getByRole('button',{name:'可视化'}).click();
+ await page.locator('.tiptap').waitFor();
+ assert.equal(await page.locator('.tiptap mark').count(),0,'reloaded literal mark must not turn into highlighting');
+ await page.getByRole('button',{name:'Markdown'}).click();
+ await page.locator('.cm-line').first().waitFor({timeout:15000});
  // Mobile Safari-like viewport: toolbar groups must wrap without document overflow.
  const mobileCtx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
  await mobileCtx.addCookies(await page.context().cookies());
