@@ -9,6 +9,7 @@ import {PanelLeft,FileText,FolderOpen,ListTodo,Search,History,Settings,LogOut,Me
 import {api,browse} from './api';
 import type {Entry} from './types';
 import {useAppearance} from './theme';
+import {clearAllSessionDrafts,hasSessionDrafts,hasActiveEditorDirty,approveLogoutNavigation} from './session-drafts';
 const menu=[{to:'/',name:'概览',icon:LayoutDashboard},{to:'/library',name:'知识库',icon:FolderOpen},{to:'/tasks',name:'任务',icon:ListTodo},{to:'/search',name:'搜索',icon:Search},{to:'/activity',name:'活动',icon:History},{to:'/settings',name:'设置',icon:Settings}] as const;
 function Navigation({onNavigate}:{onNavigate?:()=>void}){const {data}=useQuery({queryKey:['browse',null],queryFn:()=>browse(null)});return <>
  <div className="nav-label">工作区</div><nav aria-label="主导航" className="nav-list">{menu.map(({to,name,icon:Icon})=><Link key={to} to={to} onClick={onNavigate} activeOptions={{exact:to==='/'}} className="nav-link" activeProps={{className:'nav-link active'}}><Icon size={16}/>{name}</Link>)}</nav>
@@ -21,7 +22,7 @@ export function Shell({children}:{children:React.ReactNode}){
  const cycleTheme=()=>setMode(mode==='system'?'light':mode==='light'?'dark':'system');
  const themeName=mode==='system'?'跟随系统':mode==='light'?'浅色':'深色';
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setCommands(v=>!v);}if(event.key==='Escape'){setCommands(false);setMobileOpen(false);}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
- const logout=async()=>{await api('/auth/logout',{method:'POST'});qc.clear();navigate({to:'/login'});};
+ const logout=async()=>{if((hasSessionDrafts()||hasActiveEditorDirty())&&!confirm('本标签页仍有未保存草稿。退出登录将删除这些草稿，确定退出吗？'))return;approveLogoutNavigation(true);try{await api('/auth/logout',{method:'POST'});clearAllSessionDrafts();qc.clear();await navigate({to:'/login'});}finally{approveLogoutNavigation(false);}};
  return <div className={'shell'+(collapsed?' sidebar-collapsed':'')}>
  <SideNav className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏" header={<div className="brand"><div className="brand-mark">R</div><span className="brand-name">Recalloom</span><IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<X size={18}/>} onClick={()=>setMobileOpen(false)}/></div>} footer={<div className="sidebar-footer"><Button className="nav-link" width="100%" variant="ghost" label={'主题：'+themeName} icon={<SunMoon size={16}/>} onClick={cycleTheme}/><Button className="nav-link" width="100%" variant="ghost" label="退出登录" icon={<LogOut size={16}/>} onClick={logout}/></div>}><Navigation onNavigate={()=>setMobileOpen(false)}/></SideNav>
  <button className={'mobile-scrim'+(mobileOpen?' is-visible':'')} aria-label="关闭导航" aria-hidden={!mobileOpen} tabIndex={mobileOpen?0:-1} onClick={()=>setMobileOpen(false)}/>

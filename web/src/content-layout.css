@@ -129,3 +129,19 @@
 .record-main, .editor-section, .editor-body, .wysiwyg { min-width: 0; width: 100%; }
 .record-main .tiptap, .record-main .markdown-preview { max-width: none; width: 100%; margin-inline: 0; box-sizing: border-box; }
 .record-main .cm-editor { max-width: none; width: 100%; }
+
+/* Unsaved draft recovery and leave protection are safety-related UI. */
+.draft-recovery-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--color-border,rgba(128,128,128,.2));background:var(--color-background-muted,rgba(128,128,128,.05));}
+.draft-recovery-banner strong{font-size:13px;font-weight:650;}
+.draft-recovery-banner p{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--color-text-secondary,#777);}
+.draft-leave-dialog{display:grid;gap:14px;min-width:0;}
+.draft-leave-dialog h2{font-size:18px;margin:0;}
+.draft-leave-dialog p{font-size:13px;line-height:1.65;color:var(--color-text-secondary,#777);margin:0;}
+.draft-leave-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+@media(max-width:720px){
+ .editor-topline button{min-height:44px;}
+ .draft-leave-actions{flex-direction:column;}
+ .draft-leave-actions > *{width:100%;}
+ .draft-recovery-banner{align-items:stretch;}
+ .draft-recovery-banner > .row{flex-wrap:wrap;}
+}

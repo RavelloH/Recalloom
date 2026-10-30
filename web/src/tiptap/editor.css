@@ -51,3 +51,34 @@
 @media(max-width:720px){.editor-table-actions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:7px 10px;}.editor-table-actions::-webkit-scrollbar{display:none;}.editor-table-actions>*{flex:none;}.editor-insert-form{gap:12px;}.editor-insert-heading h2{font-size:16px;}}
 
 .editor-table-actions[hidden]{display:none;}
+
+/* Restore Markdown list semantics after Astryx reset; task lists use checkboxes. */
+.tiptap ul:not([data-type="taskList"]){list-style:disc outside;padding-inline-start:1.7rem;}
+.tiptap ol{list-style:decimal outside;padding-inline-start:1.7rem;}
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]){list-style-type:circle;}
+.tiptap ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]){list-style-type:square;}
+.tiptap ol ol{list-style-type:lower-alpha;}
+.tiptap ol ol ol{list-style-type:lower-roman;}
+.tiptap li:not([data-type="taskItem"]){display:list-item;list-style-position:outside;}
+.tiptap li:not([data-type="taskItem"])::marker{color:var(--color-text-secondary,currentColor);}
+.tiptap li:not([data-type="taskItem"]) > p{margin-block:0;}
+.tiptap ul:not([data-type="taskList"]),.tiptap ol{margin-block:0.8em;}
+@media(max-width:720px){
+ .wysiwyg-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x;}
+ .wysiwyg-toolbar::-webkit-scrollbar{display:none;}
+ .wysiwyg-tools{flex:0 0 auto;overflow:visible;max-width:none;}
+ .wysiwyg-tools + .wysiwyg-tools{border-left:1px solid var(--color-border,rgba(128,128,128,.2));padding-left:10px;}
+ .wysiwyg-tools button,.editor-table-actions button{min-height:44px;min-width:44px;}
+}
+
+/* TaskItem in Tiptap 3 puts data-type on the parent UL, not each LI. */
+.tiptap ul[data-type="taskList"]{list-style:none;padding-inline-start:0;}
+.tiptap ul[data-type="taskList"] > li{
+ display:flex;align-items:flex-start;gap:9px;list-style:none;margin:4px 0;
+}
+.tiptap ul[data-type="taskList"] > li > label{
+ display:flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:24px;margin:0;
+}
+.tiptap ul[data-type="taskList"] > li > div{flex:1;min-width:0;}
+.tiptap ul[data-type="taskList"] > li > div > p{margin:0;}
+.tiptap ul[data-type="taskList"] > li > div > p:first-child{min-height:24px;line-height:24px;}
