@@ -32,3 +32,22 @@
  .wysiwyg-tools {flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;}
  .wysiwyg-tools::-webkit-scrollbar {display:none;}
 }
+
+/* Contextual table controls and low-density Astryx insert dialogs. */
+.editor-table-actions {display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid var(--color-border,rgba(128,128,128,.22));background:var(--color-background-muted,rgba(128,128,128,.04));}
+.editor-table-actions button{min-height:34px;min-width:34px;display:inline-flex;gap:2px;}
+.table-actions-label{margin-right:3px;}
+.editor-table-sep{align-self:stretch;margin:4px 5px;width:1px;background:var(--color-border,rgba(128,128,128,.22));}
+.editor-insert-form{display:flex;flex-direction:column;gap:16px;width:100%;min-width:0;}
+.editor-insert-heading{display:flex;align-items:center;gap:12px;margin-bottom:3px;}
+.editor-insert-heading h2{font-size:17px;font-weight:650;margin:0;}
+.editor-insert-heading p{margin:4px 0 0;line-height:1.45;}
+.editor-insert-icon{display:grid;place-items:center;width:37px;height:37px;flex:none;border-radius:9px;background:var(--color-background-muted,rgba(128,128,128,.08));}
+.editor-insert-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--color-border,rgba(128,128,128,.2));}
+.editor-insert-spacer{flex:1;}
+.editor-math-preview,.editor-image-preview{display:flex;justify-content:center;align-items:center;min-height:86px;max-height:250px;overflow:auto;background:var(--color-background-muted,rgba(128,128,128,.05));border:1px solid var(--color-border,rgba(128,128,128,.2));border-radius:8px;padding:14px;}
+.editor-image-preview img{max-width:100%;max-height:205px;object-fit:contain;}
+.editor-math-preview .katex-display{max-width:100%;overflow:auto;margin:6px 0;}
+@media(max-width:720px){.editor-table-actions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:7px 10px;}.editor-table-actions::-webkit-scrollbar{display:none;}.editor-table-actions>*{flex:none;}.editor-insert-form{gap:12px;}.editor-insert-heading h2{font-size:16px;}}
+
+.editor-table-actions[hidden]{display:none;}

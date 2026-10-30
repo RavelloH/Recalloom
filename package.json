@@ -15,7 +15,7 @@
     "build:web": "node scripts/stage-cap-wasm.mjs && vite build",
     "dev:web": "node scripts/stage-cap-wasm.mjs && vite --host 127.0.0.1",
     "test:ui": "node scripts/web-ui-e2e.mjs",
-    "test:editor": "node scripts/tiptap-roundtrip-e2e.mjs"
+    "test:editor": "node scripts/tiptap-roundtrip-e2e.mjs && node scripts/tiptap-interactions-e2e.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",
@@ -47,6 +47,7 @@
     "@tiptap/extension-text-align": "^3.32.0",
     "@tiptap/extension-underline": "^3.32.0",
     "@tiptap/markdown": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
     "@uiw/react-codemirror": "^4.25.12",
