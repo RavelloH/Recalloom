@@ -20,6 +20,12 @@ const samples=[
  ['gfm','- [x] Done\n- [ ] Pending\n\n~~removed~~ and '+tick+'inline'+tick,true,{}],
  ['math','Inline $x^2$ and block:\n\n$$\nx^2+y^2=z^2\n$$',true,{}],
  ['mermaid',tick.repeat(3)+'mermaid\ngraph TD\n A-->B\n'+tick.repeat(3),true,{}],
+ ['extra-blank-lines','# Title\n\nFirst paragraph.\n\n\nSecond paragraph.',true,{}],
+ ['auto-link','Visit <https://example.com> for docs.',true,{}],
+ ['identifier-placeholder','Owner web:owner:<sessionId> and grant:<actorId>.',true,{}],
+ ['unclosed-html-tag','The <mark> element should not be dropped.',false,{}],
+ ['unsupported-footnote','A detail[^note].\n\n[^note]: Important footnote text.',false,{}],
+ ['unsupported-reference-link','[Read this][docs]\n\n[docs]: https://example.com "Docs"',false,{}],
  ['unsupported-html','<div class="notice">Careful HTML</div>',false,{}],
  ['yaml-frontmatter','---\ntitle: Example\ntags:\n - foo\n---\n\n# Content',false,{}]
 ];

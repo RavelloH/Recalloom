@@ -49,3 +49,22 @@ test('Upstream NeutralPress extensions implement Markdown serializers',()=>{
  const md=fn(table,{renderChildren:()=>cols[i++]});
  assert.match(md,/\| -------: \| :------: \|/);
 });
+
+test('semantic Markdown admits harmless whitespace and link normalization but rejects information loss',()=>{
+ assert.ok(markdownRoundTripSafe('# Heading\n\nPara A.\n\n\nPara B.','# Heading\n\nPara A.\n\nPara B.'));
+ assert.ok(markdownRoundTripSafe('Visit <https://example.com>.','Visit [https://example.com](https://example.com).'));
+ assert.equal(markdownRoundTripSafe('**important**','important'),false);
+ assert.equal(markdownRoundTripSafe('`code`','code'),false);
+ assert.equal(markdownRoundTripSafe('\x60\x60\x60ts title=demo.ts\nconst v=1;\n\x60\x60\x60','\x60\x60\x60ts\nconst v=1;\n\x60\x60\x60'),false);
+ assert.equal(markdownRoundTripSafe('A reference[^note].\n\n[^note]: Details.','A reference.'),false);
+ assert.equal(markdownRoundTripSafe('<div class="alert">Sensitive</div>','Sensitive'),false);
+ assert.equal(markdownRoundTripSafe('---\ntitle: Metadata\n---\n\n# Page','---\ntitle: Metadata\n---\n\n# Page'),false);
+ assert.equal(markdownRoundTripSafe('+++\ntitle = "Metadata"\n+++\n\n# Page','+++\ntitle = "Metadata"\n+++\n\n# Page'),false);
+});
+
+test('literal identifier placeholders are safely escaped without losing their text',()=>{
+ assert.ok(markdownRoundTripSafe('Actor web:owner:<sessionId>','Actor web:owner:\\<sessionId\\>'));
+ assert.ok(markdownRoundTripSafe('MCP grant:<actorId>','MCP grant:\\<actorId\\>'));
+ assert.equal(markdownRoundTripSafe('React <mark> text','React \\<mark\\> text'),false);
+ assert.equal(markdownRoundTripSafe('<sessionId>text</sessionId>','\\<sessionId\\>text\\</sessionId\\>'),false);
+});
