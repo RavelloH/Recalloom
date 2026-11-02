@@ -82,3 +82,20 @@
 .tiptap ul[data-type="taskList"] > li > div{flex:1;min-width:0;}
 .tiptap ul[data-type="taskList"] > li > div > p{margin:0;}
 .tiptap ul[data-type="taskList"] > li > div > p:first-child{min-height:24px;line-height:24px;}
+
+/* Unsupported Markdown is a literal, accessible source island inside Tiptap. */
+.raw-markdown-node{margin:14px 0;border:1px solid var(--color-border,rgba(128,128,128,.25));border-radius:10px;overflow:hidden;background:var(--color-background-muted,rgba(128,128,128,.045));max-width:100%;}
+.raw-markdown-node.is-selected{outline:2px solid var(--color-accent,#5a84d9);outline-offset:1px;}
+.raw-markdown-caption{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--color-border,rgba(128,128,128,.19));font-size:12px;color:var(--color-text-secondary,#888);}
+.raw-markdown-caption button{border:1px solid var(--color-border,rgba(128,128,128,.25));border-radius:7px;padding:7px 11px;background:var(--color-background-surface,transparent);color:inherit;cursor:pointer;min-height:34px;}
+.raw-markdown-caption button:focus-visible{outline:2px solid var(--color-accent,#5a84d9);outline-offset:2px;}
+.raw-markdown-actions{display:flex;flex-wrap:wrap;gap:6px;}
+.raw-markdown-content,.raw-markdown-node textarea{font:12.5px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2;background:transparent;color:inherit;}
+.raw-markdown-content{margin:0!important;padding:13px 15px!important;max-height:380px;overflow:auto;}
+.raw-markdown-node textarea{display:block;resize:vertical;width:100%;min-height:105px;border:0;padding:13px 15px;outline:none;}
+.raw-markdown-notice{padding:10px 14px;font-size:12px;line-height:1.6;background:var(--color-background-muted,rgba(128,128,128,.06));color:var(--color-text-secondary,#888);border-bottom:1px solid var(--color-border,rgba(128,128,128,.2));}
+@media(max-width:720px){.raw-markdown-caption button{min-height:44px;}.raw-markdown-caption{flex-wrap:wrap;}.raw-markdown-content{max-height:280px;}}
+
+/* A floating table toolbar cannot shift the ProseMirror selection during a click. */
+.wysiwyg{position:relative;}
+.editor-table-actions:not([hidden]){position:absolute;z-index:12;left:12px;right:12px;border:1px solid var(--color-border,rgba(128,128,128,.25));border-radius:9px;box-shadow:0 8px 25px rgba(0,0,0,.13);}

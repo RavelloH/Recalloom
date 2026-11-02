@@ -16,28 +16,30 @@ import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
-import {postProcessTableAlignment} from './tiptap/table-alignment';
-import {markdownRoundTripSafe,prepareVisualMarkdown} from './tiptap/fidelity';
+import {RawMarkdown} from './tiptap/raw-markdown';
+import {buildLosslessMarkdown} from './tiptap/lossless-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
-const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;onUnsafe:()=>void}>(function VisualEditor({value,onChange,onUnsafe},ref){
+const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void}>(function VisualEditor({value,onChange},ref){
  const checked=useRef(false);
- const [initialSource]=useState(()=>prepareVisualMarkdown(value));
+ const [protectedCount,setProtectedCount]=useState(0);
  const [ready,setReady]=useState(false);
  const applying=useRef(false);
  const edited=useRef(false);
  const lastColumn=useRef<number|null>(null);
  const lastCellPos=useRef<number|null>(null);
  const [tableTarget,setTableTarget]=useState(false);
+ const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const extensions=useMemo(()=>[
   StarterKit.configure({heading:false,paragraph:false,underline:false,link:{openOnClick:false}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
+  RawMarkdown,
   Image.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
@@ -48,7 +50,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   Placeholder.configure({placeholder:'开始写作…'}),
  ],[]);
  const editor=useEditor({
-  extensions,content:initialSource,contentType:'markdown',immediatelyRender:false,
+  extensions,content:'',contentType:'markdown',immediatelyRender:false,
   onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}},
  },[]);
  const active=useEditorState({editor,selector:({editor:e})=>({
@@ -75,13 +77,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   checked.current=true;
   applying.current=true;
   try{
-   const parsed=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent}}).markdown.parse(initialSource);
-   const aligned=postProcessTableAlignment(parsed,value);
-   if(JSON.stringify(aligned)!==JSON.stringify(editor.getJSON()))editor.commands.setContent(aligned,{emitUpdate:false});
-   if(!markdownRoundTripSafe(value,editor.getMarkdown()))onUnsafe();
-  }catch{onUnsafe();}
+   const manager=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent;serialize:(doc:JSONContent)=>string}}).markdown;
+   const result=buildLosslessMarkdown(value,manager);
+   editor.commands.setContent(result.doc,{emitUpdate:false});
+   setProtectedCount(result.protectedCount);
+  }catch{editor.commands.setContent({type:'doc',content:[{type:'rawMarkdown',attrs:{source:value}}]},{emitUpdate:false});setProtectedCount(1);}
   finally{applying.current=false;setReady(true);}
- },[editor,value,onUnsafe]);
+ },[editor,value]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
@@ -158,13 +160,17 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
-  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;setTableTarget(false);}return;}
+  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;requestAnimationFrame(()=>setTableTarget(false));}return;}
   const row=cell.parentElement as HTMLTableRowElement;
   lastColumn.current=Array.from(row.cells).slice(0,cell.cellIndex).reduce((count,sibling)=>count+Math.max(1,sibling.colSpan),0);
   lastCellPos.current=editor.view.posAtDOM(cell,0);
+  const surface=event.currentTarget.getBoundingClientRect();
+  setTableToolbarTop(Math.max(60,cell.getBoundingClientRect().top-surface.top-55));
   // Align the actual editor selection with the cell the user clicked.
-  setTableTarget(true);
+  // Delay layout-changing toolbar visibility until pointer selection has settled.
+  requestAnimationFrame(()=>setTableTarget(true));
  }}>
+  {protectedCount>0&&<div className="raw-markdown-notice" role="status">已保留 {protectedCount} 处无法无损转换的 Markdown。其他内容可以正常编辑；原样片段可通过“编辑此段源码”修改。</div>}
   <div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools">
     {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}
@@ -196,7 +202,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     {action('插入块级公式',()=>openMath('block'),<>$$</>)}
    </div>
   </div>
-  <div hidden={!(active?.table||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作">
+  <div hidden={!(active?.table||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
    <span className="muted small table-actions-label">表格</span>
    {action('在上方插入行',()=>tableCommand('addRowBefore'),<><Rows3 size={15}/><Plus size={12}/></>,!tableTarget&&!editor.can().addRowBefore())}
    {action('在下方插入行',()=>tableCommand('addRowAfter'),<><Rows3 size={15}/><Plus size={12}/></>,!tableTarget&&!editor.can().addRowAfter())}

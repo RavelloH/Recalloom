@@ -85,3 +85,12 @@ test('literal orphan mark in prose renders as text without blocking visual editi
  assert.equal(prepareVisualMarkdown('```html\n<mark>\n```'),'```html\n<mark>\n```');
  assert.equal(markdownRoundTripSafe('React <mark class="x">text','React text'),false);
 });
+
+test('versioned package references stay plain text while code and genuine email remain untouched',()=>{
+ assert.equal(prepareVisualMarkdown('Install agent-desktop@1.0.2 now'),'Install agent-desktop\\@1.0.2 now');
+ assert.equal(prepareVisualMarkdown('Use `agent-desktop@1.0.2`'),'Use `agent-desktop@1.0.2`');
+ assert.equal(prepareVisualMarkdown('[release](https://example.com/agent-desktop@1.0.2)'),'[release](https://example.com/agent-desktop@1.0.2)');
+ assert.equal(prepareVisualMarkdown('Contact admin@example.com'),'Contact admin@example.com');
+ assert.equal(prepareVisualMarkdown('```shell\nnpm i agent-desktop@1.0.2\n```'),'```shell\nnpm i agent-desktop@1.0.2\n```');
+ assert.ok(markdownRoundTripSafe('agent-desktop@1.0.2','agent-desktop\\@1.0.2'));
+});

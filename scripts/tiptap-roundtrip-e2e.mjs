@@ -24,11 +24,11 @@ const samples=[
  ['auto-link','Visit <https://example.com> for docs.',true,{}],
  ['identifier-placeholder','Owner web:owner:<sessionId> and grant:<actorId>.',true,{}],
  ['literal-inline-mark','The <mark> element should not be dropped.',true,{mark:0}],
- ['standalone-unclosed-mark','<mark> the rest of the document',false,{}],
- ['unsupported-footnote','A detail[^note].\n\n[^note]: Important footnote text.',false,{}],
- ['unsupported-reference-link','[Read this][docs]\n\n[docs]: https://example.com "Docs"',false,{}],
- ['unsupported-html','<div class="notice">Careful HTML</div>',false,{}],
- ['yaml-frontmatter','---\ntitle: Example\ntags:\n - foo\n---\n\n# Content',false,{}]
+ ['standalone-unclosed-mark','<mark> the rest of the document',true,{}],
+ ['unsupported-footnote','A detail[^note].\n\n[^note]: Important footnote text.',true,{}],
+ ['unsupported-reference-link','[Read this][docs]\n\n[docs]: https://example.com "Docs"',true,{}],
+ ['unsupported-html','<div class="notice">Careful HTML</div>',true,{}],
+ ['yaml-frontmatter','---\ntitle: Example\ntags:\n - foo\n---\n\n# Content',true,{}]
 ];
 try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});
@@ -60,6 +60,7 @@ try{
     align:[...el.querySelectorAll('tr:first-child>*')].map(x=>x.style.textAlign)
    }));
    for(const [key,value] of Object.entries(marks))assert.deepEqual(actual[key],value,name+' markup '+key);
+   if(name.startsWith('unsupported-')||name==='standalone-unclosed-mark'||name==='yaml-frontmatter')assert.ok(await page.locator('.raw-markdown-node').count()>0,name+' must show original Markdown in Tiptap');
   }else{
    assert.ok(await page.locator('.warning-banner').count(),name+' offers safe source fallback');
   }
@@ -90,10 +91,10 @@ try{
  await page.locator('.cm-content').fill(originalTable);
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
- await page.locator('.tiptap table tr:last-child td:first-child').click();
+ await page.locator('.tiptap table tr:last-child td:first-child p').click();
+ await page.waitForTimeout(140);
  await page.locator('.tiptap').focus();
- await page.keyboard.press('End');
- await page.locator('.tiptap').pressSequentially(' updated',{delay:8});
+ await page.keyboard.type(' updated',{delay:8});
  const tableDOM=await page.locator('.tiptap').innerText();
  const tableFocus=await page.evaluate(()=>({tag:document.activeElement?.tagName,cls:document.activeElement?.className,html:document.activeElement?.outerHTML.slice(0,200)}));
  await page.getByRole('button',{name:'Markdown'}).click();
@@ -109,8 +110,9 @@ try{
  assert.equal(await page.locator('.tiptap mark').count(),0,'orphan mark should not highlight prose');
  assert.ok((await page.locator('.tiptap').innerText()).includes('<mark>'),'orphan mark text should be visible');
  await page.locator('.tiptap p').last().click();
+ await page.waitForTimeout(140);
  await page.locator('.tiptap').focus();
- await page.locator('.tiptap').pressSequentially(' 已更新',{delay:8});
+ await page.keyboard.type(' 已更新',{delay:8});
  const orphanVisual=await page.locator('.tiptap').innerText();
  await page.getByRole('button',{name:'Markdown'}).click();
  await page.locator('.cm-line').first().waitFor({timeout:15000});
@@ -120,8 +122,6 @@ try{
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap').waitFor();
  assert.equal(await page.locator('.tiptap mark').count(),0,'reloaded literal mark must not turn into highlighting');
- await page.getByRole('button',{name:'Markdown'}).click();
- await page.locator('.cm-line').first().waitFor({timeout:15000});
  // Mobile Safari-like viewport: toolbar groups must wrap without document overflow.
  const mobileCtx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
  await mobileCtx.addCookies(await page.context().cookies());

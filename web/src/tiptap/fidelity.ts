@@ -55,6 +55,33 @@ export function markdownSemantics(source:string):TreeValue{
  return normalizePlaceholders(structuralValue(parser.parse(source.replace(/\r\n/g,'\n'))),source);
 }
 /**
+ * Prevent package@1.2.3 text from being mistaken for an email link by Tiptap.
+ * Only parser-proven plain text nodes are modified. Inline code, links, and
+ * original source in the database remain untouched.
+ */
+function shieldPackageVersions(source:string):string{
+ type NodeInfo={type?:string;children?:NodeInfo[];position?:{start?:{offset?:number};end?:{offset?:number}}};
+ const tree=parser.parse(source) as NodeInfo,positions:number[]=[];
+ const walk=(node:NodeInfo)=>{
+  if(node.type==='text'){
+   const start=node.position?.start?.offset,end=node.position?.end?.offset;
+   if(start!==undefined&&end!==undefined){
+    const raw=source.slice(start,end);
+    const pattern=/\b[A-Za-z][\w.-]{1,80}@\d+(?:\.\d+){2,}(?![\w.])/g;
+    for(const match of raw.matchAll(pattern)){
+     const at=start+(match.index??0)+match[0].indexOf('@');
+     if(source[at-1]!=='\\')positions.push(at);
+    }
+   }
+  }
+  for(const child of node.children??[])walk(child);
+ };
+ walk(tree);
+ let result=source;
+ for(const at of positions.sort((a,b)=>b-a))result=result.slice(0,at)+'\\'+result.slice(at);
+ return result;
+}
+/**
  * Escape only unmatched bare <mark> inside prose for Tiptap's temporary input.
  * Complete <mark>text</mark>, standalone HTML and attributed tags are unchanged.
  * This never rewrites the original document until an actual user edit.
@@ -83,7 +110,7 @@ export function prepareVisualMarkdown(source:string):string{
  const locations=tokens.filter((tag,i)=>tag.opening&&tag.eligible&&!paired.has(i)).map(t=>t.offset).sort((a,b)=>b-a);
  let result=source;
  for(const offset of locations)result=result.slice(0,offset)+'\\'+result.slice(offset);
- return result;
+ return shieldPackageVersions(result);
 }
 
 /** Preserve NeutralPress's legacy ++underlined++ syntax on comparison. */
