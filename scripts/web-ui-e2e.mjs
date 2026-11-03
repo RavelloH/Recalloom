@@ -46,9 +46,24 @@ try{
    const screen=await probe.newPage();
    await screen.goto(url+'/',{waitUntil:'networkidle'});
    await screen.getByRole('heading',{name:'概览'}).waitFor();
+   // A fixed off-canvas sidebar must never consume layout width when closed.
+   // Scroll width alone cannot catch a 290px sidebar occupying flex space.
+   const shellLayout=await screen.evaluate(()=>{
+     const sidebar=document.querySelector('.sidebar');
+     const workspace=document.querySelector('.workspace');
+     const main=document.querySelector('.main-content');
+     const box=workspace?.getBoundingClientRect();
+     return {sidePosition:sidebar&&getComputedStyle(sidebar).position,
+       left:box?.left,width:box?.width,mainWidth:main?.getBoundingClientRect().width,viewport:innerWidth};
+   });
+   assert.equal(shellLayout.sidePosition,'fixed','mobile sidebar must be out of normal layout');
+   assert.ok(Math.abs(shellLayout.left??99)<=1,'mobile workspace starts at left edge: '+JSON.stringify(shellLayout));
+   assert.ok(Math.abs((shellLayout.width??0)-width)<=1,'mobile workspace occupies whole viewport: '+JSON.stringify(shellLayout));
+   assert.ok((shellLayout.mainWidth??0)>=width-1,'main content remains readable: '+JSON.stringify(shellLayout));
    if(width===390){
      await screen.getByRole('button',{name:'打开导航'}).click();
      await screen.waitForFunction(()=>document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
+     assert.ok(await screen.locator('.workspace').evaluate(el=>Math.abs(el.getBoundingClientRect().left)<2),'opening navigation must not shift main workspace');
      const visible=await screen.locator('.mobile-scrim').evaluate(el=>({
        opacity:getComputedStyle(el).opacity,
        transition:getComputedStyle(el).transitionDuration,

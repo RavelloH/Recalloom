@@ -12,6 +12,7 @@ import '@astryxdesign/theme-neutral/theme.css';
 import './style.css';
 import './design-system.css';
 import './motion.css';
+import './ui-enhancements.css';
 import './content-layout.css';
 import './document-typography.css';
 // Keep Cap.js proof-of-work self-hosted: no third-party runtime download.

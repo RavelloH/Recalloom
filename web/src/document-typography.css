@@ -2,8 +2,8 @@
    Astryx remains responsible for surface/control chrome; this file covers
    only Markdown semantics and the readable-vs-wide content measure. */
 .record-main {
-  --rk-prose-measure: 800px;
-  --rk-wide-measure: 1180px;
+  --rk-prose-measure: 720px;
+  --rk-wide-measure: 980px;
   --rk-document-pad: clamp(20px, 3.2vw, 48px);
   --rk-document-leading: 1.82;
   --rk-document-ink: var(--color-text-primary, #202020);

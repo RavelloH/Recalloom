@@ -76,6 +76,22 @@ try {
  },markdown);
  await page.goto(base+'/records/'+id,{waitUntil:'networkidle'});
  await page.locator('.tiptap').waitFor();
+ // The document is scrolled by Astryx's native viewport, not window/body.
+ const scrollStatus=await page.evaluate(()=>{
+   const pane=document.querySelector('.main-scroll');
+   const topbar=document.querySelector('.topbar');
+   if(!(pane instanceof HTMLElement)||!topbar)throw Error('Missing Astryx scroll viewport');
+   const before=topbar.getBoundingClientRect().y;
+   pane.scrollTop=480;
+   const status={height:pane.clientHeight,contentHeight:pane.scrollHeight,
+     position:pane.scrollTop,topbarShift:Math.abs(topbar.getBoundingClientRect().y-before),
+     overflow:getComputedStyle(pane).overflowY};
+   pane.scrollTop=0;
+   return status;
+ });
+ assert.ok(scrollStatus.contentHeight>scrollStatus.height,'long document overflows its scroll area');
+ assert.ok(scrollStatus.position>100,'desktop document scrolls inside the Astryx area: '+JSON.stringify(scrollStatus));
+ assert.ok(scrollStatus.topbarShift<1,'topbar remains fixed while document scrolls');
  const visual=await metrics('.tiptap');
  assert.ok(visual.document.width>=900,'desktop document should use wide surface: '+JSON.stringify(visual));
  assert.ok(visual.paragraph.width<=802&&visual.paragraph.width>=700,'prose follows readable measure');
@@ -104,7 +120,22 @@ try {
   assert.ok(mobile.scrollWidth<=mobile.viewport,'mobile page must not overflow '+width+': '+JSON.stringify(mobile));
   assert.ok(mobile.paragraph.width<=mobile.document.width,'mobile paragraph must fit');
   assert.ok(mobile.fontSize>=15.5,'mobile text remains legible');
-  if(width===390)await page.screenshot({path:'tmp/typography-mobile.png',fullPage:false});
+  if(width===390){
+    const mobileScroll=await page.evaluate(()=>{
+      const pane=document.querySelector('.main-scroll');
+      const topbar=document.querySelector('.topbar');
+      if(!(pane instanceof HTMLElement)||!topbar)throw Error('Missing mobile scroll area');
+      const y=topbar.getBoundingClientRect().y;
+      pane.scrollTop=240;
+      const out={scrollTop:pane.scrollTop,topbarShift:Math.abs(topbar.getBoundingClientRect().y-y),
+        viewport:pane.clientWidth};
+      pane.scrollTop=0;
+      return out;
+    });
+    assert.ok(mobileScroll.scrollTop>=150,'mobile document remains scrollable within Astryx ScrollableArea');
+    assert.ok(mobileScroll.topbarShift<1,'mobile topbar stays fixed while document scrolls');
+    await page.screenshot({path:'tmp/typography-mobile.png',fullPage:false});
+  }
  }
  await page.getByRole('button',{name:'可视化',exact:true}).click();
  await page.locator('.tiptap').waitFor();

@@ -1,0 +1,344 @@
+/* Recalloom 全局增强样式 - 基于 InsightFlare UI 系统 */
+
+/* ========== Astryx 原生滚动条 ========== */
+/* ScrollableArea owns scroll semantics, including native iOS momentum. */
+.main-scroll,
+.record-main pre, .record-main table, .record-main .tableWrapper,
+.raw-markdown-content, .diff-output {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text-primary, #222) 35%, transparent) transparent;
+}
+.main-scroll::-webkit-scrollbar { width: 9px; }
+.main-scroll::-webkit-scrollbar-track { background: transparent; }
+.main-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background: color-mix(in srgb, var(--color-text-primary, #222) 28%, transparent);
+  background-clip: padding-box;
+  border-radius: 9px;
+}
+.main-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-primary, #222) 42%, transparent);
+  background-clip: padding-box;
+}
+
+/* ========== 固定视口外壳 ========== */
+.shell { height: 100dvh; min-height: 0; overflow: hidden; }
+.sidebar { height: 100%; }
+.workspace { height: 100%; min-height: 0; }
+.main-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.main-scroll { flex: 1 1 0; min-height: 0; min-width: 0; width: 100%; height: 100%; }
+.route-stage { min-height: 100%; }
+
+/* Route transition animations remain owned by motion.css. */
+
+/* ========== 侧边栏底部操作区 ========== */
+.sidebar-footer {
+  border-top: 1px solid var(--color-border, rgba(0,0,0,.08));
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--color-background-muted, #fafafa);
+}
+
+.sidebar-footer button.nav-link {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #666);
+  text-align: left;
+  transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-footer button.nav-link > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-footer button.nav-link > svg { flex: none; opacity: .8; }
+
+@media (hover: hover) {
+  .sidebar-footer button.nav-link:hover {
+    background: var(--color-background-surface, rgba(0,0,0,.05));
+    color: var(--color-text-primary, #111);
+  }
+  .sidebar-footer button.nav-link:hover > svg { opacity: 1; }
+}
+
+.sidebar-footer button.nav-link:active { background: var(--color-background-surface, rgba(0,0,0,.08)); }
+
+.sidebar-footer button.nav-link.is-danger:hover {
+  background: rgba(220, 68, 68, .1);
+  color: #c0392b;
+}
+html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hover {
+  background: rgba(220, 68, 68, .18);
+  color: #ff8b80;
+}
+
+/* Document measure is owned by document-typography.css. */
+
+/* ========== 列表进入动画 ========== */
+@keyframes data-row-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes list-row-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.file-row, .search-result, .task-item, .compact-row, .recent-entry, .activity-row {
+  animation: data-row-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+.file-row:nth-child(1), .search-result:nth-child(1), .task-item:nth-child(1),
+.compact-row:nth-child(1), .recent-entry:nth-child(1), .activity-row:nth-child(1) { --row-delay: 0ms; }
+.file-row:nth-child(2), .search-result:nth-child(2), .task-item:nth-child(2),
+.compact-row:nth-child(2), .recent-entry:nth-child(2), .activity-row:nth-child(2) { --row-delay: 35ms; }
+.file-row:nth-child(3), .search-result:nth-child(3), .task-item:nth-child(3),
+.compact-row:nth-child(3), .recent-entry:nth-child(3), .activity-row:nth-child(3) { --row-delay: 70ms; }
+.file-row:nth-child(4), .search-result:nth-child(4), .task-item:nth-child(4),
+.compact-row:nth-child(4), .recent-entry:nth-child(4), .activity-row:nth-child(4) { --row-delay: 105ms; }
+.file-row:nth-child(5), .search-result:nth-child(5), .task-item:nth-child(5),
+.compact-row:nth-child(5), .recent-entry:nth-child(5), .activity-row:nth-child(5) { --row-delay: 140ms; }
+.file-row:nth-child(n+6), .search-result:nth-child(n+6), .task-item:nth-child(n+6),
+.compact-row:nth-child(n+6), .recent-entry:nth-child(n+6), .activity-row:nth-child(n+6) { --row-delay: 165ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .file-row, .search-result, .task-item, .compact-row, .recent-entry, .activity-row {
+    animation: none !important;
+  }
+}
+
+/* ========== 顶部栏优化 ========== */
+.topbar {
+  backdrop-filter: saturate(180%) blur(8px);
+  background: color-mix(in srgb, var(--color-background-body, white) 85%, transparent);
+  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+html[data-effective-theme="dark"] .topbar {
+  background: color-mix(in srgb, var(--color-background-body, #1a1a1a) 85%, transparent);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ========== 侧边栏增强 ========== */
+.sidebar {
+  background: var(--color-background-muted, #fafafa);
+  border-right: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  transition: width 280ms cubic-bezier(0.45, 0, 0.15, 1),
+              min-width 280ms cubic-bezier(0.45, 0, 0.15, 1),
+              transform 280ms cubic-bezier(0.45, 0, 0.15, 1);
+}
+
+.brand-mark {
+  background: linear-gradient(135deg,
+    var(--color-text-primary, #1a1a1a) 0%,
+    var(--color-text-secondary, #4a4a4a) 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (hover: hover) {
+  .brand:hover .brand-mark {
+    transform: rotate(-5deg) scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  }
+}
+
+/* ========== 卡片与面板增强 ========== */
+.panel, .home-card {
+  background: var(--color-background-body, #fff);
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04),
+              0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 140ms ease;
+}
+
+html[data-effective-theme="dark"] .panel,
+html[data-effective-theme="dark"] .home-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2),
+              0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+@media (hover: hover) {
+  .panel:hover, .home-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08),
+                0 2px 4px rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* Astryx owns Button/Dialog hover, press, focus and modal transitions.
+   Avoid global element selectors that override the component library. */
+
+/* ========== 移动端优化 ========== */
+@media (max-width: 720px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    transition: transform 280ms cubic-bezier(0.45, 0, 0.15, 1);
+  }
+  .workspace { width: 100%; min-width: 0; }
+
+  html[data-effective-theme="dark"] .sidebar {
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-scrim {
+    display: block;
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0s linear 280ms;
+  }
+
+  .mobile-scrim.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0s;
+  }
+
+  .bottom-nav {
+    backdrop-filter: saturate(180%) blur(12px);
+    background: color-mix(in srgb, var(--color-background-body, white) 85%, transparent);
+    border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  html[data-effective-theme="dark"] .bottom-nav {
+    background: color-mix(in srgb, var(--color-background-body, #1a1a1a) 85%, transparent);
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.2);
+  }
+
+}
+
+/* Astryx owns input and textarea focus treatments. */
+
+/* ========== 编辑器优化 ========== */
+.editor-section {
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 140ms ease;
+}
+
+.editor-section:focus-within {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08),
+              0 0 0 3px color-mix(in srgb, var(--color-text-primary, #171717) 8%, transparent);
+}
+
+.wysiwyg-toolbar {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--color-background-body, white) 95%, transparent);
+  transition: background-color 200ms ease;
+}
+
+html[data-effective-theme="dark"] .wysiwyg-toolbar {
+  background: color-mix(in srgb, var(--color-background-body, #1a1a1a) 95%, transparent);
+}
+
+/* ========== 空状态优化 ========== */
+.empty {
+  animation: empty-fade-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes empty-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========== 加载状态优化 ========== */
+.content-loading {
+  animation: loading-fade-in 240ms ease-out both;
+}
+
+@keyframes loading-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ========== 搜索结果增强 ========== */
+.search-result {
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 140ms ease;
+}
+
+@media (hover: hover) {
+  .search-result:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    border-color: var(--color-border, rgba(0, 0, 0, 0.12));
+  }
+}
+
+.search-result:active {
+  transform: translateY(0);
+}
+
+/* ========== 文件行增强 ========== */
+.file-row {
+  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.06));
+  transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (hover: hover) {
+  .file-row:hover {
+    background: var(--color-background-muted, rgba(0, 0, 0, 0.02));
+    transform: translateX(2px);
+  }
+}
+
+.file-row:active {
+  transform: translateX(0) scale(0.995);
+}
+
+/* ========== 性能优化 ========== */
+.sidebar,
+.topbar,
+.bottom-nav,
+.modal-backdrop {
+  will-change: auto;
+}
