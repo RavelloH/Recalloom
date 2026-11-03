@@ -28,14 +28,21 @@ export function consentForm(
   redirectHost: string,
   handle: string,
   scopes: readonly string[],
-  error = ''
+  error = '',
+  clientDomain?: string | null,
+  redirectIsLoopback = false
 ): string {
   const url = new URL(request.url);
   const scopeInputs = scopes.map(scope => '<input type="hidden" name="scope" value="' + escapeHtml(scope) + '">').join('');
+  const publisher = clientDomain
+    ? '<p>客户端域名：<strong>' + escapeHtml(clientDomain) + '</strong></p>'
+    : '<p>此客户端尚无已验证的域名，显示名称由客户端自行提供。</p>';
   return '<h1>授权 Recalloom</h1>'
     + (error ? '<p role="alert">' + escapeHtml(error) + '</p>' : '')
     + '<p>客户端 <strong>' + escapeHtml(clientName) + '</strong> 正在请求访问你的私人知识库。</p>'
+    + publisher
     + '<p>回调域名：' + escapeHtml(redirectHost) + '</p>'
+    + (redirectIsLoopback ? '<p>此客户端将在本机接收 OAuth 令牌。</p>' : '')
     + '<p>权限：' + scopes.map(escapeHtml).join(', ') + '</p>'
     + '<form method="post" action="' + escapeHtml(url.pathname + url.search) + '">'
     + '<input type="hidden" name="handle" value="' + escapeHtml(handle) + '">' + scopeInputs

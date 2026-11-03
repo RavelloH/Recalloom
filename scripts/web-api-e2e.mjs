@@ -38,7 +38,7 @@ async function main(){
 
   const oauthMetadata=await api('/.well-known/oauth-authorization-server');
   assertStatus(oauthMetadata,200,'OAuth discovery available');
-  assert.equal(oauthMetadata.data.client_id_metadata_document_supported,false,'DCR stays preferred while ChatGPT CIMD metadata is blocked from Workers');
+  assert.equal(oauthMetadata.data.client_id_metadata_document_supported,true,'CIMD advertised alongside DCR for modern MCP clients');
   assert.equal(oauthMetadata.data.registration_endpoint,origin+'/oauth/register','DCR stays available for older clients');
   const resourceMetadata=await api('/.well-known/oauth-protected-resource/mcp');
   assertStatus(resourceMetadata,200,'MCP resource metadata');

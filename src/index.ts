@@ -1,4 +1,4 @@
-import OAuthProvider, { AuthorizationError } from '@cloudflare/workers-oauth-provider';
+import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
@@ -9,6 +9,32 @@ import type { Env } from './types.js';
 import { page, escapeHtml, consentForm } from './auth-page.js';
 
 const SCOPES=['notes:read','notes:write'];
+const MAX_AUTH_FAILURES=8;
+const AUTH_FAILURE_TTL=3600;
+
+async function rateLimitKey(request:Request):Promise<string>{
+  // Hash the client IP rather than storing it in OAuth KV.
+  const ip=request.headers.get('cf-connecting-ip')??'unknown';
+  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ip)));
+  const value=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+  return 'recalloom:auth-fail:'+value;
+}
+
+function oauthErrorResponse(error:unknown):Response{
+  if(error instanceof AuthorizationError){
+    if(error.redirectTo)return Response.redirect(error.redirectTo,302);
+    return page('授权失败','<h1>授权错误</h1><p>'+escapeHtml(error.description)+'</p>',400);
+  }
+  if(error instanceof CimdFetchError){
+    // Metadata can be unreachable from Cloudflare even when it opens in a browser.
+    // Never bypass CIMD validation or silently trust an unverified client.
+    const response=page('客户端暂时不可验证',
+      '<h1>客户端元数据暂时不可用</h1><p>请稍后重试，或让客户端使用动态客户端注册（DCR）重新连接。</p>',503);
+    response.headers.set('retry-after','30');
+    return response;
+  }
+  throw error;
+}
 
 function safeEqual(a:string,b:string):boolean{
   const x=new TextEncoder().encode(a),y=new TextEncoder().encode(b);
@@ -29,28 +55,38 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       const callbackOrigin = new URL(parsed.redirectUri).origin;
       const res = page(
         'Recalloom OAuth',
-        consentForm(request, details.clientName, details.redirectHost, consent.handle, scope),
+        consentForm(request, details.clientName, details.redirectHost, consent.handle, scope, '', details.clientDomain, details.redirectIsLoopback),
         200,
         callbackOrigin
       );
       consent.headers.forEach((value,key)=>res.headers.append(key,value));
       return res;
     }
-    const form=await request.formData();
+    const declaredLength=Number(request.headers.get('content-length')??0);
+    if(declaredLength>8192)return page('授权失败','<h1>授权表单过大</h1>',413);
+    const rawBody=await request.text();
+    if(new TextEncoder().encode(rawBody).length>8192)return page('授权失败','<h1>授权表单过大</h1>',413);
+    if(!(request.headers.get('content-type')??'').startsWith('application/x-www-form-urlencoded'))
+      return page('授权失败','<h1>授权表单格式不正确</h1>',400);
+    const form=new URLSearchParams(rawBody);
     const handle=String(form.get('handle')??'');
     if(!handle)return page('授权已失效','<h1>授权已失效</h1><p>请从客户端重新开始连接。</p>',400);
     if(form.get('decision')!=='approve'){
       const denied=await oauth.denyConsent(request,handle);
       return new Response(null,{status:302,headers:denied.headers});
     }
+    const attemptsKey=await rateLimitKey(request);
+    const attempts=Number(await env.OAUTH_KV.get(attemptsKey)??'0');
+    if(attempts>=MAX_AUTH_FAILURES)return page('授权已暂停','<h1>尝试次数过多</h1><p>请稍后重新发起授权。</p>',429);
     const supplied=String(form.get('secret')??'');
     if(!safeEqual(supplied,env.MCP_AUTH_SECRET)){
+      await env.OAUTH_KV.put(attemptsKey,String(attempts+1),{expirationTtl:AUTH_FAILURE_TTL});
       const parsed = await oauth.parseAuthRequest(request);
       const details = await oauth.describeConsent(parsed);
       const scopes = details.scope.length ? details.scope : SCOPES;
       return page(
         '授权密钥不正确',
-        consentForm(request, details.clientName, details.redirectHost, handle, scopes, '授权密钥不正确，请重试或取消。'),
+        consentForm(request, details.clientName, details.redirectHost, handle, scopes, '授权密钥不正确，请重试或取消。', details.clientDomain, details.redirectIsLoopback),
         401,
         new URL(parsed.redirectUri).origin
       );
@@ -64,15 +100,10 @@ async function authorize(request:Request,env:Env):Promise<Response>{
       request:approved.request,userId:'owner',metadata:{},scope:approved.request.scope,
       props:{actorId,clientName:details.clientName.trim().slice(0,200)}
     });
+    await env.OAUTH_KV.delete(attemptsKey);
     approved.headers.set('location',redirectTo);
     return new Response(null,{status:302,headers:approved.headers});
-  }catch(e){
-    if(e instanceof AuthorizationError){
-      if(e.redirectTo)return Response.redirect(e.redirectTo,302);
-      return page('授权失败','<h1>授权错误</h1><p>'+escapeHtml(e.description)+'</p>',400);
-    }
-    throw e;
-  }
+  }catch(e){return oauthErrorResponse(e);}
 }
 function provider(env:Env,request:Request){
   const origin=env.MCP_BASE_URL?new URL(env.MCP_BASE_URL).origin:new URL(request.url).origin;
@@ -102,13 +133,14 @@ function provider(env:Env,request:Request){
     tokenEndpoint:'/oauth/token',
     clientRegistrationEndpoint:'/oauth/register',
     scopesSupported:SCOPES,
-    requiredScopes:SCOPES,
+    // All MCP sessions need read access; write permission is checked per tool.
+    // Requiring both scopes here incorrectly rejects read-only OAuth grants.
+    requiredScopes:['notes:read'],
     resourceMetadata:{resource:origin+'/mcp',authorization_servers:[origin],resource_name:'Recalloom'},
-    // Keep DCR for ChatGPT/Codex: Cloudflare Worker fetches of chatgpt.com CIMD JSON
-    // currently return HTTP 403, even though a browser fetch may return 200.
-    // Enabling CIMD here makes these clients prefer a failing authorization path.
-    // Re-evaluate when upstream Worker-to-ChatGPT metadata fetching is fixed.
-    clientIdMetadataDocumentEnabled:false,
+    // Match cf-browser-mcp: support both Client ID Metadata Documents and DCR.
+    // Some CIMD origins (including ChatGPT) can block Cloudflare egress (HTTP 403).
+    // Fail closed with a recoverable 503 on metadata errors; DCR remains available.
+    clientIdMetadataDocumentEnabled:true,
     refreshTokenTTL:90*24*3600,
     refreshTokenIdleTTL:30*24*3600
   });

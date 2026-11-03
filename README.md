@@ -74,7 +74,9 @@ Worker 创建后，在其 **Settings → Variables and Secrets** 中添加运行
 https://<你的 Worker 域名>/mcp
 ```
 
-首次连接会打开 OAuth 授权页面。使用上面设置的 `MCP_AUTH_SECRET` 授权客户端，并选择所需的读取或写入权限。
+首次连接会打开 OAuth 授权页面。使用上面设置的 `MCP_AUTH_SECRET` 授权客户端，并选择所需的读取或写入权限。读取权限（`notes:read`）即可连接并使用只读工具；写入类工具还需要 `notes:write`。
+
+服务端同时支持 Client ID Metadata Document（CIMD）和动态客户端注册（DCR），OAuth 端点均保持在同一个域名下。部分客户端的 CIMD 元数据服务器会拦截 Cloudflare Worker 发出的请求；遇到“客户端元数据暂时不可用”时，可在客户端支持的情况下改用 DCR 重新连接。不要使用非官方的元数据代理，也不要关闭客户端元数据验证。
 
 连接后，你可以直接告诉 Agent：
 

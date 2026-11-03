@@ -10,6 +10,7 @@
     "check": "tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:web": "node scripts/web-api-e2e.mjs",
+    "test:oauth": "node scripts/oauth-flow-e2e.mjs",
     "db:local": "wrangler d1 migrations apply recalloom --local",
     "db:remote": "wrangler d1 migrations apply recalloom --remote",
     "build:web": "node scripts/stage-cap-wasm.mjs && vite build",
