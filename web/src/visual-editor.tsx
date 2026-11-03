@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
 import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
+import {Banner} from '@astryxdesign/core/Banner';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -170,7 +171,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
-  {protectedCount>0&&<div className="raw-markdown-notice" role="status">已保留 {protectedCount} 处无法无损转换的 Markdown。其他内容可以正常编辑；原样片段可通过“编辑此段源码”修改。</div>}
+  {protectedCount>0&&<Banner status="info" container="section" title={'已保护 '+protectedCount+' 处 Markdown 原文'} description="不支持的语法将以原始文本保留，其余内容仍可可视化编辑。选择“编辑此段源码”可单独修改。" collapsible={false}/>}
   <div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools">
     {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}

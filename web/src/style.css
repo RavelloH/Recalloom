@@ -17,10 +17,11 @@ html[data-effective-theme="dark"] .search-highlight{background:#715c16;color:#ff
 .outline-panel{margin-top:16px;border-top:1px solid var(--border,rgba(128,128,128,.24));padding-top:12px}
 .outline-panel h3{font-size:13px;font-weight:600;margin:0 0 8px}
 .outline-items{display:flex;flex-direction:column;gap:2px;max-height:42vh;overflow-y:auto}
-.outline-item{display:flex;justify-content:space-between;gap:8px;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-radius:5px;padding:6px 8px;color:inherit;cursor:pointer;font-size:12px}
-.outline-item:hover,.outline-item:focus-visible{background:rgba(127,127,127,.13)}
-.outline-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.outline-item small{flex:none;opacity:.6}
+.outline-indent{min-width:0;width:100%}
+.outline-indent .outline-item{width:100%;min-width:0;max-width:100%;justify-content:flex-start;text-align:left}
+
+.outline-indent .outline-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.outline-indent .outline-item small{flex:none;opacity:.65}
 
 .home-card{min-width:0;max-width:100%;font-size:12px}
 .home-card h2{font-size:13px;font-weight:680;margin:0}

@@ -6,11 +6,13 @@ import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
 import {Dialog} from '@astryxdesign/core/Dialog';
-import {Save,History,Code2,Type,AlertTriangle,RotateCcw,Diff} from 'lucide-react';
+import {Banner} from '@astryxdesign/core/Banner';
+import {Save,History,Code2,Type,RotateCcw,Diff} from 'lucide-react';
 import {ApiError,api,mutate,versions} from './api';
 import {useAppearance} from './theme';
 import {ContextPanel} from './context-panel';
 import {readSessionDraft,writeSessionDraft,clearSessionDraft,isLogoutNavigationApproved,setActiveEditorDirty} from './session-drafts';
+import {useConfirmDialog} from './confirm-dialog';
 import type {RecordDetail} from './types';
 
 const VisualEditor=React.lazy(()=>import('./visual-editor'));
@@ -27,6 +29,7 @@ export function RecordEditor({item,onSaved,jumpToLine}:{item:RecordDetail;onSave
  const staleRecovery=stored&&stored.content!==item.content&&stored.revision!==item.revision;
  const [recoveryNotice,setRecoveryNotice]=useState(Boolean(usableRecovery||staleRecovery));
  const [mode,setMode]=useState<'visual'|'source'|'preview'>(initialMode==='source'||initialMode==='preview'?initialMode:'visual');
+ const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [draft,setDraft]=useState(usableRecovery?stored.content:item.content);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[history,setHistory]=useState(false),[diff,setDiff]=useState('');
  const [editorKey,setEditorKey]=useState(0);
@@ -94,18 +97,18 @@ export function RecordEditor({item,onSaved,jumpToLine}:{item:RecordDetail;onSave
  };
  const versionsQuery=useQuery({queryKey:['versions',item.id],queryFn:()=>versions(item.id),enabled:history});
  const showDiff=async(rev:number)=>{try{const value=await api<{diff?:string;patch?:string;changed:boolean}>('/records/'+item.id+'/diff?from='+rev+'&to='+item.revision);setDiff(value.diff||value.patch||JSON.stringify(value,null,2));}catch(e){setError(e);}};
- const restore=async(rev:number)=>{if(changed||!confirm('恢复历史版本会创建新的当前 Revision。确定继续吗？'))return;setBusy(true);try{await mutate('/records/'+item.id+'/restore',{targetRevision:rev,expectedRevision:item.revision});onSaved();}catch(e){setError(e);}finally{setBusy(false);}};
+ const restore=async(rev:number)=>{if(changed||!(await askConfirm({title:'恢复历史版本？',description:'这会将所选版本的内容创建为一个新的当前 Revision，不会覆盖已有历史。',actionLabel:'恢复该版本'})))return;setBusy(true);try{await mutate('/records/'+item.id+'/restore',{targetRevision:rev,expectedRevision:item.revision});onSaved();}catch(e){setError(e);}finally{setBusy(false);}};
  const discardRecovered=()=>{
   clearSessionDraft(sessionId,item.id);latestDraft.current=item.content;setDraft(item.content);setEditorKey(key=>key+1);setRecoveryNotice(false);
  };
- return <div className="editor-section">
+ return <div className="editor-section">{confirmation}
   <div className="editor-topline"><ButtonGroup label="编辑模式" size="sm"><Button label="可视化" icon={<Type size={15}/>} variant={mode==='visual'?'primary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="Markdown" icon={<Code2 size={15}/>} variant={mode==='source'?'primary':'ghost'} onClick={()=>switchMode('source')}/><Button label="预览" variant={mode==='preview'?'primary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup><div className="row gap"><span className="muted tiny">R{item.revision}{changed?' · 未保存':''}</span><Button label="历史" icon={<History size={15}/>} size="sm" onClick={()=>setHistory(v=>!v)}/><Button label="保存" icon={<Save size={15}/>} variant="primary" size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/></div></div>
-  {recoveryNotice&&usableRecovery&&<div className="draft-recovery-banner" role="status"><div><strong>已恢复本标签页未保存的草稿</strong><p>草稿属于当前 Revision，保存后才会写入知识库。</p></div><Button label="丢弃恢复的草稿" variant="secondary" size="sm" onClick={discardRecovered}/></div>}
-  {recoveryNotice&&staleRecovery&&<div className="draft-recovery-banner" role="status"><div><strong>发现旧版本的未保存草稿</strong><p>草稿来自 R{stored.revision}，当前是 R{item.revision}。为避免覆盖 Agent 或其他设备的更新，未自动恢复。</p></div><div className="row gap"><Button label="复制旧草稿" size="sm" onClick={()=>navigator.clipboard.writeText(stored.content)}/><Button label="丢弃旧草稿" size="sm" variant="secondary" onClick={()=>{clearSessionDraft(sessionId,item.id);setRecoveryNotice(false);}}/></div></div>}
-  {Boolean(error)&&<div className="error-banner" role="alert"><AlertTriangle size={16}/>{error instanceof ApiError&&error.status===409?'保存失败：记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'保存失败'}{error instanceof ApiError&&error.status===409&&<Button label="重新加载" onClick={onSaved}/>}</div>}
-  {warning&&<div className="warning-banner"><AlertTriangle size={16}/>{warning}</div>}
+  {recoveryNotice&&usableRecovery&&<Banner status="info" container="section" title="已恢复本标签页未保存的草稿" description="草稿属于当前 Revision，保存后才会写入知识库。" endContent={<Button label="丢弃恢复的草稿" variant="secondary" size="sm" onClick={discardRecovered}/>}/>}
+  {recoveryNotice&&staleRecovery&&<Banner status="warning" container="section" title="发现旧版本的未保存草稿" description={"草稿来自 R"+stored.revision+"，当前是 R"+item.revision+"。为避免覆盖其他客户端的更新，未自动恢复。"} endContent={<div className="row gap"><Button label="复制旧草稿" size="sm" onClick={()=>navigator.clipboard.writeText(stored.content)}/><Button label="丢弃旧草稿" size="sm" variant="secondary" onClick={()=>{clearSessionDraft(sessionId,item.id);setRecoveryNotice(false);}}/></div>}/>}
+  {Boolean(error)&&<Banner status="error" container="section" title="保存失败" description={error instanceof ApiError&&error.status===409?'记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'请稍后重试'} endContent={error instanceof ApiError&&error.status===409?<Button label="重新加载" onClick={onSaved}/>:undefined}/>}
+  {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   <div className="editor-body editor-view" key={mode+':'+editorKey} aria-busy={busy}>{mode==='preview'?<React.Suspense fallback={<div className="content-loading">正在生成预览…</div>}><MarkdownPreview content={draft}/></React.Suspense>:mode==='source'?<React.Suspense fallback={<div className="content-loading">加载 Markdown 编辑器…</div>}><SourceEditor value={draft} onChange={changeDraft} focusLine={jumpToLine?.line} focusToken={jumpToLine?.token} dark={theme==='dark'||(theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches)}/></React.Suspense>:<React.Suspense fallback={<div className="content-loading">加载可视化编辑器…</div>}><VisualEditor ref={visualRef} value={draft} onChange={changeDraft}/></React.Suspense>}</div>
-  <ContextPanel open={history} onOpenChange={setHistory} label="版本历史"><div className="history-panel"><div className="panel-heading"><h2>版本历史</h2><IconButton variant="ghost" label="关闭历史" icon={<span aria-hidden="true">×</span>} onClick={()=>setHistory(false)}/></div>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<p className="error-banner">{versionsQuery.error.message}</p>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Diff size={14}/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<RotateCcw size={14}/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div></ContextPanel>
+  <ContextPanel open={history} onOpenChange={setHistory} label="版本历史"><div className="history-panel"><div className="panel-heading"><h2>版本历史</h2><IconButton variant="ghost" label="关闭历史" icon={<span aria-hidden="true">×</span>} onClick={()=>setHistory(false)}/></div>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Diff size={14}/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<RotateCcw size={14}/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div></ContextPanel>
   <Dialog isOpen={blocker.status==='blocked'} onOpenChange={open=>{if(!open)closeBlocker();}} width={440} padding={4} purpose="info" aria-label="未保存的编辑内容">
    <div className="draft-leave-dialog"><h2>还有未保存的编辑内容</h2><p>离开后当前编辑器将关闭。可以先保留本标签页草稿，下次进入此文档时自动恢复；也可以明确丢弃。</p><div className="draft-leave-actions"><Button label="留在编辑器" variant="primary" onClick={closeBlocker}/><Button label="保留草稿并离开" variant="secondary" isDisabled={busy} onClick={keepAndLeave}/><Button label="丢弃更改并离开" variant="destructive" isDisabled={busy} onClick={discardAndLeave}/></div></div>
   </Dialog>

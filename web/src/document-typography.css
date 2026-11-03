@@ -1,0 +1,290 @@
+/* Shared document typography for Tiptap and read-only Markdown preview.
+   Astryx remains responsible for surface/control chrome; this file covers
+   only Markdown semantics and the readable-vs-wide content measure. */
+.record-main {
+  --rk-prose-measure: 800px;
+  --rk-wide-measure: 1180px;
+  --rk-document-pad: clamp(20px, 3.2vw, 48px);
+  --rk-document-leading: 1.82;
+  --rk-document-ink: var(--color-text-primary, #202020);
+  --rk-document-muted: var(--color-text-secondary, #737373);
+  --rk-document-border: var(--color-border, rgba(128,128,128,.22));
+  --rk-document-wash: var(--color-background-muted, rgba(128,128,128,.045));
+}
+.record-main :is(.tiptap, .markdown-preview) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 32px var(--rk-document-pad) 64px;
+  font-size: 16px;
+  line-height: var(--rk-document-leading);
+  color: var(--rk-document-ink);
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+/* The surrounding document remains wide, but prose follows a comfortable
+   measure. Tables, images, code and block math can use the full workspace. */
+.record-main :is(.tiptap, .markdown-preview) > :is(
+  h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, hr
+) {
+  box-sizing: border-box;
+  max-width: min(100%, var(--rk-prose-measure));
+  margin-inline: auto;
+}
+.record-main :is(.tiptap, .markdown-preview) > :is(
+  pre, table, figure, .tableWrapper, .katex-display, .tiptap-mathematics-render[data-type="block-math"], .raw-markdown-node
+) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, var(--rk-wide-measure));
+  margin-inline: auto;
+}
+.record-main :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6) {
+  color: var(--rk-document-ink);
+  font-weight: 680;
+  line-height: 1.34;
+  letter-spacing: -.018em;
+  overflow-wrap: anywhere;
+}
+.record-main :is(.tiptap, .markdown-preview) > h1 {
+  font-size: clamp(25px, 2.15vw, 32px);
+  font-weight: 720;
+  letter-spacing: -.035em;
+  margin-block: 0 24px;
+  padding-block-end: 13px;
+  border-bottom: 1px solid var(--rk-document-border);
+}
+.record-main :is(.tiptap, .markdown-preview) > h2 {
+  font-size: clamp(21px, 1.75vw, 25px);
+  margin-block: 36px 16px;
+}
+.record-main :is(.tiptap, .markdown-preview) > h3 {
+  font-size: clamp(18px, 1.55vw, 20px);
+  margin-block: 28px 12px;
+}
+.record-main :is(.tiptap, .markdown-preview) > :is(h4,h5,h6) {
+  font-size: 16px;
+  margin-block: 24px 10px;
+}
+.record-main :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6):first-child {
+  margin-block-start: 0;
+}
+.record-main :is(.tiptap, .markdown-preview) p {
+  line-height: inherit;
+  margin-block: 0 1.05em;
+}
+.record-main :is(.tiptap, .markdown-preview) :is(ul,ol) {
+  margin-block: .85em 1.2em;
+  padding-inline-start: 1.7em;
+  line-height: inherit;
+  list-style-position: outside;
+}
+.record-main :is(.tiptap, .markdown-preview) ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+}
+.record-main :is(.tiptap, .markdown-preview) ol {
+  list-style-type: decimal;
+}
+.record-main :is(.tiptap, .markdown-preview) :is(ul,ol) :is(ul,ol) {
+  margin-block: .35em .55em;
+}
+.record-main :is(.tiptap, .markdown-preview) li {
+  padding-inline-start: .16em;
+  margin-block: .18em;
+}
+.record-main :is(.tiptap, .markdown-preview) li::marker {
+  color: var(--rk-document-muted);
+}
+.record-main :is(.tiptap, .markdown-preview) li > p {
+  margin-block: .2em;
+}
+.record-main :is(.tiptap, .markdown-preview) strong {
+  font-weight: 680;
+}
+.record-main :is(.tiptap, .markdown-preview) :is(a,a:visited) {
+  color: var(--color-text-link, #2269b5);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: .18em;
+}
+.record-main :is(.tiptap, .markdown-preview) a:hover {
+  text-decoration-color: currentColor;
+}
+.record-main :is(.tiptap, .markdown-preview) a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.record-main :is(.tiptap, .markdown-preview) blockquote {
+  border-inline-start: 3px solid var(--rk-document-border);
+  border-radius: 0 8px 8px 0;
+  background: var(--rk-document-wash);
+  padding: 12px 20px;
+  color: var(--rk-document-muted);
+  margin-block: 22px;
+}
+.record-main :is(.tiptap, .markdown-preview) blockquote > :last-child {
+  margin-block-end: 0;
+}
+.record-main :is(.tiptap, .markdown-preview) hr {
+  border: 0;
+  border-top: 1px solid var(--rk-document-border);
+  margin-block: 34px;
+}
+.record-main :is(.tiptap, .markdown-preview) :not(pre) > code {
+  border-radius: 5px;
+  padding: .12em .34em;
+  background: var(--rk-document-wash);
+  border: 1px solid var(--rk-document-border);
+  font: .87em/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.record-main :is(.tiptap, .markdown-preview) pre {
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  margin-block: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--rk-document-border);
+  border-radius: 10px;
+  background: var(--rk-document-wash);
+  font: 13px/1.72 ui-monospace, SFMono-Regular, Consolas, monospace;
+  tab-size: 2;
+}
+.record-main :is(.tiptap, .markdown-preview) pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.record-main .tiptap > .tableWrapper {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  margin-block: 23px;
+}
+.record-main .tiptap > .tableWrapper > table {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+}
+.record-main :is(.tiptap, .markdown-preview) table {
+  display: block;
+  border-collapse: collapse;
+  overflow-x: auto;
+  max-width: min(100%, var(--rk-wide-measure));
+  margin-block: 23px;
+  font-size: 14px;
+  line-height: 1.55;
+  scrollbar-width: thin;
+}
+.record-main :is(.tiptap, .markdown-preview) :is(th,td) {
+  padding: 10px 13px;
+  min-width: 88px;
+  border: 1px solid var(--rk-document-border);
+  vertical-align: top;
+  text-align: start;
+}
+.record-main :is(.tiptap, .markdown-preview) th {
+  font-weight: 670;
+  white-space: nowrap;
+  background: var(--rk-document-wash);
+}
+.record-main :is(.tiptap, .markdown-preview) tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--rk-document-wash) 45%, transparent);
+}
+.record-main :is(.tiptap, .markdown-preview) img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 20px auto;
+  border-radius: 8px;
+}
+.record-main :is(.tiptap, .markdown-preview) .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: .2em;
+}
+/* Inline math stays inline; scroll containers here intercept its edit clicks. */
+.record-main .tiptap .tiptap-mathematics-render--editable {
+  overflow: visible;
+}
+.record-main :is(.tiptap, .markdown-preview) .katex-display {
+  margin-block: 24px;
+}
+.record-main :is(.tiptap, .markdown-preview) input[type="checkbox"] {
+  accent-color: var(--color-text-primary, currentColor);
+  margin-inline-end: .3em;
+}
+.record-main .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-inline-start: 0;
+}
+.record-main .tiptap ul[data-type="taskList"] > li {
+  padding-inline-start: 0;
+}
+.record-main .tiptap ul[data-type="taskList"] > li > div > p {
+  margin-block: 0;
+}
+.record-main .tiptap .raw-markdown-node {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.record-main .tiptap .raw-markdown-node .raw-markdown-content {
+  background: transparent;
+  color: var(--rk-document-ink);
+  white-space: pre-wrap;
+}
+@media (max-width: 720px) {
+  .record-main {
+    --rk-prose-measure: 100%;
+    --rk-document-pad: 16px;
+    --rk-document-leading: 1.75;
+  }
+  .record-main :is(.tiptap, .markdown-preview) {
+    padding: 22px var(--rk-document-pad) 42px;
+    font-size: 16px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) > h1 {
+    font-size: 25px;
+    margin-block-end: 20px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) > h2 {
+    font-size: 21px;
+    margin-block-start: 27px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) blockquote {
+    padding: 9px 12px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) pre {
+    padding: 13px 14px;
+    font-size: 12.5px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) table {
+    font-size: 12.5px;
+  }
+  .record-main :is(.tiptap, .markdown-preview) :is(th,td) {
+    padding: 8px 10px;
+    min-width: 66px;
+  }
+}
+@media print {
+  .record-main :is(.tiptap, .markdown-preview) {
+    padding: 0;
+    font-size: 11pt;
+    max-width: 100%;
+  }
+  .record-main :is(.tiptap, .markdown-preview) > * {
+    max-width: 100%;
+  }
+}

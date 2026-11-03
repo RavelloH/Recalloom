@@ -1,6 +1,8 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
+import {Button} from '@astryxdesign/core/Button';
+import {TextArea} from '@astryxdesign/core/TextArea';
 
 /** A lossless atom for Markdown that cannot be represented by rich-text nodes.
  * Text is never interpreted as HTML; users can explicitly edit source in place.
@@ -14,10 +16,10 @@ function RawView({node,updateAttributes,selected}:NodeViewProps){
  const cancel=()=>{updateAttributes({source:editBaseline.current});setDraft(editBaseline.current);setEditing(false);};
  return <NodeViewWrapper className={'raw-markdown-node'+(selected?' is-selected':'')} contentEditable={false}>
   <div className="raw-markdown-caption"><span>原始 Markdown · 保留语法</span>
-   {editing?<div className="raw-markdown-actions"><button type="button" onClick={cancel}>取消</button><button type="button" onClick={save}>应用源码</button></div>
-   :<button type="button" onClick={()=>{editBaseline.current=String(node.attrs.source??'');setEditing(true);}}>编辑此段源码</button>}
+   {editing?<div className="raw-markdown-actions"><Button label="取消" size="sm" variant="secondary" onClick={cancel}/><Button label="应用源码" size="sm" variant="primary" onClick={save}/></div>
+   :<Button label="编辑此段源码" size="sm" variant="secondary" onClick={()=>{editBaseline.current=String(node.attrs.source??'');setEditing(true);}}/>}
   </div>
-  {editing?<textarea aria-label="编辑原始 Markdown" value={draft} spellCheck={false} rows={Math.min(18,Math.max(4,draft.split('\n').length+1))} onChange={event=>{setDraft(event.target.value);updateAttributes({source:event.target.value});}} onKeyDown={event=>event.stopPropagation()}/>
+  {editing?<div className="raw-markdown-field" onKeyDown={event=>event.stopPropagation()}><TextArea label="编辑原始 Markdown" isLabelHidden width="100%" size="sm" value={draft} hasSpellCheck={false} rows={Math.min(18,Math.max(4,draft.split('\n').length+1))} onChange={value=>{setDraft(value);updateAttributes({source:value});}}/></div>
    :<pre className="raw-markdown-content">{String(node.attrs.source??'')}</pre>}
  </NodeViewWrapper>;
 }

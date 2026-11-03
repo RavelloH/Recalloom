@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-import {existsSync,mkdirSync} from 'node:fs';
+import {existsSync,mkdirSync,readFileSync} from 'node:fs';
 const url=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
-const secret=process.env.RECALLOOM_TEST_SECRET||'recalloom-local-web-test-secret-32-bytes-only';
+const secretLine=existsSync('.dev.vars')?readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line)):undefined;
+const localSecret=secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'')??'';
+const secret=process.env.RECALLOOM_TEST_SECRET||localSecret;
+if(!secret)throw Error('Set RECALLOOM_TEST_SECRET or provide MCP_AUTH_SECRET in local .dev.vars');
 const browserPath=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(path=>path&&existsSync(path));
 if(!browserPath)throw Error('Install Edge/Chrome or set RECALLOOM_BROWSER_PATH for browser E2E tests.');
 async function chooseOption(page,label,value){

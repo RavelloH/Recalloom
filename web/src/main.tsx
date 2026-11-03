@@ -13,6 +13,7 @@ import './style.css';
 import './design-system.css';
 import './motion.css';
 import './content-layout.css';
+import './document-typography.css';
 // Keep Cap.js proof-of-work self-hosted: no third-party runtime download.
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';
 window.CAP_CUSTOM_HASHWX_URL='/cap-wasm/hashwx.wasm';

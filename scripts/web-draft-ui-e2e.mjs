@@ -135,9 +135,14 @@ try{
  await source();
  await page.locator('.cm-content').fill('DRAFT_BEFORE_LOGOUT');
  await page.getByRole('button',{name:'打开导航'}).click();
- page.on('dialog',dialog=>dialog.accept());
  await page.getByRole('button',{name:'退出登录'}).click();
- await page.waitForTimeout(1800);
+ const logoutConfirm=page.getByRole('alertdialog',{name:'退出并清除草稿？'});
+ await logoutConfirm.waitFor();
+ await logoutConfirm.getByRole('button',{name:'取消'}).click();
+ assert.ok(page.url().includes('/records/'),'cancel keeps editing and draft');
+ await page.getByRole('button',{name:'退出登录'}).click();
+ await page.getByRole('alertdialog',{name:'退出并清除草稿？'}).getByRole('button',{name:'退出并清除'}).click();
+ await page.waitForTimeout(500);
  await page.waitForURL(/\/login/,{timeout:6000});
  assert.equal(await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('recalloom:draft:')).length),0,'logout must purge all session draft data');
 

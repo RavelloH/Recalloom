@@ -95,7 +95,13 @@ try{
  md=await source();
  assert.ok(md.includes('$E=mc^2$'),'inline formula insertion: '+md);
  await back();
- await page.locator('.tiptap .katex').first().click();
+ // Click the actual inline math node as a user would. The nested KaTeX span
+ // can straddle the paragraph line box, making locator click hit-testing flaky.
+ const inlineMath=page.locator('.tiptap [data-type="inline-math"]').first();
+ await inlineMath.scrollIntoViewIfNeeded();
+ const formulaBox=await inlineMath.boundingBox();
+ assert.ok(formulaBox,'inline math node is visible');
+ await page.mouse.click(formulaBox.x+formulaBox.width/2,formulaBox.y+formulaBox.height/2);
  const editMath=page.getByRole('dialog',{name:'编辑数学公式'});
  await editMath.getByRole('textbox',{name:'LaTeX 公式'}).fill('F=ma');
  await editMath.getByRole('button',{name:'更新',exact:true}).click();
