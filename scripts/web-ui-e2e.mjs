@@ -30,12 +30,12 @@ try{
  }));
  assert.ok(entryMotion.name.includes('rk-page-enter'),'route entrance uses short motion: '+JSON.stringify(entryMotion));
  assert.ok(parseFloat(entryMotion.duration)>0&&parseFloat(entryMotion.duration)<.5,'entry motion under half a second');
- assert.equal(await page.locator('.overview-link').count(),3,'quiet quick links replace oversized cards');
+ assert.equal(await page.locator('.home-section .section-heading').count(),1,'home leads with recently visited pages');
  assert.equal(await page.locator('.stat-card').count(),0,'no large nested navigation cards');
  assert.equal(await page.locator('.route-stage').evaluate(el=>getComputedStyle(el).transform),'none','no page slide transform');
  await page.keyboard.press('Control+k');
  await page.getByRole('dialog',{name:'快速导航'}).waitFor();
- await page.getByRole('dialog',{name:'快速导航'}).getByRole('button',{name:'搜索'}).click();
+ await page.getByRole('dialog',{name:'快速导航'}).getByRole('option',{name:'搜索',exact:true}).click();
  await page.getByRole('heading',{name:'搜索',level:1}).waitFor();
  await page.goto(url+'/');
  await page.getByRole('heading',{name:'概览'}).waitFor();
@@ -186,7 +186,10 @@ try{
  await page.locator('.tiptap').click();
  await page.keyboard.press('End');
  await page.keyboard.type(' Additional visual edit.');
- const boldButton=page.getByRole('button',{name:'粗体'});
+ // Desktop formatting lives in the selection bubble menu, as in Notion.
+ await page.keyboard.press('Shift+Home');
+ const boldButton=page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'粗体'});
+ await boldButton.waitFor();
  await boldButton.click();
  assert.equal(await boldButton.getAttribute('aria-pressed'),'true','Astryx ToggleButton reflects formatting state');
  await boldButton.click();
@@ -259,7 +262,7 @@ try{
  await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
  await page.getByRole('button',{name:'创建',exact:true}).click();
- await page.locator('.page-header').getByRole('heading',{name:'Phase summary'}).waitFor();
+ await page.locator('.doc-header').getByRole('heading',{name:'Phase summary'}).waitFor();
  await page.getByRole('button',{name:'详情'}).click();
  await page.locator('.record-inspector dd').filter({hasText:'checkpoint'}).waitFor();
  await page.locator('.outline-item').first().waitFor();

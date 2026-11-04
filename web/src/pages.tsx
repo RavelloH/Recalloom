@@ -1,5 +1,5 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Link,useNavigate,useParams,useLocation} from '@tanstack/react-router';
+import React,{useEffect,useState} from 'react';
+import {Link,useNavigate,useParams,useLocation,useSearch} from '@tanstack/react-router';
 import {useQuery,useInfiniteQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
@@ -9,17 +9,23 @@ import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Spinner} from '@astryxdesign/core/Spinner';
 import {Skeleton} from '@astryxdesign/core/Skeleton';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {Selector} from '@astryxdesign/core/Selector';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {ArrowLeft,ArrowRight,ChevronRight,FileText,Folder,FolderPlus,Plus,Search,History,RefreshCw,ExternalLink,Archive,Check,Clock,Shield,Settings,LogOut,Sun,Moon,Monitor,Database,Tag,ListTodo,FolderOpen,Lock} from 'lucide-react';
-import {ApiError,api,browse,mutate,record,tasks,versions,activity,sessions,queryString} from './api';
-import type {Entry,RecordDetail,Task,Event} from './types';
+import {FileText,Folder,FolderPlus,Plus,Search,RefreshCw,Archive,Clock,Shield,Settings,Database,Tag,ListTodo,FolderOpen,Lock,Library,PanelRight,Copy,Shapes,CircleDot} from 'lucide-react';
+import {ApiError,api,browse,mutate,record,tasks,activity,sessions,queryString} from './api';
+import type {Task,Event} from './types';
 import {useAppearance} from './theme';
 import {ActivityEntry} from './activity-entry';
 import {ContextPanel} from './context-panel';
 import {SearchHighlight} from './search-highlight';
 import {useConfirmDialog} from './confirm-dialog';
+import {TopbarPortal} from './topbar-slot';
+import {Breadcrumbs,InlineTitle,PageActions,Properties,Property,TagEditor} from './page-chrome';
+import {rememberPage,forgetPage,useRecentPages} from './recent-pages';
+import {revealFolder} from './page-tree';
+import {createUntitled,consumeTitleFocus} from './create-page';
 const RecordEditor=React.lazy(()=>import('./record-editor').then(module=>({default:module.RecordEditor})));
 
 export function PageTitle({title,description,actions}:{title:string;description?:string;actions?:React.ReactNode}){return <header className="page-header"><div className="page-title-copy"><Heading level={1}>{title}</Heading>{description&&<p className="muted">{description}</p>}</div>{actions&&<div className="page-actions">{actions}</div>}</header>;}
@@ -47,13 +53,38 @@ export function LoginPage(){const [secret,setSecret]=useState(''),[busy,setBusy]
  return <div className="login-page"><Card className="login-panel" padding={6}><div className="login-logo">R</div><h1>登录 Recalloom</h1><p className="muted">使用现有 OAuth 授权密钥访问管理控制台。</p><form onSubmit={submit} className="login-form"><TextInput label="授权密钥" type="password" value={secret} onChange={setSecret} isRequired autoComplete="off" placeholder="输入 MCP_AUTH_SECRET"/>{error&&<Banner status="error" container="section" title="登录失败" description={error}/>}<Button label={busy?'验证中…':'登录'} variant="primary" type="submit" width="100%" isDisabled={!secret||busy} isLoading={busy}/>{busy&&<p className="muted small">人机验证 {progress?progress+'%':'进行中'}，请勿关闭页面。</p>}</form><p className="login-foot"><Shield size={14}/>密钥仅用于登录，不会保存在浏览器中。登录后通过安全会话访问 API。</p></Card></div>;
 }
 
-export function HomePage(){const {data:todo,isPending}=useQuery({queryKey:['tasks','all'],queryFn:()=>tasks()});const {data:events,isPending:activityPending}=useQuery({queryKey:['activity'],queryFn:activity});const active=todo?.items.filter(t=>!['done','cancelled'].includes(t.status))??[];return <div className="page"><PageTitle title="概览" description="你的知识、任务与近期变化"/><nav className="overview-links" aria-label="知识库快捷访问"><Link to="/library" className="overview-link"><FolderOpen size={18}/><span><strong>知识库</strong><small>浏览全部内容</small></span><ArrowRight size={15} className="overview-arrow"/></Link><Link to="/tasks" className="overview-link"><ListTodo size={18}/><span><strong>{isPending?'—':active.length} 项待办</strong><small>管理任务</small></span><ArrowRight size={15} className="overview-arrow"/></Link><Link to="/activity" className="overview-link"><History size={18}/><span><strong>最近修改</strong><small>查看活动</small></span><ArrowRight size={15} className="overview-arrow"/></Link></nav><div className="dashboard-grid"><Card className="home-card" padding={4}><div className="panel-heading"><h2>未完成事项</h2><Link to="/tasks">查看全部</Link></div>{isPending?<LoadingRows kind="compact" count={5}/>:active.length?active.slice(0,5).map(t=><div className="compact-row" key={t.id}><span className={'status-dot '+t.status}/><Link to="/records/$recordId" params={{recordId:t.recordId}}>{t.title}</Link><span className="muted tiny">P{t.priority}</span></div>):<Empty title="暂无待办" description="在任务列表中创建后会显示在这里。"/>}</Card><Card className="home-card" padding={4}><div className="panel-heading"><h2>最近活动</h2><Link to="/activity">查看全部</Link></div>{activityPending?<LoadingRows kind="activity" count={5}/>:events?.items?.length?events.items.slice(0,5).map(e=><ActivityEntry key={e.seq} item={e} compact/>):<Empty title="暂无活动"/>}</Card></div></div>}
+const ago=(value?:number|string)=>{
+ const time=typeof value==='number'?value:value?Date.parse(value):NaN;
+ if(!Number.isFinite(time))return '';
+ const minutes=Math.round((time-Date.now())/60000);
+ const format=new Intl.RelativeTimeFormat('zh-CN',{numeric:'auto'});
+ if(Math.abs(minutes)<1)return '刚刚';
+ if(Math.abs(minutes)<60)return format.format(minutes,'minute');
+ if(Math.abs(minutes)<60*24)return format.format(Math.round(minutes/60),'hour');
+ if(Math.abs(minutes)<60*24*7)return format.format(Math.round(minutes/1440),'day');
+ return fmt(time);
+};
+const greeting=()=>{const hour=new Date().getHours();return hour<5?'夜深了':hour<11?'早上好':hour<13?'中午好':hour<18?'下午好':'晚上好';};
+const statusNames:Record<string,string>={draft:'草稿',active:'正常',completed:'已完成',superseded:'已取代',archived:'已归档'};
 
-export function LibraryPage(){const params=useParams({strict:false});const folderId=(params as {folderId?:string}).folderId||null;const qc=useQueryClient(),nav=useNavigate();const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null);
+export function HomePage(){const {data:todo,isPending}=useQuery({queryKey:['tasks','all'],queryFn:()=>tasks()});const {data:events,isPending:activityPending}=useQuery({queryKey:['activity'],queryFn:activity});const recent=useRecentPages();const active=todo?.items.filter(t=>!['done','cancelled'].includes(t.status))??[];
+ return <div className="page home-page"><PageTitle title="概览" description={greeting()+'。从最近的页面继续，或查看待办与近期变化。'}/>
+ <section className="home-section" aria-labelledby="home-recent"><h2 id="home-recent" className="section-heading"><Clock size={14}/>最近访问</h2>
+  {recent.length?<div className="recent-pages">{recent.slice(0,8).map(page=><Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page"><span className="recent-page-cover" aria-hidden="true"/><span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<ListTodo size={20}/>:<FileText size={20}/>}</span><strong className="recent-page-name">{page.name}</strong><small className="recent-page-meta truncate">{ago(page.visitedAt)}</small></Link>)}</div>
+  :<div className="recent-empty"><p className="muted small">最近打开的页面会显示在这里。</p><Link to="/library" className="small text-link">浏览知识库</Link></div>}
+ </section>
+ <div className="dashboard-grid"><section className="home-card"><div className="panel-heading"><h2>未完成事项</h2><Link to="/tasks">查看全部</Link></div>{isPending?<LoadingRows kind="compact" count={5}/>:active.length?active.slice(0,5).map(t=><div className="compact-row" key={t.id}><span className={'status-dot '+t.status}/><Link to="/records/$recordId" params={{recordId:t.recordId}}>{t.title}</Link><span className="muted tiny">P{t.priority}</span></div>):<Empty title="暂无待办" description="在任务列表中创建后会显示在这里。"/>}</section><section className="home-card"><div className="panel-heading"><h2>最近活动</h2><Link to="/activity">查看全部</Link></div>{activityPending?<LoadingRows kind="activity" count={5}/>:events?.items?.length?events.items.slice(0,5).map(e=><ActivityEntry key={e.seq} item={e} compact/>):<Empty title="暂无活动"/>}</section></div></div>;
+}
+
+type FolderDetail={id:string;name:string;parentId:string|null;description?:string;metadataRevision:number};
+export function LibraryPage(){const params=useParams({strict:false});const folderId=(params as {folderId?:string}).folderId||null;const qc=useQueryClient(),nav=useNavigate();const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null),[quickBusy,setQuickBusy]=useState(false);
+ const [focusTitle]=useState(()=>folderId?consumeTitleFocus(folderId):false);
  useEffect(()=>{setCreating(null);},[folderId]);
  const q=useInfiniteQuery({queryKey:['browse-pages',folderId],initialPageParam:undefined as string|undefined,queryFn:({pageParam})=>browse(folderId,pageParam),getNextPageParam:last=>last.page.hasMore&&last.page.nextCursor!=null?String(last.page.nextCursor):undefined});
  const entries=q.data?.pages.flatMap(page=>page.items)??[];
- const currentFolder=useQuery({queryKey:['folder',folderId],queryFn:()=>api<{name:string;parentId:string|null;description?:string}>('/folders/'+folderId),enabled:Boolean(folderId)});
+ const currentFolder=useQuery({queryKey:['folder',folderId],queryFn:()=>api<FolderDetail>('/folders/'+folderId),enabled:Boolean(folderId)});
+ useEffect(()=>{revealFolder(currentFolder.data?.parentId);},[currentFolder.data?.parentId]);
+ const renameFolder=async(next:string)=>{const folder=currentFolder.data;if(!folder)return;await mutate('/folders/'+folder.id,{name:next,expectedMetadataRevision:folder.metadataRevision},'PATCH');await Promise.all([qc.invalidateQueries({queryKey:['folder',folder.id]}),qc.invalidateQueries({queryKey:['folder-trail']}),qc.invalidateQueries({queryKey:['browse']})]);};
  const create=async()=>{if(!name.trim()||!creating)return;try{
   const isTemplate=creating==='checkpoint_template';
   const tags=[...new Set([...tagInput.split(/[,，]/).map(t=>t.trim().toLowerCase()).filter(Boolean),...(isTemplate?['checkpoint']:[])])];
@@ -63,19 +94,62 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
       ...(isTemplate?{content:'# '+name.trim()+'\n\n## 概述\n\n## 已完成\n\n## 待跟进\n\n## 验证与参考\n'}:{})});
   setName('');setTagInput('');setCreating(null);qc.invalidateQueries({queryKey:['browse']});qc.invalidateQueries({queryKey:['browse-pages']});if(creating!=='folder')nav({to:'/records/$recordId',params:{recordId:data.id}});
  }catch(e){setError(e);}};
- return <div className="page">{folderId&&<div className="breadcrumbs"><Link to="/library">知识库</Link><ChevronRight size={14}/><span className="truncate">{currentFolder.data?.name||'当前文件夹'}</span></div>}<PageTitle title={folderId?(currentFolder.data?.name||'文件夹'):'知识库'} description={currentFolder.data?.description||'文件夹、Markdown 文档和结构化任务'} actions={<><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="primary" size="sm" onClick={()=>setCreating('document')}/></>}/>
+ const quickCreate=async()=>{if(quickBusy)return;setQuickBusy(true);setError(null);try{const id=await createUntitled(qc,'document',folderId);revealFolder(folderId);await nav({to:'/records/$recordId',params:{recordId:id}});}catch(e){setError(e);}finally{setQuickBusy(false);}};
+ const title=folderId?currentFolder.data?.name??'':'知识库';
+ const subtitle=folderId?currentFolder.data?.description:'文件夹、Markdown 文档和结构化任务';
+ return <div className="page folder-page">
+ <TopbarPortal slot="start"><Breadcrumbs folderId={currentFolder.data?.parentId} current={folderId?title||'…':undefined}/></TopbarPortal>
+ <header className="doc-header">
+  <div className="page-icon" aria-hidden="true">{folderId?<FolderOpen size={34} strokeWidth={1.6}/>:<Library size={34} strokeWidth={1.6}/>}</div>
+  {folderId&&currentFolder.isPending?<Skeleton width="45%" height={40} radius={2}/>:currentFolder.isError?<ErrorText error={currentFolder.error}/>:<InlineTitle value={title} onRename={folderId?renameFolder:undefined} autoFocus={focusTitle}/>}
+  {subtitle&&<p className="page-subtitle">{subtitle}</p>}
+  <div className="doc-header-actions"><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/></div>
+ </header>
  {creating&&<Card className="inline-form create-surface" padding={4}><form className="create-form" onSubmit={e=>{e.preventDefault();void create();}}><div className="create-fields"><div className="inline-selector"><Selector label="类型" size="md" width="100%" value={creating} options={[{value:'folder',label:'文件夹'},{value:'document',label:'文档'},{value:'checkpoint_template',label:'阶段总结（文档模板）'},{value:'task_list',label:'任务列表'}]} onChange={value=>setCreating(value as typeof creating)}/></div><div className="inline-field"><TextInput label="名称" hasAutoFocus width="100%" placeholder="名称" value={name} onChange={setName} onEnter={create} onKeyDown={e=>{if(e.key==='Escape')setCreating(null);}}/></div>{creating!=='folder'&&<div className="inline-field"><TextInput label="标签" width="100%" placeholder="标签（逗号分隔，可选）" value={tagInput} onChange={setTagInput}/></div>}</div><div className="create-actions"><Button type="submit" label="创建" variant="primary" isDisabled={!name.trim()}/><Button label="取消" onClick={()=>setCreating(null)}/></div></form></Card>}
- {Boolean(error)&&<ErrorText error={error}/>}<Card className="file-table" padding={0}><div className="file-table-head"><span>名称</span><span>类型</span><span>最近修改</span></div>{q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:entries.length?entries.map(item=>item.entityType==='folder'?<Link to="/library/$folderId" params={{folderId:item.id}} className="file-row" key={item.id}><span><Folder size={17}/><span className="truncate">{item.name}</span></span><span>文件夹</span><span>{fmt(item.updatedAt)}</span></Link>:<Link to="/records/$recordId" params={{recordId:item.id}} className="file-row" key={item.id}><span><FileText size={17}/><span className="truncate">{item.name}</span></span><span>{item.kind==='task_list'?'任务':'文档'}</span><span>{fmt(item.updatedAt)}</span></Link>):<Empty title="此目录没有内容" description="创建一个文件夹或记录以开始。"/>}</Card>
+ {Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}
+ <div className="file-table"><div className="file-table-head"><span>名称</span><span>类型</span><span>最近修改</span></div>{q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:entries.length?entries.map(item=>item.entityType==='folder'?<Link to="/library/$folderId" params={{folderId:item.id}} className="file-row" key={item.id}><span><Folder size={17}/><span className="truncate">{item.name}</span></span><span>文件夹</span><span>{fmt(item.updatedAt)}</span></Link>:<Link to="/records/$recordId" params={{recordId:item.id}} className={'file-row'+(item.status==='archived'?' is-archived':'')} key={item.id}><span>{item.kind==='task_list'?<ListTodo size={17}/>:<FileText size={17}/>}<span className="truncate">{item.name}</span></span><span>{item.status==='archived'?'已归档':item.kind==='task_list'?'任务':'文档'}</span><span>{fmt(item.updatedAt)}</span></Link>):<Empty title="此目录没有内容" description="创建一个文件夹或记录以开始。"/>}
+ {!q.isPending&&!q.isError&&<button type="button" className="file-new" disabled={quickBusy} onClick={()=>void quickCreate()}><Plus size={16}/>{quickBusy?'正在创建…':'新建页面'}</button>}</div>
  {q.hasNextPage&&<Button label="加载更多" onClick={()=>q.fetchNextPage()} size="sm" isLoading={q.isFetchingNextPage}/> }</div>;
 }
 
 export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const qc=useQueryClient();const q=useQuery({queryKey:['record',recordId],queryFn:()=>record(recordId)});const [metaOpen,setMetaOpen]=useState(false),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null),[newName,setNewName]=useState('');
+ const [focusTitle]=useState(()=>consumeTitleFocus(recordId));
  useEffect(()=>{setMetaOpen(false);setOutlineTarget(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const outline=useQuery({queryKey:['outline',recordId,q.data?.revision],queryFn:()=>api<{headings:Array<{title:string;level:number;lineStart:number;lineEnd:number}>;totalHeadings:number}>('/records/'+recordId+'/outline?limit=200'),enabled:Boolean(metaOpen&&q.data&&q.data.kind==='document')});
- const updateMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;setError(null);try{await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');qc.invalidateQueries({queryKey:['record',recordId]});qc.invalidateQueries({queryKey:['browse']});qc.invalidateQueries({queryKey:['browse-pages']});setMetaOpen(false);}catch(e){setError(e);}};
- if(q.isPending)return <Loading/>;if(q.isError)return <div className="page"><ErrorText error={q.error}/></div>;
- const item=q.data;return <div className="page record-page">{confirmation}<div className="breadcrumbs"><Link to="/library">知识库</Link><ChevronRight size={14}/><span className="truncate">{item.path}</span></div><PageTitle title={item.name} description={item.kind==='task_list'?'结构化任务列表':'Markdown 文档'} actions={<><Button label="详情" variant="secondary" size="sm" onClick={()=>{if(!metaOpen)setNewName(item.name);setMetaOpen(v=>!v);}}/><Button label="重命名" size="sm" onClick={()=>{setNewName(item.name);setMetaOpen(true);}}/></>}/>{Boolean(error)&&<ErrorText error={error}/>}<div className="record-layout"><div className="record-main">{item.kind==='task_list'?<TasksPage recordId={recordId}/>:<React.Suspense fallback={<Loading/>}><RecordEditor key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget} onSaved={()=>{qc.invalidateQueries({queryKey:['record',recordId]});qc.invalidateQueries({queryKey:['browse']});qc.invalidateQueries({queryKey:['browse-pages']});}}/></React.Suspense>}</div><ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div><TextInput label="名称" width="100%" value={newName} onChange={setNewName}/><Button label="保存名称" variant="secondary" size="sm" isDisabled={!newName.trim()||newName===item.name} onClick={()=>updateMeta({name:newName.trim()})}/><dl><dt>记录类型</dt><dd>{item.kind==='document'?'Markdown 文档':item.kind==='task_list'?'任务列表':item.kind}</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{item.status==='active'?'正常':item.status==='archived'?'已归档':item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>标签</dt><dd>{item.tags?.join(', ')||'无'}</dd></dl>{item.kind==='document'&&<div className="outline-panel"><h3>文档大纲</h3>{outline.isPending?<p className="muted small">加载大纲…</p>:outline.isError?<p className="muted small">大纲暂不可用</p>:outline.data?.headings.length?<div className="outline-items">{outline.data.headings.map((h,i)=><div className="outline-indent" key={i} style={{paddingInlineStart:(h.level-1)*12}}><Button className="outline-item" variant="ghost" size="sm" width="100%" label={h.title} tooltip={'第 '+h.lineStart+' 行至第 '+h.lineEnd+' 行'} endContent={<small>L{h.lineStart}</small>} onClick={()=>{setOutlineTarget(prev=>({line:h.lineStart,token:(prev?.token??0)+1}));setMetaOpen(false);}}/></div>)}{outline.data.totalHeadings>outline.data.headings.length&&<p className="muted small">仅显示前 200 个标题</p>}</div>:<p className="muted small">暂无 Markdown 标题</p>}</div>}<Button label={archiving?'处理中…':'归档记录'} icon={<Archive size={14}/>} variant="destructive" size="sm" isDisabled={archiving||item.status==='archived'} onClick={async()=>{if(!(await askConfirm({title:'归档此记录？',description:'归档后记录将不再显示在常用列表中，但内容和历史版本仍会保留。',actionLabel:'归档记录',destructive:true})))return;setArchiving(true);await updateMeta({status:'archived'});setArchiving(false);}}/></div></ContextPanel></div></div>;
+ const item=q.data;
+ useEffect(()=>{if(!item)return;rememberPage({id:item.id,name:item.name,kind:item.kind,path:item.path});revealFolder(item.folderId);},[item?.id,item?.name,item?.kind,item?.path,item?.folderId]);
+ useEffect(()=>{if(q.error instanceof ApiError&&q.error.status===404)forgetPage(recordId);},[q.error,recordId]);
+ const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']})]);
+ const saveMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');await refresh();};
+ const updateMeta=async(fields:Record<string,unknown>)=>{setError(null);try{await saveMeta(fields);setMetaOpen(false);}catch(e){setError(e);}};
+ const changeTag=async(tag:string,action:'add'|'remove')=>{await mutate('/records/'+recordId+'/tags',{tag,action});await refresh();};
+ const archive=async()=>{if(!(await askConfirm({title:'归档此记录？',description:'归档后记录将不再显示在常用列表中，但内容和历史版本仍会保留。',actionLabel:'归档记录',destructive:true})))return;setArchiving(true);await updateMeta({status:'archived'});setArchiving(false);};
+ if(q.isPending)return <Loading/>;if(q.isError||!item)return <div className="page"><ErrorText error={q.error}/></div>;
+ const openDetails=()=>{if(!metaOpen)setNewName(item.name);setMetaOpen(v=>!v);};
+ const pageActions=<>
+  <IconButton variant="ghost" size="sm" label="详情" icon={<PanelRight size={16}/>} onClick={openDetails}/>
+  <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
+   {label:'复制页面链接',icon:<Copy size={15}/>,onClick:()=>void navigator.clipboard?.writeText(location.origin+'/records/'+item.id)},
+   {label:'查看大纲与信息',icon:<PanelRight size={15}/>,onClick:openDetails},
+   {type:'divider'},
+   {label:'归档记录',icon:<Archive size={15}/>,variant:'destructive',isDisabled:archiving||item.status==='archived',onClick:()=>void archive()}
+  ]}/>
+ </>;
+ return <div className="page record-page">{confirmation}
+ <TopbarPortal slot="start"><Breadcrumbs folderId={item.folderId} current={item.name}/></TopbarPortal>
+ {item.status==='archived'&&<div className="doc-notice"><Banner status="warning" container="section" title="此记录已归档" description="归档的记录不会显示在侧边栏中，内容和历史版本仍完整保留。" endContent={<Button label="恢复为正常" size="sm" variant="secondary" onClick={()=>void updateMeta({status:'active'})}/>}/></div>}
+ <header className="doc-header">
+  <div className="page-icon" aria-hidden="true">{item.kind==='task_list'?<ListTodo size={34} strokeWidth={1.6}/>:<FileText size={34} strokeWidth={1.6}/>}</div>
+  <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle}/>
+  <Properties>
+   <Property icon={<Shapes size={14}/>} label="类型">{item.kind==='task_list'?'任务列表':'Markdown 文档'}</Property>
+   <Property icon={<Tag size={14}/>} label="标签"><TagEditor tags={item.tags??[]} onChange={changeTag}/></Property>
+   <Property icon={<Clock size={14}/>} label="更新时间"><span title={item.updatedAt}>{ago(item.updatedAt)||'—'}</span></Property>
+   {item.status!=='active'&&<Property icon={<CircleDot size={14}/>} label="状态">{statusNames[item.status??'']??item.status}</Property>}
+  </Properties>
+ </header>
+ {Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}<div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><TasksPage recordId={recordId}/></>:<React.Suspense fallback={<Loading/>}><RecordEditor key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget} pageActions={pageActions} onSaved={()=>void refresh()}/></React.Suspense>}</div><ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div><TextInput label="名称" width="100%" value={newName} onChange={setNewName}/><Button label="保存名称" variant="secondary" size="sm" isDisabled={!newName.trim()||newName===item.name} onClick={()=>updateMeta({name:newName.trim()})}/><dl><dt>记录类型</dt><dd>{item.kind==='document'?'Markdown 文档':item.kind==='task_list'?'任务列表':item.kind}</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>标签</dt><dd>{item.tags?.join(', ')||'无'}</dd></dl>{item.kind==='document'&&<div className="outline-panel"><h3>文档大纲</h3>{outline.isPending?<p className="muted small">加载大纲…</p>:outline.isError?<p className="muted small">大纲暂不可用</p>:outline.data?.headings.length?<div className="outline-items">{outline.data.headings.map((h,i)=><div className="outline-indent" key={i} style={{paddingInlineStart:(h.level-1)*12}}><Button className="outline-item" variant="ghost" size="sm" width="100%" label={h.title} tooltip={'第 '+h.lineStart+' 行至第 '+h.lineEnd+' 行'} endContent={<small>L{h.lineStart}</small>} onClick={()=>{setOutlineTarget(prev=>({line:h.lineStart,token:(prev?.token??0)+1}));setMetaOpen(false);}}/></div>)}{outline.data.totalHeadings>outline.data.headings.length&&<p className="muted small">仅显示前 200 个标题</p>}</div>:<p className="muted small">暂无 Markdown 标题</p>}</div>}<Button label={archiving?'处理中…':'归档记录'} icon={<Archive size={14}/>} variant="destructive" size="sm" isDisabled={archiving||item.status==='archived'} onClick={()=>void archive()}/></div></ContextPanel></div></div>;
 }
 
 export function TasksPage({recordId}:{recordId?:string}){const qc=useQueryClient();const q=useQuery({queryKey:['tasks',recordId??'all'],queryFn:()=>tasks(recordId?{recordId}:undefined)});const [filter,setFilter]=useState('open'),[newTitle,setNewTitle]=useState(''),[error,setError]=useState<unknown>(null),[pending,setPending]=useState(false);
@@ -87,7 +161,9 @@ export function TasksPage({recordId}:{recordId?:string}){const qc=useQueryClient
 }
 
 export function SearchPage(){
- const [term,setTerm]=useState(''),[submitted,setSubmitted]=useState(''),[mode,setMode]=useState('auto');
+ const initial=(useSearch({strict:false}) as {q?:string}).q??'';
+ const [term,setTerm]=useState(initial),[submitted,setSubmitted]=useState(initial),[mode,setMode]=useState('auto');
+ useEffect(()=>{setTerm(initial);setSubmitted(initial);},[initial]);
  const q=useQuery({queryKey:['search',submitted,mode],queryFn:()=>api<{items:Array<{id:string;name:string;kind?:string;description?:string;snippet?:string;path?:string;score?:number;source?:'literal'|'metadata'|'semantic'|'hybrid'}>;indexMayLag?:boolean}>('/search?'+queryString({query:submitted,mode,limit:30})),enabled:submitted.trim().length>0});
  return <div className="page"><PageTitle title="搜索" description="查找文档、任务和关联知识"/>
  <div className="search-surface"><form className="search-form" onSubmit={e=>{e.preventDefault();setSubmitted(term.trim());}}><div className="search-query-field"><TextInput label="搜索关键字" isLabelHidden width="100%" hasAutoFocus startIcon={<Search size={18}/>} placeholder="输入关键词或自然语言问题…" value={term} onChange={setTerm}/></div><div className="search-mode-field"><Selector label="搜索模式" isLabelHidden width="100%" size="md" value={mode} onChange={setMode} options={[{value:"auto",label:"自动"},{value:"literal",label:"精确文本"},{value:"metadata",label:"名称与描述"},{value:"semantic",label:"语义"},{value:"hybrid",label:"混合"}]}/></div><Button label="搜索" variant="primary" type="submit" isDisabled={!term.trim()}/></form></div>

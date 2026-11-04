@@ -1,6 +1,7 @@
-import React,{useEffect,useState} from 'react';
+import React from 'react';
 import {Drawer} from '@astryxdesign/core/Drawer';
 import {BottomSheet} from '@astryxdesign/core/BottomSheet';
+import {useCompactLayout} from './use-media';
 
 /**
  * Astryx-owned overlay semantics: full-height inspector on large screens,
@@ -8,14 +9,7 @@ import {BottomSheet} from '@astryxdesign/core/BottomSheet';
  * scrolling behavior without inserting controls below long documents.
  */
 export function ContextPanel({open,onOpenChange,label,children}:{open:boolean;onOpenChange:(value:boolean)=>void;label:string;children:React.ReactNode}){
- const [mobile,setMobile]=useState(()=>typeof window!=='undefined'&&matchMedia('(max-width:720px)').matches);
- useEffect(()=>{
-  const query=matchMedia('(max-width:720px)');
-  const handle=()=>setMobile(query.matches);
-  query.addEventListener('change',handle);
-  handle();
-  return()=>query.removeEventListener('change',handle);
- },[]);
+ const mobile=useCompactLayout();
  const inner=<div className="context-panel-inner">{children}</div>;
  return mobile
   ?<BottomSheet isOpen={open} onOpenChange={onOpenChange} label={label} height="tall" padding={4}>{inner}</BottomSheet>

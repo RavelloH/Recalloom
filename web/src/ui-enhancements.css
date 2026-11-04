@@ -145,52 +145,19 @@ html[data-effective-theme="dark"] .topbar {
 
 /* ========== 侧边栏增强 ========== */
 .sidebar {
-  background: var(--color-background-muted, #fafafa);
-  border-right: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
   transition: width 280ms cubic-bezier(0.45, 0, 0.15, 1),
               min-width 280ms cubic-bezier(0.45, 0, 0.15, 1),
               transform 280ms cubic-bezier(0.45, 0, 0.15, 1);
 }
 
-.brand-mark {
-  background: linear-gradient(135deg,
-    var(--color-text-primary, #1a1a1a) 0%,
-    var(--color-text-secondary, #4a4a4a) 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (hover: hover) {
-  .brand:hover .brand-mark {
-    transform: rotate(-5deg) scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-  }
-}
-
 /* ========== 卡片与面板增强 ========== */
-.panel, .home-card {
+.panel {
   background: var(--color-background-body, #fff);
   border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04),
-              0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 140ms ease;
 }
 
-html[data-effective-theme="dark"] .panel,
-html[data-effective-theme="dark"] .home-card {
+html[data-effective-theme="dark"] .panel {
   border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2),
-              0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-@media (hover: hover) {
-  .panel:hover, .home-card:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08),
-                0 2px 4px rgba(0, 0, 0, 0.06);
-  }
 }
 
 /* Astryx owns Button/Dialog hover, press, focus and modal transitions.
@@ -248,18 +215,6 @@ html[data-effective-theme="dark"] .home-card {
 /* Astryx owns input and textarea focus treatments. */
 
 /* ========== 编辑器优化 ========== */
-.editor-section {
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 140ms ease;
-}
-
-.editor-section:focus-within {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08),
-              0 0 0 3px color-mix(in srgb, var(--color-text-primary, #171717) 8%, transparent);
-}
-
 .wysiwyg-toolbar {
   backdrop-filter: blur(8px);
   background: color-mix(in srgb, var(--color-background-body, white) 95%, transparent);
@@ -294,45 +249,6 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 @keyframes loading-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* ========== 搜索结果增强 ========== */
-.search-result {
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 140ms ease;
-}
-
-@media (hover: hover) {
-  .search-result:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
-    border-color: var(--color-border, rgba(0, 0, 0, 0.12));
-  }
-}
-
-.search-result:active {
-  transform: translateY(0);
-}
-
-/* ========== 文件行增强 ========== */
-.file-row {
-  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.06));
-  transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
-              transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (hover: hover) {
-  .file-row:hover {
-    background: var(--color-background-muted, rgba(0, 0, 0, 0.02));
-    transform: translateX(2px);
-  }
-}
-
-.file-row:active {
-  transform: translateX(0) scale(0.995);
 }
 
 /* ========== 性能优化 ========== */

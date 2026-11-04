@@ -20,7 +20,7 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/library/$folderId',component:LibraryPage}),
  createRoute({getParentRoute:()=>root,path:'/records/$recordId',component:RecordPage}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage}),
- createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage}),
+ createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage,validateSearch:(search:Record<string,unknown>):{q?:string}=>typeof search.q==='string'&&search.q.trim()?{q:search.q.slice(0,4000)}:{}}),
  createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage}),
  createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:()=> <Navigate to="/settings" replace/>}),

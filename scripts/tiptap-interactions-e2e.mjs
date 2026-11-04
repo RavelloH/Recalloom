@@ -17,6 +17,16 @@ const back=async()=>{
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap').waitFor();
 };
+// Desktop inserts go through the Notion-style slash menu on a fresh paragraph.
+const slash=async command=>{
+ await page.locator('.tiptap').click();
+ await page.keyboard.press('Control+End');
+ await page.keyboard.press('Enter');
+ await page.keyboard.type('/'+command);
+ await page.getByRole('listbox',{name:'插入块'}).waitFor();
+ await page.keyboard.press('Enter');
+};
+const bubble=name=>page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name});
 const load=async markdown=>{
  await page.getByRole('button',{name:'Markdown',exact:true}).click();
  await page.locator('.cm-content').fill(markdown);
@@ -35,8 +45,7 @@ try{
  await page.getByRole('heading',{name:/Editor interactions/}).waitFor();
 
  // Insert and edit an existing Markdown link, preserving the display text.
- await page.locator('.tiptap').click();
- await page.getByRole('button',{name:'插入或编辑链接'}).click();
+ await slash('链接');
  const linkDialog=page.getByRole('dialog',{name:'插入链接'});
  await linkDialog.getByRole('textbox',{name:'链接文字'}).fill('文档链接');
  await linkDialog.getByRole('textbox',{name:'链接地址'}).fill('https://example.com/docs');
@@ -45,7 +54,7 @@ try{
  assert.ok(md.includes('[文档链接](https://example.com/docs)'),'link insertion: '+md);
  await back();
  await page.locator('.tiptap a').click();
- await page.getByRole('button',{name:'插入或编辑链接'}).click();
+ await bubble('插入或编辑链接').click();
  const editLink=page.getByRole('dialog',{name:'编辑链接'});
  await editLink.getByRole('textbox',{name:'链接地址'}).fill('https://example.org/new');
  await editLink.getByRole('button',{name:'更新',exact:true}).click();
@@ -53,14 +62,14 @@ try{
  assert.ok(md.includes('https://example.org/new'),'link update: '+md);
  await back();
  await page.locator('.tiptap a').click();
- await page.getByRole('button',{name:'插入或编辑链接'}).click();
+ await bubble('插入或编辑链接').click();
  await page.getByRole('dialog',{name:'编辑链接'}).getByRole('button',{name:'删除链接'}).click();
  md=await source();
  assert.ok(md.includes('文档链接')&&!md.includes('https://example.org/new'),'link removal keeps text: '+md);
 
  // External image insertion, alt edit, removal and protocol validation.
  await back();
- await page.getByRole('button',{name:'插入或编辑图片'}).click();
+ await slash('图片');
  const imageDialog=page.getByRole('dialog',{name:'插入图片'});
  await imageDialog.getByRole('textbox',{name:'图片地址'}).fill('ftp://example.com/image.png');
  assert.equal(await imageDialog.getByRole('button',{name:'插入',exact:true}).isDisabled(),true);
@@ -71,7 +80,7 @@ try{
  assert.ok(md.includes('![演示图片](https://example.com/pic.png)'),'image insertion: '+md);
  await back();
  await page.locator('.tiptap img').click();
- await page.getByRole('button',{name:'插入或编辑图片'}).click();
+ await bubble('插入或编辑图片').click();
  const editImage=page.getByRole('dialog',{name:'编辑图片'});
  await editImage.getByRole('textbox',{name:'替代文本（Alt）'}).fill('更新的图片描述');
  await editImage.getByRole('button',{name:'更新',exact:true}).click();
@@ -79,15 +88,14 @@ try{
  assert.ok(md.includes('更新的图片描述'),'image alt update: '+md);
  await back();
  await page.locator('.tiptap img').click();
- await page.getByRole('button',{name:'插入或编辑图片'}).click();
+ await bubble('插入或编辑图片').click();
  await page.getByRole('dialog',{name:'编辑图片'}).getByRole('button',{name:'删除图片'}).click();
  md=await source();
  assert.ok(!md.includes('pic.png'),'image removal: '+md);
 
  // Insertion, KaTeX live preview, and update of existing inline formula.
  await back();
- await page.locator('.tiptap').click();
- await page.getByRole('button',{name:'插入行内公式'}).click();
+ await slash('行内公式');
  const mathDialog=page.getByRole('dialog',{name:'插入数学公式'});
  await mathDialog.getByRole('textbox',{name:'LaTeX 公式'}).fill('E=mc^2');
  await mathDialog.locator('.katex').first().waitFor();

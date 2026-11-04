@@ -157,8 +157,6 @@ body { font-size: 14px; line-height: 1.5; }
 .activity-row { padding-block: 14px; }
 .record-inspector { width: 292px; min-width: 0; }
 .record-inspector dl { font-size: 13px; }
-.editor-section { border-radius: var(--rk-radius); }
-.editor-topline { padding: 14px 18px; gap: 12px; }
 .wysiwyg-toolbar { padding: 10px 14px; gap: 4px; }
 .login-panel { width: min(100%, 424px); border-radius: 16px; }
 .login-panel h1 { font-size: 24px; letter-spacing: -.025em; }
@@ -218,7 +216,6 @@ body { font-size: 14px; line-height: 1.5; }
   .task-item { padding: 12px 10px; gap: 10px; }
   .task-status { min-width: 100px; flex: 0 0 100px; }
   .record-inspector { width: 100%; }
-  .editor-topline { padding: 11px 12px; }
   .bottom-nav { padding-inline: 10px; }
 }
 @media (max-width: 359px) {

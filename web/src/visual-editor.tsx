@@ -4,6 +4,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
+import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import {Markdown} from '@tiptap/markdown';
 import Image from '@tiptap/extension-image';
@@ -11,8 +12,9 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import {BlockMath,InlineMath} from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
-import type {JSONContent} from '@tiptap/core';
-import {Link2,ImagePlus,Sigma,Table2,Rows3,Columns3,Trash2,AlignLeft,AlignCenter,AlignRight,Plus,Minus} from 'lucide-react';
+import {NodeSelection} from '@tiptap/pm/state';
+import type {Editor,JSONContent} from '@tiptap/core';
+import {Link2,ImagePlus,Sigma,Table2,Rows3,Columns3,Trash2,AlignLeft,AlignCenter,AlignRight,Plus,Minus,Code} from 'lucide-react';
 import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
@@ -21,6 +23,14 @@ import {RawMarkdown} from './tiptap/raw-markdown';
 import {buildLosslessMarkdown} from './tiptap/lossless-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
+import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {useCompactLayout} from './use-media';
+
+type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number};
+const SLASH_MENU_WIDTH=300;
+const SLASH_MENU_SPACE=280;
+// Inline atoms (math, images) must not be mistaken for whitespace before "/".
+const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
 
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
@@ -35,6 +45,41 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableTarget,setTableTarget]=useState(false);
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
+ const compact=useCompactLayout();
+ const compactRef=useRef(compact);
+ compactRef.current=compact;
+ const surfaceRef=useRef<HTMLDivElement>(null);
+ const slashListRef=useRef<HTMLDivElement>(null);
+ const [slash,setSlash]=useState<SlashState|null>(null);
+ const slashRef=useRef<SlashState|null>(null);
+ slashRef.current=slash;
+ const slashDismissedAt=useRef<number|null>(null);
+ const runSlashRef=useRef<(command:SlashCommand)=>void>(()=>{});
+ const editorRef=useRef<Editor|null>(null);
+ const detectSlash=(e:Editor)=>{
+  const selection=e.state.selection;
+  const $from=selection.$from;
+  const query=selection.empty&&e.isEditable&&$from.parent.isTextblock&&!$from.parent.type.spec.code
+   ?matchSlashQuery($from.parent.textBetween(0,$from.parentOffset,undefined,LEAF_PLACEHOLDER)):null;
+  if(query===null){slashDismissedAt.current=null;setSlash(null);return;}
+  const from=$from.pos-query.length-1;
+  const surface=surfaceRef.current;
+  if(slashDismissedAt.current===from||!surface||!filterSlashCommands(e,query).length){setSlash(null);return;}
+  const coords=e.view.coordsAtPos(from),box=surface.getBoundingClientRect();
+  const above=innerHeight-coords.bottom<SLASH_MENU_SPACE&&coords.top>SLASH_MENU_SPACE;
+  setSlash(previous=>({from,to:$from.pos,query,index:previous?.from===from&&previous.query===query?previous.index:0,
+   placement:above?'above':'below',offset:above?box.bottom-coords.top+6:coords.bottom-box.top+6,
+   left:Math.max(0,Math.min(coords.left-box.left,box.width-SLASH_MENU_WIDTH))}));
+ };
+ // Keyboard navigation can move into another cell; keep the table toolbar beside it.
+ const followTableSelection=(e:Editor)=>{
+  lastCellPos.current=null;lastColumn.current=null;
+  if(!e.isActive('table'))return;
+  const at=e.view.domAtPos(e.state.selection.from).node;
+  const cell=(at instanceof Element?at:at.parentElement)?.closest('td, th');
+  const surface=surfaceRef.current;
+  if(cell&&surface)setTableToolbarTop(Math.max(compactRef.current?60:8,cell.getBoundingClientRect().top-surface.getBoundingClientRect().top-55));
+ };
  const extensions=useMemo(()=>[
   StarterKit.configure({heading:false,paragraph:false,underline:false,link:{openOnClick:false}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
@@ -48,15 +93,35 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
-  Placeholder.configure({placeholder:'开始写作…'}),
+  Placeholder.configure({placeholder:({editor:e,node})=>node.type.name==='heading'?'标题 '+String(node.attrs.level??''):e.isEmpty?'输入“/”插入内容，或直接开始写作…':'输入“/”插入块'}),
  ],[]);
  const editor=useEditor({
   extensions,content:'',contentType:'markdown',immediatelyRender:false,
-  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}},
+  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}detectSlash(editor);},
+  onSelectionUpdate:({editor})=>{detectSlash(editor);followTableSelection(editor);},
+  onBlur:()=>{setSlash(null);setTableTarget(false);},
+  editorProps:{handleKeyDown:(_view,event)=>{
+   const state=slashRef.current,e=editorRef.current;
+   if(!state||!e||event.isComposing)return false;
+   const items=filterSlashCommands(e,state.query);
+   if(!items.length)return false;
+   if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    const step=event.key==='ArrowDown'?1:-1;
+    setSlash({...state,index:(state.index+step+items.length)%items.length});
+    return true;
+   }
+   if(event.key==='Enter'||event.key==='Tab'){runSlashRef.current(items[Math.min(state.index,items.length-1)]!);return true;}
+   if(event.key==='Escape'){slashDismissedAt.current=state.from;setSlash(null);return true;}
+   return false;
+  }},
  },[]);
+ editorRef.current=editor;
  const active=useEditorState({editor,selector:({editor:e})=>({
   bold:e?.isActive('bold')??false,italic:e?.isActive('italic')??false,
+  heading1:e?.isActive('heading',{level:1})??false,
   heading2:e?.isActive('heading',{level:2})??false,
+  heading3:e?.isActive('heading',{level:3})??false,
+  code:e?.isActive('code')??false,
   bulletList:e?.isActive('bulletList')??false,
   orderedList:e?.isActive('orderedList')??false,
   taskList:e?.isActive('taskList')??false,
@@ -70,9 +135,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   link:e?.isActive('link')??false,
   image:e?.isActive('image')??false,
   table:e?.isActive('table')??false,
+  focused:e?.isFocused??false,
   alignCenter:e?.isActive({textAlign:'center'})??false,
-  alignRight:e?.isActive({textAlign:'right'})??false
+  alignRight:e?.isActive({textAlign:'right'})??false,
+  textSelection:e?!e.state.selection.empty&&!(e.state.selection instanceof NodeSelection):false,
+  imageSelected:e?e.state.selection instanceof NodeSelection&&e.state.selection.node.type.name==='image':false,
+  linkHref:e?.isActive('link')?String(e.getAttributes('link').href??''):''
  })});
+ useEffect(()=>{slashListRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest'});},[slash?.index,slash?.query]);
  useEffect(()=>{
   if(!editor||checked.current)return;
   checked.current=true;
@@ -152,12 +222,27 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(lastCellPos.current!==null)chain.setTextSelection(lastCellPos.current);
   chain[name]().run();
  };
+ runSlashRef.current=command=>{
+  const state=slashRef.current;
+  if(!editor||!state)return;
+  setSlash(null);slashDismissedAt.current=null;
+  editor.chain().focus().deleteRange({from:state.from,to:state.to}).run();
+  command.run(editor,{openLink,openImage,openMath});
+ };
  if(!editor||!ready)return <div className="content-loading">正在准备可视化编辑器…</div>;
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
   <ToggleButton key={name} label={name} size="sm" isPressed={pressed} onPressedChange={run}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
   <Button key={name} label={name} variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
- return <div className="wysiwyg" onClickCapture={event=>{
+ const slashItems=slash?filterSlashCommands(editor,slash.query):[];
+ const inlineMarks=<>
+  {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}
+  {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
+  {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
+  {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
+  {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleHighlight().run(),<span className="toolbar-highlight">H</span>)}
+ </>;
+ return <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
@@ -166,19 +251,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   lastColumn.current=Array.from(row.cells).slice(0,cell.cellIndex).reduce((count,sibling)=>count+Math.max(1,sibling.colSpan),0);
   lastCellPos.current=editor.view.posAtDOM(cell,0);
   const surface=event.currentTarget.getBoundingClientRect();
-  setTableToolbarTop(Math.max(60,cell.getBoundingClientRect().top-surface.top-55));
+  setTableToolbarTop(Math.max(compact?60:8,cell.getBoundingClientRect().top-surface.top-55));
   // Align the actual editor selection with the cell the user clicked.
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
-  {protectedCount>0&&<Banner status="info" container="section" title={'已保护 '+protectedCount+' 处 Markdown 原文'} description="不支持的语法将以原始文本保留，其余内容仍可可视化编辑。选择“编辑此段源码”可单独修改。" collapsible={false}/>}
-  <div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
+  {protectedCount>0&&<div className="doc-notice"><Banner status="info" container="section" title={'已保护 '+protectedCount+' 处 Markdown 原文'} description="不支持的语法将以原始文本保留，其余内容仍可可视化编辑。选择“编辑此段源码”可单独修改。" collapsible={false}/></div>}
+  {compact&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools">
-    {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}
-    {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
-    {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
-    {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
-    {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleHighlight().run(),<span className="toolbar-highlight">H</span>)}
+    {inlineMarks}
     {toggle('上标',active?.superscript??false,()=>editor.chain().focus().toggleSuperscript().run(),<>x<sup>2</sup></>)}
     {toggle('下标',active?.subscript??false,()=>editor.chain().focus().toggleSubscript().run(),<>x<sub>2</sub></>)}
    </div>
@@ -202,8 +283,39 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     {action('插入行内公式',()=>openMath('inline'),<Sigma size={17}/>)}
     {action('插入块级公式',()=>openMath('block'),<>$$</>)}
    </div>
-  </div>
-  <div hidden={!(active?.table||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
+  </div>}
+  {!compact&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
+   shouldShow={({editor:e,state,from,to})=>{
+    if(!e.isEditable)return false;
+    const selection=state.selection;
+    if(selection instanceof NodeSelection)return selection.node.type.name==='image';
+    if(e.isActive('codeBlock'))return false;
+    return from!==to||e.isActive('link');
+   }}>
+   <div className="bubble-menu-inner" role="toolbar" aria-label="文本格式" onMouseDown={event=>event.preventDefault()}>
+    {active?.imageSelected
+     ?action('插入或编辑图片',openImage,<><ImagePlus size={15}/><span>编辑图片</span></>)
+     :!active?.textSelection
+      ?<>{active?.linkHref&&<span className="bubble-link truncate" title={active.linkHref}>{active.linkHref}</span>}{action('插入或编辑链接',openLink,<><Link2 size={15}/><span>编辑链接</span></>)}</>
+      :<>
+       <div className="bubble-group">
+        {toggle('一级标题',active?.heading1??false,()=>editor.chain().focus().toggleHeading({level:1}).run(),'H1')}
+        {toggle('二级标题',active?.heading2??false,()=>editor.chain().focus().toggleHeading({level:2}).run(),'H2')}
+        {toggle('三级标题',active?.heading3??false,()=>editor.chain().focus().toggleHeading({level:3}).run(),'H3')}
+       </div>
+       <div className="bubble-group">
+        {inlineMarks}
+        {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<Code size={15}/>)}
+       </div>
+       <div className="bubble-group">
+        {toggle('上标',active?.superscript??false,()=>editor.chain().focus().toggleSuperscript().run(),<>x<sup>2</sup></>)}
+        {toggle('下标',active?.subscript??false,()=>editor.chain().focus().toggleSubscript().run(),<>x<sub>2</sub></>)}
+       </div>
+       <div className="bubble-group">{action('插入或编辑链接',openLink,<Link2 size={15}/>)}</div>
+      </>}
+   </div>
+  </BubbleMenu>}
+  <div hidden={!((active?.table&&active.focused)||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
    <span className="muted small table-actions-label">表格</span>
    {action('在上方插入行',()=>tableCommand('addRowBefore'),<><Rows3 size={15}/><Plus size={12}/></>,!tableTarget&&!editor.can().addRowBefore())}
    {action('在下方插入行',()=>tableCommand('addRowAfter'),<><Rows3 size={15}/><Plus size={12}/></>,!tableTarget&&!editor.can().addRowAfter())}
@@ -220,6 +332,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<Trash2 size={16}/>,!tableTarget&&!editor.can().deleteTable())}
   </div>
   <EditorContent editor={editor}/>
+  {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
+   <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>
+   {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
+    onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
+    <span className="slash-icon"><Icon size={18}/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+  </div>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>;
 });
