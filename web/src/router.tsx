@@ -7,6 +7,8 @@ import {Shell} from './shell';
 import {LoginPage,HomePage,LibraryPage,ArchivePage,RecordPage,TasksPage,SearchPage,ActivityPage,SettingsPage} from './pages';
 import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
+const KnowledgeGraphPage=React.lazy(()=>import('./knowledge-graph'));
+const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
  if(onLogin)return <Outlet/>;
@@ -34,6 +36,8 @@ const list=[
   })())}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>warm(queryClient.ensureQueryData(tasksQuery()))}),
  createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>warm(queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/graph',component:GraphRoute,
+  validateSearch:(search:Record<string,unknown>):{focus?:string}=>typeof search.focus==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(search.focus)?{focus:search.focus}:{}}),
  createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage,
   validateSearch:(search:Record<string,unknown>):{q?:string;mode?:SearchMode}=>({
    ...(typeof search.q==='string'&&search.q.trim()?{q:search.q.slice(0,4000)}:{}),

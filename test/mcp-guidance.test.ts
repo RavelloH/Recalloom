@@ -39,7 +39,7 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
-    assert.equal(tools.length,26);
+    assert.equal(tools.length,Object.keys(TOOL_GUIDANCE).length);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){
       const guidance=TOOL_GUIDANCE[tool.name as keyof typeof TOOL_GUIDANCE];
@@ -61,6 +61,9 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     assert.ok(tool('get_overview').description.includes('folder'));
     assert.ok(tool('get_outline').description.includes('heading'));
     assert.equal(tool('get_outline').annotations?.readOnlyHint,true);
+    assert.equal(tool('related_records').annotations?.readOnlyHint,true);
+    assert.equal(tool('get_knowledge_graph').annotations?.readOnlyHint,true);
+    assert.match(tool('related_records').description,/semantic candidates/);
     assert.equal(tool('mutate_task').annotations?.destructiveHint,true);
     assert.equal(tool('manage_record').annotations?.destructiveHint,true);
     assert.equal(tool('index_pending').annotations?.destructiveHint,false);

@@ -1,6 +1,7 @@
 import {QueryClient,infiniteQueryOptions,queryOptions} from '@tanstack/react-query';
 import {api,activity,browse,queryString,record,tasks} from './api';
 import type {Event} from './types';
+import type {RelationsResponse,GraphResponse} from './graph-types';
 
 /** One client for React and route loaders, so a loader-warmed cache is what pages read. */
 export const queryClient=new QueryClient({defaultOptions:{queries:{retry:1,staleTime:15_000,refetchOnWindowFocus:false}}});
@@ -11,6 +12,13 @@ export type SearchHit={id:string;name:string;kind?:string;description?:string;sn
 export type SearchResult={items:SearchHit[];indexMayLag?:boolean;degraded?:boolean};
 
 export const recordQuery=(id:string)=>queryOptions({queryKey:['record',id],queryFn:()=>record(id)});
+export const relationsQuery=(id:string,semantic=true)=>queryOptions({
+ queryKey:['relations',id,semantic],queryFn:()=>api<RelationsResponse>('/records/'+id+'/relations?semantic='+semantic),staleTime:45_000
+});
+export const graphQuery=(focusId?:string,semantic=true)=>queryOptions({
+ queryKey:['knowledge-graph',focusId??'all',semantic],
+ queryFn:()=>api<GraphResponse>('/graph?'+queryString({focusId,semantic:String(semantic),limit:80})),staleTime:45_000
+});
 export const folderQuery=(id:string)=>queryOptions({queryKey:['folder',id],queryFn:()=>api<FolderDetail>('/folders/'+id)});
 export const folderPagesQuery=(folderId:string|null)=>infiniteQueryOptions({
  queryKey:['browse-pages',folderId],

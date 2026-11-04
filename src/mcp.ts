@@ -5,6 +5,7 @@ import { StorageError } from './types.js';
 import * as store from './storage.js';
 import * as agent from './agent-tools.js';
 import { processIndexJobs, search } from './search.js';
+import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
 
 const uuid=z.string().uuid().describe('Stable record/folder UUID returned by browse, search, or resolve_path.');
@@ -130,6 +131,12 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     (x)=>agent.listTags(env,x.limit,x.cursor));
   register('list_links',
     z.object({id:uuid,cursor:pageCursor}),false,(x)=>agent.links(env,x.id,'list',undefined,undefined,actor,x.cursor));
+  register('related_records',
+    z.object({id:uuid,semantic:z.boolean().describe('Include Vectorize semantic candidates (default true); false returns only confirmed links.').optional(),limit:z.number().int().min(1).max(25).describe('Maximum semantic candidates (1–25).').optional()}),false,
+    (x)=>recordRelations(env,x.id,{semantic:x.semantic!==false,limit:x.limit}));
+  register('get_knowledge_graph',
+    z.object({focusId:uuid.describe('Center the graph around one record; omit to show a recent-knowledge subgraph.').optional(),limit:z.number().int().min(10).max(100).optional(),semantic:z.boolean().describe('Include semantic neighbours only when focusId is provided.').optional()}),false,
+    (x)=>graphView(env,{focusId:x.focusId,limit:x.limit,semantic:x.semantic!==false}));
   register('manage_link',
     z.object({id:uuid,action:z.enum(['add','remove']),targetId:uuid,relation:z.string().min(1).max(64).optional()}),true,
     (x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor));

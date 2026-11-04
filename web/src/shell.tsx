@@ -18,7 +18,7 @@ import {OverlayScroll} from './scrollbars';
 import {PageTransition} from './page-transition';
 import {useFullWidth} from './preferences';
 
-const quickLinks=menu.filter(item=>['/','/tasks','/activity','/archive'].includes(item.to));
+const quickLinks=menu.filter(item=>['/','/tasks','/activity','/archive','/graph'].includes(item.to));
 const shortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform)?'⌘K':'Ctrl K';
 
 export function Shell({children}:{children:React.ReactNode}){

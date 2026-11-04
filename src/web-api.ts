@@ -5,6 +5,7 @@ import { StorageError } from './types.js';
 import * as store from './storage.js';
 import * as agent from './agent-tools.js';
 import { search } from './search.js';
+import {recordRelations,graphView} from './graph.js';
 import { recentActivity } from './web-activity.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
@@ -180,6 +181,11 @@ webApi.post('/records/:id/restore',async(c)=>{
   const v=await body(z.object({targetRevision:z.number().int().positive(),expectedRevision:z.number().int().positive()}).strict())(c.req.raw);
   return asJson(await store.restoreRecord(c.env,id,v.targetRevision,v.expectedRevision,actor(c.get('webSession'))));
 });
+webApi.get('/records/:id/relations',async(c)=>{
+ const id=idSchema.parse(c.req.param()).id;
+ const q=parseQuery(c.req.url,z.object({semantic:z.enum(['true','false']).optional(),limit:z.coerce.number().int().min(1).max(25).optional()}));
+ return asJson(await recordRelations(c.env,id,{semantic:q.semantic!=='false',limit:q.limit}));
+});
 webApi.get('/records/:id/links',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
   const q=parseQuery(c.req.url,z.object({cursor:z.string().max(4096).optional()}));
@@ -200,6 +206,10 @@ webApi.post('/tasks/mutate',async(c)=>{
     if(v.action!=='add'&&!v.taskId)ctx.addIssue({code:'custom',path:['taskId'],message:'Required for update/remove'});
   }))(c.req.raw);
   return asJson(await store.taskOperation(c.env,v.recordId,v.expectedRevision,v.action,v.taskId,v.changes??{},actor(c.get('webSession'))));
+});
+webApi.get('/graph',async(c)=>{
+ const q=parseQuery(c.req.url,z.object({focusId:uuid.optional(),limit:z.coerce.number().int().min(10).max(100).optional(),semantic:z.enum(['true','false']).optional()}));
+ return asJson(await graphView(c.env,{focusId:q.focusId,limit:q.limit,semantic:q.semantic!=='false'}));
 });
 webApi.get('/search',async(c)=>{
   const q=parseQuery(c.req.url,z.object({query:z.string().trim().min(1).max(4000),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).optional(),folderId:uuid.optional(),status:status.optional(),tag:z.string().max(64).optional(),limit:z.coerce.number().int().min(1).max(30).optional(),minScore:z.coerce.number().min(0).max(1).optional()}));

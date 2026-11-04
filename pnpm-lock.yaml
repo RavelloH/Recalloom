@@ -125,6 +125,9 @@ importers:
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
+      cytoscape:
+        specifier: ^3.34.4
+        version: 3.34.4
       diff:
         specifier: ^8.0.2
         version: 8.0.4
@@ -1507,6 +1510,10 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  cytoscape@3.34.4:
+    resolution: {integrity: sha512-msY99tMY8iWTg+sIPGfSqDcPNOt4xcj+v/K/7qUFaCUxxlqnMkUYLBjRUzn9W5CU/R2hrmtJa5+UtovrEM2ctg==}
+    engines: {node: '>=0.10'}
 
   debounce-fn@6.0.0:
     resolution: {integrity: sha512-rBMW+F2TXryBwB54Q0d8drNEI+TfoS9JpNTAoVpukbWEhjXQq4rySFYLaqXMFXwdv61Zb2OHtj5bviSoimqxRQ==}
@@ -3792,6 +3799,8 @@ snapshots:
   css-mediaquery@0.1.2: {}
 
   csstype@3.2.3: {}
+
+  cytoscape@3.34.4: {}
 
   debounce-fn@6.0.0:
     dependencies:

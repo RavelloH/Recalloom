@@ -14,12 +14,13 @@ import {Selector} from '@astryxdesign/core/Selector';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
-import {FileText,Folder,FolderPlus,Plus,Search,RefreshCw,Archive,Clock,Shield,Settings,Database,Tag,ListTodo,FolderOpen,Lock,Library,PanelRight,Copy,Shapes,CircleDot,MoveHorizontal,Command} from 'lucide-react';
+import {FileText,Folder,FolderPlus,Plus,Search,RefreshCw,Archive,Clock,Shield,Settings,Database,Tag,ListTodo,FolderOpen,Lock,Library,PanelRight,Copy,Shapes,CircleDot,MoveHorizontal,Command,Network} from 'lucide-react';
 import {ApiError,api,mutate,sessions,queryString} from './api';
 import type {Task} from './types';
 import {useAppearance} from './theme';
 import {ActivityEntry} from './activity-entry';
 import {ContextPanel} from './context-panel';
+import {RecordRelations} from './record-relations';
 import {SearchHighlight} from './search-highlight';
 import {useConfirmDialog} from './confirm-dialog';
 import {TopbarPortal} from './topbar-slot';
@@ -181,7 +182,7 @@ export function ArchivePage(){
  </div>;
 }
 
-export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
+export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
  const [focusTitle]=useState(()=>consumeTitleFocus(recordId));
  const fullWidth=useFullWidth();
  useEffect(()=>{setMetaOpen(false);setOutlineTarget(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
@@ -208,10 +209,11 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  if(q.isPending)return <div className="page record-page"><div className="doc-header"><Skeleton width={56} height={56} radius={3}/><div className="doc-skeleton-title"><Skeleton width="55%" height={40} radius={2}/></div><Skeleton width="38%" height={14} radius={1}/></div></div>;
  if(q.isError||!item)return <div className="page"><ErrorText error={q.error}/></div>;
  const pageActions=<>
-  <IconButton variant="ghost" size="sm" label="详情" icon={<PanelRight size={16}/>} onClick={()=>setMetaOpen(v=>!v)}/>
+  <IconButton variant="ghost" size="sm" label="详情与关联" icon={<PanelRight size={16}/>} onClick={()=>setMetaOpen(v=>!v)}/>
   <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
    {label:'复制页面链接',icon:<Copy size={15}/>,onClick:()=>void navigator.clipboard?.writeText(location.origin+'/records/'+item.id)},
    {label:fullWidth?'恢复标准宽度':'全宽显示',icon:<MoveHorizontal size={15}/>,onClick:()=>setFullWidth(!fullWidth)},
+   {label:'查看关系网',icon:<Network size={15}/>,onClick:()=>void nav({to:'/graph',search:{focus:item.id}})},
    {type:'divider'},
    {label:'归档记录',icon:<Archive size={15}/>,variant:'destructive',isDisabled:archiving||item.status==='archived',onClick:()=>void archive()}
   ]}/>
@@ -234,6 +236,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  <ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
   <dl><dt>记录类型</dt><dd>{item.kind==='document'?'Markdown 文档':item.kind==='task_list'?'任务列表':item.kind}</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
   {item.kind==='document'&&<div className="outline-panel"><h3>文档大纲</h3><Swap state={outline.isPending?'loading':outline.isError?'error':'ready'}>{outline.isPending?<p className="muted small">加载大纲…</p>:outline.isError?<p className="muted small">大纲暂不可用</p>:outline.data?.headings.length?<div className="outline-items">{outline.data.headings.map((h,i)=><div className="outline-indent" key={i} style={{paddingInlineStart:(h.level-1)*12}}><Button className="outline-item" variant="ghost" size="sm" width="100%" label={h.title} tooltip={'第 '+h.lineStart+' 行至第 '+h.lineEnd+' 行'} endContent={<small>L{h.lineStart}</small>} onClick={()=>{setOutlineTarget(prev=>({line:h.lineStart,token:(prev?.token??0)+1}));setMetaOpen(false);}}/></div>)}{outline.data.totalHeadings>outline.data.headings.length&&<p className="muted small">仅显示前 200 个标题</p>}</div>:<p className="muted small">暂无 Markdown 标题</p>}</Swap></div>}
+  {metaOpen&&<RecordRelations recordId={recordId} onNavigate={()=>setMetaOpen(false)}/>}
  </div></ContextPanel></div></div>;
 }
 

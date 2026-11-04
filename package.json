@@ -22,7 +22,8 @@
     "test:drafts": "node scripts/web-draft-ui-e2e.mjs",
     "test:panels": "node scripts/web-panels-ui-e2e.mjs",
     "test:workspace": "node scripts/notion-workspace-e2e.mjs",
-    "test:archive": "node scripts/archive-management-e2e.mjs"
+    "test:archive": "node scripts/archive-management-e2e.mjs",
+    "test:graph": "node scripts/knowledge-graph-e2e.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",
@@ -64,6 +65,7 @@
     "cap-widget": "^0.1.58",
     "capjs-core": "0.1.3",
     "codemirror": "^6.0.2",
+    "cytoscape": "^3.34.4",
     "diff": "^8.0.2",
     "hono": "4.11.5",
     "katex": "^0.16.47",

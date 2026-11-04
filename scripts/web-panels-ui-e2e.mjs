@@ -33,7 +33,7 @@ try{
  await dh.getByRole('button',{name:'关闭历史'}).click();
  await dh.waitFor({state:'hidden'});
  assert.equal(await page.evaluate(()=>scrollY),scrollBefore,'history should not jump main document');
- await page.getByRole('button',{name:'详情',exact:true}).click();
+ await page.getByRole('button',{name:'详情与关联',exact:true}).click();
  const di=page.getByRole('dialog',{name:'记录信息'});
  await di.waitFor();
  assert.ok(await di.getByText('记录类型').count());
@@ -45,7 +45,7 @@ try{
  await di.waitFor({state:'hidden'});
  await page.setViewportSize({width:390,height:844});
  await page.reload();
- await page.getByRole('button',{name:'详情',exact:true}).click();
+ await page.getByRole('button',{name:'详情与关联',exact:true}).click();
  const mi=page.getByRole('dialog',{name:'记录信息'});
  await mi.waitFor();
  let bounds=await mi.boundingBox();

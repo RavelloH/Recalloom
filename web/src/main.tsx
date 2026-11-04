@@ -19,6 +19,7 @@ import './motion.css';
 import './ui-enhancements.css';
 import './content-layout.css';
 import './document-typography.css';
+import './graph.css';
 import './workspace.css';
 import './polish.css';
 applyScrollbarPolicy();
