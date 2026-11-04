@@ -73,10 +73,13 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
    if(latest!==null&&latest!==undefined)changeDraft(latest);
   }
   setWarning('');
+  // Commit the requested mode to the URL before awaiting the lazy chunk.
+  // A concurrent save increments the revision and remounts RecordEditor;
+  // the replacement must read the requested mode, not the previous one.
+  const url=new URL(location.href);url.searchParams.set('mode',next);historyReplace(url);
   // Warm the next view first so the cross-fade never passes through a loading state.
   await (next==='source'?SourceEditor:next==='preview'?MarkdownPreview:VisualEditor).preload().catch(()=>undefined);
   setMode(next);
-  const url=new URL(location.href);url.searchParams.set('mode',next);historyReplace(url);
  };
  const save=async()=>{
   if(busy)return;

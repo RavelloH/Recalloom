@@ -48,7 +48,9 @@ try{
   revisions++;
   await page.getByText('R'+revisions,{exact:false}).first().waitFor({timeout:15000});
   await page.getByRole('button',{name:'可视化'}).click();
-  await page.waitForTimeout(280);
+  // Wait for the actual visual editor to mount after its lazy chunk loads.
+  // A fixed animation delay causes flaky failures on cold or cached navigation.
+  await page.waitForFunction(()=>Boolean(document.querySelector('.tiptap')||document.querySelector('.warning-banner')),null,{timeout:15000});
   const visible=await page.locator('.tiptap').count()>0;
   assert.equal(visible,visualExpected,name+' visual-mode fidelity');
   assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled(),name+' must never dirty original without edits');

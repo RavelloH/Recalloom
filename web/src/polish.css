@@ -81,12 +81,9 @@ html:not([data-scrollbar-mode="native"]) ::-webkit-scrollbar { display: none; wi
 
 /* ---------- Route transitions ---------- */
 .page-transition { min-height: 100%; }
-.page-transition[data-phase="exit"] { animation: rk-route-exit 240ms cubic-bezier(.4, 0, 1, 1) both; pointer-events: none; }
-.page-transition[data-phase="enter"] { animation: rk-route-enter 320ms var(--rk-ease-out) both; }
-@keyframes rk-route-exit { to { opacity: 0; transform: translateY(20px); } }
-@keyframes rk-route-enter { from { opacity: 0; transform: translateY(16px); } }
+.page-transition[data-phase="enter"] { animation: rk-route-enter 180ms var(--rk-ease-out) both; }
+@keyframes rk-route-enter { from { opacity: 0; transform: translateY(6px); } }
 .topbar-slot { transition: opacity 240ms var(--rk-ease-out); }
-html[data-route-phase="exit"] .topbar-slot { opacity: 0; transition-duration: 200ms; }
 .route-progress {
   position: sticky;
   top: 0;

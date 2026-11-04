@@ -24,11 +24,11 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'概览'}).waitFor({timeout:18000});
- // Route changes ease the old page out and the new one in (InsightFlare-style), under half a second each.
+ // Routing is immediate; only the new page receives a short enter animation.
  const phases=new Set();
  await page.locator('.sidebar .nav-link',{hasText:'任务'}).click();
  for(let i=0;i<16;i++){phases.add(await page.locator('.page-transition').getAttribute('data-phase'));await page.waitForTimeout(40);}
- assert.ok(phases.has('exit')&&phases.has('enter'),'route transition exits then enters: '+[...phases]);
+ assert.ok(phases.has('enter')&&!phases.has('exit'),'route must not block on an exit animation: '+[...phases]);
  await page.getByRole('heading',{name:'任务',level:1}).waitFor();
  await page.locator('.sidebar .nav-link',{hasText:'概览'}).click();
  await page.getByRole('heading',{name:'概览'}).waitFor();
@@ -108,7 +108,9 @@ try{
  const skeletonContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  await skeletonContext.addCookies(await context.cookies());
  const skeletonPage=await skeletonContext.newPage();
- await skeletonPage.route('**/api/folders*',async route=>{await new Promise(resolve=>setTimeout(resolve,800));await route.continue();});
+ // A cold page's JS and route loader warm-up may take longer than 800ms.
+ // Hold the response long enough to deterministically inspect the transient skeleton.
+ await skeletonPage.route('**/api/folders*',async route=>{await new Promise(resolve=>setTimeout(resolve,3000));await route.continue();});
  await skeletonPage.goto(url+'/library',{waitUntil:'domcontentloaded'});
  await skeletonPage.locator('.skeleton-files .file-row').first().waitFor({timeout:15000});
  const skeletonBox=await skeletonPage.locator('.skeleton-files .file-row').first().boundingBox();

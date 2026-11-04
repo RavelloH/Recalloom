@@ -40,7 +40,7 @@ webApi.onError((e)=>{
   if(e instanceof StorageError){
     const code=e.code;
     const status=code==='RECORD_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND' ?404
-      :code==='VERSION_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'?409
+      :code==='VERSION_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='FOLDER_NOT_EMPTY'?409
       :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
     return err(code,status,e.message);
   }
@@ -107,7 +107,11 @@ webApi.delete('/auth/oauth-grants/:id',async(c)=>{
 });
 webApi.get('/folders',async(c)=>{
   const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}));
-  return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor));
+  return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor,false));
+});
+webApi.get('/archives',async(c)=>{
+  const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional()}));
+  return asJson(await store.archivedRecords(c.env,q.limit,q.cursor));
 });
 webApi.get('/folders/:id',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
@@ -122,6 +126,11 @@ webApi.patch('/folders/:id',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
   const v=await body(z.object({name:z.string().trim().min(1).max(180).optional(),parentId:uuid.nullable().optional(),description:z.string().max(5000).optional(),expectedMetadataRevision:z.number().int().positive()}).strict())(c.req.raw);
   return asJson(await store.manageFolder(c.env,id,v,actor(c.get('webSession'))));
+});
+webApi.delete('/folders/:id',async(c)=>{
+  const id=idSchema.parse(c.req.param()).id;
+  const payload=await body(z.object({expectedMetadataRevision:z.number().int().positive(),expectedName:z.string().min(1).max(180)}).strict())(c.req.raw);
+  return asJson(await store.deleteEmptyFolder(c.env,id,payload.expectedMetadataRevision,payload.expectedName,actor(c.get('webSession'))));
 });
 webApi.get('/paths',async(c)=>{
   const q=parseQuery(c.req.url,z.object({path:z.string().startsWith('/').max(2048)}));

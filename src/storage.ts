@@ -42,15 +42,15 @@ export async function createFolder(env: Env, name: string, parentId: string|null
   ]);
   return {id,parentId,name,description,metadataRevision:1};
 }
-type BrowseCursor={folderId:string|null;folderDone:boolean;recordDone:boolean;lastFolder?:{name:string;id:string};lastRecord?:{updatedAt:string;id:string}};
-export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:string|null){
+type BrowseCursor={folderId:string|null;folderDone:boolean;recordDone:boolean;includeArchived?:boolean;lastFolder?:{name:string;id:string};lastRecord?:{updatedAt:string;id:string}};
+export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:string|null,includeArchived=true){
   if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
   const size=bounded(limit,100);
-  let state:BrowseCursor={folderId,folderDone:false,recordDone:false};
+  let state:BrowseCursor={folderId,folderDone:false,recordDone:false,includeArchived};
   if(cursor){
     try{
       const value=JSON.parse(cursor) as BrowseCursor;
-      if(value.folderId!==folderId||typeof value.folderDone!=='boolean'||typeof value.recordDone!=='boolean')throw Error();
+      if(value.folderId!==folderId||typeof value.folderDone!=='boolean'||typeof value.recordDone!=='boolean'||(value.includeArchived??true)!==includeArchived)throw Error();
       state=value;
     }catch{throw new StorageError('INVALID_CURSOR');}
   }
@@ -59,15 +59,15 @@ export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:
       env.DB.prepare('SELECT id,parent_id AS parentId,name,description,metadata_revision AS metadataRevision,updated_at AS updatedAt FROM folders WHERE parent_id IS ? AND (? IS NULL OR name>? OR (name=? AND id>?)) ORDER BY name,id LIMIT ?')
         .bind(folderId,state.lastFolder?.name??null,state.lastFolder?.name??'',state.lastFolder?.name??'',state.lastFolder?.id??'',size+1).all(),
     state.recordDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
-      env.DB.prepare("SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND (? IS NULL OR r.updated_at<? OR (r.updated_at=? AND r.id>?)) ORDER BY r.updated_at DESC,r.id LIMIT ?")
-        .bind(folderId,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
+      env.DB.prepare("SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND (?=1 OR r.status!='archived') AND (? IS NULL OR r.updated_at<? OR (r.updated_at=? AND r.id>?)) ORDER BY r.updated_at DESC,r.id LIMIT ?")
+        .bind(folderId,includeArchived?1:0,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
   ]);
   const folders=folderRows.results.slice(0,size) as Array<Record<string,unknown>>;
   const recordAllowance=Math.max(0,size-folders.length);
   const records=recordRows.results.slice(0,recordAllowance) as Array<Record<string,unknown>>;
   const folderDone=state.folderDone||folderRows.results.length<=size;
   const recordDone=state.recordDone||recordRows.results.length===0||(recordAllowance>0&&recordRows.results.length<=recordAllowance);
-  const next:BrowseCursor={folderId,folderDone,recordDone,
+  const next:BrowseCursor={folderId,folderDone,recordDone,includeArchived,
     lastFolder:folders.length?{name:String(folders.at(-1)?.name),id:String(folders.at(-1)?.id)}:state.lastFolder,
     lastRecord:records.length?{updatedAt:String(records.at(-1)?.updatedAt),id:String(records.at(-1)?.id)}:state.lastRecord};
   const items:Array<Record<string,unknown>>=[
@@ -76,6 +76,25 @@ export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:
   ];
   const hasMore=!folderDone||!recordDone;
   return {folderId,items,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null}};
+}
+type ArchiveCursor={updatedAt:string;id:string};
+/** Archived documents are not deleted and retain all revisions, tasks and links.
+ * This is a global, independently paginated view, unlike ordinary browsing. */
+export async function archivedRecords(env:Env,limit=50,cursor?:string){
+ const size=bounded(limit,100);
+ let from:ArchiveCursor|undefined;
+ if(cursor){
+  try{
+   from=JSON.parse(cursor) as ArchiveCursor;
+   if(!from||typeof from.updatedAt!=='string'||typeof from.id!=='string'||!from.updatedAt||!from.id)throw Error();
+  }catch{throw new StorageError('INVALID_CURSOR');}
+ }
+ const rows=(await env.DB.prepare(
+  "SELECT r.id,r.name,r.kind,r.status,r.description,r.folder_id AS folderId,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,f.name AS folderName FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE r.status='archived' AND (? IS NULL OR r.updated_at<? OR (r.updated_at=? AND r.id>?)) ORDER BY r.updated_at DESC,r.id LIMIT ?"
+ ).bind(from?.updatedAt??null,from?.updatedAt??'',from?.updatedAt??'',from?.id??'',size+1).all()).results;
+ const items=rows.slice(0,size);
+ const last=items.at(-1);
+ return {items,page:{hasMore:rows.length>size,nextCursor:rows.length>size?JSON.stringify({updatedAt:last?.updatedAt,id:last?.id}):null}};
 }
 export async function createRecord(env: Env, input:{name:string;folderId?:string|null;kind?:RecordKind;description?:string;content?:string;tags?:string[]}, actor='agent') {
   const id=newId(), ts=now(), name=nameCheck(input.name), folderId=input.folderId??null,kind=input.kind??'document',tags=normalizeTags(input.tags);
@@ -312,6 +331,29 @@ export async function changesSince(env:Env,cursor=0,limit=50){
   }));
   const hasMore=rows.length>size;
   return {items,page:{hasMore,nextCursor:items.at(-1)?.seq??cursor}};
+}
+/** Explicitly delete only a truly empty folder. A folder containing even
+ * archived records is not empty. Optimistic metadata/name checks and the
+ * foreign keys protect against concurrent Agents adding or moving children. */
+export async function deleteEmptyFolder(env:Env,id:string,expectedMetadataRevision:number,expectedName:string,actor='web'){
+ const folder=await env.DB.prepare('SELECT id,name,parent_id,metadata_revision FROM folders WHERE id=?').bind(id)
+  .first<{id:string;name:string;parent_id:string|null;metadata_revision:number}>();
+ if(!folder)throw new StorageError('FOLDER_NOT_FOUND');
+ if(folder.metadata_revision!==expectedMetadataRevision||folder.name!==expectedName)
+  throw new StorageError('METADATA_CONFLICT','Folder changed; reload before deletion');
+ const checked=await env.DB.batch([
+  env.DB.prepare('DELETE FROM folders WHERE id=? AND metadata_revision=? AND name=? AND NOT EXISTS (SELECT 1 FROM folders WHERE parent_id=?) AND NOT EXISTS (SELECT 1 FROM records WHERE folder_id=?)')
+   .bind(id,expectedMetadataRevision,expectedName,id,id),
+  env.DB.prepare("INSERT INTO change_events(record_id,event_type,revision,actor,created_at,entity_type,entity_id,details_json) SELECT NULL,'folder_delete',NULL,?,?,?,?,? WHERE changes()>0")
+   .bind(actor,now(),'folder',id,JSON.stringify({name:folder.name,parentId:folder.parent_id}))
+ ]);
+ if((checked[0]?.meta?.changes??0)!==1){
+  const remains=await env.DB.prepare('SELECT metadata_revision FROM folders WHERE id=?').bind(id).first<{metadata_revision:number}>();
+  if(!remains)throw new StorageError('FOLDER_NOT_FOUND');
+  if(remains.metadata_revision!==expectedMetadataRevision)throw new StorageError('METADATA_CONFLICT');
+  throw new StorageError('FOLDER_NOT_EMPTY','Move or remove all child folders and records first, including archived ones');
+ }
+ return {id,deleted:true,parentId:folder.parent_id};
 }
 export async function manageFolder(env:Env,id:string,changes:{
   name?:string;parentId?:string|null;description?:string;expectedMetadataRevision?:number

@@ -4,8 +4,8 @@ import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation} fr
 import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
 import {Shell} from './shell';
-import {LoginPage,HomePage,LibraryPage,RecordPage,TasksPage,SearchPage,ActivityPage,SettingsPage} from './pages';
-import {queryClient,recordQuery,folderQuery,folderPagesQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
+import {LoginPage,HomePage,LibraryPage,ArchivePage,RecordPage,TasksPage,SearchPage,ActivityPage,SettingsPage} from './pages';
+import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
@@ -33,6 +33,7 @@ const list=[
    await (item?.kind==='task_list'?queryClient.ensureQueryData(tasksQuery(params.recordId)):preloadEditor(deps.mode??'visual'));
   })())}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>warm(queryClient.ensureQueryData(tasksQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>warm(queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
  createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage,
   validateSearch:(search:Record<string,unknown>):{q?:string;mode?:SearchMode}=>({
    ...(typeof search.q==='string'&&search.q.trim()?{q:search.q.slice(0,4000)}:{}),

@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {Link,useNavigate,useParams,useLocation,useSearch} from '@tanstack/react-router';
 import {useQuery,useInfiniteQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
@@ -30,10 +30,10 @@ import {createUntitled,consumeTitleFocus} from './create-page';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import {RecordEditorChunk} from './editor-chunks';
 import {setFullWidth,useFullWidth} from './preferences';
-import {activityPagesQuery,activityQuery,folderPagesQuery,folderQuery,recordQuery,searchModes,searchQuery,tasksQuery,type SearchMode} from './queries';
+import {activityPagesQuery,activityQuery,folderPagesQuery,folderQuery,recordQuery,archivedRecordsQuery,searchModes,searchQuery,tasksQuery,type SearchMode} from './queries';
 
 export function PageTitle({title,description,actions}:{title:string;description?:string;actions?:React.ReactNode}){return <header className="page-header"><div className="page-title-copy"><Heading level={1}>{title}</Heading>{description&&<p className="muted">{description}</p>}</div>{actions&&<div className="page-actions">{actions}</div>}</header>;}
-const ErrorText=({error}:{error:unknown})=><Banner status="error" container="section" title="操作失败" description={error instanceof ApiError?error.status===409?'记录已被其他客户端修改。请重新加载并核对新内容。':error.message:error instanceof Error?error.message:'操作失败'}/>;
+const ErrorText=({error}:{error:unknown})=><Banner status="error" container="section" title="操作失败" description={error instanceof ApiError?error.code==='FOLDER_NOT_EMPTY'?'文件夹中仍有文档、归档记录或子文件夹，请先处理这些内容。':error.status===409?'内容已被其他客户端修改，请刷新后重试。':error.message:error instanceof Error?error.message:'操作失败'}/>;
 const Loading=()=> <div className="content-loading" role="status"><Spinner size="md" shade="subtle" label="正在加载…"/></div>;
 type SkeletonKind='files'|'tasks'|'activity'|'compact';
 const LoadingRows=({count=4,kind='files'}:{count?:number;kind?:SkeletonKind})=><div className={'loading-rows skeleton-'+kind} role="status" aria-label="正在加载内容">
@@ -90,7 +90,8 @@ export function HomePage(){const {data:todo,isPending,isError}=useQuery(tasksQue
  </div></div>;
 }
 
-export function LibraryPage(){const params=useParams({strict:false});const folderId=(params as {folderId?:string}).folderId||null;const qc=useQueryClient(),nav=useNavigate();const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null),[quickBusy,setQuickBusy]=useState(false);
+export function LibraryPage(){const params=useParams({strict:false});const folderId=(params as {folderId?:string}).folderId||null;const qc=useQueryClient(),nav=useNavigate();const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null),[quickBusy,setQuickBusy]=useState(false),[deletingFolder,setDeletingFolder]=useState(false);
+ const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [focusTitle]=useState(()=>folderId?consumeTitleFocus(folderId):false);
  useEffect(()=>{setCreating(null);},[folderId]);
  const q=useInfiniteQuery(folderPagesQuery(folderId));
@@ -108,22 +109,76 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
   setName('');setTagInput('');setCreating(null);qc.invalidateQueries({queryKey:['browse']});qc.invalidateQueries({queryKey:['browse-pages']});if(creating!=='folder')nav({to:'/records/$recordId',params:{recordId:data.id}});
  }catch(e){setError(e);}};
  const quickCreate=async()=>{if(quickBusy)return;setQuickBusy(true);setError(null);try{const id=await createUntitled(qc,'document',folderId);revealFolder(folderId);await nav({to:'/records/$recordId',params:{recordId:id}});}catch(e){setError(e);}finally{setQuickBusy(false);}};
+ const deleteFolder=async()=>{
+  const current=currentFolder.data;
+  if(!folderId||!current||deletingFolder)return;
+  if(!(await askConfirm({title:'永久删除空文件夹？',description:'将删除「'+current.name+'」这个目录，但不会删除任何文档或子文件夹。只要仍有子项（包括归档记录），服务器就会拒绝删除。',actionLabel:'删除空文件夹',destructive:true})))return;
+  setDeletingFolder(true);setError(null);
+  try{
+   await mutate('/folders/'+folderId,{expectedMetadataRevision:current.metadataRevision,expectedName:current.name},'DELETE');
+   await Promise.all([qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['folder-trail']})]);
+   if(current.parentId)await nav({to:'/library/$folderId',params:{folderId:current.parentId}});
+   else await nav({to:'/library'});
+  }catch(e){setError(e);}finally{setDeletingFolder(false);}
+ };
  const title=folderId?currentFolder.data?.name??'':'知识库';
  const subtitle=folderId?currentFolder.data?.description:'文件夹、Markdown 文档和结构化任务';
- return <div className="page folder-page">
+ return <div className="page folder-page">{confirmation}
  <TopbarPortal slot="start"><Breadcrumbs folderId={currentFolder.data?.parentId} current={folderId?title||'…':undefined}/></TopbarPortal>
  <header className="doc-header">
   <div className="page-icon" aria-hidden="true">{folderId?<FolderOpen size={34} strokeWidth={1.6}/>:<Library size={34} strokeWidth={1.6}/>}</div>
   {folderId&&currentFolder.isPending?<Skeleton width="45%" height={40} radius={2}/>:currentFolder.isError?<ErrorText error={currentFolder.error}/>:<InlineTitle value={title} onRename={folderId?renameFolder:undefined} autoFocus={focusTitle}/>}
   {subtitle&&<p className="page-subtitle">{subtitle}</p>}
-  <div className="doc-header-actions"><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/></div>
+  <div className="doc-header-actions"><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/>{folderId&&<Button label="删除空文件夹" variant="ghost" size="sm" isDisabled={deletingFolder||currentFolder.isPending} isLoading={deletingFolder} onClick={()=>void deleteFolder()}/>}</div>
  </header>
  <AutoResizer><AutoTransition transitionKey={creating?'form':'none'} type="slideUp">{creating&&<Card className="inline-form create-surface" padding={4}><form className="create-form" onSubmit={e=>{e.preventDefault();void create();}}><div className="create-fields"><div className="inline-selector"><Selector label="类型" size="md" width="100%" value={creating} options={[{value:'folder',label:'文件夹'},{value:'document',label:'文档'},{value:'checkpoint_template',label:'阶段总结（文档模板）'},{value:'task_list',label:'任务列表'}]} onChange={value=>setCreating(value as typeof creating)}/></div><div className="inline-field"><TextInput label="名称" hasAutoFocus width="100%" placeholder="名称" value={name} onChange={setName} onEnter={create} onKeyDown={e=>{if(e.key==='Escape')setCreating(null);}}/></div>{creating!=='folder'&&<div className="inline-field"><TextInput label="标签" width="100%" placeholder="标签（逗号分隔，可选）" value={tagInput} onChange={setTagInput}/></div>}</div><div className="create-actions"><Button type="submit" label="创建" variant="primary" isDisabled={!name.trim()}/><Button label="取消" onClick={()=>setCreating(null)}/></div></form></Card>}</AutoTransition></AutoResizer>
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
+ {!folderId&&<div className="library-archive-link"><Link to="/archive" className="text-link"><Archive size={15}/>查看归档内容</Link></div>}
  <div className="file-table"><div className="file-table-head"><span>名称</span><span>类型</span><span>最近修改</span></div>
   <Swap state={stateOf(q,!entries.length)}>{q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:entries.length?entries.map(item=>item.entityType==='folder'?<Link to="/library/$folderId" params={{folderId:item.id}} className="file-row" key={item.id}><span><Folder size={17}/><span className="truncate">{item.name}</span></span><span>文件夹</span><span>{fmt(item.updatedAt)}</span></Link>:<Link to="/records/$recordId" params={{recordId:item.id}} className={'file-row'+(item.status==='archived'?' is-archived':'')} key={item.id}><span>{item.kind==='task_list'?<ListTodo size={17}/>:<FileText size={17}/>}<span className="truncate">{item.name}</span></span><span>{item.status==='archived'?'已归档':item.kind==='task_list'?'任务':'文档'}</span><span>{fmt(item.updatedAt)}</span></Link>):<Empty title="此目录没有内容" description="创建一个文件夹或记录以开始。"/>}</Swap>
   {!q.isPending&&!q.isError&&<button type="button" className="file-new" disabled={quickBusy} onClick={()=>void quickCreate()}><Plus size={16}/>{quickBusy?'正在创建…':'新建页面'}</button>}</div>
  {q.hasNextPage&&<div className="load-more"><Button label="加载更多" onClick={()=>q.fetchNextPage()} size="sm" variant="ghost" isLoading={q.isFetchingNextPage}/></div>}</div>;
+}
+
+/** Archived records retain their version history and remain recoverable.
+ * Archived items are intentionally absent from the active page tree. */
+export function ArchivePage(){
+ const qc=useQueryClient();
+ const q=useInfiniteQuery(archivedRecordsQuery());
+ const [restoring,setRestoring]=useState<string|null>(null);
+ const [error,setError]=useState<unknown>(null);
+ const items=q.data?.pages.flatMap(page=>page.items)??[];
+ const restore=async(item:typeof items[number])=>{
+  if(restoring)return;
+  setRestoring(item.id);setError(null);
+  try{
+   await mutate('/records/'+item.id+'/meta',{status:'active',expectedMetadataRevision:item.metadataRevision},'PATCH');
+   await Promise.all([
+    qc.invalidateQueries({queryKey:['archived-records']}),
+    qc.invalidateQueries({queryKey:['browse']}),
+    qc.invalidateQueries({queryKey:['browse-pages']}),
+    qc.invalidateQueries({queryKey:['record',item.id]})
+   ]);
+  }catch(e){setError(e);}finally{setRestoring(null);}
+ };
+ return <div className="page archive-page">
+  <PageTitle title="归档" description="这里保存不再参与日常工作的页面。所有内容和历史版本都会保留，可以随时恢复。"
+   actions={<Link to="/library" className="small text-link">返回知识库</Link>}/>
+  {Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}
+  {q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:
+   items.length?<div className="archive-list">{items.map(item=><div className="archive-item" key={item.id}>
+    <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link">
+     {item.kind==='task_list'?<ListTodo size={18}/>:<FileText size={18}/>}
+     <span className="archive-item-text"><strong className="truncate">{item.name}</strong>
+      <small className="muted truncate">{item.folderName?'来自「'+item.folderName+'」 · ':''}{fmt(item.updatedAt)} · R{item.revision??'—'}</small>
+     </span>
+    </Link>
+    <Button label="恢复" variant="secondary" size="sm" isLoading={restoring===item.id} isDisabled={Boolean(restoring)}
+      onClick={()=>void restore(item)}/>
+   </div>)}</div>:<Empty title="暂无归档内容" description="在记录页面使用“归档记录”后，它会出现在这里；归档不会删除数据。"/>}
+  {q.hasNextPage&&<div className="load-more"><Button label="加载更多" variant="ghost" size="sm" isLoading={q.isFetchingNextPage}
+   onClick={()=>void q.fetchNextPage()}/></div>}
+ </div>;
 }
 
 export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
@@ -133,9 +188,19 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const outline=useQuery({queryKey:['outline',recordId,q.data?.revision],queryFn:()=>api<{headings:Array<{title:string;level:number;lineStart:number;lineEnd:number}>;totalHeadings:number}>('/records/'+recordId+'/outline?limit=200'),enabled:Boolean(metaOpen&&q.data&&q.data.kind==='document')});
  const item=q.data;
- useEffect(()=>{if(!item)return;rememberPage({id:item.id,name:item.name,kind:item.kind,path:item.path});revealFolder(item.folderId);},[item?.id,item?.name,item?.kind,item?.path,item?.folderId]);
+ const lastReveal=useRef<string|null>(null);
+ useEffect(()=>{if(!item)return;if(item.status==='archived'){forgetPage(item.id);return;}rememberPage({id:item.id,name:item.name,kind:item.kind,path:item.path});},[item?.id,item?.name,item?.kind,item?.path,item?.status]);
+ useEffect(()=>{
+  if(!item||item.status==='archived')return;
+  // Auto-reveal only on entering a new record/location, not whenever record
+  // metadata or a background query refreshes. Respect manual tree collapse.
+  const key=item.id+':'+(item.folderId??'');
+  if(lastReveal.current===key)return;
+  lastReveal.current=key;
+  revealFolder(item.folderId);
+ },[item?.id,item?.folderId,item?.status]);
  useEffect(()=>{if(q.error instanceof ApiError&&q.error.status===404)forgetPage(recordId);},[q.error,recordId]);
- const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']})]);
+ const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['archived-records']})]);
  const saveMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');await refresh();};
  const updateMeta=async(fields:Record<string,unknown>)=>{setError(null);try{await saveMeta(fields);setMetaOpen(false);}catch(e){setError(e);}};
  const changeTag=async(tag:string,action:'add'|'remove')=>{await mutate('/records/'+recordId+'/tags',{tag,action});await refresh();};

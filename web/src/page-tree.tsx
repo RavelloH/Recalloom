@@ -12,6 +12,8 @@ import {AutoResizer} from './motion-primitives';
 const storageKey='recalloom:tree-open';
 const listeners=new Set<()=>void>();
 let openIds:ReadonlySet<string>=loadOpen();
+// Explicit user collapses take precedence over background record refreshes.
+const manuallyClosed=new Set<string>();
 function loadOpen():ReadonlySet<string>{
  try{
   const value:unknown=JSON.parse(localStorage.getItem(storageKey)??'[]');
@@ -26,11 +28,15 @@ function setOpen(next:Set<string>){
 const useOpenIds=()=>useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn);},()=>openIds,()=>openIds);
 function toggleFolder(id:string){
  const next=new Set(openIds);
- if(next.has(id))next.delete(id);else next.add(id);
+ if(next.has(id)){next.delete(id);manuallyClosed.add(id);}
+ else{next.add(id);manuallyClosed.delete(id);}
  setOpen(next);
 }
-export function revealFolder(id:string|null|undefined){
- if(id&&!openIds.has(id))setOpen(new Set([...openIds,id]));
+export function revealFolder(id:string|null|undefined,force=false){
+ if(id&&(!manuallyClosed.has(id)||force)&&!openIds.has(id)){
+  if(force)manuallyClosed.delete(id);
+  setOpen(new Set([...openIds,id]));
+ }
 }
 
 type TreeActions={createItems:(parentId:string|null)=>DropdownMenuOption[];onNavigate?:()=>void};
@@ -84,7 +90,7 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
   setBusy(true);setError('');
   try{
    const id=await createUntitled(qc,kind,parentId);
-   revealFolder(parentId);
+   revealFolder(parentId,true);
    onNavigate?.();
    if(kind==='folder')await navigate({to:'/library/$folderId',params:{folderId:id}});
    else await navigate({to:'/records/$recordId',params:{recordId:id}});

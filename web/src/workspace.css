@@ -339,3 +339,24 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
 @media (prefers-reduced-motion: reduce) {
   .tree-toggle svg, .sidebar-collapse, .tree-actions, .tree-heading > :last-child, .recent-page { transition: none !important; }
 }
+
+/* Archived knowledge is browsable but stays separate from the active tree. */
+.library-archive-link { display: flex; justify-content: flex-end; margin: -4px 0 14px; }
+.library-archive-link .text-link { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.archive-list { display: grid; gap: 2px; }
+.archive-item {
+ display: flex; align-items: center; justify-content: space-between; gap: 12px;
+ padding: 10px 12px; border-bottom: 1px solid var(--rk-border-soft);
+ border-radius: 8px; min-width: 0;
+}
+.archive-item:hover { background: var(--rk-hover); }
+.archive-item-link { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.archive-item-link > svg { flex: none; color: var(--rk-ink-soft); }
+.archive-item-text { display: grid; gap: 4px; min-width: 0; }
+.archive-item-text strong { font-size: 14px; font-weight: 560; }
+.archive-item-text small { font-size: 12px; }
+.archive-item > button { flex: none; }
+@media(max-width:720px){
+ .archive-item { gap: 8px; padding-inline: 4px; }
+ .archive-item-text small { font-size: 11px; }
+}

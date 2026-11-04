@@ -18,6 +18,12 @@ export const folderPagesQuery=(folderId:string|null)=>infiniteQueryOptions({
  queryFn:({pageParam})=>browse(folderId,pageParam),
  getNextPageParam:last=>last.page.hasMore&&last.page.nextCursor!=null?String(last.page.nextCursor):undefined
 });
+export const archivedRecordsQuery=()=>infiniteQueryOptions({
+ queryKey:['archived-records'],
+ initialPageParam:undefined as string|undefined,
+ queryFn:({pageParam})=>api<{items:Array<{id:string;name:string;kind:'document'|'task_list';folderId:string|null;folderName:string|null;metadataRevision:number;revision:number;updatedAt:string}>;page:{hasMore:boolean;nextCursor:string|null}}>('/archives?'+queryString({cursor:pageParam,limit:50})),
+ getNextPageParam:last=>last.page.hasMore?last.page.nextCursor??undefined:undefined
+});
 export const tasksQuery=(recordId?:string)=>queryOptions({queryKey:['tasks',recordId??'all'],queryFn:()=>tasks(recordId?{recordId}:undefined)});
 export const activityQuery=()=>queryOptions({queryKey:['activity'],queryFn:activity});
 export const activityPagesQuery=()=>infiniteQueryOptions({

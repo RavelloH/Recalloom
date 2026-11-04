@@ -21,7 +21,8 @@
     "test:confirm": "node scripts/alert-dialog-e2e.mjs",
     "test:drafts": "node scripts/web-draft-ui-e2e.mjs",
     "test:panels": "node scripts/web-panels-ui-e2e.mjs",
-    "test:workspace": "node scripts/notion-workspace-e2e.mjs"
+    "test:workspace": "node scripts/notion-workspace-e2e.mjs",
+    "test:archive": "node scripts/archive-management-e2e.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",

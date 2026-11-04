@@ -103,6 +103,8 @@ try{
  const toggle=page.locator('.tree-row').filter({hasText:folderName}).getByRole('button',{name:/收起|展开/});
  assert.equal(await toggle.getAttribute('aria-expanded'),'true','visiting a page reveals its folder');
  await toggle.click();
+ // AutoResizer animates the collapsed tree; wait until the exiting subtree unmounts.
+ await page.locator('.tree-row').filter({hasText:'Workspace note'}).first().waitFor({state:'detached',timeout:12000});
  assert.equal(await page.locator('.tree-row').filter({hasText:'Workspace note'}).count(),0,'collapsed folder hides children');
  await page.goto(base+'/library/'+folder.id,{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
