@@ -1,6 +1,6 @@
 import {describe,it} from 'node:test';
 import assert from 'node:assert/strict';
-import {joinEdges,relatedSemantic,type KnowledgeNode} from '../src/graph.js';
+import {joinEdges,relatedSemantic,graphView,recordRelations,type KnowledgeNode} from '../src/graph.js';
 import type {Env} from '../src/types.js';
 
 const source:KnowledgeNode={
@@ -22,7 +22,11 @@ function fake(matches:Array<{id:string;score:number;metadata:Record<string,strin
    bind:(...params:unknown[])=>({
     all:async()=>{
      if(sql.includes('SELECT chunk_id AS chunkId'))return {results:options.index===false?[]:[{chunkId:'aaa:0'},{chunkId:'aaa:1'}]};
-     if(sql.includes('SELECT s.chunk_id,s.content,s.revision'))return {results:rows.filter(r=>params.includes(r.chunk_id))};
+     if(sql.includes('SELECT s.chunk_id,s.content,s.revision')){
+      assert.ok(params.length<=100,'D1 allows at most 100 bound parameters');
+      const requested=new Set((JSON.parse(params[0] as string)) as string[]);
+      return {results:rows.filter(r=>requested.has(r.chunk_id))};
+     }
      throw Error('Unexpected SQL '+sql.slice(0,100));
     }
    })
@@ -94,5 +98,64 @@ describe('knowledge graph semantic suggestions',()=>{
   const result=await relatedSemantic(env,source);
   assert.equal(result.status,'unavailable');
   assert.deepEqual(result.edges,[]);
+ });
+});
+
+describe('knowledge graph D1 binding limits',()=>{
+ it('loads a 100-document global subgraph with only two JSON parameters',async()=>{
+  const nodes=Array.from({length:100},(_,i)=>({
+   id:'record-'+i,name:'Document '+i,kind:'document',status:'active',
+   folderId:null,folderName:null,updatedAt:'2026-11-05T00:00:00.000Z',revision:1
+  }));
+  let linkParams:unknown[]=[];
+  const db={
+   prepare:(sql:string)=>({
+    bind:(...params:unknown[])=>({
+     all:async()=>{
+      assert.ok(params.length<=100,'D1 max 100 parameters');
+      if(sql.includes('ORDER BY r.updated_at DESC LIMIT ?'))return {results:nodes};
+      if(sql.includes('FROM record_links WHERE source_id IN')){
+       linkParams=params;
+       return {results:[{sourceId:nodes[0]!.id,targetId:nodes[1]!.id,relation:'references'}]};
+      }
+      throw Error('Unexpected query '+sql);
+     }
+    })
+   })
+  };
+  const graph=await graphView({DB:db} as unknown as Env,{limit:100,semantic:false});
+  assert.equal(graph.nodes.length,100);
+  assert.equal(graph.edges.length,1);
+  assert.equal(linkParams.length,2);
+  assert.deepEqual(JSON.parse(linkParams[0] as string),nodes.map(n=>n.id));
+  assert.equal(linkParams[0],linkParams[1]);
+ });
+ it('loads 160 backlinks with a single JSON list instead of 160 bindings',async()=>{
+  const ids=Array.from({length:160},(_,i)=>'peer-'+i);
+  const db={
+   prepare:(sql:string)=>({
+    bind:(...params:unknown[])=>({
+     first:async()=> {
+      assert.equal(params[0],'aaa');
+      return source;
+     },
+     all:async()=>{
+      assert.ok(params.length<=100,'D1 max 100 parameters');
+      if(sql.includes('FROM record_links WHERE source_id=? OR target_id=?'))
+       return {results:ids.map(id=>({sourceId:id,targetId:'aaa',relation:'related'}))};
+      if(sql.includes('r.id IN (SELECT value FROM json_each(?))')){
+       assert.equal(params.length,1);
+       const peers=JSON.parse(params[0] as string) as string[];
+       assert.equal(peers.length,160);
+       return {results:peers.map(id=>({...source,id,name:id}))};
+      }
+      throw Error('Unexpected query '+sql);
+     }
+    })
+   })
+  };
+  const result=await recordRelations({DB:db} as unknown as Env,'aaa',{semantic:false});
+  assert.equal(result.links.length,160);
+  assert.ok(result.links.every(l=>l.direction==='incoming'));
  });
 });
