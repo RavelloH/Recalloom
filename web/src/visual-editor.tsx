@@ -20,6 +20,7 @@ import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {RawMarkdown} from './tiptap/raw-markdown';
+import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
 import {buildLosslessMarkdown} from './tiptap/lossless-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
@@ -32,6 +33,13 @@ const SLASH_MENU_SPACE=280;
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
 const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
 
+/** The table toolbar floats just above the whole table, so it never covers a row being edited. */
+const tableToolbarOffset=(cell:Element,surface:Element,compact:boolean)=>{
+ const table=cell.closest('.tableWrapper')??cell;
+ const box=table.getBoundingClientRect(),top=surface.getBoundingClientRect().top;
+ // No room above (a table opening the document): sit just below it instead.
+ return box.top-top-54>=(compact?60:8)?box.top-top-54:box.bottom-top+8;
+};
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
 const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void}>(function VisualEditor({value,onChange},ref){
@@ -78,16 +86,17 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const at=e.view.domAtPos(e.state.selection.from).node;
   const cell=(at instanceof Element?at:at.parentElement)?.closest('td, th');
   const surface=surfaceRef.current;
-  if(cell&&surface)setTableToolbarTop(Math.max(compactRef.current?60:8,cell.getBoundingClientRect().top-surface.getBoundingClientRect().top-55));
+  if(cell&&surface)setTableToolbarTop(tableToolbarOffset(cell,surface,compactRef.current));
  };
  const extensions=useMemo(()=>[
-  StarterKit.configure({heading:false,paragraph:false,underline:false,link:{openOnClick:false}}),
+  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:{openOnClick:false}}),
+  ScrollCodeBlock,
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
   RawMarkdown,
   Image.configure({allowBase64:false}),
-  TableWithMarkdown.configure({resizable:false}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
+  TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
@@ -99,6 +108,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   extensions,content:'',contentType:'markdown',immediatelyRender:false,
   onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}detectSlash(editor);},
   onSelectionUpdate:({editor})=>{detectSlash(editor);followTableSelection(editor);},
+  // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
+  onFocus:({editor})=>followTableSelection(editor),
   onBlur:()=>{setSlash(null);setTableTarget(false);},
   editorProps:{handleKeyDown:(_view,event)=>{
    const state=slashRef.current,e=editorRef.current;
@@ -251,7 +262,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   lastColumn.current=Array.from(row.cells).slice(0,cell.cellIndex).reduce((count,sibling)=>count+Math.max(1,sibling.colSpan),0);
   lastCellPos.current=editor.view.posAtDOM(cell,0);
   const surface=event.currentTarget.getBoundingClientRect();
-  setTableToolbarTop(Math.max(compact?60:8,cell.getBoundingClientRect().top-surface.top-55));
+  setTableToolbarTop(tableToolbarOffset(cell,event.currentTarget,compact));
   // Align the actual editor selection with the cell the user clicked.
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));

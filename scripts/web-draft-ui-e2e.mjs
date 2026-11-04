@@ -11,6 +11,8 @@ const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:tru
 const page=await ctx.newPage();
 const text=()=>page.locator('.cm-line').allTextContents().then(lines=>lines.join('\n'));
 const source=async()=>{if(!(await page.getByRole('button',{name:'Markdown',exact:true}).getAttribute('aria-pressed'))){/* mode may not use aria-pressed */}await page.getByRole('button',{name:'Markdown',exact:true}).click();await page.locator('.cm-content').waitFor();};
+// The tab bar steps aside while the keyboard is up; dismissing it (blur) brings the tab bar back.
+const searchTab=async()=>{await page.evaluate(()=>document.activeElement?.blur?.());await page.locator('.bottom-nav').getByText('搜索').click();};
 const editor=async()=>{await page.locator('.editor-topline').waitFor();};
 try{
  await page.goto(origin+'/login');
@@ -34,19 +36,19 @@ try{
   window.__draftSetItem=original;
   Storage.prototype.setItem=function(key,value){if(key.startsWith('recalloom:draft:'))throw new Error('QuotaExceededError');return original.call(this,key,value);};
  });
- await page.locator('.bottom-nav').getByText('搜索').click();
+ await searchTab();
  await dialog.waitFor();
  await dialog.getByRole('button',{name:'保留草稿并离开'}).click();
  assert.equal(page.url().split('?')[0],recordUrl,'must stay on editor if draft cannot be stashed');
  assert.ok(await page.getByText(/浏览器无法暂存草稿/).count(),'must tell user why navigation was stopped');
  await page.evaluate(()=>{Storage.prototype.setItem=window.__draftSetItem;delete window.__draftSetItem;});
- await page.locator('.bottom-nav').getByText('搜索').click();
+ await searchTab();
 
  await dialog.waitFor();
  await dialog.getByRole('button',{name:'留在编辑器'}).click();
  assert.equal(page.url().split('?')[0],recordUrl);
  assert.match(await text(),/Draft must survive navigation/);
- await page.locator('.bottom-nav').getByText('搜索').click();
+ await searchTab();
  await dialog.getByRole('button',{name:'保留草稿并离开'}).click();
  await page.waitForURL(/\/search/);
  await page.goto(recordUrl);
@@ -55,9 +57,11 @@ try{
  await source();
  assert.match(await text(),/Draft must survive navigation/);
  await page.getByRole('button',{name:'丢弃恢复的草稿'}).click();
+ // The editor cross-fades to the stored revision; wait for the replacement to mount.
+ await page.waitForFunction(()=>document.querySelectorAll('.cm-editor').length===1&&[...document.querySelectorAll('.cm-line')].map(l=>l.textContent).join('').trim()==='');
  assert.equal((await text()).trim(),'');
  await page.locator('.cm-content').fill('To be discarded');
- await page.locator('.bottom-nav').getByText('搜索').click();
+ await searchTab();
  await dialog.getByRole('button',{name:'丢弃更改并离开'}).click();
  await page.waitForURL(/\/search/);
  await page.goto(recordUrl);
@@ -120,7 +124,7 @@ try{
  await page.locator('.tiptap li:not([data-type="taskItem"])').first().click();
  await page.keyboard.type('VISUAL_DRAFT_TEXT');
  assert.ok((await page.locator('.tiptap').innerText()).includes('VISUAL_DRAFT_TEXT'));
- await page.locator('.bottom-nav').getByText('搜索').click();
+ await searchTab();
  await dialog.waitFor();
  await dialog.getByRole('button',{name:'保留草稿并离开'}).click();
  await page.waitForURL(/\/search/);

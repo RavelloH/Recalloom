@@ -24,15 +24,18 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'概览'}).waitFor({timeout:18000});
- const entryMotion=await page.locator('.route-stage').evaluate(el=>({
-   name:getComputedStyle(el).animationName,
-   duration:getComputedStyle(el).animationDuration
- }));
- assert.ok(entryMotion.name.includes('rk-page-enter'),'route entrance uses short motion: '+JSON.stringify(entryMotion));
- assert.ok(parseFloat(entryMotion.duration)>0&&parseFloat(entryMotion.duration)<.5,'entry motion under half a second');
+ // Route changes ease the old page out and the new one in (InsightFlare-style), under half a second each.
+ const phases=new Set();
+ await page.locator('.sidebar .nav-link',{hasText:'任务'}).click();
+ for(let i=0;i<16;i++){phases.add(await page.locator('.page-transition').getAttribute('data-phase'));await page.waitForTimeout(40);}
+ assert.ok(phases.has('exit')&&phases.has('enter'),'route transition exits then enters: '+[...phases]);
+ await page.getByRole('heading',{name:'任务',level:1}).waitFor();
+ await page.locator('.sidebar .nav-link',{hasText:'概览'}).click();
+ await page.getByRole('heading',{name:'概览'}).waitFor();
+ await page.waitForFunction(()=>document.querySelector('.page-transition')?.dataset.phase==='idle');
  assert.equal(await page.locator('.home-section .section-heading').count(),1,'home leads with recently visited pages');
  assert.equal(await page.locator('.stat-card').count(),0,'no large nested navigation cards');
- assert.equal(await page.locator('.route-stage').evaluate(el=>getComputedStyle(el).transform),'none','no page slide transform');
+ assert.equal(await page.locator('.page-transition').evaluate(el=>getComputedStyle(el).transform),'none','settled page has no transform');
  await page.keyboard.press('Control+k');
  await page.getByRole('dialog',{name:'快速导航'}).waitFor();
  await page.getByRole('dialog',{name:'快速导航'}).getByRole('option',{name:'搜索',exact:true}).click();
@@ -143,7 +146,7 @@ try{
  await quietPage.goto(url+'/library',{waitUntil:'networkidle'});
  await quietPage.getByRole('heading',{name:'知识库'}).waitFor();
  const quietStyles=await quietPage.evaluate(()=>({
-  route:getComputedStyle(document.querySelector('.route-stage')).animationName,
+  route:getComputedStyle(document.querySelector('.page-transition')).animationName,
   sidebar:getComputedStyle(document.querySelector('.sidebar')).transitionDuration,
   row:getComputedStyle(document.querySelector('.file-row')||document.querySelector('.file-table')).transitionDuration
  }));
@@ -210,7 +213,7 @@ try{
  const recUrl=page.url();
  await page.goto(url+'/settings');
  await page.getByRole('heading',{name:'设置',level:1}).waitFor();
- const switchTheme=page.getByRole('button',{name:/切换主题/});
+ const switchTheme=page.locator('.sidebar-footer').getByRole('button',{name:/主题：/});
  // Each press cycles system -> light -> dark -> system without a theme settings page.
  for(let i=0;i<3;i++)await switchTheme.click();
  assert.ok(['light','dark'].includes(String(await page.locator('html').getAttribute('data-effective-theme'))));
@@ -227,7 +230,7 @@ try{
  assert.ok((await page.locator('.recent-entry[data-activity-seq]').first().innerText()).includes('本人（Web）'),'activity displays owner');
  await page.goto(url+'/search');
  await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
- await chooseOption(page,'搜索模式','精确文本');
+ await page.getByRole('group',{name:'搜索方式'}).getByRole('button',{name:'关键词'}).click();
  await page.getByRole('button',{name:'搜索',exact:true}).click();
  await page.locator('.search-highlight').first().waitFor({timeout:15000});
  await page.goto(recUrl);
@@ -245,8 +248,11 @@ try{
  await mobilePage.getByRole('link',{name:'活动',exact:true}).first().tap();
  await mobilePage.getByRole('heading',{name:'活动',level:1}).waitFor();
  await mobilePage.getByRole('link',{name:'设置',exact:true}).last().tap();
- const mobileTheme=mobilePage.getByRole('button',{name:/切换主题/});
- await mobileTheme.tap();
+ // One theme control, in the navigation drawer (no duplicate in the top bar).
+ assert.equal(await mobilePage.locator('.topbar').getByRole('button',{name:/主题/}).count(),0,'top bar has no duplicate theme toggle');
+ await mobilePage.getByRole('button',{name:'打开导航'}).tap();
+ await mobilePage.locator('.sidebar.mobile-open').waitFor();
+ await mobilePage.locator('.sidebar-footer').getByRole('button',{name:/主题：/}).tap();
  assert.ok(['dark','light'].includes(String(await mobilePage.locator('html').getAttribute('data-effective-theme'))));
  await mobilePage.goto(url+'/settings/oauth');
  await mobilePage.getByRole('heading',{name:'Agent 授权',level:1}).waitFor();
@@ -264,7 +270,7 @@ try{
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.locator('.doc-header').getByRole('heading',{name:'Phase summary'}).waitFor();
  await page.getByRole('button',{name:'详情'}).click();
- await page.locator('.record-inspector dd').filter({hasText:'checkpoint'}).waitFor();
+ await page.locator('.page-properties .tag-editor').getByText('checkpoint',{exact:true}).waitFor(); // tags are edited in the page properties
  await page.locator('.outline-item').first().waitFor();
  await page.locator('.outline-item').nth(1).click();
  await page.locator('.cm-content').waitFor();

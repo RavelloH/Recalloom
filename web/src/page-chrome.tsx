@@ -7,12 +7,19 @@ import {ChevronRight,Plus} from 'lucide-react';
 import {ApiError,api} from './api';
 import {TopbarPortal} from './topbar-slot';
 import {useCompactLayout} from './use-media';
+import {AutoResizer,AutoTransition} from './motion-primitives';
 
-/** Page actions live in the shell top bar on desktop and inline on phones. */
-export function PageActions({className='',children}:{className?:string;children:React.ReactNode}){
+/** Page actions live in the shell top bar on desktop. On phones the bar sits
+ *  inline under the title, while `pinned` actions (save) stay in the top bar
+ *  so they are never scrolled or wrapped out of reach. */
+export function PageActions({className='',children,pinned}:{className?:string;children:React.ReactNode;pinned?:React.ReactNode}){
  const compact=useCompactLayout();
- const bar=<div className={('page-actions-bar '+className).trim()}>{children}</div>;
- return compact?bar:<TopbarPortal slot="end">{bar}</TopbarPortal>;
+ const classes=('page-actions-bar '+className).trim();
+ if(!compact)return <TopbarPortal slot="end"><div className={classes}>{children}{pinned}</div></TopbarPortal>;
+ return <>
+  <div className={classes}>{children}</div>
+  {pinned&&<TopbarPortal slot="end"><div className="page-actions-bar page-actions-pinned">{pinned}</div></TopbarPortal>}
+ </>;
 }
 
 export const errorMessage=(error:unknown)=>error instanceof ApiError
@@ -81,7 +88,7 @@ export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=fa
     if(event.key==='Escape'){event.currentTarget.textContent=value;event.currentTarget.blur();}
    }}
    onBlur={()=>void commit()}/>
-  {error&&<p className="page-title-error" role="alert">{error}</p>}
+  <AutoResizer><AutoTransition transitionKey={error||'none'}>{error&&<p className="page-title-error" role="alert">{error}</p>}</AutoTransition></AutoResizer>
  </div>;
 }
 

@@ -13,7 +13,10 @@ const ctx=await browser.newContext({viewport:{width:1440,height:900}});
 const page=await ctx.newPage();
 const faults=[];
 page.on('pageerror',e=>faults.push(e.message));
-page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401 (Unauthorized)'))faults.push(m.text());});
+// Local dev has no Workers AI: smart search answers 500 and the UI falls back to keyword results.
+const aiUnavailable=r=>r.url().includes('/api/search')&&r.url().includes('mode=auto');
+page.on('response',r=>{if(r.status()>=500&&!aiUnavailable(r))faults.push(r.status()+' '+r.url());});
+page.on('console',m=>{if(m.type()==='error'&&!/401 \(Unauthorized\)|Failed to load resource/.test(m.text()))faults.push(m.text());});
 const json=path=>page.evaluate(async p=>{const r=await fetch('/api'+p);if(!r.ok)throw Error(p+' '+r.status);return r.json();},path);
 const until=async(check,message)=>{for(let i=0;i<60;i++){if(await check())return;await page.waitForTimeout(250);}throw Error('Timed out: '+message);};
 try{
@@ -126,6 +129,25 @@ try{
  assert.equal(list.folderId,folder.id);
  await page.getByRole('heading',{name:'未命名任务列表',level:1}).waitFor();
 
+ // One column: title, properties and the document body share the same edges.
+ await page.goto(base+'/records/'+recordId,{waitUntil:'networkidle'});
+ await page.locator('.tiptap').waitFor();
+ const edges=await page.evaluate(()=>[...document.querySelectorAll('.page-title, .page-properties, .tiptap')].map(e=>{const b=e.getBoundingClientRect();return Math.round(b.left)+':'+Math.round(b.width);}));
+ assert.equal(new Set(edges).size,1,'shared measure: '+edges);
+ // Native bars are hidden outside Apple WebKit; the page scrolls with the JS scrollbar.
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.scrollbarMode),'overlay');
+ assert.ok(await page.locator('.main-scroll-host > .os-scrollbar-vertical').count(),'main area uses the overlay scrollbar');
+ assert.equal(await page.locator('.topbar').getByRole('button',{name:/主题/}).count(),0,'theme toggle lives only in the sidebar');
+ // The palette and the search page are one search: the footer opens the same query as a page.
+ await page.keyboard.press('Control+k');
+ await palette.waitFor();
+ await page.keyboard.type('Workspace note');
+ await palette.getByRole('button',{name:'在搜索页查看全部结果'}).click();
+ await page.waitForURL(url=>url.pathname==='/search'&&url.searchParams.get('q')==='Workspace note');
+ await page.getByRole('heading',{name:'搜索',level:1}).waitFor();
+ await page.locator('.search-result').filter({hasText:'Workspace note'}).first().waitFor({timeout:20000});
+ assert.equal(await page.getByRole('textbox',{name:'搜索关键字'}).inputValue(),'Workspace note');
+
  // Phones keep inline actions and the format toolbar without horizontal overflow.
  const phone=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  await phone.addCookies(await ctx.cookies());
@@ -136,6 +158,8 @@ try{
  const fit=await mobile.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth,crumb:document.querySelector('.topbar .crumb-current')?.textContent}));
  assert.ok(fit.scroll<=fit.viewport,'mobile record fits: '+JSON.stringify(fit));
  assert.equal(fit.crumb,'Workspace note','mobile top bar names the current page');
+ // Save is pinned in the top bar on phones, never scrolled out of the action row.
+ assert.ok(await mobile.locator('.topbar .page-actions-pinned').getByRole('button',{name:'保存'}).isVisible(),'mobile save stays reachable');
  await phone.close();
 
  assert.equal(faults.length,0,'browser errors: '+faults.join('\n'));

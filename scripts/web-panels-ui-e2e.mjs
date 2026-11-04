@@ -37,7 +37,9 @@ try{
  const di=page.getByRole('dialog',{name:'记录信息'});
  await di.waitFor();
  assert.ok(await di.getByText('记录类型').count());
- assert.equal(await di.getByRole('textbox',{name:'名称'}).inputValue(),recordName);
+ // Renaming lives in the inline title; the panel shows facts only, without duplicate controls.
+ assert.ok((await di.locator('dd.break-word').innerText()).includes(recordName),'detail shows the record path');
+ assert.equal(await di.getByRole('textbox',{name:'名称'}).count(),0,'no duplicate rename field');
  assert.ok(await di.getByText('Markdown 文档').count());
  await di.getByRole('button',{name:'关闭',exact:true}).click();
  await di.waitFor({state:'hidden'});

@@ -49,7 +49,7 @@ async function metrics(selector){
   const root=document.querySelector(selector);
   if(!root)throw Error('Missing document root '+selector);
   const para=root.querySelector(':scope > p');
-  const code=root.querySelector(':scope > pre');
+  const code=root.querySelector(':scope > .code-block');
   const table=root.querySelector(':scope > .tableWrapper, :scope > table');
   if(!para||!code||!table)throw Error('Missing document geometry '+JSON.stringify({p:!!para,pre:!!code,table:!!table,children:[...root.children].slice(0,15).map(x=>({tag:x.tagName,cls:x.className,text:x.textContent?.slice(0,55)}))}));
   const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,width:r.width,right:r.right};};
@@ -58,8 +58,9 @@ async function metrics(selector){
    fontSize:parseFloat(getComputedStyle(root).fontSize),
    lineHeight:parseFloat(getComputedStyle(root).lineHeight),
    viewport:window.innerWidth,scrollWidth:document.documentElement.scrollWidth,
-   wideScroll:code.scrollWidth > code.clientWidth,
-   tableScroll:table.scrollWidth > table.clientWidth,
+   // Wide blocks scroll inside their own viewport (overlay scrollbar), never the page.
+   wideScroll:(v=>v.scrollWidth>v.clientWidth)(code.querySelector('.rk-scroll-viewport')),
+   tableScroll:(v=>v.scrollWidth>v.clientWidth)(table.querySelector('.rk-scroll-viewport')),
    headingCount:root.querySelectorAll('h1,h2,h3').length
   };
  },selector);
@@ -93,11 +94,11 @@ try {
  assert.ok(scrollStatus.position>100,'desktop document scrolls inside the Astryx area: '+JSON.stringify(scrollStatus));
  assert.ok(scrollStatus.topbarShift<1,'topbar remains fixed while document scrolls');
  const visual=await metrics('.tiptap');
- assert.ok(visual.document.width>=900,'desktop document should use wide surface: '+JSON.stringify(visual));
- assert.ok(visual.paragraph.width<=802&&visual.paragraph.width>=700,'prose follows readable measure');
- assert.ok(visual.pre.width>visual.paragraph.width+120,'code can use wide layout');
- assert.ok(visual.table.width>visual.paragraph.width+120,'table can use wide layout');
- assert.ok(Math.abs((visual.paragraph.x+visual.paragraph.width/2)-(visual.document.x+visual.document.width/2))<3,'prose centered on workspace');
+ // One measure: prose, code and tables share the same column edges.
+ assert.ok(visual.paragraph.width<=802&&visual.paragraph.width>=700,'prose follows readable measure: '+JSON.stringify(visual));
+ assert.ok(Math.abs(visual.document.width-visual.paragraph.width)<=1,'document is the column');
+ for(const block of ['pre','table'])assert.ok(Math.abs(visual[block].x-visual.paragraph.x)<=1&&Math.abs(visual[block].width-visual.paragraph.width)<=1,block+' shares the prose column');
+ assert.ok(visual.tableScroll,'wide table scrolls inside its block');
  assert.ok(visual.lineHeight>=visual.fontSize*1.7,'comfortable line spacing');
  assert.ok(visual.wideScroll,'long code scrolls inside its block');
 
@@ -107,7 +108,8 @@ try {
  assert.ok(Math.abs(preview.paragraph.width-visual.paragraph.width)<=1,'visual and preview have identical prose measure');
  assert.ok(Math.abs(preview.fontSize-visual.fontSize)<=0.1,'visual and preview have identical type scale');
  assert.ok(Math.abs(preview.lineHeight-visual.lineHeight)<=0.1,'visual and preview have identical leading');
- assert.ok(preview.table.width>preview.paragraph.width+120,'preview table remains wide');
+ for(const block of ['pre','table'])assert.ok(Math.abs(preview[block].x-visual[block].x)<=1&&Math.abs(preview[block].width-visual[block].width)<=1,'preview '+block+' matches the visual editor');
+ assert.ok(preview.wideScroll&&preview.tableScroll,'preview wide blocks scroll the same way');
  mkdirSync('tmp',{recursive:true});
  await page.screenshot({path:'tmp/typography-desktop.png',fullPage:false});
  console.log('DESKTOP',JSON.stringify({visual,preview}));
@@ -132,7 +134,7 @@ try {
       pane.scrollTop=0;
       return out;
     });
-    assert.ok(mobileScroll.scrollTop>=150,'mobile document remains scrollable within Astryx ScrollableArea');
+    assert.ok(mobileScroll.scrollTop>=150,'mobile document remains scrollable within the overlay-scrollbar viewport');
     assert.ok(mobileScroll.topbarShift<1,'mobile topbar stays fixed while document scrolls');
     await page.screenshot({path:'tmp/typography-mobile.png',fullPage:false});
   }
@@ -156,5 +158,5 @@ try {
  assert.ok(await raw.evaluate(el=>!!el.closest('.raw-markdown-field')),'raw text editor rendered in field wrapper');
  await page.locator('.raw-markdown-node').first().getByRole('button',{name:'取消'}).click();
  assert.equal(errors.length,0,'no unhandled browser errors');
- console.log('PASS Markdown typography: wide blocks, readable measure, preview/editor parity, mobile 320/390/430, Astryx raw node');
+ console.log('PASS Markdown typography: one column, in-block scrolling, preview/editor parity, mobile 320/390/430, Astryx raw node');
 }finally {await browser.close();}

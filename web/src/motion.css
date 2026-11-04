@@ -12,11 +12,8 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-/* Changes of location remain perceptible without shifting the document. */
-.route-stage {
-  min-width: 0;
-  animation: rk-page-enter 140ms ease-out both;
-}
+/* Route changes are animated by page-transition.tsx. */
+.route-stage { min-width: 0; }
 .sidebar {
   transition: width var(--rk-motion-panel) ease,
               min-width var(--rk-motion-panel) ease;
@@ -85,7 +82,7 @@
   min-width: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .route-stage, .create-surface, .record-inspector, .history-panel,
+  .create-surface, .record-inspector, .history-panel,
   .error-banner, .warning-banner { animation: none !important; }
   .sidebar, .mobile-scrim, .nav-link, .folder-link, .settings-tab,
   .overview-link, .file-row, .task-item, .search-result,
