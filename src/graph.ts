@@ -71,8 +71,8 @@ export async function relatedSemantic(env:Env,source:KnowledgeNode,limit=10):Pro
   const ids=[...new Set(candidates.map(c=>c.id))].slice(0,120);
   if(!ids.length)return {status:'ready',edges:[]};
   const rows=(await env.DB.prepare(
-   'SELECT s.chunk_id,s.content,s.revision,r.id AS record_id,c.revision AS current_revision,r.status FROM search_chunks s JOIN records r ON r.id=s.record_id JOIN record_contents c ON c.record_id=r.id WHERE s.chunk_id IN ('+ids.map(()=>'?').join(',')+')'
-  ).bind(...ids).all()).results as Array<IndexedChunk&{current_revision:number;status:string}>;
+   'SELECT s.chunk_id,s.content,s.revision,r.id AS record_id,c.revision AS current_revision,r.status FROM search_chunks s JOIN records r ON r.id=s.record_id JOIN record_contents c ON c.record_id=r.id WHERE s.chunk_id IN (SELECT value FROM json_each(?))'
+  ).bind(JSON.stringify(ids)).all()).results as Array<IndexedChunk&{current_revision:number;status:string}>;
   const byChunk=new Map(rows.map(row=>[row.chunk_id,row]));
   const grouped=new Map<string,{score:number;support:Set<number>;snippet:string}>();
   for(const hit of candidates){
@@ -101,8 +101,8 @@ export async function relatedSemantic(env:Env,source:KnowledgeNode,limit=10):Pro
 async function nodesByIds(env:Env,ids:string[]):Promise<KnowledgeNode[]>{
  if(!ids.length)return [];
  return (await env.DB.prepare(
-  'SELECT '+nodeFields+' FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE r.id IN ('+ids.map(()=>'?').join(',')+')'
- ).bind(...ids).all()).results as KnowledgeNode[];
+  'SELECT '+nodeFields+' FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE r.id IN (SELECT value FROM json_each(?))'
+ ).bind(JSON.stringify(ids)).all()).results as KnowledgeNode[];
 }
 
 export async function recordRelations(env:Env,id:string,options:{semantic?:boolean;limit?:number}={}){
@@ -164,8 +164,8 @@ export async function graphView(env:Env,options:{focusId?:string;limit?:number;s
   if(rows.length){
    const ids=rows.map(r=>r.id);
    const linked=(await env.DB.prepare(
-    'SELECT source_id AS sourceId,target_id AS targetId,relation FROM record_links WHERE source_id IN ('+ids.map(()=>'?').join(',')+') AND target_id IN ('+ids.map(()=>'?').join(',')+') LIMIT 220'
-   ).bind(...ids,...ids).all()).results as Array<{sourceId:string;targetId:string;relation:string}>;
+    'SELECT source_id AS sourceId,target_id AS targetId,relation FROM record_links WHERE source_id IN (SELECT value FROM json_each(?)) AND target_id IN (SELECT value FROM json_each(?)) LIMIT 220'
+   ).bind(JSON.stringify(ids),JSON.stringify(ids)).all()).results as Array<{sourceId:string;targetId:string;relation:string}>;
    edges.push(...joinEdges(linked));
    // Only sparse folder links. Never build an N² clique for a large folder.
    const lastByFolder=new Map<string,string>();
