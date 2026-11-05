@@ -10,6 +10,69 @@ import {Network,ZoomIn,ZoomOut,Maximize2,ArrowRight,Sparkles,Link2,Folder,Refres
 import {graphQuery} from './queries';
 import {relationLabel,semanticMessage,type KnowledgeEdge,type KnowledgeNode} from './graph-types';
 
+type GraphPalette={
+ ink:string;fill:string;taskFill:string;border:string;halo:string;
+ focusFill:string;focusBorder:string;explicit:string;semantic:string;folder:string
+};
+/** Cytoscape accepts rgb()/rgba(), but not Astryx's light-dark() custom
+ * property values. Let the browser resolve them in a temporary DOM probe. */
+function readGraphPalette(host:HTMLElement):GraphPalette{
+ const dark=document.documentElement.dataset.effectiveTheme==='dark';
+ const fallback=(light:string,darkColor:string)=>dark?darkColor:light;
+ const probe=document.createElement('span');
+ probe.style.cssText='position:absolute;width:0;height:0;visibility:hidden;pointer-events:none';
+ host.appendChild(probe);
+ const color=(variable:string,fallback:string)=>{
+  probe.style.color='var('+variable+', '+fallback+')';
+  const computed=getComputedStyle(probe).color;
+  return /^rgba?\(/.test(computed)?computed:fallback;
+ };
+ try{
+  return {
+   ink:color('--kg-node-ink',fallback('rgb(23,23,23)','rgb(245,245,245)')),
+   fill:color('--kg-node-fill',fallback('rgb(237,242,248)','rgb(53,67,84)')),
+   taskFill:color('--kg-node-task-fill',fallback('rgb(243,238,249)','rgb(68,58,83)')),
+   border:color('--kg-node-border',fallback('rgb(167,184,203)','rgb(122,147,174)')),
+   halo:color('--kg-label-halo',fallback('rgb(255,255,255)','rgb(38,38,38)')),
+   focusFill:color('--kg-focus-fill',fallback('rgb(220,234,255)','rgb(41,67,95)')),
+   focusBorder:color('--kg-focus-border',fallback('rgb(52,108,186)','rgb(173,208,255)')),
+   explicit:color('--kg-edge-explicit',fallback('rgb(78,120,177)','rgb(154,196,255)')),
+   semantic:color('--kg-edge-semantic',fallback('rgb(145,104,178)','rgb(211,168,255)')),
+   folder:color('--kg-edge-folder',fallback('rgb(160,168,178)','rgb(135,147,165)'))
+  };
+ }finally{probe.remove();}
+}
+function graphStyles(colors:GraphPalette,compact:boolean):cytoscape.StylesheetJson{
+ return [
+  {selector:'node',style:{
+   label:'data(label)','background-color':colors.fill,
+   'border-width':2,'border-color':colors.border,'color':colors.ink,
+   width:44,height:44,'font-size':compact?11:12,'font-weight':500,
+   'text-valign':'bottom','text-margin-y':10,
+   'text-outline-width':2,'text-outline-color':colors.halo,
+   'text-max-width':compact?'86px':'125px','text-wrap':'ellipsis',
+   'overlay-opacity':0,'transition-property':'background-color, border-color, opacity',
+   'transition-duration':120
+  }},
+  {selector:'node.task-node',style:{shape:'round-rectangle',width:40,height:40,
+   'background-color':colors.taskFill}},
+  {selector:'node:selected',style:{'border-width':4,
+   'border-color':colors.focusBorder,'background-color':colors.focusFill}},
+  {selector:'edge',style:{'width':1.8,'line-color':colors.folder,
+   'curve-style':'bezier','target-arrow-shape':'none','opacity':0.72}},
+  {selector:'edge.explicit',style:{'line-color':colors.explicit,'width':2.8,
+   'opacity':0.93,'target-arrow-shape':'triangle',
+   'target-arrow-color':colors.explicit}},
+  {selector:'edge.semantic',style:{'line-style':'dashed','line-color':colors.semantic,
+   'opacity':0.92,'width':2}},
+  {selector:'edge.folder',style:{'line-style':'dotted','line-color':colors.folder,
+   'width':1.4,'opacity':0.55}},
+  {selector:'.dimmed',style:{opacity:0.15}},
+  {selector:'node.focus-node',style:{'border-color':colors.focusBorder,
+   'border-width':3,'width':48,'height':48}}
+ ];
+}
+
 function GraphCanvas({nodes,edges,selected,onSelect,cyRef,query}:{
  nodes:KnowledgeNode[];edges:KnowledgeEdge[];selected:string|null;
  onSelect:(id:string)=>void;cyRef:React.RefObject<Core|null>;query:string
@@ -17,12 +80,8 @@ function GraphCanvas({nodes,edges,selected,onSelect,cyRef,query}:{
  const host=useRef<HTMLDivElement>(null);
  useEffect(()=>{
   if(!host.current)return;
-  const styles=getComputedStyle(host.current);
-  const foreground=styles.getPropertyValue('--color-text-primary').trim()||'#202124';
-  const muted=styles.getPropertyValue('--color-text-secondary').trim()||'#6f7681';
-  const surface=styles.getPropertyValue('--color-background-surface').trim()||'#dfe8f4';
-  const border=styles.getPropertyValue('--color-border').trim()||'#9ca3af';
   const compact=window.matchMedia('(max-width:760px)').matches;
+  const initialPalette=readGraphPalette(host.current);
   const elements:ElementDefinition[]=[
    ...nodes.map(n=>({data:{id:n.id,label:n.name},classes:
     n.kind==='task_list'?'task-node':'document-node'})),
@@ -33,30 +92,42 @@ function GraphCanvas({nodes,edges,selected,onSelect,cyRef,query}:{
    container:host.current,elements,
    minZoom:0.15,maxZoom:2.8,wheelSensitivity:0.23,
    boxSelectionEnabled:false,autounselectify:false,
-   style:[
-    {selector:'node',style:{label:'data(label)','background-color':surface,
-     'border-width':1.5,'border-color':border,'color':foreground,
-     width:40,height:40,'font-size':compact?10:11,'text-valign':'bottom','text-margin-y':9,
-     'text-outline-width':0,'text-max-width':compact?'86px':'115px','text-wrap':'ellipsis',
-     'overlay-opacity':0,'transition-property':'background-color, border-color, opacity',
-     'transition-duration':120}},
-    {selector:'node.task-node',style:{shape:'round-rectangle',width:36,height:36}},
-    {selector:'node:selected',style:{'border-width':4,'border-color':'#447bd6','background-color':'#dbeafe'}},
-    {selector:'edge',style:{'width':1.7,'line-color':border,'curve-style':'bezier',
-     'target-arrow-shape':'none','opacity':0.74}},
-    {selector:'edge.explicit',style:{'line-color':'#5e80b5','width':2.7,
-     'target-arrow-shape':'triangle','target-arrow-color':'#5e80b5'}},
-    {selector:'edge.semantic',style:{'line-style':'dashed','line-color':'#aa83c9','width':1.6}},
-    {selector:'edge.folder',style:{'line-style':'dotted','line-color':muted,'width':1.2,'opacity':0.35}},
-    {selector:'.dimmed',style:{opacity:0.15}},
-    {selector:'node.focus-node',style:{'border-color':'#447bd6','border-width':3,'width':48,'height':48}}
-   ],
+   style:graphStyles(initialPalette,compact),
    layout:{name:'cose',animate:false,fit:true,padding:52,
     nodeRepulsion:()=>12000,idealEdgeLength:()=>145,edgeElasticity:()=>90,numIter:650}
   });
   cy.on('tap','node',event=>onSelect(event.target.id()));
   cyRef.current=cy;
-  return ()=>{cyRef.current=null;cy.destroy();};
+  // Repaint colours when Astryx switches between light/dark/system themes.
+  // Updating Cytoscape's stylesheet (instead of recreating the graph) keeps
+  // pan, zoom, selected nodes and the computed layout intact.
+  let paletteSignature=JSON.stringify(initialPalette)+':'+compact;
+  let frame=0;
+  const updateTheme=()=>{
+   if(!host.current||cy.destroyed())return;
+   const palette=readGraphPalette(host.current);
+   const condensed=window.matchMedia('(max-width:760px)').matches;
+   const signature=JSON.stringify(palette)+':'+condensed;
+   if(signature===paletteSignature)return;
+   paletteSignature=signature;
+   cy.style().fromJson(graphStyles(palette,condensed)).update();
+  };
+  const schedule=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(updateTheme);};
+  const observer=new MutationObserver(schedule);
+  observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-effective-theme','style','class']});
+  const systemTheme=window.matchMedia('(prefers-color-scheme: dark)');
+  const compactScreen=window.matchMedia('(max-width:760px)');
+  systemTheme.addEventListener('change',schedule);
+  compactScreen.addEventListener('change',schedule);
+  const resizeObserver=new ResizeObserver(()=>{cy.resize();schedule();});
+  resizeObserver.observe(host.current);
+  return ()=>{
+   cancelAnimationFrame(frame);
+   observer.disconnect();resizeObserver.disconnect();
+   systemTheme.removeEventListener('change',schedule);
+   compactScreen.removeEventListener('change',schedule);
+   cyRef.current=null;cy.destroy();
+  };
  },[nodes,edges,onSelect,cyRef]);
  useEffect(()=>{
   const cy=cyRef.current;if(!cy)return;

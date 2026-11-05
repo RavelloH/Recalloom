@@ -6,6 +6,20 @@
  --kg-muted:var(--color-text-secondary,#78818e);
  --kg-surface:var(--color-background-surface,var(--color-background-body,#fff));
  --kg-wash:var(--color-background-muted,rgba(127,127,127,.045));
+ /* Graph pigments are computed by the browser, then passed to Cytoscape as rgb().
+    Cytoscape cannot parse Astryx Neutral's light-dark() tokens directly. */
+ --kg-node-ink:var(--color-text-primary,light-dark(#171717,#f5f5f5));
+ --kg-node-fill:light-dark(#edf2f8,#354354);
+ --kg-node-task-fill:light-dark(#f3eef9,#443a53);
+ --kg-node-border:light-dark(#a7b8cb,#7a93ae);
+ --kg-label-halo:var(--color-background-surface,light-dark(#ffffff,#262626));
+ --kg-focus-fill:light-dark(#dceaff,#29435f);
+ --kg-focus-border:light-dark(#346cba,#add0ff);
+ --kg-edge-explicit:light-dark(#4e78b1,#9ac4ff);
+ --kg-edge-semantic:light-dark(#9168b2,#d3a8ff);
+ --kg-edge-folder:light-dark(#a0a8b2,#8793a5);
+ --kg-hover:light-dark(#eef2f8,#313c49);
+ --kg-row-active:light-dark(#e2edfc,#30445e);
  display:flex;flex-direction:column;gap:16px;max-width:none;
  padding-block-end:28px;min-width:0;
 }
@@ -21,9 +35,9 @@
 .graph-stage{display:flex;flex-direction:column;min-height:0;position:relative;}
 .graph-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--kg-border);color:var(--kg-muted);font-size:12px;}
 .graph-legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.graph-legend i{display:inline-block;width:18px;border-top:2px solid #5e80b5;}
-.graph-legend i[data-relation="semantic"]{border-top:2px dashed #aa83c9;margin-inline-start:8px;}
-.graph-legend i[data-relation="folder"]{border-top:2px dotted var(--kg-muted);margin-inline-start:8px;}
+.graph-legend i{display:inline-block;width:18px;border-top:2px solid var(--kg-edge-explicit);}
+.graph-legend i[data-relation="semantic"]{border-top:2px dashed var(--kg-edge-semantic);margin-inline-start:8px;}
+.graph-legend i[data-relation="folder"]{border-top:2px dotted var(--kg-edge-folder);margin-inline-start:8px;}
 .knowledge-graph-canvas{flex:1;min-height:250px;width:100%;background:radial-gradient(circle at 50% 50%,var(--kg-wash),transparent 72%);outline-offset:-3px;touch-action:none;}
 .graph-bottomline{margin:0;padding:10px 15px;border-top:1px solid var(--kg-border);color:var(--kg-muted);font-size:11.5px;line-height:1.6;}
 .graph-empty,.graph-loading{display:grid;place-items:center;min-height:280px;color:var(--kg-muted);font-size:14px;text-align:center;padding:24px;}
@@ -35,12 +49,13 @@
 .graph-open-link:hover{text-decoration:underline;}
 .graph-neighbors,.graph-node-list{display:grid;gap:2px;max-height:210px;overflow-y:auto;overscroll-behavior:contain;}
 .graph-neighbor,.graph-node-option{display:flex;align-items:center;gap:8px;padding:8px;border:0;border-radius:7px;color:inherit;background:transparent;text-align:start;cursor:pointer;font:inherit;font-size:12.5px;min-width:0;}
-.graph-neighbor:hover,.graph-node-option:hover,.graph-node-option.is-selected{background:var(--kg-wash);}
+.graph-neighbor:hover,.graph-node-option:hover{background:var(--kg-hover);}
+.graph-node-option.is-selected{background:var(--kg-row-active);}
 .graph-neighbor svg{flex:none;color:var(--kg-muted);}
 .graph-neighbor span,.graph-node-option span{flex:1;min-width:0;}
 .graph-neighbor small{font-size:10px;color:var(--kg-muted);flex:none;}
 .graph-node-list{max-height:260px;}
-.graph-node-option.is-selected{font-weight:670;}
+.graph-node-option.is-selected{font-weight:670;outline:1px solid var(--kg-node-border);}
 .graph-inspector .relation-group-heading{margin-block:2px 0;}
 .relation-panel{border-top:1px solid var(--kg-border);padding-top:17px;margin-top:16px;display:grid;gap:13px;min-width:0;}
 .relation-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
