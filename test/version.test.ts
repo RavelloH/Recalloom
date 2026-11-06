@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {TextVersion} from 'text-version';
 import {initialVersion,nextVersion,historicalVersion,applyLineChanges,editContent,sha256} from '../src/version.js';
 
 test('text-version preserves exact historical text with separated latest snapshot',()=>{
@@ -9,6 +10,25 @@ test('text-version preserves exact historical text with separated latest snapsho
   assert.equal(historicalVersion(data,1),'# 计划\n- [ ] 实现认证\n');
   assert.equal(historicalVersion(data,2),'# 计划\n- [x] 实现认证\n');
   assert.equal(historicalVersion(data,3),'# 计划\n- [x] 实现认证\n- [ ] 完成搜索\n');
+});
+test('text-version 2.2 preserves LaTeX and JS replacement markers without duplicate history',()=>{
+  const marker=String.fromCharCode(36,96);
+  const samples=[
+    '# Formula\n\n$$\nE=mc^2\n$$',
+    'A literal '+marker+' marker must never duplicate the metadata prefix',
+    'A $& or $\' marker must remain literal source text',
+    'Finally, the answer is $x^2$.'
+  ];
+  let state=initialVersion(samples[0]!);
+  for(let i=1;i<samples.length;i++){
+    state=nextVersion(state,samples[i]!,i+1);
+    for(let revision=1;revision<=i+1;revision++){
+      assert.equal(historicalVersion(state,revision),samples[revision-1]);
+    }
+  }
+  const versioned=new TextVersion(state.metadata,state.content) as unknown as {getParsedData():{versions:string[]}};
+  assert.deepEqual(versioned.getParsedData().versions,['1','2','3','4']);
+  assert.equal((new TextVersion() as unknown as {optimizeDiffStorage:boolean}).optimizeDiffStorage,false);
 });
 test('restoring older content appends a new revision',()=>{
   let data=initialVersion('alpha');

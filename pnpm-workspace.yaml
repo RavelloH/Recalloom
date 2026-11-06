@@ -4,3 +4,4 @@ allowBuilds:
   workerd: true
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20261027.1'
+  - 'text-version@2.2.0'

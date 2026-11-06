@@ -1,7 +1,6 @@
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
-import { getRecord } from './storage.js';
-import { historicalVersion } from './version.js';
+import { getRecord,revisionContent } from './storage.js';
 
 export type MarkdownHeading={level:number;title:string;lineStart:number;lineEnd:number};
 
@@ -52,6 +51,6 @@ export async function getOutline(env:Env,id:string,revision?:number,limit=100,cu
   const currentRevision=row.revision;
   const selected=revision??currentRevision;
   if(!Number.isInteger(selected)||selected<1||selected>currentRevision)throw new StorageError('REVISION_NOT_FOUND');
-  const content=selected===currentRevision?row.content:historicalVersion({content:row.content,metadata:row.history_metadata},selected);
+  const content=await revisionContent(env,row,selected);
   return {id,revision:selected,currentRevision,...parseMarkdownOutline(content,limit,cursor)};
 }

@@ -1,7 +1,6 @@
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
-import { readRecord, getRecord } from './storage.js';
-import { historicalVersion } from './version.js';
+import { readRecord, getRecord,revisionContent } from './storage.js';
 import { createTwoFilesPatch } from 'diff';
 export { getOutline } from './outline.js';
 
@@ -18,7 +17,7 @@ export async function readMany(env:Env,items:ReadSpec[],maxChars=20000){
       const metadata=await readRecord(env,spec.id,{revision:spec.revision,metadataOnly:true});
       const row=await getRecord(env,spec.id);
       const content=(spec.revision!==undefined&&spec.revision!==row.revision)
-        ?historicalVersion({content:row.content,metadata:row.history_metadata},spec.revision):row.content;
+        ?await revisionContent(env,row,spec.revision):row.content;
       const offset=spec.offsetChars??0;
       if(!Number.isInteger(offset)||offset<0||offset>content.length)throw new StorageError('INVALID_CONTENT_OFFSET');
       const header={...metadata,offsetChars:offset,totalChars:content.length};
@@ -51,8 +50,8 @@ export async function diffRevisions(env:Env,id:string,fromRevision:number,toRevi
   const row=await getRecord(env,id);
   if(!Number.isInteger(fromRevision)||!Number.isInteger(toRevision)||fromRevision<1||toRevision<1
     ||fromRevision>row.revision||toRevision>row.revision)throw new StorageError('REVISION_NOT_FOUND');
-  const version=(n:number)=>n===row.revision?row.content:historicalVersion({content:row.content,metadata:row.history_metadata},n);
-  const before=version(fromRevision),after=version(toRevision);
+  const version=(n:number)=>revisionContent(env,row,n);
+  const [before,after]=await Promise.all([version(fromRevision),version(toRevision)]);
   if(before.length+after.length>200_000)throw new StorageError('DIFF_REQUIRES_SMALLER_RECORD');
   const diff=createTwoFilesPatch(id+'@'+fromRevision,id+'@'+toRevision,before,after,'','',{context:3});
   return {id,fromRevision,toRevision,changed:before!==after,diff:diff.slice(0,120000),truncated:diff.length>120000};

@@ -116,13 +116,15 @@ export default {
       check(snapshot.format==='recalloom-snapshot-v2'&&snapshot.folders.length>=1,'versioned backup export');
       const originalRow=await store.getRecord(env,rec.id);
       const importedId=crypto.randomUUID();
-      const originalVersions=await store.listVersions(env,rec.id);
+      const originalVersions=(await env.DB.prepare(
+        'SELECT v.*,s.content AS content_snapshot FROM revisions v LEFT JOIN record_revision_snapshots s ON s.record_id=v.record_id AND s.revision=v.revision WHERE v.record_id=? ORDER BY v.revision'
+      ).bind(rec.id).all()).results;
       const backupRecord={...originalRow,id:importedId,name:'restored-'+importedId+'.md',folder_id:folder.id};
       const payload={
         format:'recalloom-snapshot-v2' as const,watermark:0,totalRecords:1,
         cursor:null,nextCursor:null,folders:[],links:[],records:[{
           record:backupRecord,
-          revisions:originalVersions.items.map(v=>({record_id:importedId,revision:v.revision,content_sha256:v.contentSha256,message:v.message,actor:v.actor,created_at:v.createdAt})).reverse(),
+          revisions:originalVersions.map(v=>({...v,record_id:importedId})),
           tags:['testing']
         }]
       };
@@ -198,8 +200,7 @@ export default {
       const legacyId=crypto.randomUUID();
       const legacyRecord={...originalRow,id:legacyId,name:'legacy-'+legacyId+'.md',kind:'checkpoint'};
       const legacyPayload={...payload,records:[{record:legacyRecord,
-        revisions:originalVersions.items.map(v=>({record_id:legacyId,revision:v.revision,
-          content_sha256:v.contentSha256,message:v.message,actor:v.actor,created_at:v.createdAt})).reverse(),
+        revisions:originalVersions.map(v=>({...v,record_id:legacyId})),
         tags:['Testing']}]};
       const legacyPage={...legacyPayload,pageHash:await (await import('../src/backup.js')).pageHash(legacyPayload)};
       const legacyDry=await agent.importSnapshot(env,{pages:[legacyPage]},true);
@@ -207,7 +208,7 @@ export default {
       await agent.importSnapshot(env,{pages:[legacyPage]},false);
       const legacyRead=await store.readRecord(env,legacyId,{revision:3});
       check(legacyRead.kind==='document'&&legacyRead.tags.includes('checkpoint')&&legacyRead.tags.includes('testing'),'legacy checkpoint converted to tagged document');
-      check(legacyRead.revision===3&&legacyRead.contentSha256===originalVersions.items.find(x=>x.revision===3)?.contentSha256,
+      check(legacyRead.revision===3&&legacyRead.contentSha256===originalVersions.find(x=>x.revision===3)?.content_sha256,
         'legacy snapshot preserves original history SHA');
       return Response.json({ok:true,folderId:folder.id,recordId:rec.id,taskListId:todo.id,versions:history.items.length,events:events.items.length,virtualPaths:true,metadataIndexJobs:true,historicalHash:true,taskRestored:true,metadataCas:true,links:true,backup:true,pagination:true});
     } catch(error){
