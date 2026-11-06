@@ -142,22 +142,63 @@
   font: .87em/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
   overflow-wrap: anywhere;
 }
-/* Highlighted inline code inherits the dark ink of <mark>, but the regular
- * inline-code surface is dark in dark mode. Keep monospaced distinction while
- * using a translucent warm inset so the complete token remains legible.
- * Apply to both mark > code and code > mark, in editor and read-only preview. */
-.record-main :is(.tiptap, .markdown-preview) mark code,
-.record-main :is(.tiptap, .markdown-preview) code:has(> mark) {
+/* The yellow highlight is the only surface. The inset code border must
+ * remain inside it even when a long expression wraps across multiple lines.
+ * Inline boxes can fragment, unlike inline-block, so mobile wrapping survives. */
+.record-main :is(.tiptap, .markdown-preview) mark:has(code) {
+  padding-block: .18em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.record-main :is(.tiptap, .markdown-preview) mark code {
   color: #251e0e;
   -webkit-text-fill-color: #251e0e;
-  background: rgba(255,255,255,.38);
-  border-color: rgba(76,55,10,.34);
+  background: transparent;
+  border: 1px solid rgba(76, 55, 10, .55);
+  border-radius: 2px;
   box-shadow: none;
+  padding: 0 .12em;
+  line-height: 1.15;
   font-weight: 550;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* Some mark orders serialize as code > mark. Draw the border on the inner
+ * mark rather than extending a separate code rectangle beyond the yellow. */
+.record-main :is(.tiptap, .markdown-preview) code:has(> mark) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  line-height: inherit;
 }
 .record-main :is(.tiptap, .markdown-preview) code > mark {
-  color: inherit;
+  color: #251e0e;
+  -webkit-text-fill-color: #251e0e;
+  background: #f5d870;
+  border: 1px solid rgba(76, 55, 10, .55);
+  border-radius: 2px;
+  padding: .08em .15em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* KaTeX can be much taller than the baseline (fractions, sums, matrices).
+ * Give the formula itself a yellow box whose height comes from its rendered
+ * content. Keep the outer mark inline so highlighted sentences still wrap. */
+.record-main :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  max-width: 100%;
+  background: #f5d870;
+  color: #251e0e;
+  border-radius: 3px;
+  padding: .14em .16em;
+  line-height: normal;
+}
+.record-main :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) .katex {
   background: transparent;
+  border-radius: 0;
   padding: 0;
 }
 .record-main :is(.tiptap, .markdown-preview) pre {
@@ -227,14 +268,43 @@
   margin: 20px auto;
   border-radius: 8px;
 }
-.record-main :is(.tiptap, .markdown-preview) .katex-display {
+/* Center display math in both editors. The Tiptap node view does not use
+ * KaTeX's .katex-display wrapper, so it needs its own centered container.
+ * Preserve horizontal scrolling when a long formula exceeds mobile width. */
+.record-main .tiptap [data-type="block-math"] {
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: .4em;
+  text-align: center;
+}
+.record-main .tiptap [data-type="block-math"] .block-math-inner {
+  width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+  margin-inline: auto;
+}
+.record-main .markdown-preview .katex-display {
+  width: 100%;
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-block: .2em;
+  text-align: center;
+  padding-block: .3em;
+}
+.record-main .markdown-preview .katex-display > .katex {
+  display: inline-block;
+  width: max-content;
+  max-width: none;
+  text-align: initial;
 }
 /* Inline math stays inline; scroll containers here intercept its edit clicks. */
-.record-main .tiptap .tiptap-mathematics-render--editable {
+.record-main .tiptap .tiptap-mathematics-render--editable:not([data-type="block-math"]) {
   overflow: visible;
 }
 .record-main :is(.tiptap, .markdown-preview) .katex-display {

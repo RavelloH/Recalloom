@@ -48,6 +48,19 @@ export const HighlightWithMarkdown = Highlight.extend({
     },
   },
 
+  // The upstream MarkdownManager only applies marks to text nodes when a
+  // tokenizer returns h.applyMark(...). That drops highlight on inline math,
+  // because a KaTeX formula is an atomic *inline node*, not text. Return
+  // marked inline nodes directly so ProseMirror can wrap the complete formula
+  // in a mark and Markdown serialization can round-trip <mark>$...$</mark>.
+  parseMarkdown(token, helpers) {
+    const children = helpers.parseInline(token.tokens || []);
+    return children.map((node: JSONContent) => ({
+      ...node,
+      marks: [...(node.marks || []), {type: 'highlight'}],
+    }));
+  },
+
   renderMarkdown(
     node: JSONContent,
     helpers: {
