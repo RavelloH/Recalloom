@@ -1,7 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
 import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
-import {Banner} from '@astryxdesign/core/Banner';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
@@ -19,9 +18,8 @@ import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
-import {RawMarkdown} from './tiptap/raw-markdown';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
-import {buildLosslessMarkdown} from './tiptap/lossless-markdown';
+import {buildVisualMarkdown,literalParagraph} from './tiptap/visual-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
@@ -44,7 +42,6 @@ export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
 const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void}>(function VisualEditor({value,onChange},ref){
  const checked=useRef(false);
- const [protectedCount,setProtectedCount]=useState(0);
  const [ready,setReady]=useState(false);
  const applying=useRef(false);
  const edited=useRef(false);
@@ -94,7 +91,6 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
-  RawMarkdown,
   Image.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
@@ -160,10 +156,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   applying.current=true;
   try{
    const manager=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent;serialize:(doc:JSONContent)=>string}}).markdown;
-   const result=buildLosslessMarkdown(value,manager);
-   editor.commands.setContent(result.doc,{emitUpdate:false});
-   setProtectedCount(result.protectedCount);
-  }catch{editor.commands.setContent({type:'doc',content:[{type:'rawMarkdown',attrs:{source:value}}]},{emitUpdate:false});setProtectedCount(1);}
+   const richDocument=buildVisualMarkdown(value,manager);
+   editor.commands.setContent(richDocument,{emitUpdate:false});
+  }catch{
+   // Even when an extension fails, the user must never be trapped in a
+   // source-only island. The fallback stays normal editable paragraph text.
+   editor.commands.setContent({type:'doc',content:[literalParagraph(value)]},{emitUpdate:false});
+  }
   finally{applying.current=false;setReady(true);}
  },[editor,value]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
@@ -267,7 +266,6 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
-  {protectedCount>0&&<div className="doc-notice"><Banner status="info" container="section" title={'已保护 '+protectedCount+' 处 Markdown 原文'} description="不支持的语法将以原始文本保留，其余内容仍可可视化编辑。选择“编辑此段源码”可单独修改。" collapsible={false}/></div>}
   {compact&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools">
     {inlineMarks}

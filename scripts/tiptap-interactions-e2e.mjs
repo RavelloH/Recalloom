@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
+import {browserBin,launchTestBrowser,testOrigin} from './local-browser.mjs';
 import {existsSync,readFileSync} from 'node:fs';
 
-const browserBin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 const keyLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(s=>/^\s*MCP_AUTH_SECRET\s*=/.test(s));
 assert.ok(browserBin&&keyLine,'Local browser and .dev.vars are required');
 const secret=keyLine.slice(keyLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const origin='http://127.0.0.1:8897',browser=await chromium.launch({executablePath:browserBin,headless:true});
+const origin=testOrigin,browser=await launchTestBrowser();
 const page=await browser.newPage({viewport:{width:1230,height:850}});
 const source=async()=>{
  await page.getByRole('button',{name:'Markdown',exact:true}).click();

@@ -1,14 +1,13 @@
 /** Visual-only regression: no production data or MCP changes. */
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
+import {browserBin,launchTestBrowser,testOrigin} from './local-browser.mjs';
 import {existsSync,readFileSync,mkdirSync} from 'node:fs';
 
-const edge=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
-assert.ok(edge&&secretLine,'A local browser and test secret are required');
+assert.ok(browserBin&&secretLine,'A local browser and test secret are required');
 const secret=secretLine.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const base='http://127.0.0.1:8897';
-const browser=await chromium.launch({headless:true,executablePath:edge});
+const base=testOrigin;
+const browser=await launchTestBrowser();
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
@@ -143,20 +142,19 @@ try {
  await page.locator('.tiptap').waitFor();
  const phone=await metrics('.tiptap');
  assert.ok(phone.scrollWidth<=phone.viewport,'mobile Tiptap must not widen document');
- const rawId=await page.evaluate(async()=>{
+ const unknownId=await page.evaluate(async()=>{
   const response=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({name:'Typography raw Markdown '+Date.now(),kind:'document',
-      content:'# Raw Markdown\n\n文本[^footnote]\n\n[^footnote]: 保留原文。'})});
-  if(!response.ok)throw Error('Raw fixture '+response.status);
+    body:JSON.stringify({name:'Typography plain fallback '+Date.now(),kind:'document',
+      content:'# Unsupported Markdown\\n\\n文本[^footnote]\\n\\n[^footnote]: 保留原文。'})});
+  if(!response.ok)throw Error('Plain fixture '+response.status);
   return (await response.json()).id;
  });
- await page.goto(base+'/records/'+rawId,{waitUntil:'networkidle'});
- await page.locator('.raw-markdown-node').first().waitFor();
- await page.locator('.raw-markdown-node').first().getByRole('button',{name:'编辑此段源码'}).click();
- const raw=page.getByRole('textbox',{name:'编辑原始 Markdown'}).first();
- assert.ok(await raw.isVisible(),'Astryx TextArea is accessible inside source node');
- assert.ok(await raw.evaluate(el=>!!el.closest('.raw-markdown-field')),'raw text editor rendered in field wrapper');
- await page.locator('.raw-markdown-node').first().getByRole('button',{name:'取消'}).click();
+ await page.goto(base+'/records/'+unknownId,{waitUntil:'networkidle'});
+ await page.locator('.tiptap').waitFor();
+ assert.equal(await page.locator('.raw-markdown-node').count(),0,'unsupported syntax is plain editable text');
+ const plain=await page.locator('.tiptap').innerText();
+ assert.ok(plain.includes('[^footnote]'),'unsupported syntax remains readable');
+ assert.ok(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),'rendering alone does not change source');
  assert.equal(errors.length,0,'no unhandled browser errors');
- console.log('PASS Markdown typography: one column, in-block scrolling, preview/editor parity, mobile 320/390/430, Astryx raw node');
+ console.log('PASS Markdown typography: one column, in-block scrolling, preview/editor parity, mobile 320/390/430, plain editable text without raw source blocks');
 }finally {await browser.close();}

@@ -35,7 +35,7 @@
   margin-inline: auto;
 }
 .record-main :is(.tiptap, .markdown-preview) > :is(
-  pre, table, figure, .tableWrapper, .katex-display, .tiptap-mathematics-render[data-type="block-math"], .raw-markdown-node
+  pre, table, figure, .tableWrapper, .katex-display, .tiptap-mathematics-render[data-type="block-math"]
 ) {
   box-sizing: border-box;
   width: 100%;
@@ -235,15 +235,6 @@
 }
 .record-main .tiptap ul[data-type="taskList"] > li > div > p {
   margin-block: 0;
-}
-.record-main .tiptap .raw-markdown-node {
-  font-size: 13px;
-  line-height: 1.6;
-}
-.record-main .tiptap .raw-markdown-node .raw-markdown-content {
-  background: transparent;
-  color: var(--rk-document-ink);
-  white-space: pre-wrap;
 }
 @media (max-width: 720px) {
   .record-main {

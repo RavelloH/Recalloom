@@ -235,7 +235,7 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar { box-shadow: 0 
 }
 
 /* ---------- Document parity: visual editor, preview and source ---------- */
-.record-main :is(.tiptap, .markdown-preview) > :is(.code-block, .tableWrapper, .raw-markdown-node) { width: 100%; max-width: 100%; margin-inline: 0; }
+.record-main :is(.tiptap, .markdown-preview) > :is(.code-block, .tableWrapper) { width: 100%; max-width: 100%; margin-inline: 0; }
 .record-main :is(.tiptap, .markdown-preview) .rk-hscroll { overflow: hidden; margin-block: 22px; scrollbar-width: none; }
 .record-main :is(.tiptap, .markdown-preview) .rk-hscroll table {
   display: table;
@@ -271,10 +271,6 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar { box-shadow: 0 
 .record-main .markdown-preview li.task-list-item { position: relative; list-style: none; padding-inline-start: 25px; margin: 4px 0; }
 .record-main .markdown-preview li.task-list-item > input[type="checkbox"] { position: absolute; inset-inline-start: 0; top: .5em; margin: 0; }
 .record-main .tiptap ul[data-type="taskList"] > li > label input { margin: 0; }
-/* Protected Markdown reads as a quiet source block, the same width as the text. */
-.record-main .tiptap .raw-markdown-node { border-color: var(--rk-document-border); background: var(--rk-document-wash); border-radius: 10px; }
-.record-main .tiptap .raw-markdown-caption { padding: 6px 12px; font-size: 12px; border-bottom-color: var(--rk-border-soft); }
-.record-main .tiptap .raw-markdown-content { font-family: var(--rk-font-mono); }
 .source-editor { min-height: 360px; }
 .source-editor .cm-editor { font-size: 16px; background: transparent; }
 .source-editor .cm-editor .cm-content { font-family: inherit; }

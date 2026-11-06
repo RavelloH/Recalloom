@@ -3,13 +3,12 @@
  * Runs against an isolated local Worker, never against production documents.
  */
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
+import {browserBin,launchTestBrowser,testOrigin} from './local-browser.mjs';
 import {existsSync,readFileSync} from 'node:fs';
-const browserBin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 const keyLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(browserBin&&keyLine,'Local browser and .dev.vars required');
 const secret=keyLine.slice(keyLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const base='http://127.0.0.1:8897',browser=await chromium.launch({headless:true,executablePath:browserBin});
+const base=testOrigin,browser=await launchTestBrowser();
 const page=await browser.newPage({viewport:{width:1280,height:800}});
 const tick=String.fromCharCode(96);
 const samples=[
@@ -50,7 +49,7 @@ try{
   await page.getByRole('button',{name:'可视化'}).click();
   // Wait for the actual visual editor to mount after its lazy chunk loads.
   // A fixed animation delay causes flaky failures on cold or cached navigation.
-  await page.waitForFunction(()=>Boolean(document.querySelector('.tiptap')||document.querySelector('.warning-banner')),null,{timeout:15000});
+  await page.locator('.tiptap').waitFor({timeout:15000});
   const visible=await page.locator('.tiptap').count()>0;
   assert.equal(visible,visualExpected,name+' visual-mode fidelity');
   assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled(),name+' must never dirty original without edits');
@@ -62,9 +61,9 @@ try{
     align:[...el.querySelectorAll('tr:first-child>*')].map(x=>x.style.textAlign)
    }));
    for(const [key,value] of Object.entries(marks))assert.deepEqual(actual[key],value,name+' markup '+key);
-   if(name.startsWith('unsupported-')||name==='standalone-unclosed-mark'||name==='yaml-frontmatter')assert.ok(await page.locator('.raw-markdown-node').count()>0,name+' must show original Markdown in Tiptap');
-  }else{
-   assert.ok(await page.locator('.warning-banner').count(),name+' offers safe source fallback');
+   assert.equal(await page.locator('.raw-markdown-node').count(),0,name+' must never show a source-protection block');
+   if(name==='unsupported-html')assert.ok((await page.locator('.tiptap').innerText()).includes('<div class="notice">Careful HTML</div>'),'unknown HTML appears literally');
+   if(name==='yaml-frontmatter')assert.ok((await page.locator('.tiptap').innerText()).includes('title: Example'),'front matter remains editable text');
   }
   await page.getByRole('button',{name:'Markdown'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});

@@ -26,6 +26,28 @@ export { CustomUnderline as UnderlineWithMarkdown } from "./custom-underline";
 export const HighlightWithMarkdown = Highlight.extend({
   priority: 1000,
 
+  // Accept both Tiptap ==highlight== and the <mark>highlight</mark>
+  // notation used by Recalloom's existing Markdown notes. Parse nested
+  // inline Markdown (especially `code`) as real rich-text marks instead of
+  // displaying literal HTML tags or falling back to a source-only block.
+  markdownTokenizer: {
+    name: 'highlight',
+    level: 'inline' as const,
+    start: (source: string) => {
+      const html = source.toLowerCase().indexOf('<mark>');
+      const delimiter = source.indexOf('==');
+      return html < 0 ? delimiter : delimiter < 0 ? html : Math.min(html, delimiter);
+    },
+    tokenize(source, _tokens, lexer) {
+      const html = /^<mark>([^\r\n]*?)<\/mark>/i.exec(source);
+      const md = /^(==)([^=]+)(==)/.exec(source);
+      const match = html ?? md;
+      if (!match) return undefined;
+      const text = html ? match[1] : match[2].trim();
+      return { type: 'highlight', raw: match[0], text, tokens: lexer.inlineTokens(text) };
+    },
+  },
+
   renderMarkdown(
     node: JSONContent,
     helpers: {
