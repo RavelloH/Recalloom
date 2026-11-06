@@ -82,7 +82,7 @@ async function measureMathLayout(scope,theme){
    const node=m.querySelector(scope==='visual'?'[data-type="inline-math"]':'.katex');
    if(!node)return null;
    const actual=node.querySelector('.katex-html')??node;
-   return {mark:rect(m),container:rect(node),glyphs:rect(actual),color:getComputedStyle(node).backgroundColor,
+   return {mark:rect(m),container:rect(node),glyphs:rect(actual),color:getComputedStyle(node).backgroundColor,markColor:getComputedStyle(m).backgroundColor,
      latex:node.getAttribute('data-latex')??actual.textContent?.slice(0,80)};
   }).filter(Boolean);
   const blocks=[...root.querySelectorAll(scope==='visual'?'[data-type="block-math"]':'.katex-display')].map(el=>{
@@ -95,9 +95,11 @@ async function measureMathLayout(scope,theme){
  console.log('MATH_GEOMETRY',JSON.stringify({scope,theme,...geometry}));
  assert.ok(geometry.formulas.length>=2,'highlighted fraction and matrix must be actual KaTeX');
  for(const f of geometry.formulas){
-  assert.equal(f.color,'rgb(245, 216, 112)','whole inline formula gets yellow surface');
-  assert.ok(f.container.top<=f.glyphs.top+2 && f.container.bottom>=f.glyphs.bottom-2,
-   'background encloses the full formula height, including numerator and denominator');
+  assert.equal(f.markColor,'rgb(245, 216, 112)','one outer mark supplies the yellow surface');
+  assert.equal(f.color,'rgba(0, 0, 0, 0)','inner formula must not draw another background');
+  assert.ok(f.mark.top<=f.glyphs.top+2 && f.mark.bottom>=f.glyphs.bottom-2 &&
+    f.mark.left<=f.container.left+2 && f.mark.right>=f.container.right-2,
+   'one outer mark box must enclose the complete height and width of the formula');
  }
  assert.ok(geometry.formulas.some(f=>f.container.height>30),
   'tall highlighted fraction or matrix must expand beyond regular line height');

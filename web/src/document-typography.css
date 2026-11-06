@@ -182,25 +182,68 @@
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
-/* KaTeX can be much taller than the baseline (fractions, sums, matrices).
- * Give the formula itself a yellow box whose height comes from its rendered
- * content. Keep the outer mark inline so highlighted sentences still wrap. */
+/* One highlight box, not the browser's narrow text-line strip PLUS a
+ * second KaTeX patch. The mark itself takes the height and width of the
+ * children, including tall fractions and matrices. Wrapping remains possible
+ * inside long highlighted phrases on narrow mobile viewports. */
+.record-main :is(.tiptap, .markdown-preview) mark:has(.katex) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  vertical-align: middle;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: .12em .18em;
+  line-height: normal;
+  color: #251e0e;
+  background: #f5d870;
+  border-radius: 3px;
+}
 .record-main :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
   max-width: 100%;
-  background: #f5d870;
-  color: #251e0e;
-  border-radius: 3px;
-  padding: .14em .16em;
-  line-height: normal;
-}
-.record-main :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) .katex {
   background: transparent;
+  color: inherit;
+  border: 0;
   border-radius: 0;
   padding: 0;
+  line-height: normal;
 }
+/* Highlighted display math is one centered, content-sized yellow card.
+ * Keep the parent as an uncolored scroll area for oversized formulas. */
+.record-main .tiptap [data-type="block-math"].rk-highlighted-block-math > .block-math-inner,
+.record-main .markdown-preview [data-highlighted-math] .katex-display {
+  color: #251e0e;
+  background: #f5d870;
+  border-radius: 4px;
+  padding: .3em .5em;
+  box-sizing: border-box;
+}
+.record-main .markdown-preview [data-highlighted-math] {
+  display: flex;
+  justify-content: safe center;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-block: 24px;
+}
+.record-main .markdown-preview [data-highlighted-math] .katex-display {
+  display: block;
+  width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+.record-main .markdown-preview [data-highlighted-math] .katex-display > .katex {
+  display: inline-block;
+  width: max-content;
+  max-width: none;
+}
+
 .record-main :is(.tiptap, .markdown-preview) pre {
   overflow: auto;
   overscroll-behavior-inline: contain;

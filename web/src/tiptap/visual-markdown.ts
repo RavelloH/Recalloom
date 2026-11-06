@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import {prepareVisualMarkdown} from './fidelity';
 import {postProcessTableAlignment} from './table-alignment';
+import {findMarkedDisplayMath} from './marked-display-math';
 
 type MarkdownDriver={parse:(source:string)=>JSONContent};
 type AstNode={type:string;value?:string;children?:AstNode[];
@@ -50,12 +51,21 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
  const content:JSONContent[]=metadata?[literalParagraph(metadata[0])]:[];
  try{
   const ast=parser.parse(tail) as AstNode;
-  if(!(ast.children??[]).some(hasUnsupportedHtml)){
+  const blocks=ast.children??[];
+  const containsMarkedMath=blocks.some((_,index)=>Boolean(findMarkedDisplayMath(blocks,index)));
+  if(!blocks.some(hasUnsupportedHtml)&&!containsMarkedMath){
    content.push(...parseSafe(tail,manager));
   }else{
-   // Split only when the document actually contains unsupported HTML.
-   // One unknown construct cannot turn the rest of the document into source.
-   for(const block of ast.children??[]){
+   // Parse the rest of the document as rich text. Standalone HTML-marked
+   // display math must become a real blockMath node, not a literal HTML block.
+   for(let i=0;i<blocks.length;i++){
+    const matched=findMarkedDisplayMath(blocks,i);
+    if(matched){
+     content.push({type:'blockMath',attrs:{latex:matched.latex,highlighted:true}});
+     i+=matched.length-1;
+     continue;
+    }
+    const block=blocks[i] as AstNode;
     const start=block.position?.start?.offset,end=block.position?.end?.offset;
     if(start===undefined||end===undefined)continue;
     const fragment=tail.slice(start,end);
