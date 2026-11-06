@@ -16,7 +16,7 @@
     "build:web": "node scripts/stage-cap-wasm.mjs && vite build",
     "dev:web": "node scripts/stage-cap-wasm.mjs && vite --host 127.0.0.1",
     "test:ui": "node scripts/web-ui-e2e.mjs",
-    "test:editor": "node scripts/tiptap-roundtrip-e2e.mjs && node scripts/tiptap-interactions-e2e.mjs && node scripts/visual-first-e2e.mjs",
+    "test:editor": "node scripts/tiptap-roundtrip-e2e.mjs && node scripts/tiptap-interactions-e2e.mjs && node scripts/visual-first-e2e.mjs && node scripts/highlight-math-e2e.mjs",
     "test:typography": "node scripts/markdown-typography-e2e.mjs",
     "test:confirm": "node scripts/alert-dialog-e2e.mjs",
     "test:drafts": "node scripts/web-draft-ui-e2e.mjs",

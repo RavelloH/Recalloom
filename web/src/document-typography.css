@@ -142,6 +142,24 @@
   font: .87em/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
   overflow-wrap: anywhere;
 }
+/* Highlighted inline code inherits the dark ink of <mark>, but the regular
+ * inline-code surface is dark in dark mode. Keep monospaced distinction while
+ * using a translucent warm inset so the complete token remains legible.
+ * Apply to both mark > code and code > mark, in editor and read-only preview. */
+.record-main :is(.tiptap, .markdown-preview) mark code,
+.record-main :is(.tiptap, .markdown-preview) code:has(> mark) {
+  color: #251e0e;
+  -webkit-text-fill-color: #251e0e;
+  background: rgba(255,255,255,.38);
+  border-color: rgba(76,55,10,.34);
+  box-shadow: none;
+  font-weight: 550;
+}
+.record-main :is(.tiptap, .markdown-preview) code > mark {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+}
 .record-main :is(.tiptap, .markdown-preview) pre {
   overflow: auto;
   overscroll-behavior-inline: contain;
