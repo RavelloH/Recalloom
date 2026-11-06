@@ -117,7 +117,7 @@ export default {
       const originalRow=await store.getRecord(env,rec.id);
       const importedId=crypto.randomUUID();
       const originalVersions=(await env.DB.prepare(
-        'SELECT v.*,s.content AS content_snapshot FROM revisions v LEFT JOIN record_revision_snapshots s ON s.record_id=v.record_id AND s.revision=v.revision WHERE v.record_id=? ORDER BY v.revision'
+        'SELECT v.* FROM revisions v WHERE v.record_id=? ORDER BY v.revision'
       ).bind(rec.id).all()).results;
       const backupRecord={...originalRow,id:importedId,name:'restored-'+importedId+'.md',folder_id:folder.id};
       const payload={

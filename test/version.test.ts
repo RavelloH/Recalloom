@@ -30,6 +30,19 @@ test('text-version 2.2 preserves LaTeX and JS replacement markers without duplic
   assert.deepEqual(versioned.getParsedData().versions,['1','2','3','4']);
   assert.equal((new TextVersion() as unknown as {optimizeDiffStorage:boolean}).optimizeDiffStorage,false);
 });
+test('a repaired document may retain revision 12 as its only historical baseline',()=>{
+  const source='# Current verified document\n\n$$\nE=mc^2\n$$';
+  const baseline=new TextVersion();
+  baseline.commit(source,'12');
+  let version={content:source,metadata:baseline.export('separate').metadata};
+  assert.equal(historicalVersion(version,12),source);
+  version=nextVersion(version,source+'\n\nNext',13);
+  version=nextVersion(version,source+'\n\nNext\nMore',14);
+  assert.equal(historicalVersion(version,12),source);
+  assert.equal(historicalVersion(version,13),source+'\n\nNext');
+  assert.equal(historicalVersion(version,14),version.content);
+  assert.deepEqual((new TextVersion(version.metadata,version.content) as unknown as {getParsedData():{versions:string[]}}).getParsedData().versions,['12','13','14']);
+});
 test('restoring older content appends a new revision',()=>{
   let data=initialVersion('alpha');
   data=nextVersion(data,'beta',2);

@@ -52,7 +52,7 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
   for(const row of selection){
     const recordId=id(row.id);
     const [versions,tags]=await Promise.all([
-      env.DB.prepare('SELECT v.*,s.content AS content_snapshot FROM revisions v LEFT JOIN record_revision_snapshots s ON s.record_id=v.record_id AND s.revision=v.revision WHERE v.record_id=? ORDER BY v.revision').bind(recordId).all(),
+      env.DB.prepare('SELECT v.* FROM revisions v WHERE v.record_id=? ORDER BY v.revision').bind(recordId).all(),
       env.DB.prepare('SELECT t.name FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all()
     ]);
     records.push({record:row,revisions:versions.results,tags:tags.results.map(x=>String(x.name))});
@@ -143,15 +143,16 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     const content=string(row.content),history=string(row.history_metadata,2_000_000);
     string(row.description,5000);
     const revision=Number(row.revision);
-    if(!Number.isSafeInteger(revision)||revision<1||item.revisions.length!==revision)fail('INVALID_SNAPSHOT_HISTORY');
+    if(!Number.isSafeInteger(revision)||revision<1||item.revisions.length<1)fail('INVALID_SNAPSHOT_HISTORY');
+    const firstRevision=Number(item.revisions[0]?.revision);
+    if(!Number.isSafeInteger(firstRevision)||firstRevision<1||firstRevision+item.revisions.length-1!==revision)
+      fail('INVALID_SNAPSHOT_HISTORY');
     if(await sha256(content)!==row.content_sha256)fail('SNAPSHOT_HASH_MISMATCH');
-    const oldestExact=item.revisions.find(v=>typeof v.content_snapshot==='string');
-    const legacyHead=oldestExact?string(oldestExact.content_snapshot):content;
     for(const [index,v] of item.revisions.entries()){
-      if(Number(v.revision)!==index+1||v.record_id!==recordId)fail('INVALID_SNAPSHOT_HISTORY');
-      const text=index+1===revision?content:typeof v.content_snapshot==='string'
-        ?string(v.content_snapshot):historicalVersion({content:legacyHead,metadata:history},index+1);
-      if(await sha256(text)!==v.content_sha256)fail('SNAPSHOT_HASH_MISMATCH','Revision '+(index+1)+' of '+recordId+' did not match the archived hash');
+      if(Number(v.revision)!==firstRevision+index||v.record_id!==recordId)fail('INVALID_SNAPSHOT_HISTORY');
+      const text=Number(v.revision)===revision?content
+        :historicalVersion({content,metadata:history},Number(v.revision));
+      if(await sha256(text)!==v.content_sha256)fail('SNAPSHOT_HASH_MISMATCH','Revision '+v.revision+' of '+recordId+' did not match the archived hash');
     }
     const legacyCheckpoint=row.kind==='checkpoint';
     const restoredKind=legacyCheckpoint?'document':row.kind;
@@ -163,9 +164,6 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     for(const v of item.revisions){
       statements.push(env.DB.prepare('INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,?,?,?,?,?)')
         .bind(recordId,v.revision,v.content_sha256,v.message,v.actor,v.created_at));
-      if(typeof v.content_snapshot==='string')statements.push(env.DB.prepare(
-        'INSERT INTO record_revision_snapshots(record_id,revision,content,content_sha256) VALUES(?,?,?,?)'
-      ).bind(recordId,v.revision,v.content_snapshot,v.content_sha256));
     }
     if(row.kind==='task_list'){
       let tasks:unknown;

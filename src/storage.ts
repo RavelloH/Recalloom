@@ -1,6 +1,6 @@
 import type { Env, EditInput, RecordKind, RecordStatus, StoredRecord, Task, TaskStatus } from './types.js';
 import { StorageError } from './types.js';
-import { sha256, initialVersion, historicalVersion, editContent } from './version.js';
+import { sha256, initialVersion, nextVersion, historicalVersion, editContent } from './version.js';
 
 const now = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
@@ -31,36 +31,20 @@ export async function getRecord(env: Env, id: string): Promise<StoredRecord> {
   if (!row) throw new StorageError('RECORD_NOT_FOUND');
   return row;
 }
-/** Exact revisions live in a sidecar table from migration 0011 onward.
- * Preserve the old text-version metadata as-is for legacy reads/recovery.
- * Always validate the canonical revision SHA before exposing historical text:
- * some old metadata chains have duplicated version names and silently
- * reconstruct incorrect Markdown. Never return wrong historical data. */
+/** text-version is the sole historical content engine. Verify every reconstructed revision. */
 export async function revisionContent(env:Env,row:StoredRecord,targetRevision:number,expectedSha?:string):Promise<string>{
  if(!Number.isInteger(targetRevision)||targetRevision<1||targetRevision>row.revision)
   throw new StorageError('REVISION_NOT_FOUND');
- if(targetRevision===row.revision)return row.content;
  const expected=expectedSha??(await env.DB.prepare(
   'SELECT content_sha256 FROM revisions WHERE record_id=? AND revision=?'
  ).bind(row.id,targetRevision).first<{content_sha256:string}>())?.content_sha256;
  if(!expected)throw new StorageError('REVISION_NOT_FOUND');
- const exact=await env.DB.prepare(
-  'SELECT content,content_sha256 FROM record_revision_snapshots WHERE record_id=? AND revision=?'
- ).bind(row.id,targetRevision).first<{content:string;content_sha256:string}>();
- if(exact){
-  if(exact.content_sha256!==expected||await sha256(exact.content)!==expected)
-   throw new StorageError('HISTORY_INTEGRITY_ERROR','Revision '+targetRevision+' snapshot failed its checksum');
-  return exact.content;
- }
- const baseline=await env.DB.prepare(
-  'SELECT content FROM record_revision_snapshots WHERE record_id=? ORDER BY revision ASC LIMIT 1'
- ).bind(row.id).first<{content:string}>();
- let historic:string;
- try {historic=historicalVersion({content:baseline?.content??row.content,metadata:row.history_metadata},targetRevision);}
- catch {throw new StorageError('HISTORY_INTEGRITY_ERROR','Historical revision '+targetRevision+' could not be reconstructed');}
- if(await sha256(historic)!==expected)
-  throw new StorageError('HISTORY_INTEGRITY_ERROR','Historical revision '+targetRevision+' failed its checksum; legacy history retained for recovery');
- return historic;
+ const content=targetRevision===row.revision
+  ?row.content
+  :historicalVersion({content:row.content,metadata:row.history_metadata},targetRevision);
+ if(await sha256(content)!==expected)
+  throw new StorageError('HISTORY_INTEGRITY_ERROR','Historical revision '+targetRevision+' failed its checksum');
+ return content;
 }
 export async function createFolder(env: Env, name: string, parentId: string|null, description='', actor='agent') {
   name=nameCheck(name);
@@ -144,8 +128,6 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
     env.DB.prepare('INSERT INTO record_histories(record_id,history_metadata) VALUES(?,?)').bind(id,version.metadata),
     env.DB.prepare('INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,?,?,?,?,?)')
       .bind(id,1,digest,'Created',actor,ts),
-    env.DB.prepare('INSERT INTO record_revision_snapshots(record_id,revision,content,content_sha256) VALUES(?,?,?,?)')
-      .bind(id,1,content,digest),
     env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
       .bind(newId(),id,1,ts),
     ...tags.flatMap(tag=>[
@@ -194,18 +176,15 @@ async function commitContent(env:Env,row:StoredRecord,content:string,expectedRev
   if (content.length>500_000) throw new StorageError('CONTENT_TOO_LARGE');
   if (content===row.content) return {id:row.id,revision:row.revision,changed:false,contentSha256:row.content_sha256};
   const rev=row.revision+1,ts=now(),digest=await sha256(content);
+  const version=nextVersion({content:row.content,metadata:row.history_metadata},content,rev);
   const q=[
-    // Retain an exact copy of the last legacy head on its first new edit.
-    // Subsequent writes add one new snapshot without traversing old deltas.
-    env.DB.prepare('INSERT OR IGNORE INTO record_revision_snapshots(record_id,revision,content,content_sha256) VALUES(?,?,?,?)')
-      .bind(row.id,row.revision,row.content,row.content_sha256),
     env.DB.prepare('UPDATE record_contents SET content=?,revision=?,content_sha256=? WHERE record_id=? AND revision=?')
       .bind(content,rev,digest,row.id,expectedRevision),
-    // A stale concurrent writer will collide with this unique revision and roll back the whole batch.
+    env.DB.prepare('UPDATE record_histories SET history_metadata=? WHERE record_id=?')
+      .bind(version.metadata,row.id),
+    // Unique revision collision rolls back the entire batch on stale concurrent edits.
     env.DB.prepare('INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,?,?,?,?,?)')
       .bind(row.id,rev,digest,message,actor,ts),
-    env.DB.prepare('INSERT INTO record_revision_snapshots(record_id,revision,content,content_sha256) VALUES(?,?,?,?)')
-      .bind(row.id,rev,content,digest),
     env.DB.prepare('UPDATE records SET updated_at=? WHERE id=?').bind(ts,row.id)
   ];
   if (tasks) {
