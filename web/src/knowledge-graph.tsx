@@ -12,7 +12,7 @@ import {relationLabel,semanticMessage,type KnowledgeEdge,type KnowledgeNode} fro
 
 type GraphPalette={
  ink:string;fill:string;taskFill:string;border:string;halo:string;
- focusFill:string;focusBorder:string;explicit:string;semantic:string;folder:string
+ focusFill:string;focusBorder:string;explicit:string;reference:string;embed:string;semantic:string;folder:string
 };
 /** Cytoscape accepts rgb()/rgba(), but not Astryx's light-dark() custom
  * property values. Let the browser resolve them in a temporary DOM probe. */
@@ -37,6 +37,8 @@ function readGraphPalette(host:HTMLElement):GraphPalette{
    focusFill:color('--kg-focus-fill',fallback('rgb(220,234,255)','rgb(41,67,95)')),
    focusBorder:color('--kg-focus-border',fallback('rgb(52,108,186)','rgb(173,208,255)')),
    explicit:color('--kg-edge-explicit',fallback('rgb(78,120,177)','rgb(154,196,255)')),
+   reference:color('--kg-edge-reference',fallback('rgb(53,133,118)','rgb(124,214,187)')),
+   embed:color('--kg-edge-embed',fallback('rgb(169,119,63)','rgb(226,180,107)')),
    semantic:color('--kg-edge-semantic',fallback('rgb(145,104,178)','rgb(211,168,255)')),
    folder:color('--kg-edge-folder',fallback('rgb(160,168,178)','rgb(135,147,165)'))
   };
@@ -63,6 +65,10 @@ function graphStyles(colors:GraphPalette,compact:boolean):cytoscape.StylesheetJs
   {selector:'edge.explicit',style:{'line-color':colors.explicit,'width':2.8,
    'opacity':0.93,'target-arrow-shape':'triangle',
    'target-arrow-color':colors.explicit}},
+  {selector:'edge.reference',style:{'line-color':colors.reference,'width':2.5,
+   'opacity':0.95,'target-arrow-shape':'triangle','target-arrow-color':colors.reference}},
+  {selector:'edge.embed',style:{'line-color':colors.embed,'width':2.8,
+   'opacity':0.96,'target-arrow-shape':'triangle','target-arrow-color':colors.embed}},
   {selector:'edge.semantic',style:{'line-style':'dashed','line-color':colors.semantic,
    'opacity':0.92,'width':2}},
   {selector:'edge.folder',style:{'line-style':'dotted','line-color':colors.folder,
@@ -188,7 +194,7 @@ export default function KnowledgeGraphPage(){
    data&&<div className="graph-workspace">
     <div className="graph-stage">
      <div className="graph-topline"><span>{focus?'以当前文档为中心':'最近更新的知识子图'} · {nodes.length} 个文档 / {edges.length} 条关联</span>
-      <span className="graph-legend"><i data-relation="explicit"/>明确关联 <i data-relation="semantic"/>语义建议 <i data-relation="folder"/>同目录</span>
+      <span className="graph-legend"><i data-relation="explicit"/>手动关联 <i data-relation="reference"/>正文引用 <i data-relation="embed"/>嵌入 <i data-relation="semantic"/>语义建议 <i data-relation="folder"/>同目录</span>
      </div>
      {nodes.length?
       <GraphCanvas nodes={nodes} edges={edges} selected={selected} onSelect={onSelect} cyRef={cy} query={filter}/>:

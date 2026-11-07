@@ -24,7 +24,8 @@
     "test:workspace": "node scripts/notion-workspace-e2e.mjs",
     "test:archive": "node scripts/archive-management-e2e.mjs",
     "test:graph": "node scripts/knowledge-graph-e2e.mjs",
-    "test:graph-theme": "node scripts/graph-theme-e2e.mjs"
+    "test:graph-theme": "node scripts/graph-theme-e2e.mjs",
+    "test:wiki": "node scripts/wiki-e2e.mjs"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",

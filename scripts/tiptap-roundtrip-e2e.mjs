@@ -9,7 +9,7 @@ const browserBin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 const keyLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(browserBin&&keyLine,'Local browser and .dev.vars required');
 const secret=keyLine.slice(keyLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const base='http://127.0.0.1:8897',browser=await chromium.launch({headless:true,executablePath:browserBin});
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897',browser=await chromium.launch({headless:true,executablePath:browserBin});
 const page=await browser.newPage({viewport:{width:1280,height:800}});
 const tick=String.fromCharCode(96);
 const samples=[

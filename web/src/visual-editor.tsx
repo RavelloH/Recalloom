@@ -1,4 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {searchQuery,type SearchHit} from './queries';
 import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -20,6 +22,7 @@ import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {RawMarkdown} from './tiptap/raw-markdown';
+import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
 import {buildLosslessMarkdown} from './tiptap/lossless-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
@@ -28,6 +31,7 @@ import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/sl
 import {useCompactLayout} from './use-media';
 
 type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number};
+type WikiState=SlashState&{kind:'link'|'embed'};
 const SLASH_MENU_WIDTH=300;
 const SLASH_MENU_SPACE=280;
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
@@ -42,7 +46,7 @@ const tableToolbarOffset=(cell:Element,surface:Element,compact:boolean)=>{
 };
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
 /** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
-const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void}>(function VisualEditor({value,onChange},ref){
+const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;recordId?:string}>(function VisualEditor({value,onChange,recordId},ref){
  const checked=useRef(false);
  const [protectedCount,setProtectedCount]=useState(0);
  const [ready,setReady]=useState(false);
@@ -63,6 +67,34 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  slashRef.current=slash;
  const slashDismissedAt=useRef<number|null>(null);
  const runSlashRef=useRef<(command:SlashCommand)=>void>(()=>{});
+ const [wiki,setWiki]=useState<WikiState|null>(null);
+ const wikiRef=useRef<WikiState|null>(null);
+ wikiRef.current=wiki;
+ const chooseWikiRef=useRef<(hit:SearchHit)=>void>(()=>{});
+ const wikiSearch=useQuery({...searchQuery(wiki?.query.trim()??'','metadata',12),enabled:Boolean(wiki&&wiki.query.trim())});
+ const wikiMatches=(wikiSearch.data?.items??[]).filter(hit=>hit.kind==='document'||hit.kind==='task_list');
+ const wikiHitsRef=useRef<SearchHit[]>([]);
+ wikiHitsRef.current=wikiMatches;
+ const detectWiki=(e:Editor)=>{
+  const sel=e.state.selection,$from=sel.$from;
+  if(!sel.empty||!e.isEditable||!$from.parent.isTextblock||$from.parent.type.spec.code){setWiki(null);return false;}
+  const before=$from.parent.textBetween(0,$from.parentOffset,undefined,LEAF_PLACEHOLDER);
+  const embed=/^\{\{embed:([^}\n]{0,120})$/.exec(before.trimStart());
+  const link=/(?:^|[\s(])\[\[([^\]\n]{0,120})$/.exec(before);
+  const kind=embed?'embed':link?'link':null;
+  if(!kind){setWiki(null);return false;}
+  const query=embed?.[1]??link?.[1]??'';
+  const from=$from.pos-query.length-(kind==='embed'?8:2);
+  const surface=surfaceRef.current;
+  if(!surface){setWiki(null);return true;}
+  const coords=e.view.coordsAtPos(from),box=surface.getBoundingClientRect();
+  const above=innerHeight-coords.bottom<SLASH_MENU_SPACE&&coords.top>SLASH_MENU_SPACE;
+  setSlash(null);
+  setWiki(last=>({kind,query,from,to:$from.pos,index:last?.from===from?last.index:0,
+   placement:above?'above':'below',offset:above?box.bottom-coords.top+6:coords.bottom-box.top+6,
+   left:Math.max(0,Math.min(coords.left-box.left,box.width-SLASH_MENU_WIDTH))}));
+  return true;
+ };
  const editorRef=useRef<Editor|null>(null);
  const detectSlash=(e:Editor)=>{
   const selection=e.state.selection;
@@ -95,6 +127,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   CustomParagraph,
   Markdown,
   RawMarkdown,
+  WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),
   Image.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
@@ -103,17 +136,34 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   InlineMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   Placeholder.configure({placeholder:({editor:e,node})=>node.type.name==='heading'?'标题 '+String(node.attrs.level??''):e.isEmpty?'输入“/”插入内容，或直接开始写作…':'输入“/”插入块'}),
- ],[]);
+ ],[recordId]);
  const editor=useEditor({
   extensions,content:'',contentType:'markdown',immediatelyRender:false,
-  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}detectSlash(editor);},
-  onSelectionUpdate:({editor})=>{detectSlash(editor);followTableSelection(editor);},
+  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}if(!detectWiki(editor))detectSlash(editor);},
+  onSelectionUpdate:({editor})=>{if(!detectWiki(editor))detectSlash(editor);followTableSelection(editor);},
   // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
   onFocus:({editor})=>followTableSelection(editor),
-  onBlur:()=>{setSlash(null);setTableTarget(false);},
+  onBlur:()=>{setSlash(null);setWiki(null);setTableTarget(false);},
   editorProps:{handleKeyDown:(_view,event)=>{
-   const state=slashRef.current,e=editorRef.current;
-   if(!state||!e||event.isComposing)return false;
+   const e=editorRef.current;
+   if(event.isComposing||!e)return false;
+   const pending=wikiRef.current;
+   if(pending){
+    const hits=wikiHitsRef.current;
+    if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+     if(!hits.length)return true;
+     const step=event.key==='ArrowDown'?1:-1;
+     setWiki({...pending,index:(pending.index+step+hits.length)%hits.length});
+     return true;
+    }
+    if(event.key==='Escape'){setWiki(null);return true;}
+    if((event.key==='Enter'||event.key==='Tab')&&hits.length){
+     chooseWikiRef.current(hits[Math.min(pending.index,hits.length-1)]!);
+     return true;
+    }
+   }
+   const state=slashRef.current;
+   if(!state)return false;
    const items=filterSlashCommands(e,state.query);
    if(!items.length)return false;
    if(event.key==='ArrowDown'||event.key==='ArrowUp'){
@@ -173,6 +223,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   return edited.current?editor.getMarkdown():null;
  }}),[editor]);
 
+ chooseWikiRef.current=hit=>{
+  const selection=wikiRef.current;
+  if(!editor||!selection)return;
+  setWiki(null);
+  editor.chain().focus().insertContentAt({from:selection.from,to:selection.to},{
+   type:selection.kind==='link'?'wikiLink':'wikiEmbed',
+   attrs:{target:'id:'+hit.id,anchor:null,alias:null}
+  }).run();
+ };
  const openLink=()=>{
   if(!editor)return;
   const info=selectedLink(editor);
@@ -290,6 +349,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    </div>
    <div className="wysiwyg-tools">
     {action('插入或编辑链接',openLink,<Link2 size={17}/>)}
+    {action('引用 Wiki 文档',()=>editor.chain().focus().insertContent('[[').run(),'[[]]')}
+    {action('嵌入 Wiki 文档',()=>editor.chain().focus().insertContent('{{embed:').run(),'{{}}')}
     {action('插入或编辑图片',openImage,<ImagePlus size={17}/>)}
     {action('插入行内公式',()=>openMath('inline'),<Sigma size={17}/>)}
     {action('插入块级公式',()=>openMath('block'),<>$$</>)}
@@ -348,6 +409,19 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
     onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
     <span className="slash-icon"><Icon size={18}/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+  </div>}
+  {wiki&&<div className="slash-menu wiki-completion" role="listbox" aria-label="引用文档"
+   style={{...(wiki.placement==='above'?{bottom:wiki.offset}:{top:wiki.offset}),left:wiki.left,width:SLASH_MENU_WIDTH}}
+   onMouseDown={event=>event.preventDefault()}>
+   <div className="slash-menu-heading">{wiki.kind==='embed'?'嵌入文档':'引用文档'} · {wiki.query?'搜索结果':'输入名称搜索'}</div>
+   {wikiSearch.isFetching&&<p className="muted small wiki-completion-status">搜索中…</p>}
+   {wikiMatches.map((hit,index)=><div key={hit.id} role="option" aria-selected={index===Math.min(wiki.index,wikiMatches.length-1)}
+    className={'slash-item'+(index===Math.min(wiki.index,wikiMatches.length-1)?' is-selected':'')}
+    onMouseEnter={()=>setWiki(state=>state?{...state,index}:state)}
+    onClick={()=>chooseWikiRef.current(hit)}>
+    <span className="slash-copy"><strong>{hit.name}</strong><small>{hit.path??hit.id}</small></span>
+   </div>)}
+   {Boolean(wiki.query)&&!wikiSearch.isFetching&&!wikiMatches.length&&<p className="muted small wiki-completion-status">没有匹配文档，请更换关键词。</p>}
   </div>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>;

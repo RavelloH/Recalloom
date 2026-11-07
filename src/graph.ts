@@ -9,7 +9,7 @@ export type KnowledgeNode={
  folderName:string|null;updatedAt:string;revision:number
 };
 export type KnowledgeEdge={
- id:string;sourceId:string;targetId:string;type:'explicit'|'semantic'|'folder';
+ id:string;sourceId:string;targetId:string;type:'explicit'|'reference'|'embed'|'semantic'|'folder';
  relation:string;score?:number;snippet?:string;support?:number
 };
 type ExplicitEdge=KnowledgeEdge & {type:'explicit'};
@@ -33,6 +33,14 @@ export function joinEdges(rows:Array<{sourceId:string;targetId:string;relation:s
  }));
 }
 
+async function wikiLinksFor(env:Env,id:string):Promise<KnowledgeEdge[]>{
+ const rows=(await env.DB.prepare(
+  "SELECT source_id AS sourceId,target_id AS targetId,kind FROM record_references WHERE target_id IS NOT NULL AND (source_id=? OR target_id=?) GROUP BY source_id,target_id,kind ORDER BY source_id,target_id LIMIT 200"
+ ).bind(id,id).all()).results as Array<{sourceId:string;targetId:string;kind:'link'|'embed'}>;
+ return rows.map(r=>({id:'wiki:'+r.kind+':'+r.sourceId+':'+r.targetId,
+  sourceId:r.sourceId,targetId:r.targetId,type:r.kind==='link'?'reference':'embed',
+  relation:r.kind==='link'?'正文引用':'内容嵌入'}));
+}
 async function linksFor(env:Env,id:string,limit=120):Promise<ExplicitEdge[]>{
  const rows=(await env.DB.prepare(
   'SELECT source_id AS sourceId,target_id AS targetId,relation FROM record_links WHERE source_id=? OR target_id=? ORDER BY relation,source_id,target_id LIMIT ?'
@@ -108,12 +116,14 @@ async function nodesByIds(env:Env,ids:string[]):Promise<KnowledgeNode[]>{
 export async function recordRelations(env:Env,id:string,options:{semantic?:boolean;limit?:number}={}){
  const source=await node(env,id);
  const explicit=await linksFor(env,id,160);
+ const wiki=await wikiLinksFor(env,id);
+ const confirmed:KnowledgeEdge[]=[...explicit,...wiki];
  const semantic=options.semantic===false?{status:'disabled' as const,edges:[] as KnowledgeEdge[]}:
   await relatedSemantic(env,source,clamp(options.limit??10,1,25));
- const allIds=[...new Set(explicit.flatMap(e=>[e.sourceId,e.targetId]).concat(semantic.edges.map(e=>e.targetId)))].filter(id=>id!==source.id);
+ const allIds=[...new Set(confirmed.flatMap(e=>[e.sourceId,e.targetId]).concat(semantic.edges.map(e=>e.targetId)))].filter(peerId=>peerId!==source.id);
  const peers=await nodesByIds(env,allIds.slice(0,200));
  const byId=new Map(peers.map(p=>[p.id,p]));
- const links=explicit.filter(e=>byId.has(e.sourceId===id?e.targetId:e.sourceId)).map(edge=>({
+ const links=confirmed.filter(e=>byId.has(e.sourceId===id?e.targetId:e.sourceId)).map(edge=>({
   ...edge,direction:edge.sourceId===id?'outgoing' as const:'incoming' as const,
   other:byId.get(edge.sourceId===id?edge.targetId:edge.sourceId)!
  }));
@@ -137,7 +147,7 @@ export async function graphView(env:Env,options:{focusId?:string;limit?:number;s
   for(const link of relations.links){
    if(nodes.size>=limit&&!nodes.has(link.other.id))break;
    nodes.set(link.other.id,link.other);
-   edges.push({id:link.id,sourceId:link.sourceId,targetId:link.targetId,type:'explicit',relation:link.relation});
+   edges.push({id:link.id,sourceId:link.sourceId,targetId:link.targetId,type:link.type,relation:link.relation});
   }
   for(const candidate of relations.suggestions){
    if(nodes.size>=limit)break;
@@ -167,6 +177,11 @@ export async function graphView(env:Env,options:{focusId?:string;limit?:number;s
     'SELECT source_id AS sourceId,target_id AS targetId,relation FROM record_links WHERE source_id IN (SELECT value FROM json_each(?)) AND target_id IN (SELECT value FROM json_each(?)) LIMIT 220'
    ).bind(JSON.stringify(ids),JSON.stringify(ids)).all()).results as Array<{sourceId:string;targetId:string;relation:string}>;
    edges.push(...joinEdges(linked));
+   const wiki=(await env.DB.prepare(
+    "SELECT source_id AS sourceId,target_id AS targetId,kind FROM record_references WHERE target_id IS NOT NULL AND source_id IN (SELECT value FROM json_each(?)) AND target_id IN (SELECT value FROM json_each(?)) GROUP BY source_id,target_id,kind LIMIT 220"
+   ).bind(JSON.stringify(ids),JSON.stringify(ids)).all()).results as Array<{sourceId:string;targetId:string;kind:'link'|'embed'}>;
+   for(const item of wiki)edges.push({id:'wiki:'+item.kind+':'+item.sourceId+':'+item.targetId,
+    sourceId:item.sourceId,targetId:item.targetId,type:item.kind==='link'?'reference':'embed',relation:item.kind==='link'?'正文引用':'内容嵌入'});
    // Only sparse folder links. Never build an N² clique for a large folder.
    const lastByFolder=new Map<string,string>();
    for(const item of rows){

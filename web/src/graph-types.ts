@@ -4,7 +4,7 @@ export type KnowledgeNode={
 };
 export type KnowledgeEdge={
  id:string;sourceId:string;targetId:string;
- type:'explicit'|'semantic'|'folder';relation:string;
+ type:'explicit'|'reference'|'embed'|'semantic'|'folder';relation:string;
  score?:number;snippet?:string;support?:number
 };
 export type SemanticState='ready'|'indexing'|'unavailable'|'archived'|'disabled';

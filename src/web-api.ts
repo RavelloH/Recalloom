@@ -6,6 +6,7 @@ import * as store from './storage.js';
 import * as agent from './agent-tools.js';
 import { search } from './search.js';
 import {recordRelations,graphView} from './graph.js';
+import {resolveWikiReference,listWikiReferences,backfillWikiReferences} from './wiki-references.js';
 import { recentActivity } from './web-activity.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
@@ -180,6 +181,18 @@ webApi.post('/records/:id/restore',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
   const v=await body(z.object({targetRevision:z.number().int().positive(),expectedRevision:z.number().int().positive()}).strict())(c.req.raw);
   return asJson(await store.restoreRecord(c.env,id,v.targetRevision,v.expectedRevision,actor(c.get('webSession'))));
+});
+webApi.post('/wiki/reindex',async(c)=>{
+ const v=await body(z.object({cursor:uuid.optional(),limit:z.number().int().min(1).max(10).optional()}).strict())(c.req.raw);
+ return asJson(await backfillWikiReferences(c.env,store.resolvePath,v));
+});
+webApi.get('/wiki/resolve',async(c)=>{
+ const q=parseQuery(c.req.url,z.object({target:z.string().min(1).max(2048),sourceId:uuid.optional()}));
+ return asJson(await resolveWikiReference(c.env,q.target,store.resolvePath,q.sourceId));
+});
+webApi.get('/records/:id/wiki-references',async(c)=>{
+ const id=idSchema.parse(c.req.param()).id;
+ return asJson(await listWikiReferences(c.env,id));
 });
 webApi.get('/records/:id/relations',async(c)=>{
  const id=idSchema.parse(c.req.param()).id;

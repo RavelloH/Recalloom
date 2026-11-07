@@ -1,6 +1,7 @@
 import type { Env, EditInput, RecordKind, RecordStatus, StoredRecord, Task, TaskStatus } from './types.js';
 import { StorageError } from './types.js';
 import { sha256, initialVersion, nextVersion, historicalVersion, editContent } from './version.js';
+import {prepareWikiProjection,deleteProjection,insertProjection,pinPathBindings,resolveNewWikiTarget} from './wiki-references.js';
 
 const now = () => new Date().toISOString();
 const newId = () => crypto.randomUUID();
@@ -105,6 +106,11 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
     throw new StorageError('TASK_LIST_CONTENT_MANAGED','Use tasks to modify task lists');
   if (content.length > 500_000) throw new StorageError('CONTENT_TOO_LARGE');
   const version=initialVersion(content),digest=await sha256(content);
+  const wikiRefs=kind==='document'?await prepareWikiProjection(env,id,content,1,resolvePath):[];
+  const existingFolder=await env.DB.prepare('SELECT id FROM folders WHERE parent_id IS ? AND name=?')
+   .bind(folderId,name).first();
+  const virtualPrefix=(await recordExtras(env,folderId,id)).path;
+  const newPath=existingFolder?null:virtualPrefix+(folderId?'/':'')+name;
   const statements=[
     env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)')
       .bind(id,folderId,name,kind,'active',input.description??'',ts,ts),
@@ -115,6 +121,8 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
       .bind(id,1,digest,'Created',actor,ts),
     env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
       .bind(newId(),id,1,ts),
+    ...(wikiRefs.length?[pinPathBindings(env,wikiRefs),insertProjection(env,wikiRefs)]:[]),
+    ...resolveNewWikiTarget(env,id,newPath),
     ...tags.flatMap(tag=>[
       env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(newId(),tag),
       env.DB.prepare('INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(id,tag)
@@ -161,6 +169,7 @@ async function commitContent(env:Env,row:StoredRecord,content:string,expectedRev
   if (content.length>500_000) throw new StorageError('CONTENT_TOO_LARGE');
   if (content===row.content) return {id:row.id,revision:row.revision,changed:false,contentSha256:row.content_sha256};
   const rev=row.revision+1,ts=now(),digest=await sha256(content);
+  const wikiRefs=row.kind==='document'?await prepareWikiProjection(env,row.id,content,rev,resolvePath):null;
   const encoded=nextVersion({content:row.content,metadata:row.history_metadata},content,rev);
   const q=[
     env.DB.prepare('UPDATE record_contents SET content=?,revision=?,content_sha256=? WHERE record_id=? AND revision=?')
@@ -171,6 +180,11 @@ async function commitContent(env:Env,row:StoredRecord,content:string,expectedRev
       .bind(row.id,rev,digest,message,actor,ts),
     env.DB.prepare('UPDATE records SET updated_at=? WHERE id=?').bind(ts,row.id)
   ];
+  if(wikiRefs){
+   if(wikiRefs.length)q.push(pinPathBindings(env,wikiRefs));
+   q.push(deleteProjection(env,row.id));
+   if(wikiRefs.length)q.push(insertProjection(env,wikiRefs));
+  }
   if (tasks) {
     q.push(env.DB.prepare('DELETE FROM tasks WHERE record_id=?').bind(row.id));
     for (const [position,task] of tasks.entries()) {
