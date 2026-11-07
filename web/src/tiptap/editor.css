@@ -249,6 +249,44 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-footnote-definition-content > :last-child {margin-bottom:0;}
 .record-main .rk-footnote-ref {font-size:.82em;vertical-align:super;color:var(--color-text-secondary);}
 
+/* Knowledge flashcards: editor shows both sides for editing; reader only
+ * reveals the answer on demand with Astryx Collapsible. No reveal state is saved. */
+.record-main .rk-flashcard {margin-block:1.15rem;max-width:100%;}
+.record-main .rk-flashcard-heading {font-weight:650;font-size:.9rem;color:var(--color-text-secondary);margin-bottom:.7rem;}
+.record-main .rk-flashcard-body {display:flex;flex-direction:column;gap:.7rem;min-width:0;}
+.record-main .rk-flashcard-panel {margin:0!important;min-width:0;}
+.record-main .rk-flashcard-panel-title {font-size:.78rem;color:var(--color-text-secondary);font-weight:600;margin-bottom:.4rem;}
+.record-main .rk-flashcard-content {min-width:0;overflow-wrap:anywhere;}
+.record-main .rk-flashcard-content > :first-child {margin-block-start:0;}
+.record-main .rk-flashcard-content > :last-child {margin-block-end:0;}
+.record-main .rk-flashcard-front {padding-block:.25rem .55rem;}
+.record-main .rk-flashcard-answer {padding-top:.5rem;}
+/* Keyboard shortcut uses native kbd semantics and Astryx design tokens. */
+.record-main .rk-keycap {display:inline-block;vertical-align:baseline;
+ font:600 .8em/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+ padding:.08em .43em;border-radius:.3em;
+ border:1px solid var(--rk-document-border);border-bottom-width:2px;
+ background:var(--rk-document-wash);color:var(--rk-document-ink);
+ box-shadow:0 1px 0 color-mix(in srgb,var(--rk-document-ink) 6%,transparent);}
+.record-main .rk-inline-kbd {display:inline;white-space:nowrap;}
+
+/* Cloze is visible and editable in the authoring surface. In readonly
+ * transclusion it is a keyboard-accessible reveal button with no saved state. */
+.record-main .rk-inline-cloze {display:inline;border-bottom:1px dashed var(--color-text-secondary);
+ background:var(--rk-document-wash);padding-inline:.14em;border-radius:.2em;}
+.record-main .rk-cloze-label {font-size:.7em;font-weight:650;margin-inline-end:.26em;
+ color:var(--color-text-secondary);user-select:none;}
+.record-main .rk-cloze-editor-answer {font-weight:550;}
+.record-main .rk-cloze-read {display:inline;}
+.record-main .rk-cloze-reveal {cursor:pointer;font:inherit;line-height:inherit;
+ border:1px dashed var(--rk-document-border);border-radius:.28em;
+ background:var(--rk-document-wash);color:var(--rk-document-muted);
+ padding:.06em .35em;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
+.record-main .rk-cloze-reveal:hover,.record-main .rk-cloze-reveal:focus-visible {
+ border-color:var(--color-text-secondary);color:var(--rk-document-ink);}
+.record-main .rk-cloze-open .rk-cloze-reveal {color:var(--rk-document-ink);
+ border-style:solid;background:transparent;}
+
 /* YAML Front Matter is a semantic metadata card, but YAML source remains canonical. */
 .record-main .rk-frontmatter-node {margin-block:1rem;}
 .record-main .rk-frontmatter-heading {display:flex;gap:.5rem;align-items:center;font-size:.9rem;font-weight:600;margin-bottom:.6rem;}

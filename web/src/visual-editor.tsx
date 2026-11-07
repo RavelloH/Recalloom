@@ -25,7 +25,7 @@ import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
 import {buildVisualMarkdown} from './tiptap/visual-markdown';
 import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
-import {RichContainer,RichBadge,RichAbbr,RichTip} from './tiptap/rich-directives';
+import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
 import {RichFrontMatter} from './tiptap/rich-frontmatter';
 import {RichFootnoteRef,RichFootnoteDefinition} from './tiptap/rich-footnotes';
@@ -140,7 +140,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
-  RichContainer,RichBadge,RichAbbr,RichTip,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+  RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),

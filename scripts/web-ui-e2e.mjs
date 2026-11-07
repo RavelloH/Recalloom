@@ -25,10 +25,26 @@ try{
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'概览'}).waitFor({timeout:18000});
  // Routing is immediate; only the new page receives a short enter animation.
- const phases=new Set();
+ // Observe route phases *before* Playwright click(): the click action can
+ // resolve after the short enter animation has already finished.
+ await page.evaluate(()=>{
+  const phases=[document.querySelector('.page-transition')?.getAttribute('data-phase')];
+  const watch=new MutationObserver(records=>{
+   for(const item of records)if(item.type==='attributes'&&item.attributeName==='data-phase'){
+    phases.push(item.target.getAttribute('data-phase'));
+   }
+  });
+  watch.observe(document.body,{subtree:true,attributes:true,attributeFilter:['data-phase']});
+  window.__routePhaseProbe={phases,watch};
+ });
  await page.locator('.sidebar .nav-link',{hasText:'任务'}).click();
- for(let i=0;i<16;i++){phases.add(await page.locator('.page-transition').getAttribute('data-phase'));await page.waitForTimeout(40);}
- assert.ok(phases.has('enter')&&!phases.has('exit'),'route must not block on an exit animation: '+[...phases]);
+ const phases=new Set(await page.evaluate(()=>{
+  const probe=window.__routePhaseProbe;
+  probe?.watch.disconnect();
+  delete window.__routePhaseProbe;
+  return probe?.phases??[];
+ }));
+ assert.ok(phases.has('enter')&&!phases.has('exit'),'route must enter without exit animation: '+[...phases]);
  await page.getByRole('heading',{name:'任务',level:1}).waitFor();
  await page.locator('.sidebar .nav-link',{hasText:'概览'}).click();
  await page.getByRole('heading',{name:'概览'}).waitFor();

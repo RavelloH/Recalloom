@@ -4,7 +4,7 @@ import {Markdown,MarkdownManager} from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
 import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
-import {RichContainer,RichBadge,RichAbbr,RichTip} from '../web/src/tiptap/rich-directives';
+import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from '../web/src/tiptap/rich-directives';
 import {VisibleComment} from '../web/src/tiptap/comment-mark';
 import {RichLinkCard} from '../web/src/tiptap/rich-link-card';
 import {RichFrontMatter} from '../web/src/tiptap/rich-frontmatter';
@@ -20,7 +20,7 @@ import type {JSONContent} from '@tiptap/core';
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false}),
  CustomHeading,CustomParagraph,Markdown,RawMarkdown,RichContainer,WikiLinkNode,WikiEmbedNode,
- RichBadge,RichAbbr,RichTip,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+ RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
 ]});
 const walk=(n:JSONContent,cb:(item:JSONContent)=>void)=>{
  cb(n);for(const x of n.content??[])walk(x,cb);
@@ -74,6 +74,48 @@ describe('Rich Markdown structural directives',()=>{
   const doc=buildVisualMarkdown(source,manager);
   assert.equal(nodes(doc,'richCritic').length,0);
   assert.ok(manager.serialize(doc).includes('{--仍是代码--}'));
+ });
+ it('serializes a knowledge flashcard with structured question and answer blocks',()=>{
+  const source=['::::flashcard[架构复习]','',':::front[问题]','','Recalloom 为什么使用 **D1**？','',':::','',':::back[答案]','','因为需要版本化和可追踪的 **存储**。','','- 审计','- 回滚','',':::','','::::'].join('\n');
+  const doc=buildVisualMarkdown(source,manager);
+  const blocks=nodes(doc,'richContainer');
+  assert.equal(blocks.length,3,JSON.stringify(doc));
+  assert.deepEqual(blocks.map(n=>n.attrs?.kind),['flashcard','front','back']);
+  assert.ok(JSON.stringify(blocks[1]).includes('D1'));
+  assert.ok(JSON.stringify(blocks[2]).includes('回滚'));
+  assert.equal(nodes(blocks[2],'bulletList').length,1);
+  const output=manager.serialize(doc);
+  assert.match(output,/::::flashcard\[架构复习\]/);
+  assert.match(output,/:::front\[问题\]/);
+  assert.match(output,/:::back\[答案\]/);
+  assert.match(output,/\*\*存储\*\*/);
+  const reread=buildVisualMarkdown(output,manager);
+  assert.deepEqual(nodes(reread,'richContainer').map(n=>n.attrs?.kind),['flashcard','front','back']);
+ });
+ it('keeps explicit Cloze answer and hint in editable Markdown without colliding with Wiki embeds',()=>{
+  const sample='复习 :cloze[Durable Objects]{hint="Cloudflare 产品"}，键帽 :kbd[Enter]。\n\n{{embed:id:11111111-1111-4111-8111-111111111111}}';
+  const doc=buildVisualMarkdown(sample,manager);
+  const items=nodes(doc,'richCloze');
+  assert.equal(items.length,1,JSON.stringify(doc));
+  assert.equal(items[0]?.content?.[0]?.text,'Durable Objects');
+  assert.equal(items[0]?.attrs?.hint,'Cloudflare 产品');
+  assert.equal(nodes(doc,'richKbd').length,1);
+  const saved=manager.serialize(doc);
+  assert.ok(saved.includes(':cloze[Durable Objects]{hint="Cloudflare 产品"}'));
+  assert.ok(saved.includes(':kbd[Enter]'));
+  assert.equal(nodes(buildVisualMarkdown(saved,manager),'richCloze').length,1);
+ });
+ it('renders :kbd shortcut as an editable inline node and keeps code samples literal',()=>{
+  const code=String.fromCharCode(96);
+  const source='按 :kbd[Ctrl+Shift+P] 打开命令；'+code+':kbd[not-a-key]'+code+' 属于代码。';
+  const doc=buildVisualMarkdown(source,manager);
+  const items=nodes(doc,'richKbd');
+  assert.equal(items.length,1,JSON.stringify(doc));
+  assert.equal(items[0]?.content?.[0]?.text,'Ctrl+Shift+P');
+  const output=manager.serialize(doc);
+  assert.ok(output.includes(':kbd[Ctrl+Shift+P]'));
+  assert.ok(output.includes(code+':kbd[not-a-key]'+code));
+  assert.equal(nodes(buildVisualMarkdown(output,manager),'richKbd').length,1);
  });
  it('serializes nested tabs and preserves every editable panel and inline mark',()=>{
   const source=['::::tabs','',':::tab[预览]','','这是**第一项**。','',':::','',':::tab[源代码]','','这里是 `const x=1`。','',':::','','::::'].join('\n');

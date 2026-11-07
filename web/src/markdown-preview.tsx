@@ -6,6 +6,7 @@ import {richRemarkDirective,remarkRichTransforms} from './rich-remark';
 import {richTitle} from './tiptap/rich-schema';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
+import {Card} from '@astryxdesign/core/Card';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
 import {Tooltip} from '@astryxdesign/core/Tooltip';
@@ -25,6 +26,7 @@ import {remarkMarkedDisplayMath} from './tiptap/marked-display-math';
 import {prepareWikiMarkdown} from './wiki-remark';
 import {prepareCriticMarkdown,type CriticKind} from './critic-syntax';
 import {CriticDisplay} from './tiptap/rich-critic';
+import ClozeReveal from './cloze-reveal';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
 import {slugHeading,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
 
@@ -71,7 +73,7 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-comment'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
@@ -82,6 +84,7 @@ const schema={
   'rk-badge':['dataVariant'],
   'rk-abbr':['dataTitle'],
   'rk-tip':['dataContent'],
+  'rk-cloze':['dataHint'],
   code:[...(defaultSchema.attributes?.code??[]),'dataFile','dataWrap','dataExpand'],
   mark:[...(defaultSchema.attributes?.mark??[]),'dataRkColor']}
 };
@@ -113,6 +116,17 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
    const kind=String(props['data-kind']??props.dataKind??'info'),title=String(props['data-title']??props.dataTitle??'');
+   if(kind==='flashcard')return <Card variant="default" padding={3} className="rk-flashcard rk-flashcard-read">
+    <div className="rk-flashcard-heading">{richTitle(kind,title)}</div>
+    <div className="rk-flashcard-body">{props.children as React.ReactNode}</div>
+   </Card>;
+   if(kind==='front')return <section className="rk-flashcard-front">
+    <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
+    <div className="rk-flashcard-content">{props.children as React.ReactNode}</div>
+   </section>;
+   if(kind==='back')return <Collapsible trigger="显示答案" defaultIsOpen={false}>
+     <div className="rk-flashcard-content rk-flashcard-answer">{props.children as React.ReactNode}</div>
+    </Collapsible>;
    if(kind==='tabs')return <TabsPreview>{props.children as React.ReactNode}</TabsPreview>;
    if(kind==='tab')return <div className="rk-tab-pane">{props.children as React.ReactNode}</div>;
    if(kind==='chat')return <ChatMessageList density="compact" align="top">{props.children as React.ReactNode}</ChatMessageList>;
@@ -132,6 +146,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
   },
   'rk-abbr':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-title']??props.dataTitle??'')}><span className="rk-inline-abbr" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
   'rk-tip':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-content']??props.dataContent??'')}><span className="rk-inline-tip" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
+  'rk-kbd':({node:_node,...props}:Record<string,unknown>)=><kbd className="rk-keycap">{props.children as React.ReactNode}</kbd>,
+  'rk-cloze':({node:_node,...props}:Record<string,unknown>)=><ClozeReveal hint={String(props['data-hint']??props.dataHint??'')}>{props.children as React.ReactNode}</ClozeReveal>,
   'rk-comment':({node:_node,...props}:Record<string,unknown>)=><span className="rk-comment" data-rk-comment="">{props.children as React.ReactNode}</span>,
   'wiki-embed':({node:_node,...props}:Record<string,unknown>)=>
    <WikiEmbed target={wikiDecode(String(props['data-target']??''))}

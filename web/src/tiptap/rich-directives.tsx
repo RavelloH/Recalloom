@@ -48,6 +48,16 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <div className="rk-tab-title" contentEditable={false}>{editTitle}</div>
       <NodeViewContent className="rk-directive-body rk-tab-content"/>
      </Card>
+   :kind==='flashcard'
+   ?<Card variant="default" padding={3} className="rk-flashcard rk-flashcard-edit">
+      <div contentEditable={false} className="rk-flashcard-heading">{editTitle}</div>
+      <NodeViewContent className="rk-directive-body rk-flashcard-body"/>
+     </Card>
+   :kind==='front'||kind==='back'
+   ?<Card variant="muted" padding={3} className={'rk-flashcard-panel rk-flashcard-'+kind}>
+      <div contentEditable={false} className="rk-flashcard-panel-title">{editTitle}</div>
+      <NodeViewContent className="rk-directive-body rk-flashcard-content"/>
+     </Card>
    :kind==='chat'
    ?<ChatMessageList density="compact" align="top"><NodeViewContent className="rk-directive-body rk-chat-list"/></ChatMessageList>
    :kind==='message'
@@ -84,15 +94,22 @@ function readAttrs(value:string):Record<string,string>{
  const attrs:Record<string,string>={};
  for(const match of value.matchAll(/(?:^|\s)([\w-]+)=("[^"]*"|'[^']*'|[^\s]+)/g)){
   const key=match[1]??'',raw=match[2]??'';
-  if(key==='title'||key==='variant'||key==='content')attrs[key]=raw.replace(/^['"]|['"]$/g,'').slice(0,300);
+  if(key==='title'||key==='variant'||key==='content'||key==='hint')attrs[key]=raw.replace(/^['"]|['"]$/g,'').slice(0,300);
  }
  return attrs;
 }
 const variants=new Set(['neutral','info','success','warning','error','blue','cyan','green','orange','pink','purple','red','teal','yellow']);
 function InlineView({node}:NodeViewProps){
  const kind=node.type.name;
- const attrs=node.attrs as {variant?:string;title?:string;content?:string};
+ const attrs=node.attrs as {variant?:string;title?:string;content?:string;hint?:string};
  const inner=<NodeViewContent as={"span" as "div"} className="rk-inline-editable"/>;
+ if(kind==='richCloze')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-cloze" title={attrs.hint||'复习挖空；编辑时答案可见'}>
+  <span contentEditable={false} className="rk-cloze-label">挖空</span>
+  <NodeViewContent as={"span" as "div"} className="rk-inline-editable rk-cloze-editor-answer"/>
+ </NodeViewWrapper>;
+ if(kind==='richKbd')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-kbd">
+  <kbd className="rk-keycap"><NodeViewContent as={"span" as "div"} className="rk-inline-editable"/></kbd>
+ </NodeViewWrapper>;
  if(kind==='richBadge'){
   const variant=variants.has(attrs.variant??'')?attrs.variant as 'neutral'|'success'|'warning'|'error'|'info':'neutral';
   return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-badge"><Badge label={inner} variant={variant}/></NodeViewWrapper>;
@@ -102,11 +119,11 @@ function InlineView({node}:NodeViewProps){
    <span title={description||undefined} tabIndex={0}>{inner}</span>
  </NodeViewWrapper>;
 }
-function makeInline(kind:'badge'|'abbr'|'tip'){
+function makeInline(kind:'badge'|'abbr'|'tip'|'kbd'|'cloze'){
  const name='rich'+kind[0]!.toUpperCase()+kind.slice(1);
  return Node.create({
   name,inline:true,group:'inline',content:'text*',priority:1800,
-  addAttributes(){return {variant:{default:'neutral'},title:{default:''},content:{default:''}};},
+  addAttributes(){return {variant:{default:'neutral'},title:{default:''},content:{default:''},hint:{default:''}};},
   parseHTML(){return [{tag:'span[data-rk-inline="'+kind+'"]'}];},
   renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-rk-inline':kind}),0];},
   addNodeView(){return ReactNodeViewRenderer(InlineView);},
@@ -116,7 +133,7 @@ function makeInline(kind:'badge'|'abbr'|'tip'){
   renderMarkdown(node:JSONContent){
    const label=(node.content??[]).map(x=>x.text??'').join('').replace(/[\r\n\]]/g,' ');
    const attrs=node.attrs??{};
-   const key=kind==='badge'?'variant':kind==='abbr'?'title':'content';
+   const key=kind==='badge'?'variant':kind==='abbr'?'title':kind==='cloze'?'hint':'content';
    const val=String(attrs[key]??'');
    const clean=kind==='badge'&&val==='neutral'?'':val;
    return ':'+kind+'['+label+']'+(clean?'{'+key+'="'+clean.replace(/"/g,'&quot;')+'"}':'');
@@ -135,3 +152,5 @@ function makeInline(kind:'badge'|'abbr'|'tip'){
 export const RichBadge=makeInline('badge');
 export const RichAbbr=makeInline('abbr');
 export const RichTip=makeInline('tip');
+export const RichKbd=makeInline('kbd');
+export const RichCloze=makeInline('cloze');

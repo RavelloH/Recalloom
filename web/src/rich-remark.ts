@@ -4,7 +4,7 @@ import {richContainerKinds,richInlineKinds} from './tiptap/rich-schema';
 type RichAst={type:string;name?:string;value?:string;attributes?:Record<string,string|null>;
  children?:RichAst[];data?:{hName?:string;hProperties?:Record<string,string> ;directiveLabel?:boolean};
  position?:{start?:{offset?:number};end?:{offset?:number}}};
-const supported=(kind:string)=>kind==='badge'||kind==='abbr'||kind==='tip';
+const supported=(kind:string)=>kind==='badge'||kind==='abbr'||kind==='tip'||kind==='kbd'||kind==='cloze';
 const escapeText=(value:string)=>value;
 const commentRx=/%%([\s\S]*?)%%/g;
 export function remarkRichTransforms(source:string){
@@ -38,7 +38,8 @@ export function remarkRichTransforms(source:string){
       child.data={...(child.data??{}),hName:'rk-'+kind,hProperties:{
        dataVariant:child.attributes?.variant??'neutral',
        dataTitle:child.attributes?.title??'',
-       dataContent:child.attributes?.content??''
+       dataContent:child.attributes?.content??'',
+       dataHint:child.attributes?.hint??''
       }};
       walk(child); updated.push(child);
      }else updated.push(asLiteral(child,source));
