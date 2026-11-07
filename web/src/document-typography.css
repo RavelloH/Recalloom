@@ -419,8 +419,5 @@
 .record-main :is(.tiptap,.markdown-preview) .rk-link-fallback{
  display:inline-block;vertical-align:-.16em;margin-right:.25em;opacity:.7;
 }
-.record-main .tiptap a[data-rk-site-icon="loaded"]::before{
- content:"";display:inline-block;width:1em;height:1em;
- vertical-align:-.16em;margin-right:.24em;
- background:var(--rk-site-icon) center / contain no-repeat;
-}
+/* Editor link favicons use an isolated stylesheet in document.head.
+ * Never mutate anchors managed by ProseMirror. */

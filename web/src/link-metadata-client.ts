@@ -127,45 +127,79 @@ export function resolveRemoteIcon(raw:string):Promise<string|null>{
   return proxyImageUrl(icon,origin);
  });
 }
-/** Only decorates existing Tiptap anchors. No document mutation or image DOM nodes. */
+/** Decorate editor links without mutating ProseMirror-managed nodes.
+ *
+ * IMPORTANT: Writing inline styles or data-* attributes on editor anchors
+ * triggers ProseMirror's DOM observer. On long documents this caused an
+ * endless DOM reconciliation loop and unbounded renderer memory growth.
+ *
+ * Apply URL-specific CSS rules to a stylesheet outside the editor DOM instead.
+ * Link metadata is still fetched lazily on viewport intersection. Every
+ * generated image URL goes through the existing private Recalloom proxy.
+ */
 export function decorateEditorLinks(root:HTMLElement):()=>void{
  let alive=true,queued=false;
+ const style=document.createElement('style');
+ style.setAttribute('data-rk-editor-link-styles','');
+ document.head.appendChild(style);
+ const sheet=style.sheet;
+ const requested=new Set<string>();
+ const inserted=new Set<string>();
+ const observed=new WeakMap<HTMLAnchorElement,string>();
+
  const visibility=new IntersectionObserver(entries=>{
   for(const entry of entries){
    if(!entry.isIntersecting)continue;
    const anchor=entry.target as HTMLAnchorElement;
    visibility.unobserve(anchor);
-   const target=anchor.getAttribute('href')??'';
-   void resolveRemoteIcon(target).then(proxy=>{
-    if(!alive||!anchor.isConnected||anchor.getAttribute('href')!==target)return;
-    if(proxy){
-     const safe=encodeURI(proxy).replace(/["'()]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
-     anchor.style.setProperty('--rk-site-icon','url("'+safe+'")');
-     anchor.dataset.rkSiteIcon='loaded';
-    }else anchor.dataset.rkSiteIcon='missing';
+   const href=anchor.getAttribute('href')??'';
+   if(!normalizedLinkUrl(href)||requested.has(href))continue;
+   requested.add(href);
+   void resolveRemoteIcon(href).then(proxy=>{
+    if(!alive||!proxy||!sheet||inserted.has(href))return;
+    // CSS.escape handles special characters in full href values; the result
+    // is used only in an attribute selector, never interpolated into HTML.
+    const selector='.record-main .tiptap a[href="'+CSS.escape(href)+'"]::before';
+    const background='url("'+proxy.replace(/\\/g,'%5C').replace(/"/g,'%22')+'")';
+    try{
+     sheet.insertRule(selector+'{content:"";display:inline-block;width:1em;height:1em;vertical-align:-.16em;margin-right:.24em;background:'+background+' center / contain no-repeat}',sheet.cssRules.length);
+     inserted.add(href);
+    }catch{
+     // An unusual URL must not break editing or trigger a DOM update.
+    }
    });
   }
  },{rootMargin:'180px'});
+
  const scan=()=>{
   queued=false;
   if(!alive)return;
   for(const anchor of Array.from(root.querySelectorAll<HTMLAnchorElement>('a[href]'))){
    const href=anchor.getAttribute('href')??'';
-   if(anchor.dataset.rkSiteHref===href)continue;
+   if(!normalizedLinkUrl(href)||requested.has(href)||observed.get(anchor)===href)continue;
    visibility.unobserve(anchor);
-   anchor.style.removeProperty('--rk-site-icon');
-   delete anchor.dataset.rkSiteIcon;
-   anchor.dataset.rkSiteHref=href;
-   if(!normalizedLinkUrl(href))continue;
-   anchor.dataset.rkSiteIcon='pending';
+   observed.set(anchor,href);
    visibility.observe(anchor);
   }
  };
- const mutation=new MutationObserver(()=>{
-  if(queued)return;
-  queued=true;queueMicrotask(scan);
+
+ const mutation=new MutationObserver(records=>{
+  // Ignore unrelated DOM churn. The stylesheet is outside ProseMirror, and
+  // this observer must never write attributes to editor-owned elements.
+  let relevant=false;
+  for(const record of records){
+   if(record.type==='attributes'&&record.attributeName==='href'){relevant=true;break;}
+   if(record.type!=='childList')continue;
+   for(const node of Array.from(record.addedNodes)){
+    if(node instanceof HTMLAnchorElement||(node instanceof Element&&node.querySelector('a[href]'))){
+     relevant=true;break;
+    }
+   }
+   if(relevant)break;
+  }
+  if(relevant&&!queued){queued=true;queueMicrotask(scan);}
  });
  mutation.observe(root,{subtree:true,childList:true,attributes:true,attributeFilter:['href']});
  scan();
- return()=>{alive=false;mutation.disconnect();visibility.disconnect();};
+ return()=>{alive=false;mutation.disconnect();visibility.disconnect();style.remove();};
 }
