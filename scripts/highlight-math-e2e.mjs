@@ -144,22 +144,11 @@ try{
    await page.screenshot({path:'tmp/highlight-math-dark-mobile.png',fullPage:false});
   }
 
-  await page.getByRole('button',{name:'预览'}).click();
-  await page.locator('.markdown-preview mark code').first().waitFor({timeout:20000});
-  await measure('preview',theme);
-  await measureMathLayout('preview',theme);
-  assert.ok(await page.locator('.markdown-preview .katex-display .katex').count()>=1,
-   'Markdown preview renders a display LaTeX equation');
-  assert.ok(await page.locator('.markdown-preview .katex:not(.katex-display .katex)').count()>=2,
-   'Markdown preview renders two inline LaTeX equations');
-  if(theme==='dark'){
-   await page.locator('.markdown-preview mark .katex').last().scrollIntoViewIfNeeded();
-   await page.screenshot({path:'tmp/highlight-math-dark-preview-mobile.png',fullPage:false});
-  }
+  assert.equal(await page.getByRole('button',{name:'预览'}).count(),0,'only visual and source modes');
  }
  const after=await api('/records/'+id);
  assert.equal(after.status,200);
- assert.equal(after.body.content,sample,'visual/preview switching must never alter stored Markdown');
+ assert.equal(after.body.content,sample,'opening and theme changes must never alter stored Markdown');
  // Confirm a real visual editor save preserves the highlight on atomic math,
  // not just the initial Markdown import and static preview.
  await page.getByRole('button',{name:'可视化'}).click();
@@ -177,5 +166,5 @@ try{
  assert.ok(updated.body.content.includes('<mark>$\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}$</mark>'),'matrix highlight survives visual save');
  assert.ok(updated.body.content.includes('<mark>$\\frac{p}{q}$</mark>'),'inline formula stays highlighted inside a mixed text span');
  assert.deepEqual(errors,[]);
- console.log('PASS: border-only highlighted code, full-height formula highlights, centered/scrollable block math, and visual-save fidelity in both themes/modes');
+ console.log('PASS: border-only highlighted code, full-height formula highlights, centered/scrollable block math, and visual-save fidelity in both themes');
 }finally{await browser.close()}

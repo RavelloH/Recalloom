@@ -6,7 +6,8 @@ const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Pr
 const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(bin&&line);
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const base='http://127.0.0.1:8897';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
+assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Browser tests must use a local-only Worker');
 const browser=await chromium.launch({headless:true,executablePath:bin});
 const page=await browser.newPage({viewport:{width:1360,height:900}});
 try {
@@ -20,7 +21,7 @@ try {
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.waitForURL(/\/records\//);
  const recordId=page.url().split('/records/')[1].split('?')[0];
- await page.getByRole('button',{name:'Markdown',exact:true}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
  async function revision(){
   const r=await page.evaluate(async id=>await (await fetch('/api/records/'+id)).json(),recordId);
   return {revision:r.revision,content:r.content};

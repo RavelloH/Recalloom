@@ -1,26 +1,14 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {canonicalMarkdown,markdownRoundTripSafe,prepareVisualMarkdown} from '../web/src/tiptap/fidelity';
+import {prepareVisualMarkdown} from '../web/src/tiptap/visual-input';
 import {postProcessTableAlignment} from '../web/src/tiptap/table-alignment';
 import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
 import {TableWithMarkdown} from '../web/src/tiptap/table-with-markdown';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown} from '../web/src/tiptap/markdown-extensions';
 
-test('NeutralPress underline notation and semantic HTML can safely roundtrip',()=>{
- assert.ok(markdownRoundTripSafe('++underlined++','<u>underlined</u>'));
- assert.ok(markdownRoundTripSafe('Text ++a b++ plus','Text <u>a b</u> plus'));
- assert.equal(canonicalMarkdown('Text \x60++literal++\x60'),'Text \x60++literal++\x60');
- assert.equal(canonicalMarkdown('\x60\x60\x60md\n++code++\n\x60\x60\x60'),'\x60\x60\x60md\n++code++\n\x60\x60\x60');
- assert.equal(markdownRoundTripSafe('<div class="callout">KEEP</div>','KEEP'),false);
- assert.equal(markdownRoundTripSafe('---\ntitle: example\n---','# example'),false);
-});
-
-test('NeutralPress table alignment normalization preserves all column alignments',()=>{
+test('table alignment is imported without requiring identical Markdown formatting',()=>{
  const source='| Item | Value | Status |\n| :--- | ---: | :---: |\n| A | 42 | Ready |';
- const output='| Item | Value | Status |\n| -------- | -------: | :------: |\n| A | 42 | Ready |\n\n';
- assert.ok(markdownRoundTripSafe(source,output));
- assert.equal(markdownRoundTripSafe(source,output.replace('-------:','--------')),false);
  const doc={type:'doc',content:[{type:'table',content:[
   {type:'tableRow',content:[{type:'tableHeader'},{type:'tableHeader'},{type:'tableHeader'}]},
   {type:'tableRow',content:[{type:'tableCell'},{type:'tableCell'},{type:'tableCell'}]}
@@ -30,7 +18,7 @@ test('NeutralPress table alignment normalization preserves all column alignments
  assert.deepEqual(result.content?.[0]?.content?.[1]?.content?.map(x=>x.attrs?.textAlign),['left','right','center']);
 });
 
-test('Upstream NeutralPress extensions implement Markdown serializers',()=>{
+test('supported formatting keeps Markdown serializers',()=>{
  const render=(ext:any,node:any,children:string)=>{
   const fn=ext.config.renderMarkdown;
   assert.equal(typeof fn,'function');
@@ -50,47 +38,22 @@ test('Upstream NeutralPress extensions implement Markdown serializers',()=>{
  assert.match(md,/\| -------: \| :------: \|/);
 });
 
-test('semantic Markdown admits harmless whitespace and link normalization but rejects information loss',()=>{
- assert.ok(markdownRoundTripSafe('# Heading\n\nPara A.\n\n\nPara B.','# Heading\n\nPara A.\n\nPara B.'));
- assert.ok(markdownRoundTripSafe('Visit <https://example.com>.','Visit [https://example.com](https://example.com).'));
- assert.equal(markdownRoundTripSafe('**important**','important'),false);
- assert.equal(markdownRoundTripSafe('`code`','code'),false);
- assert.equal(markdownRoundTripSafe('\x60\x60\x60ts title=demo.ts\nconst v=1;\n\x60\x60\x60','\x60\x60\x60ts\nconst v=1;\n\x60\x60\x60'),false);
- assert.equal(markdownRoundTripSafe('A reference[^note].\n\n[^note]: Details.','A reference.'),false);
- assert.equal(markdownRoundTripSafe('<div class="alert">Sensitive</div>','Sensitive'),false);
- assert.equal(markdownRoundTripSafe('---\ntitle: Metadata\n---\n\n# Page','---\ntitle: Metadata\n---\n\n# Page'),false);
- assert.equal(markdownRoundTripSafe('+++\ntitle = "Metadata"\n+++\n\n# Page','+++\ntitle = "Metadata"\n+++\n\n# Page'),false);
-});
-
-test('literal identifier placeholders are safely escaped without losing their text',()=>{
- assert.ok(markdownRoundTripSafe('Actor web:owner:<sessionId>','Actor web:owner:\\<sessionId\\>'));
- assert.ok(markdownRoundTripSafe('MCP grant:<actorId>','MCP grant:\\<actorId\\>'));
- assert.equal(markdownRoundTripSafe('React <mark> text','React \\<mark\\> text'),true);
- assert.equal(markdownRoundTripSafe('<sessionId>text</sessionId>','\\<sessionId\\>text\\</sessionId\\>'),false);
-});
-
-test('literal orphan mark in prose renders as text without blocking visual editing',()=>{
+test('unclosed inline mark is only shielded in the temporary visual parser input',()=>{
  const literal='React <mark> 安全渲染';
  assert.equal(prepareVisualMarkdown(literal),'React \\<mark> 安全渲染');
- assert.ok(markdownRoundTripSafe(literal,'React \\<mark> 安全渲染'));
- assert.ok(markdownRoundTripSafe(literal,'React &lt;mark&gt; 安全渲染'));
  assert.equal(prepareVisualMarkdown('React <mark>黄色</mark> 安全渲染'),'React <mark>黄色</mark> 安全渲染');
- assert.ok(markdownRoundTripSafe('<mark>黄色</mark>','<mark>黄色</mark>'));
- assert.equal(markdownRoundTripSafe('React <mark>黄色</mark>','React \\<mark\\>黄色\\</mark\\>'),false);
- assert.equal(prepareVisualMarkdown('React `\u003cmark>`'),'React `\u003cmark>`');
+ assert.equal(prepareVisualMarkdown('React \x60<mark>\x60'),'React \x60<mark>\x60');
  assert.equal(prepareVisualMarkdown('React \\<mark> 安全渲染'),'React \\<mark> 安全渲染');
  assert.equal(prepareVisualMarkdown('React <mark class="test"> 安全渲染'),'React <mark class="test"> 安全渲染');
- assert.equal(prepareVisualMarkdown('<mark>独立未闭合'),'\u003cmark>独立未闭合');
+ assert.equal(prepareVisualMarkdown('<mark>独立未闭合'),'<mark>独立未闭合');
  assert.equal(prepareVisualMarkdown('React <mark> A\n\nOther </mark> B'),'React <mark> A\n\nOther </mark> B');
- assert.equal(prepareVisualMarkdown('```html\n<mark>\n```'),'```html\n<mark>\n```');
- assert.equal(markdownRoundTripSafe('React <mark class="x">text','React text'),false);
+ assert.equal(prepareVisualMarkdown('\x60\x60\x60html\n<mark>\n\x60\x60\x60'),'\x60\x60\x60html\n<mark>\n\x60\x60\x60');
 });
 
-test('versioned package references stay plain text while code and genuine email remain untouched',()=>{
+test('package versions avoid temporary autolinking while code and email are untouched',()=>{
  assert.equal(prepareVisualMarkdown('Install agent-desktop@1.0.2 now'),'Install agent-desktop\\@1.0.2 now');
- assert.equal(prepareVisualMarkdown('Use `agent-desktop@1.0.2`'),'Use `agent-desktop@1.0.2`');
+ assert.equal(prepareVisualMarkdown('Use \x60agent-desktop@1.0.2\x60'),'Use \x60agent-desktop@1.0.2\x60');
  assert.equal(prepareVisualMarkdown('[release](https://example.com/agent-desktop@1.0.2)'),'[release](https://example.com/agent-desktop@1.0.2)');
  assert.equal(prepareVisualMarkdown('Contact admin@example.com'),'Contact admin@example.com');
- assert.equal(prepareVisualMarkdown('```shell\nnpm i agent-desktop@1.0.2\n```'),'```shell\nnpm i agent-desktop@1.0.2\n```');
- assert.ok(markdownRoundTripSafe('agent-desktop@1.0.2','agent-desktop\\@1.0.2'));
+ assert.equal(prepareVisualMarkdown('\x60\x60\x60shell\nnpm i agent-desktop@1.0.2\n\x60\x60\x60'),'\x60\x60\x60shell\nnpm i agent-desktop@1.0.2\n\x60\x60\x60');
 });

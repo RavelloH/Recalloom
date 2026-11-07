@@ -101,23 +101,15 @@ try {
  assert.ok(visual.lineHeight>=visual.fontSize*1.7,'comfortable line spacing');
  assert.ok(visual.wideScroll,'long code scrolls inside its block');
 
- await page.getByRole('button',{name:'预览',exact:true}).click();
- await page.locator('.markdown-preview').waitFor();
- const preview=await metrics('.markdown-preview');
- assert.ok(Math.abs(preview.paragraph.width-visual.paragraph.width)<=1,'visual and preview have identical prose measure');
- assert.ok(Math.abs(preview.fontSize-visual.fontSize)<=0.1,'visual and preview have identical type scale');
- assert.ok(Math.abs(preview.lineHeight-visual.lineHeight)<=0.1,'visual and preview have identical leading');
- for(const block of ['pre','table'])assert.ok(Math.abs(preview[block].x-visual[block].x)<=1&&Math.abs(preview[block].width-visual[block].width)<=1,'preview '+block+' matches the visual editor');
- assert.ok(preview.wideScroll&&preview.tableScroll,'preview wide blocks scroll the same way');
  mkdirSync('tmp',{recursive:true});
  await page.screenshot({path:'tmp/typography-desktop.png',fullPage:false});
- console.log('DESKTOP',JSON.stringify({visual,preview}));
+ console.log('DESKTOP',JSON.stringify({visual}));
 
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:844});
   // Let responsive SideNav finish its CSS slide-out before screenshot and measurements.
   await page.waitForTimeout(350);
-  const mobile=await metrics('.markdown-preview');
+  const mobile=await metrics('.tiptap');
   assert.ok(mobile.scrollWidth<=mobile.viewport,'mobile page must not overflow '+width+': '+JSON.stringify(mobile));
   assert.ok(mobile.paragraph.width<=mobile.document.width,'mobile paragraph must fit');
   assert.ok(mobile.fontSize>=15.5,'mobile text remains legible');
@@ -156,5 +148,5 @@ try {
  assert.ok(plain.includes('[^footnote]'),'unsupported syntax remains readable');
  assert.ok(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),'rendering alone does not change source');
  assert.equal(errors.length,0,'no unhandled browser errors');
- console.log('PASS Markdown typography: one column, in-block scrolling, preview/editor parity, mobile 320/390/430, plain editable text without raw source blocks');
+ console.log('PASS Markdown typography: one column, in-block scrolling, mobile 320/390/430, plain editable text without raw source blocks');
 }finally {await browser.close();}

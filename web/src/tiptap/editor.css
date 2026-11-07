@@ -86,3 +86,14 @@
 /* A floating table toolbar cannot shift the ProseMirror selection during a click. */
 .wysiwyg{position:relative;}
 .editor-table-actions:not([hidden]){position:absolute;z-index:12;left:12px;right:12px;border:1px solid var(--color-border,rgba(128,128,128,.25));border-radius:9px;box-shadow:0 8px 25px rgba(0,0,0,.13);}
+
+/* Unknown Markdown is normal editable prose, not a code island. Preserve source line breaks. */
+.record-main .tiptap p[data-raw-markdown] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}

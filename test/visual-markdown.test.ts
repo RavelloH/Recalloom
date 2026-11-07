@@ -7,12 +7,12 @@ import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
 import {HighlightWithMarkdown,UnderlineWithMarkdown} from '../web/src/tiptap/markdown-extensions';
 import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
-import {markdownRoundTripSafe} from '../web/src/tiptap/fidelity';
+import {RawMarkdown} from '../web/src/tiptap/raw-markdown';
 import type {JSONContent} from '@tiptap/core';
 
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false}),
- CustomHeading,CustomParagraph,CodeBlock,Markdown,
+ CustomHeading,CustomParagraph,CodeBlock,Markdown,RawMarkdown,
  HighlightWithMarkdown,UnderlineWithMarkdown,
 ]});
 const walk=(node:JSONContent,fn:(node:JSONContent)=>void)=>{
@@ -29,43 +29,68 @@ describe('visual-first Markdown import',()=>{
    '- 原始公式：<mark>`R_T = ΔP_s·U_N²/S_N² × 1000` Ω</mark>'
   ].join('\n');
   const doc=buildVisualMarkdown(source,manager);
-  let highlights=0,codeWithinHighlight=0,rawNodes=0;
+  let highlights=0,codeWithinHighlight=0;
   walk(doc,node=>{
-   if(node.type==='rawMarkdown')rawNodes++;
    if(node.marks?.some(mark=>mark.type==='highlight'))highlights++;
    if(node.marks?.some(mark=>mark.type==='highlight')&&node.marks?.some(mark=>mark.type==='code'))codeWithinHighlight++;
   });
-  assert.equal(rawNodes,0);
   assert.ok(highlights>=4);
   assert.ok(codeWithinHighlight>=3,'highlight must preserve nested inline code');
   const exported=manager.serialize(doc);
-  assert.ok(markdownRoundTripSafe(source,exported),'valid highlight Markdown is semantically preserved');
+  assert.ok(exported.includes('<mark>50 Hz</mark>'),'supported highlight stays rich after serialization');
   assert.ok(exported.includes('<mark>')&&exported.includes('`1.05 U_N`'));
  });
- it('converts unknown HTML and incomplete highlight into editable normal text',()=>{
+ it('keeps unknown HTML and incomplete highlights as editable plain text',()=>{
   const source='<div class="note">Unsupported HTML</div>\n\nA detail[^footnote].\n\n[^footnote]: footnote text.\n\n<mark> incomplete.';
   const doc=buildVisualMarkdown(source,manager);
-  let contents='',blocks=0;
-  walk(doc,node=>{if(node.type==='rawMarkdown')throw Error('must not have raw nodes');if(node.type==='paragraph')blocks++;if(node.type==='text')contents+=node.text??'';});
-  assert.ok(blocks>=2);
+  let contents='',rawBlocks=0;
+  walk(doc,node=>{if(node.type==='rawMarkdown')rawBlocks++;if(node.type==='text')contents+=node.text??'';});
+  assert.ok(rawBlocks>=2,'unsupported syntax is locally preserved');
   assert.ok(contents.includes('<div class="note">Unsupported HTML</div>'));
   assert.ok(contents.includes('[^footnote]'));
   assert.ok(contents.includes('<mark> incomplete'));
  });
- it('displays unsupported YAML front matter as plain text and still renders the heading afterward',()=>{
+ it('displays YAML front matter as plain text and still renders the heading afterward',()=>{
   const doc=buildVisualMarkdown('---\ntitle: Note\ncategory: 学习\n---\n\n# Rich Heading\n\nMore **content**.',manager);
-  assert.equal(doc.content?.[0]?.type,'paragraph','YAML must not be misinterpreted as markdown layout');
+  assert.equal(doc.content?.[0]?.type,'rawMarkdown','YAML is a plain editable block');
   assert.equal(doc.content?.[1]?.type,'heading');
   const first=doc.content?.[0]?.content??[];
-  assert.ok(first.some(node=>node.type==='text'&&node.text==='title: Note'));
-  assert.ok(first.some(node=>node.type==='hardBreak'));
+  assert.ok(first.some(node=>node.type==='text'&&node.text?.includes('title: Note')));
   assert.ok(doc.content?.some(node=>node.type==='paragraph'&&node.content?.some(n=>n.marks?.some(m=>m.type==='bold'))));
  });
  it('keeps text editable when the Markdown parser throws',()=>{
   const source='unsupported syntax\n<future-component>alpha</future-component>';
   const doc=buildVisualMarkdown(source,{parse:()=>{throw Error('parser failure')}});
-  assert.equal(doc.content?.[0]?.type,'paragraph');
-  assert.ok(doc.content?.[0]?.content?.some(n=>n.type==='hardBreak'));
-  assert.ok(doc.content?.[0]?.content?.every(n=>n.type==='text'||n.type==='hardBreak'));
+  assert.equal(doc.content?.[0]?.type,'rawMarkdown');
+  assert.ok(doc.content?.[0]?.content?.some(n=>n.type==='text'&&n.text?.includes('unsupported syntax')));
+ });
+ it('serializes unsupported HTML verbatim when a different heading is edited',()=>{
+  const input='# Before\n\n<custom-component data-value="1">\nSome **literal** content\n</custom-component>\n\n## After';
+  const doc=buildVisualMarkdown(input,manager);
+  assert.equal(doc.content?.[1]?.type,'rawMarkdown');
+  assert.equal(doc.content?.[1]?.content?.[0]?.text,'<custom-component data-value="1">\nSome **literal** content\n</custom-component>');
+  assert.equal(doc.content?.[2]?.type,'heading');
+  doc.content![0]!.content=[{type:'text',text:'Edited'}];
+  const output=manager.serialize(doc);
+  assert.ok(output.includes('<custom-component data-value="1">\nSome **literal** content\n</custom-component>'),output);
+  assert.ok(!output.includes('\\<custom-component'),output);
+  assert.ok(output.includes('# Edited'),output);
+ });
+ it('retains YAML front matter after editing ordinary Markdown',()=>{
+  const input='---\ntitle: QA\ncategories: [a, b]\n---\n\n# Original';
+  const doc=buildVisualMarkdown(input,manager);
+  doc.content![1]!.content=[{type:'text',text:'Changed'}];
+  const output=manager.serialize(doc);
+  assert.ok(output.startsWith('---\ntitle: QA\ncategories: [a, b]\n---'),output);
+  assert.ok(output.includes('# Changed'),output);
+ });
+ it('keeps unsupported inline syntax plain but nearby rich paragraphs rich',()=>{
+  const input='## Header\n\nBefore <custom-token name="X"/> after.\n\nThis is **rich**.';
+  const doc=buildVisualMarkdown(input,manager);
+  assert.equal(doc.content?.[1]?.type,'rawMarkdown');
+  assert.equal(doc.content?.[2]?.type,'paragraph');
+  assert.ok(doc.content?.[2]?.content?.some(n=>n.marks?.some(m=>m.type==='bold')));
+  const output=manager.serialize(doc);
+  assert.ok(output.includes('Before <custom-token name="X"/> after.'),output);
  });
 });

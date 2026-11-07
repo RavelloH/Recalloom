@@ -23,7 +23,8 @@ import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,Supers
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
-import {buildVisualMarkdown,literalParagraph} from './tiptap/visual-markdown';
+import {buildVisualMarkdown} from './tiptap/visual-markdown';
+import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
@@ -124,6 +125,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
+   RawMarkdown,
   WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),
   Image.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
@@ -212,7 +214,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   }catch{
    // Even when an extension fails, the user must never be trapped in a
    // source-only island. The fallback stays normal editable paragraph text.
-   editor.commands.setContent({type:'doc',content:[literalParagraph(value)]},{emitUpdate:false});
+   editor.commands.setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false});
   }
   finally{applying.current=false;setReady(true);}
  },[editor,value]);

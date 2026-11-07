@@ -6,11 +6,12 @@ const auth=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH
 assert(browserBin&&auth);
 const secret=auth.slice(auth.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const browser=await chromium.launch({headless:true,executablePath:browserBin});
-const origin='http://127.0.0.1:8897';
+const origin=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
+assert.match(origin,/^http:\/\/127\.0\.0\.1:\d+$/,'Browser tests must use a local-only Worker');
 const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
 const page=await ctx.newPage();
 const text=()=>page.locator('.cm-line').allTextContents().then(lines=>lines.join('\n'));
-const source=async()=>{if(!(await page.getByRole('button',{name:'Markdown',exact:true}).getAttribute('aria-pressed'))){/* mode may not use aria-pressed */}await page.getByRole('button',{name:'Markdown',exact:true}).click();await page.locator('.cm-content').waitFor();};
+const source=async()=>{if(!(await page.getByRole('button',{name:'源码',exact:true}).getAttribute('aria-pressed'))){/* mode may not use aria-pressed */}await page.getByRole('button',{name:'源码',exact:true}).click();await page.locator('.cm-content').waitFor();};
 // The tab bar steps aside while the keyboard is up; dismissing it (blur) brings the tab bar back.
 const searchTab=async()=>{await page.evaluate(()=>document.activeElement?.blur?.());await page.locator('.bottom-nav').getByText('搜索').click();};
 const editor=async()=>{await page.locator('.editor-topline').waitFor();};

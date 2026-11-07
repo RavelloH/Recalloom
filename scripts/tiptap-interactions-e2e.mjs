@@ -8,7 +8,7 @@ const secret=keyLine.slice(keyLine.indexOf('=')+1).trim().replace(/^["']|["']$/g
 const origin=testOrigin,browser=await launchTestBrowser();
 const page=await browser.newPage({viewport:{width:1230,height:850}});
 const source=async()=>{
- await page.getByRole('button',{name:'Markdown',exact:true}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
  await page.locator('.cm-line').first().waitFor();
  return(await page.locator('.cm-line').allTextContents()).join('\n');
 };
@@ -27,7 +27,7 @@ const slash=async command=>{
 };
 const bubble=name=>page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name});
 const load=async markdown=>{
- await page.getByRole('button',{name:'Markdown',exact:true}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
  await page.locator('.cm-content').fill(markdown);
  await page.getByRole('button',{name:'保存',exact:true}).click();
  await back();

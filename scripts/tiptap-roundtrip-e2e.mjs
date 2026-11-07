@@ -40,7 +40,7 @@ try{
  await page.getByRole('button',{name:'创建',exact:true}).click();
  let revisions=1;
  for(const [name,content,visualExpected,marks] of samples){
-  await page.getByRole('button',{name:'Markdown'}).click();
+  await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});
   await page.locator('.cm-content').fill(content);
   await page.getByRole('button',{name:'保存'}).click();
@@ -65,14 +65,14 @@ try{
    if(name==='unsupported-html')assert.ok((await page.locator('.tiptap').innerText()).includes('<div class="notice">Careful HTML</div>'),'unknown HTML appears literally');
    if(name==='yaml-frontmatter')assert.ok((await page.locator('.tiptap').innerText()).includes('title: Example'),'front matter remains editable text');
   }
-  await page.getByRole('button',{name:'Markdown'}).click();
+  await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});
   const raw=await page.locator('.cm-line').allTextContents();
   assert.equal(raw.join('\n'),content,name+' source remains byte-for-byte identical on mode switches');
  }
  // Real edits must preserve extended marks through Markdown export.
  const ext=String(samples.find(row=>row[0]==='extended-marks')[1]);
- await page.getByRole('button',{name:'Markdown'}).click();
+ await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});
  await page.locator('.cm-content').fill(ext);
  await page.getByRole('button',{name:'保存'}).click();
@@ -83,7 +83,7 @@ try{
  await page.locator('.tiptap').pressSequentially(' Continued.',{delay:8});
  const visualTyped=await page.locator('.tiptap').innerText();
  const saveDisabled=await page.getByRole('button',{name:'保存'}).isDisabled();
- await page.getByRole('button',{name:'Markdown'}).click();
+ await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});
  const editedMarks=(await page.locator('.cm-line').allTextContents()).join('\n');
  for(const tag of ['u','mark','sup','sub'])assert.ok(editedMarks.includes('<'+tag+'>'),tag+' must survive visual edit');
@@ -98,7 +98,7 @@ try{
  await page.keyboard.type(' updated',{delay:8});
  const tableDOM=await page.locator('.tiptap').innerText();
  const tableFocus=await page.evaluate(()=>({tag:document.activeElement?.tagName,cls:document.activeElement?.className,html:document.activeElement?.outerHTML.slice(0,200)}));
- await page.getByRole('button',{name:'Markdown'}).click();
+ await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});
  const editedTable=(await page.locator('.cm-line').allTextContents()).join('\n');
  assert.ok(editedTable.includes('updated'),'visual table cell edit exported: '+JSON.stringify({editedTable,tableDOM,tableFocus}));
@@ -115,10 +115,10 @@ try{
  await page.locator('.tiptap').focus();
  await page.keyboard.type(' 已更新',{delay:8});
  const orphanVisual=await page.locator('.tiptap').innerText();
- await page.getByRole('button',{name:'Markdown'}).click();
+ await page.getByRole('button',{name:'源码'}).click();
  await page.locator('.cm-line').first().waitFor({timeout:15000});
  const orphanEdited=(await page.locator('.cm-line').allTextContents()).join('\n');
- assert.ok((orphanEdited.includes('&lt;mark&gt;')||orphanEdited.includes('\\<mark>'))&&orphanEdited.includes('已更新'),'literal mark safely escaped after visual edit: '+JSON.stringify({orphanVisual,orphanEdited}));
+ assert.ok(orphanEdited.includes('<mark>')&&orphanEdited.includes('已更新'),'literal mark stays unescaped after visual edit: '+JSON.stringify({orphanVisual,orphanEdited}));
  await page.getByRole('button',{name:'保存'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap').waitFor();

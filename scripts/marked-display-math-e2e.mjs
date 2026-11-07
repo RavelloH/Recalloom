@@ -64,10 +64,7 @@ try{
   await page.locator('.rk-highlighted-block-math').first().waitFor({timeout:18000});
   await verify('visual');
   if(theme==='dark')await page.screenshot({path:'tmp/marked-display-visual.png'});
-  await page.getByRole('button',{name:'预览'}).click();
-  await page.locator('[data-highlighted-math]').first().waitFor({timeout:18000});
-  await verify('preview');
-  if(theme==='dark')await page.screenshot({path:'tmp/marked-display-preview.png'});
+  assert.equal(await page.getByRole('button',{name:'预览'}).count(),0);
  }
  assert.equal((await api('/records/'+id)).data.content,sample);
  await page.getByRole('button',{name:'可视化'}).click();
@@ -80,5 +77,5 @@ try{
  assert.equal((updated.match(/<mark>\n\$\$/g)??[]).length,2,'marked blocks remain marked after a real edit');
  assert.ok(updated.includes('Z_B=\\frac{U_B^2}{S_B}'));
  assert.deepEqual(errors,[]);
- console.log('PASS marked block math parsing, single-area inline highlight, preview/edit parity and save');
+ console.log('PASS marked block math parsing, single-area inline highlight, visual editing and save');
 }finally{await browser.close()}

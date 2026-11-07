@@ -64,15 +64,15 @@ try{
  assert.ok(graph.edges.some(x=>x.type==='reference'));
  assert.ok(graph.edges.some(x=>x.type==='embed'));
 
- await page.goto(base+'/records/'+source.id+'?mode=preview',{waitUntil:'networkidle'});
- await wait(page.getByRole('button',{name:'预览'}));
- await wait(page.locator('.markdown-preview .wiki-link').first());
+ await page.goto(base+'/records/'+source.id+'?mode=visual',{waitUntil:'networkidle'});
+ await wait(page.locator('.tiptap'));
+ await wait(page.locator('.tiptap .wiki-link').first());
  await wait(page.locator('.wiki-embed'));
  await wait(page.getByText('This is only section content.',{exact:false}).first());
  assert.equal(await page.locator('.wiki-link').count(),3,'three actual wiki links');
  const sectionHref=await page.locator('.wiki-link').filter({hasText:'See section'}).getAttribute('href');
  assert.equal(sectionHref,'/records/'+target.id+'#user-content-section','anchor resolves to stable DOM id');
- assert.ok(!await page.locator('.markdown-preview').getByText('This is reused knowledge.',{exact:false}).count(),'only the section is embedded');
+ assert.ok(!await page.locator('.tiptap').getByText('This is reused knowledge.',{exact:false}).count(),'only the section is embedded');
  await page.screenshot({path:'tmp/wiki-preview.png'});
  const geometry=await page.locator('.wiki-embed').first().evaluate(el=>{
   const inner=el.querySelector('.wiki-embed-body'),article=inner?.querySelector('.markdown-preview');
@@ -141,7 +141,7 @@ try{
  const editedRefs=ok(await api('/records/'+source.id+'/wiki-references'),200,'visual serialization projection');
  assert.equal(editedRefs.items.length,4);
 
- await page.goto(base+'/records/'+target.id+'?mode=preview',{waitUntil:'networkidle'});
+ await page.goto(base+'/records/'+target.id+'?mode=visual',{waitUntil:'networkidle'});
  await page.locator('h2#user-content-section').waitFor();
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap h2#user-content-section').waitFor();
@@ -186,7 +186,7 @@ try{
  const cycleA=ok(await api('/records','POST',{name:'Cycle-A.md',folderId:parent.id,kind:'document',content:'# A'}),201,'create cycle A');
  const cycleB=ok(await api('/records','POST',{name:'Cycle-B.md',folderId:parent.id,kind:'document',content:'{{embed:id:'+cycleA.id+'}}'}),201,'create cycle B');
  ok(await api('/records/'+cycleA.id+'/content','PATCH',{expectedRevision:1,content:'{{embed:id:'+cycleB.id+'}}'}),200,'create A-B-A cycle');
- await page.goto(base+'/records/'+cycleA.id+'?mode=preview',{waitUntil:'networkidle'});
+ await page.goto(base+'/records/'+cycleA.id+'?mode=visual',{waitUntil:'networkidle'});
  await wait(page.getByText('检测到循环嵌入，已停止递归。'));
  assert.ok(await page.locator('.wiki-embed').count()<=3,'cycle does not mount infinite embed subtree');
  // A->B->C->D->E hits the explicit nesting budget.
@@ -195,7 +195,7 @@ try{
   name:'Depth-'+i+'.md',folderId:parent.id,kind:'document',content:'# Depth '+i}),201,'create deep embed'));
  for(let i=3;i>=0;i--)ok(await api('/records/'+chain[i].id+'/content','PATCH',{
   expectedRevision:1,content:'{{embed:id:'+chain[i+1].id+'}}'}),200,'link deep embed');
- await page.goto(base+'/records/'+chain[0].id+'?mode=preview',{waitUntil:'networkidle'});
+ await page.goto(base+'/records/'+chain[0].id+'?mode=visual',{waitUntil:'networkidle'});
  await wait(page.getByText('嵌入层级已达上限，请打开源文档查看。'));
  assert.ok(await page.locator('.wiki-embed').count()<=4,'nested transclusions are bounded');
  const indexed=ok(await api('/wiki/reindex','POST',{limit:8}),200,'bounded legacy backfill');
@@ -205,7 +205,7 @@ try{
  await wait(page.getByText('Wiki 引用索引',{exact:true}));
  await wait(page.getByRole('button',{name:'扫描旧文档'}));
  await page.setViewportSize({width:390,height:844});
- await page.goto(base+'/records/'+source.id+'?mode=preview',{waitUntil:'networkidle'});
+ await page.goto(base+'/records/'+source.id+'?mode=visual',{waitUntil:'networkidle'});
  await wait(page.locator('.wiki-embed'));
  const sizes=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
  assert.ok(sizes.scroll<=sizes.viewport+1,JSON.stringify(sizes));

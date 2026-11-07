@@ -73,7 +73,8 @@ try{
  assert.ok(initial.headings>=4,'original Markdown headings are rich-text headings');
  assert.equal(initial.highlights,15,'15 real highlights are rich text (the intro contains one literal code example)');
  assert.ok(initial.markedCode>=8,'inline code is still nested inside highlights');
- assert.equal(initial.sourceBlocks,0,'no raw Markdown protection blocks');
+ assert.equal(initial.sourceBlocks,0,'supported text needs no literal fallback');
+ assert.equal(await page.getByRole('button',{name:'预览'}).count(),0,'only visual and source modes remain');
  assert.equal(await page.getByText(/已保护.*Markdown 原文/).count(),0);
  assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled(),'opening rich editor does not dirty original');
  assert.equal(good(await get('/records/'+created.id),200,'read first').content,doc,'opening a document cannot modify stored Markdown');
@@ -92,7 +93,7 @@ try{
  assert.ok(saved.content.includes('<mark>50 Hz</mark>'));
  assert.ok(saved.content.includes('<mark>'+tick+'1.05 U_N'+tick+'</mark>'),'highlighted code is retained');
  assert.ok(saved.content.includes('Visual edit verified.'));
- await page.getByRole('button',{name:'Markdown',exact:true}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
  await page.waitForTimeout(550);
  await page.locator('.cm-content').waitFor();
  await page.getByRole('button',{name:'可视化'}).click();
@@ -101,7 +102,7 @@ try{
  await page.screenshot({path:'tmp/vps-visual-power-after.png'});
 
  // Unsupported HTML is ordinary editable text, not a source block.
- const fallbackText='<div class="unsupported">No special support</div>\n\n<mark> left open.\n\n[^note]: a literal footnote.';
+ const fallbackText='# Before\n\n<div class="unsupported">No special support</div>\n\n<mark> left open.\n\n[^note]: a literal footnote.\n\n## After\n\nSome **ordinary** text.';
  const fallback=good(await get('/records','POST',{name:'Plain-fallback-'+Date.now()+'.md',kind:'document',content:fallbackText}),201,'unknown fixture');
  await page.goto(base+'/records/'+fallback.id,{waitUntil:'networkidle'});
  await page.locator('.tiptap').waitFor();
@@ -109,9 +110,43 @@ try{
  const plain=await page.locator('.tiptap').textContent();
  assert.ok(plain.includes('<div class="unsupported">No special support</div>'));
  assert.ok(plain.includes('[^note]'));
- assert.equal(await page.locator('.raw-markdown-node').count(),0);
+ assert.ok(await page.locator('.tiptap [data-raw-markdown]').count()>=2,'unknown syntax is editable prose');
+ assert.equal(await page.locator('.tiptap [data-raw-markdown]').first().evaluate(el=>getComputedStyle(el).whiteSpace),'pre-wrap');
  assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled());
-
+ await page.locator('.tiptap h2').last().click();
+ await page.keyboard.press('End');
+ await page.keyboard.type(' changed');
+ await page.getByRole('button',{name:'保存'}).click();
+ await page.waitForFunction(async id=>{
+  const response=await fetch('/api/records/'+id);
+  return response.ok&&(await response.json()).content.includes('## After changed');
+ },fallback.id,{timeout:20000});
+ const fallbackSaved=good(await get('/records/'+fallback.id),200,'raw fallback preserved');
+ assert.ok(fallbackSaved.content.includes('<div class="unsupported">No special support</div>'),fallbackSaved.content);
+ assert.ok(fallbackSaved.content.includes('<mark> left open.'),fallbackSaved.content);
+ assert.ok(fallbackSaved.content.includes('[^note]: a literal footnote.'),fallbackSaved.content);
+ assert.ok(!fallbackSaved.content.includes('\\<div'),fallbackSaved.content);
+ await page.getByRole('button',{name:'源码',exact:true}).click();
+ await page.locator('.cm-content').waitFor();
+ await page.getByRole('button',{name:'可视化'}).click();
+ await page.locator('.tiptap h2').last().waitFor();
+ await page.goto(base+'/records/'+fallback.id+'?mode=preview',{waitUntil:'networkidle'});
+ await page.locator('.tiptap').waitFor();
+ assert.equal(await page.locator('[data-mode="visual"]').count(),1,'old preview URL opens visual mode');
+ await page.locator('.tiptap p[data-raw-markdown]').first().click();
+ await page.keyboard.type(' DIRECT_RAW_EDIT');
+ assert.ok(await page.getByRole('button',{name:'保存'}).isEnabled(),'unknown Markdown remains directly editable');
+ await page.getByRole('button',{name:'保存'}).click();
+ await page.waitForFunction(async id=>{
+  const response=await fetch('/api/records/'+id);
+  return response.ok&&(await response.json()).content.includes('DIRECT_RAW_EDIT');
+ },fallback.id,{timeout:20000});
+ const rawEdited=good(await get('/records/'+fallback.id),200,'edited raw text');
+ assert.ok(rawEdited.content.includes('DIRECT_RAW_EDIT'));
+ assert.ok(!rawEdited.content.includes('\\<div'),'unknown HTML stays literal');
+ await page.reload({waitUntil:'networkidle'});
+ await page.locator('.tiptap [data-raw-markdown]').first().waitFor();
+ assert.ok((await page.locator('.tiptap').textContent()).includes('DIRECT_RAW_EDIT'));
  // The mobile hamburger must always remain available even on an empty page.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/',{waitUntil:'networkidle'});

@@ -28,7 +28,7 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/library',component:LibraryPage,loader:()=>warm(queryClient.ensureInfiniteQueryData(folderPagesQuery(null)))}),
  createRoute({getParentRoute:()=>root,path:'/library/$folderId',component:LibraryPage,loader:({params})=>warm(queryClient.ensureInfiniteQueryData(folderPagesQuery(params.folderId)),queryClient.ensureQueryData(folderQuery(params.folderId)))}),
  createRoute({getParentRoute:()=>root,path:'/records/$recordId',component:RecordPage,
-  validateSearch:(search:Record<string,unknown>):{mode?:'source'|'preview'}=>search.mode==='source'||search.mode==='preview'?{mode:search.mode}:{},
+  validateSearch:(search:Record<string,unknown>):{mode?:'source'}=>search.mode==='source'?{mode:'source'}:{},
   loaderDeps:({search})=>({mode:search.mode}),
   loader:({params,deps})=>warm((async()=>{
    const item=await queryClient.ensureQueryData(recordQuery(params.recordId)).catch(()=>null);

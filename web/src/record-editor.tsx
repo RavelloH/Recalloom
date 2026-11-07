@@ -7,14 +7,14 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
 import {Dialog} from '@astryxdesign/core/Dialog';
 import {Banner} from '@astryxdesign/core/Banner';
-import {Save,History,Code2,Type,RotateCcw,Diff,Eye} from 'lucide-react';
+import {Save,History,Code2,Type,RotateCcw,Diff} from 'lucide-react';
 import {ApiError,api,mutate,versions} from './api';
 import {ContextPanel} from './context-panel';
 import {PageActions} from './page-chrome';
 import {readSessionDraft,writeSessionDraft,clearSessionDraft,isLogoutNavigationApproved,setActiveEditorDirty} from './session-drafts';
 import {useConfirmDialog} from './confirm-dialog';
 import type {RecordDetail} from './types';
-import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor,PreviewChunk as MarkdownPreview} from './editor-chunks';
+import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor} from './editor-chunks';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 
 
@@ -27,7 +27,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
  const usableRecovery=stored&&stored.content!==item.content&&stored.revision===item.revision;
  const staleRecovery=stored&&stored.content!==item.content&&stored.revision!==item.revision;
  const [recoveryNotice,setRecoveryNotice]=useState(Boolean(usableRecovery||staleRecovery));
- const [mode,setMode]=useState<'visual'|'source'|'preview'>(initialMode==='source'||initialMode==='preview'?initialMode:'visual');
+ const [mode,setMode]=useState<'visual'|'source'>(initialMode==='source'?'source':'visual');
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [draft,setDraft]=useState(usableRecovery?stored.content:item.content);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[history,setHistory]=useState(false),[diff,setDiff]=useState('');
@@ -65,7 +65,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
   blocker.proceed();
  };
  const settleVisualInput=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
- const switchMode=async(next:'visual'|'source'|'preview')=>{
+ const switchMode=async(next:'visual'|'source')=>{
   if(next===mode)return;
   if(mode==='visual'){
    await settleVisualInput();
@@ -78,7 +78,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
   // the replacement must read the requested mode, not the previous one.
   const url=new URL(location.href);url.searchParams.set('mode',next);historyReplace(url);
   // Warm the next view first so the cross-fade never passes through a loading state.
-  await (next==='source'?SourceEditor:next==='preview'?MarkdownPreview:VisualEditor).preload().catch(()=>undefined);
+  await (next==='source'?SourceEditor:VisualEditor).preload().catch(()=>undefined);
   setMode(next);
  };
  const save=async()=>{
@@ -119,8 +119,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
    <AutoResizer animateWidth animateHeight={false} className="save-status-box"><AutoTransition as="span" transitionKey={busy?'busy':changed?'dirty':'clean'} duration={.14}><span className={'save-status'+(changed?' is-dirty':'')} title={changed?'按 Ctrl/⌘ + S 保存':'所有更改已保存'}>{busy?'保存中…':changed?'未保存':'已保存'}<span className="save-revision"> · R{item.revision}</span></span></AutoTransition></AutoResizer>
    <Button label="保存" icon={<Save size={14}/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
   </>}>
-   <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<Type size={14}/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="预览" icon={<Eye size={14}/>} variant={mode==='preview'?'secondary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup>
-   <IconButton variant={mode==='source'?'secondary':'ghost'} size="sm" label="Markdown" tooltip="高级：编辑 Markdown 源码" icon={<Code2 size={16}/>} onClick={()=>switchMode('source')}/>
+   <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<Type size={14}/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="源码" icon={<Code2 size={14}/>} variant={mode==='source'?'secondary':'ghost'} onClick={()=>switchMode('source')}/></ButtonGroup>
    <IconButton variant="ghost" size="sm" label="历史" icon={<History size={16}/>} onClick={()=>setHistory(v=>!v)}/>
    {pageActions}
   </PageActions>
@@ -130,7 +129,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
   {Boolean(error)&&<Banner status="error" container="section" title="保存失败" description={error instanceof ApiError&&error.status===409?'记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'请稍后重试'} endContent={error instanceof ApiError&&error.status===409?<Button label="重新加载" onClick={onSaved}/>:undefined}/>}
   {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   </div></AutoResizer>
-  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='preview'?<MarkdownPreview content={draft} sourceId={item.id}/>:mode==='source'?<SourceEditor value={draft} onChange={changeDraft} focusLine={jumpToLine?.line} focusToken={jumpToLine?.token}/>:<VisualEditor ref={visualRef} value={draft} recordId={item.id} onChange={changeDraft}/>}</React.Suspense></div></AutoTransition>
+  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={draft} onChange={changeDraft} focusLine={jumpToLine?.line} focusToken={jumpToLine?.token}/>:<VisualEditor ref={visualRef} value={draft} recordId={item.id} onChange={changeDraft}/>}</React.Suspense></div></AutoTransition>
   <ContextPanel open={history} onOpenChange={setHistory} label="版本历史"><div className="history-panel"><div className="panel-heading"><h2>版本历史</h2><IconButton variant="ghost" label="关闭历史" icon={<span aria-hidden="true">×</span>} onClick={()=>setHistory(false)}/></div>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Diff size={14}/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<RotateCcw size={14}/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div></ContextPanel>
   <Dialog isOpen={blocker.status==='blocked'} onOpenChange={open=>{if(!open)closeBlocker();}} width={440} padding={4} purpose="info" aria-label="未保存的编辑内容">
    <div className="draft-leave-dialog"><h2>还有未保存的编辑内容</h2><p>离开后当前编辑器将关闭。可以先保留本标签页草稿，下次进入此文档时自动恢复；也可以明确丢弃。</p><div className="draft-leave-actions"><Button label="留在编辑器" variant="primary" onClick={closeBlocker}/><Button label="保留草稿并离开" variant="secondary" isDisabled={busy} onClick={keepAndLeave}/><Button label="丢弃更改并离开" variant="destructive" isDisabled={busy} onClick={discardAndLeave}/></div></div>

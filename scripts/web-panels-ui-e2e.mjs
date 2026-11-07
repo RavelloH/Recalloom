@@ -6,7 +6,8 @@ const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH
 assert.ok(bin&&line,'Browser and local secret required');
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const browser=await chromium.launch({headless:true,executablePath:bin});
-const origin='http://127.0.0.1:8897';
+const origin=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
+assert.match(origin,/^http:\/\/127\.0\.0\.1:\d+$/,'Browser tests must use a local-only Worker');
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 try{
  await page.goto(origin+'/login');
@@ -19,7 +20,7 @@ try{
  await page.getByRole('textbox',{name:'名称'}).fill(recordName);
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.waitForURL(/\/records\//);
- await page.getByRole('button',{name:'Markdown',exact:true}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
  await page.locator('.cm-content').fill(Array.from({length:65},(_,i)=>'## Section '+(i+1)+'\n\nParagraph for document section '+(i+1)+'.').join('\n\n'));
  await page.getByRole('button',{name:'保存',exact:true}).click();
  await page.getByRole('button',{name:'可视化',exact:true}).click();

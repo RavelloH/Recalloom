@@ -49,32 +49,24 @@ try{
  const source=must(await api('/records','POST',{
   name:'Help Examples '+suffix+'.md',kind:'document',content
  }),201);
- // Preview must render the exact samples, including the special block mark.
- await page.goto(testOrigin+'/records/'+source.id+'?mode=preview',{waitUntil:'networkidle'});
- await page.locator('[data-highlighted-math]').first().waitFor({timeout:20000});
- await page.locator('.wiki-embed').first().waitFor({timeout:20000});
- await page.getByText('空载试验中的目标正文。',{exact:false}).first().waitFor({timeout:20000});
- assert.equal(await page.locator('.markdown-preview [data-highlighted-math]').count(),1);
- assert.equal(await page.locator('.markdown-preview .wiki-link').count(),3);
- assert.equal(await page.locator('.markdown-preview .wiki-embed').count(),3);
- assert.ok(await page.locator('.markdown-preview mark .katex').count()>=1);
- assert.ok(await page.locator('.markdown-preview .katex-display .katex').count()>=2);
- const visible=await page.locator('.markdown-preview [data-highlighted-math]').evaluate(node=>{
-  const latex=node.querySelector('.katex');
-  const a=node.getBoundingClientRect(),b=latex?.getBoundingClientRect();
-  return {rendered:!!latex,outerHeight:a.height,mathHeight:b?.height??0,
-   overflow:a.width<10,background:getComputedStyle(node).backgroundColor};
- });
- assert.ok(visible.rendered&&visible.outerHeight>=visible.mathHeight-3,
-  'the marked display block should encompass the entire KaTeX box');
- // The actual Tiptap editor must import the samples as rich nodes.
- await page.getByRole('button',{name:'可视化'}).click();
- await page.locator('.rk-highlighted-block-math').first().waitFor({timeout:20000});
+ // The visual editor is the single reading and editing surface.
+ await page.goto(testOrigin+'/records/'+source.id+'?mode=visual',{waitUntil:'networkidle'});
+ await page.locator('.tiptap .rk-highlighted-block-math').first().waitFor({timeout:20000});
  await page.locator('.wiki-editor-embed').first().waitFor({timeout:20000});
+ await page.getByText('空载试验中的目标正文。',{exact:false}).first().waitFor({timeout:20000});
  assert.equal(await page.locator('.tiptap .rk-highlighted-block-math').count(),1);
  assert.equal(await page.locator('.tiptap .wiki-editor-chip').count(),3);
  assert.equal(await page.locator('.tiptap .wiki-editor-embed').count(),3);
  assert.ok(await page.locator('.tiptap mark [data-type="inline-math"]').count()>=1);
+ assert.ok(await page.locator('.tiptap [data-type="block-math"] .katex').count()>=2);
+ const visible=await page.locator('.tiptap .rk-highlighted-block-math').evaluate(node=>{
+  const inner=node.querySelector('.block-math-inner');
+  const a=node.getBoundingClientRect(),b=inner?.getBoundingClientRect();
+  return {rendered:!!inner,outerHeight:a.height,mathHeight:b?.height??0};
+ });
+ assert.ok(visible.rendered&&visible.outerHeight>=visible.mathHeight-3,
+  'visual highlighted display block encompasses the KaTeX box');
+ assert.equal(await page.getByRole('button',{name:'预览'}).count(),0);
  await page.locator('.tiptap h1').first().click();
  await page.keyboard.press('End');
  await page.keyboard.type(' edited');
@@ -94,5 +86,5 @@ try{
  assert.equal(linked.items.length,6);
  assert.ok(linked.items.every(item=>item.targetId===target.id));
  assert.deepEqual(errors,[]);
- console.log('PASS: real help Markdown preview, math highlight layout, Tiptap import/save and Wiki projection');
+ console.log('PASS: real help Markdown visual editing, math highlight layout and Wiki projection');
 }finally{await browser.close()}
