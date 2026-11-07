@@ -109,7 +109,8 @@ try{
  await page.waitForFunction(()=>document.querySelector('.tiptap')?.textContent?.includes('No special support'),null,{timeout:12000});
  const plain=await page.locator('.tiptap').textContent();
  assert.ok(plain.includes('<div class="unsupported">No special support</div>'));
- assert.ok(plain.includes('[^note]'));
+ assert.ok(plain.includes('a literal footnote.'),'new GFM footnote definition should remain visible');
+ assert.equal(await page.locator('.tiptap [data-rk-footnote-definition]').count(),1,'supported footnote should be a structured editable node');
  assert.ok(await page.locator('.tiptap [data-raw-markdown]').count()>=2,'unknown syntax is editable prose');
  assert.equal(await page.locator('.tiptap [data-raw-markdown]').first().evaluate(el=>getComputedStyle(el).whiteSpace),'pre-wrap');
  assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled());

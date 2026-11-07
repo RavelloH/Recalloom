@@ -63,7 +63,10 @@ try{
    for(const [key,value] of Object.entries(marks))assert.deepEqual(actual[key],value,name+' markup '+key);
    assert.equal(await page.locator('.raw-markdown-node').count(),0,name+' must never show a source-protection block');
    if(name==='unsupported-html')assert.ok((await page.locator('.tiptap').innerText()).includes('<div class="notice">Careful HTML</div>'),'unknown HTML appears literally');
-   if(name==='yaml-frontmatter')assert.ok((await page.locator('.tiptap').innerText()).includes('title: Example'),'front matter remains editable text');
+   if(name==='yaml-frontmatter'){
+    assert.equal(await page.locator('.tiptap [data-rk-frontmatter]').count(),1,'front matter should render as metadata card');
+    assert.ok((await page.locator('.tiptap').innerText()).includes('Example'),'front matter should show metadata values');
+   }
   }
   await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-line').first().waitFor({timeout:15000});

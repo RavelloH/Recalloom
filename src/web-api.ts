@@ -9,6 +9,7 @@ import { search } from './search.js';
 import {recordRelations,graphView} from './graph.js';
 import {resolveWikiReference,listWikiReferences,backfillWikiReferences} from './wiki-references.js';
 import { recentActivity } from './web-activity.js';
+import {parsePublicImageUrl,proxyRemoteImage,privateImageResponse} from './link-image-proxy.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
 type Vars={webSession:WebSession};
@@ -67,6 +68,24 @@ webApi.post('/auth/cap/redeem',async(c)=>capRedeem(c.req.raw,c.env,await jsonBod
 webApi.post('/auth/login',async(c)=>webLogin(c.req.raw,c.env,await jsonBody(c.req.raw,
   z.object({secret:z.string().min(1).max(4096),capToken:z.string().min(1).max(2048)}).strict(),8192)));
 webApi.get('/auth/session',(c)=>asJson({authenticated:true,session:c.get('webSession')}));
+/** Private image proxy: global session middleware authenticates before this route.
+ * It never redirects clients to third-party images or serves SVG/HTML under the same origin.
+ */
+webApi.get('/link-image',async(c)=>{
+ const params=parseQuery(c.req.url,z.object({url:z.string().min(10).max(4096),site:z.string().max(2048).optional()}));
+ if(!parsePublicImageUrl(params.url))return err('INVALID_PUBLIC_IMAGE_URL',400);
+ const site=params.site?parsePublicImageUrl(params.site):null;
+ if(params.site&&!site)return err('INVALID_PUBLIC_SITE_URL',400);
+ let image=await proxyRemoteImage(params.url);
+ // Link icons sometimes point to stale CDN paths. Only an explicitly
+ // supplied public site origin can be used for a controlled favicon fallback.
+ if(!image&&site){
+  const fallback=new URL('/favicon.ico',site).href;
+  if(fallback!==params.url)image=await proxyRemoteImage(fallback);
+ }
+ if(!image)return err('IMAGE_UNAVAILABLE',404);
+ return privateImageResponse(image);
+});
 webApi.post('/auth/logout',async(c)=>{
   await logout(c.env,c.get('webSession').id);
   const response=asJson({loggedOut:true});response.headers.append('set-cookie',cookie('',undefined));return response;

@@ -45,3 +45,11 @@ Recalloom 把最新正文与 text-version 历史版本分开管理。所有正�
 edit_record 保存的是 Markdown 源码，不是渲染后的 HTML。行内 KaTeX 使用 $...$，块公式使用独立 $$ 行；使用 <mark> 包裹公式时须遵守 math 的换行规则。Wiki 引用的 UUID 与路径应依据已确认的记录解析，详见 wiki。
 
 结构化 task_list 的具体状态、优先级和条目管理详见 tasks。归档会从活动路径移除记录，删除文件夹将归档其所有后代，永久删除只允许已归档记录；详细安全和并发规则参见 lifecycle。
+
+## Rich Markdown 的编辑与保存
+
+Banner、Collapsible、Badge、显式缩略词和提示、始终可见的注释、彩色高亮和增强代码块的具体语法见 markdown 帮助主题。只读 Astryx Tooltip 不应污染 Tiptap 内部的可编辑 DOM。**打开文档、等待 Shiki 高亮、异步获取链接图标都不得触发未保存状态。** 外链图标是运行时表现，不应写入内容版本。浏览器直接向 Meta API 发送完整网站链接，完整路径会被解析服务看到，但查询参数与锚点会预先移除；原站 HTTP/HTTPS 图片则通过有会话鉴权的同源图片代理 `/api/link-image` 下载。此代理不能公开、不能被滥用为访问内网的通用代理，也不得返回可执行的同源 SVG/HTML。
+
+YAML Front Matter 在可视化模式中由 Astryx 元数据卡片展示并可修改完整 YAML；修改不会自动同步 Recalloom 独立的文件元数据。仅打开/预览属性卡片不应触发保存。
+
+Astryx Tabs 在可视化编辑模式保留全部 Tab 正文，阅读时才切换显示内容；点击标签不能触发文档编辑或丢失未选中的内容。标题 {#id} 和段落末尾 ^block-id 在可视化中变成稳定 DOM 锚点，源码导出时重新附上原标记。相同 ID 需人工避免重复；列表/表格/数学块锚点暂未实现。

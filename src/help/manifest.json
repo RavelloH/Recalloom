@@ -7,7 +7,7 @@
   {
     "topic": "markdown",
     "title": "Markdown 与扩展语法",
-    "summary": "CommonMark/GFM、任务列表、表格、安全 HTML、格式高亮"
+    "summary": "GFM、YAML Front Matter、Astryx Banner/Chat/Tabs/LinkCard/Badge、脚注、稳定标题/段落锚点、Mermaid、代码高亮与鉴权外链图标"
   },
   {
     "topic": "math",

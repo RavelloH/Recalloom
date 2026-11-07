@@ -45,7 +45,7 @@ export const CustomHeading = Heading.extend({
 
   renderHTML({node,HTMLAttributes}){
     return ['h'+node.attrs.level,mergeAttributes(this.options.HTMLAttributes,HTMLAttributes,{
-      id:headingAnchor(node.textContent)
+      id:headingAnchor(String(node.attrs.id||node.textContent))
     }),0];
   },
 
@@ -59,10 +59,12 @@ export const CustomHeading = Heading.extend({
     const align = node.attrs?.textAlign;
     const content = helpers.renderChildren(node.content || []);
     const prefix = "#".repeat(level);
+    const id=typeof node.attrs?.id==='string'&&/^[a-z][a-z0-9-]{0,79}$/i.test(node.attrs.id)?String(node.attrs.id).toLowerCase():'';
+    const suffix=id?' {#'+id+'}':'';
 
     // 左对齐或无对齐：使用标准 Markdown 标题
     if (!align || align === "left") {
-      return `${prefix} ${content}`;
+      return `${prefix} ${content}${suffix}`;
     }
 
     // 其他对齐：使用 HTML 标题标签

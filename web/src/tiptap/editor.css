@@ -97,3 +97,137 @@
   border: 0;
   padding: 0;
 }
+
+/* Rich Markdown: editable Astryx directives and consistently visible annotations. */
+.record-main .rk-directive {margin-block: 1rem;}
+.record-main .rk-directive-body {min-width:0;overflow-wrap:anywhere;}
+.record-main .rk-directive-body > :first-child {margin-top:0;}
+.record-main .rk-directive-body > :last-child {margin-bottom:0;}
+.record-main .rk-directive-title {display:inline-flex;gap:.45rem;align-items:center;min-width:0;}
+.record-main .rk-directive-title input {max-width:min(28ch,60vw);}
+.record-main .rk-directive-title button {opacity:.58;}
+.record-main .rk-directive-title button:focus-visible,
+.record-main .rk-directive-title:hover button {opacity:1;}
+.record-main .rk-rich-inline {display:inline;}
+.record-main .rk-inline-editable {display:inline;}
+.record-main .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
+.record-main .rk-inline-tip {text-decoration:underline dashed;text-underline-offset:.17em;cursor:help;}
+.record-main .rk-comment,
+.record-main .tiptap [data-rk-comment] {
+  color:var(--color-text-tertiary,var(--rk-ink-faint));
+  font-size:.89em;
+  line-height:1.58;
+  font-weight:400;
+  background:transparent;
+  white-space:pre-wrap;
+}
+.record-main .rk-comment::before {content:'·';margin-inline-end:.24em;opacity:.75;}
+
+/* Shiki code blocks use native Astryx controls for actions and typography tokens. */
+.record-main .rk-code-block {
+  display:block;
+  border:1px solid var(--rk-document-border);
+  border-radius:10px;
+  background:var(--rk-document-wash)!important;
+  margin-block:22px;
+  min-width:0;
+  overflow:hidden;
+}
+.record-main .rk-code-header {
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  padding:5px 9px;
+  border-bottom:1px solid var(--rk-document-border);
+  color:var(--color-text-secondary);
+  font-size:12px;
+}
+.record-main .rk-code-title,.record-main .rk-code-actions {
+  display:inline-flex;align-items:center;gap:.25rem;min-width:0;
+}
+.record-main .rk-code-title {flex:1;}
+.record-main .rk-code-title > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.record-main .rk-code-title input {max-width:260px;}
+.record-main .rk-code-viewport {overflow-x:auto;overscroll-behavior-inline:contain;}
+.record-main .rk-code-block pre {
+  border:0;border-radius:0;margin:0;background:transparent!important;
+  overflow:visible;padding:14px 18px;
+}
+.record-main .rk-code-block pre code {white-space:pre;}
+.record-main .rk-code-block.rk-code-wrap pre code {white-space:pre-wrap;overflow-wrap:anywhere;}
+.record-main .rk-code-folded .rk-code-viewport {max-height:18rem;overflow-y:hidden;}
+.record-main .rk-code-fold-button {display:flex;justify-content:center;border-top:1px solid var(--rk-document-border);}
+.record-main .tiptap .rk-code-block.shiki span[style] {background:transparent!important;}
+@media (prefers-color-scheme:dark) {
+  .record-main .tiptap .rk-code-block.shiki span[style] {color:var(--shiki-dark)!important;}
+}
+[data-theme="dark"] .record-main .tiptap .rk-code-block.shiki span[style],
+html.dark .record-main .tiptap .rk-code-block.shiki span[style] {color:var(--shiki-dark)!important;}
+
+/* Rich semantic highlights inherit Astryx neutral palette in both themes. */
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color] {color:inherit;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="red"] {background:var(--color-background-red,#fddede)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="orange"] {background:var(--color-background-orange,#ffe8d5)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="yellow"] {background:var(--color-background-yellow,#fff0ba)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="green"] {background:var(--color-background-green,#d7f3df)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="blue"] {background:var(--color-background-blue,#dceaff)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="purple"] {background:var(--color-background-purple,#ecdfff)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="pink"] {background:var(--color-background-pink,#ffe0ed)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="cyan"] {background:var(--color-background-cyan,#d4f5fb)!important;}
+.record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="teal"] {background:var(--color-background-teal,#d6efef)!important;}
+
+/* Mermaid is derived from editable fenced source and never stored as Markdown. */
+.record-main .rk-mermaid {
+ margin:0.5rem 0 0.75rem;
+ padding:1rem;
+ overflow-x:auto;
+ border-top:1px solid var(--rk-document-border);
+ background:var(--rk-document-wash);
+ border-radius:0 0 10px 10px;
+}
+.record-main .rk-mermaid-svg {width:100%;min-width:0;text-align:center;}
+.record-main .rk-mermaid-svg > img {display:inline-block;max-width:100%;height:auto!important;}
+.record-main .rk-mermaid-error,.record-main .rk-mermaid-loading {
+ display:flex;align-items:center;justify-content:center;gap:.5rem;
+ color:var(--color-text-secondary);padding:1rem;font-size:.9rem;
+}
+.record-main .rk-chat-list {display:flex;flex-direction:column;gap:1rem;min-width:0;}
+.record-main .rk-chat-message {min-width:0;overflow-wrap:anywhere;}
+.record-main .rk-chat-message > :first-child {margin-block-start:0;}
+.record-main .rk-chat-message > :last-child {margin-block-end:0;}
+.record-main .rk-link-card {width:100%;max-width:100%;}
+.record-main .rk-link-card-row {display:flex;min-width:0;gap:.75rem;align-items:flex-start;}
+.record-main .rk-link-card-image {width:min(10rem,30%);aspect-ratio:4/3;object-fit:cover;flex-shrink:0;border-radius:.5rem;}
+.record-main .rk-link-card-text {display:flex;flex-direction:column;gap:.4rem;min-width:0;flex:1;}
+.record-main .rk-link-card-head {display:flex;align-items:center;gap:.3rem;color:var(--color-text-secondary);font-size:.8rem;}
+.record-main .rk-link-card-title {font-weight:600;overflow-wrap:anywhere;}
+.record-main .rk-link-card-desc {color:var(--color-text-secondary);font-size:.9rem;line-height:1.4;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
+.record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;}
+.record-main .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
+.record-main .rk-rich-link-card {margin-block:1rem;}
+.record-main .rk-rich-link-card > button {margin-block:.3rem;}
+.record-main .rk-footnote-definition {margin-block:1rem;}
+.record-main .rk-footnote-definition-title {font-size:.85rem;color:var(--color-text-secondary);display:flex;align-items:center;gap:.3rem;margin-bottom:.45rem;}
+.record-main .rk-footnote-definition-content > :first-child {margin-top:0;}
+.record-main .rk-footnote-definition-content > :last-child {margin-bottom:0;}
+.record-main .rk-footnote-ref {font-size:.82em;vertical-align:super;color:var(--color-text-secondary);}
+
+/* YAML Front Matter is a semantic metadata card, but YAML source remains canonical. */
+.record-main .rk-frontmatter-node {margin-block:1rem;}
+.record-main .rk-frontmatter-heading {display:flex;gap:.5rem;align-items:center;font-size:.9rem;font-weight:600;margin-bottom:.6rem;}
+.record-main .rk-frontmatter-caption {font-size:.78rem;color:var(--color-text-tertiary);margin-top:.7rem;}
+.record-main .rk-frontmatter-controls {display:flex;align-items:center;justify-content:flex-end;gap:.4rem;margin-bottom:.35rem;}
+.record-main .rk-frontmatter-error {color:var(--color-text-secondary);font-size:.85rem;}
+.record-main .rk-frontmatter-node textarea {min-width:0;max-width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;}
+.record-main .markdown-preview>.rk-frontmatter-card {margin-block:1rem;}
+
+/* Astryx Tabs: every editable panel remains mounted in ProseMirror.
+ * Only read-only Markdown hides inactive panels. */
+.record-main .rk-tabs-edit,.record-main .rk-tabs-preview {max-width:100%;min-width:0;}
+.record-main .rk-tabs-editor-body {display:flex;flex-direction:column;gap:.8rem;padding-top:.8rem;}
+.record-main .rk-tab-edit {margin:0!important;min-width:0;}
+.record-main .rk-tab-title {font-weight:600;margin-bottom:.5rem;}
+.record-main .rk-tabs-heading {font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.5rem;}
+.record-main .rk-tabs-read-panel {min-height:2rem;padding-top:.9rem;}
+.record-main .rk-tabs-read-panel[hidden] {display:none;}
+.record-main .rk-tabs-unscoped {border-top:1px solid var(--rk-document-border);padding-top:.5rem;}
+.record-main .rk-tabs-read-panel .rk-tab-pane > :first-child {margin-top:0;}
+.record-main .rk-tabs-read-panel .rk-tab-pane > :last-child {margin-bottom:0;}

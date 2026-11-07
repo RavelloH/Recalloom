@@ -15,7 +15,7 @@ import {BlockMathWithHighlight} from '../web/src/tiptap/block-math-highlight';
 import {InlineMathWithHighlight} from '../web/src/tiptap/inline-math-highlight';
 import {HighlightWithMarkdown} from '../web/src/tiptap/markdown-extensions';
 import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
-import {wikiRemark} from '../web/src/wiki-remark';
+import {prepareWikiMarkdown} from '../web/src/wiki-remark';
 
 const examples=(doc:string)=>[...doc.matchAll(/~~~markdown\n([\s\S]*?)\n~~~/g)].map(x=>x[1]);
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
@@ -149,10 +149,8 @@ test('published Markdown mark and Wiki samples go through actual editor and prev
  for(const [index,kind,count] of [[0,'wiki-ref',3],[1,'wiki-embed',3]] as const){
   const source=wikiExamples[index];
   assert.ok(source);
-  const ast=parser.parse(source);
-  wikiRemark(source)(ast as any);
-  const html=JSON.stringify(ast);
-  const found=html.split('<'+kind+' ').length-1;
-  assert.equal(found,count,kind+' should survive the actual preview AST transformation: '+html.slice(0,600));
+  const prepared=prepareWikiMarkdown(source);
+  const found=prepared.split('<'+kind+' ').length-1;
+  assert.equal(found,count,kind+' must survive protected read-only Markdown preprocessing: '+prepared.slice(0,600));
  }
 });

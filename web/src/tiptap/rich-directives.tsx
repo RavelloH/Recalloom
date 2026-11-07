@@ -1,0 +1,137 @@
+import React,{useState} from 'react';
+import {Node,mergeAttributes} from '@tiptap/core';
+import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
+import type {JSONContent} from '@tiptap/core';
+import {Banner} from '@astryxdesign/core/Banner';
+import {Badge} from '@astryxdesign/core/Badge';
+import {Collapsible} from '@astryxdesign/core/Collapsible';
+import {Card} from '@astryxdesign/core/Card';
+import {TabList,Tab} from '@astryxdesign/core/TabList';
+import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
+import {IconButton} from '@astryxdesign/core/IconButton';
+import {TextInput} from '@astryxdesign/core/TextInput';
+import {Pencil} from 'lucide-react';
+import {richTitle} from './rich-schema';
+export {richTitle} from './rich-schema';
+
+const bannerStatus=(kind:string):'info'|'warning'|'error'|'success'=>
+ kind==='warning'?'warning':kind==='danger'?'error':kind==='success'?'success':'info';
+const safeTitle=(v:string)=>v.replace(/[\r\n\[\]]/g,' ').slice(0,180);
+
+function ContainerView({node,updateAttributes}:NodeViewProps){
+ const kind=String(node.attrs.kind??'note'),title=String(node.attrs.title??'');
+ const sender=node.attrs.sender==='user'?'user':node.attrs.sender==='system'?'system':'assistant';
+ const tabs=node.content?.content.filter(child=>child.type.name==='richContainer'&&child.attrs.kind==='tab')??[];
+ const [selected,setSelected]=useState('0');
+ const [editing,setEditing]=useState(false);
+ const [draft,setDraft]=useState(title);
+ const editTitle=<span className="rk-directive-title" contentEditable={false}>
+  {editing?<TextInput label="容器标题" value={draft} onChange={setDraft} aria-label="容器标题"
+    onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();updateAttributes({title:safeTitle(draft)});setEditing(false);}if(event.key==='Escape')setEditing(false);}}
+    onBlur={()=>{updateAttributes({title:safeTitle(draft)});setEditing(false);}}/>
+  :<span>{richTitle(kind,title)}</span>}
+  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<Pencil size={13}/>}/>}
+ </span>;
+ return <NodeViewWrapper className={'rk-directive rk-directive-'+kind} data-rk-kind={kind}>
+  {kind==='tabs'
+   ?<Card variant="default" padding={3} className="rk-tabs-edit">
+      <div className="rk-tabs-heading" contentEditable={false}>{editTitle}</div>
+      {tabs.length>0&&<div contentEditable={false}>
+       <TabList value={String(Math.min(Number(selected)||0,tabs.length-1))} onChange={setSelected} hasDivider>
+        {tabs.map((tab,index)=><Tab key={index} value={String(index)} label={richTitle('tab',String(tab.attrs.title??''))}/>) }
+       </TabList>
+      </div>}
+      <NodeViewContent className="rk-directive-body rk-tabs-editor-body"/>
+     </Card>
+   :kind==='tab'
+   ?<Card variant="muted" padding={3} className="rk-tab-edit">
+      <div className="rk-tab-title" contentEditable={false}>{editTitle}</div>
+      <NodeViewContent className="rk-directive-body rk-tab-content"/>
+     </Card>
+   :kind==='chat'
+   ?<ChatMessageList density="compact" align="top"><NodeViewContent className="rk-directive-body rk-chat-list"/></ChatMessageList>
+   :kind==='message'
+   ?<ChatMessage sender={sender}><ChatMessageBubble name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></ChatMessageBubble></ChatMessage>
+   :kind==='details'
+   ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
+   :<Banner status={bannerStatus(kind)} title={editTitle} collapsible={false} container="card">
+      <NodeViewContent className="rk-directive-body"/>
+     </Banner>}
+ </NodeViewWrapper>;
+}
+export const RichContainer=Node.create({
+ name:'richContainer',group:'block',content:'block+',defining:true,isolating:true,priority:67,
+ addAttributes(){return {kind:{default:'note'},title:{default:''},sender:{default:null}};},
+ parseHTML(){return [{tag:'div[data-rk-kind]'}];},
+ renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-kind':HTMLAttributes.kind}),0];},
+ addNodeView(){return ReactNodeViewRenderer(ContainerView);},
+ renderMarkdown(node:JSONContent,helpers:{renderChildren:(children:JSONContent[])=>string}){
+  const kind=String(node.attrs?.kind??'note'),title=safeTitle(String(node.attrs?.title??''));
+  const sender=kind==='message'&&['assistant','user','system'].includes(String(node.attrs?.sender))?'{sender='+String(node.attrs?.sender)+'}':'';
+  // Each block must retain its own blank-line boundary. Tiptap's helper
+  // concatenates adjacent paragraphs and lists without a separator.
+  const body=(node.content??[]).map(child=>helpers.renderChildren([child]).trimEnd()).join('\n\n');
+  // CommonMark directive fences must be longer than nested directive fences.
+  // In particular, a chat wraps :::message with ::::chat / ::::.
+  const colons=(body.match(/^:{3,}(?=[\[{\w\s]|$)/gm)??[]).reduce((max,line)=>Math.max(max,line.length),2)+1;
+  const fence=':'.repeat(Math.max(3,colons));
+  return fence+kind+(title?'['+title+']':'')+sender+'\n\n'+body+'\n\n'+fence;
+ }
+});
+
+type RichToken={type?:string;raw?:string;label?:string;attrs?:Record<string,string>};
+function readAttrs(value:string):Record<string,string>{
+ const attrs:Record<string,string>={};
+ for(const match of value.matchAll(/(?:^|\s)([\w-]+)=("[^"]*"|'[^']*'|[^\s]+)/g)){
+  const key=match[1]??'',raw=match[2]??'';
+  if(key==='title'||key==='variant'||key==='content')attrs[key]=raw.replace(/^['"]|['"]$/g,'').slice(0,300);
+ }
+ return attrs;
+}
+const variants=new Set(['neutral','info','success','warning','error','blue','cyan','green','orange','pink','purple','red','teal','yellow']);
+function InlineView({node}:NodeViewProps){
+ const kind=node.type.name;
+ const attrs=node.attrs as {variant?:string;title?:string;content?:string};
+ const inner=<NodeViewContent as={"span" as "div"} className="rk-inline-editable"/>;
+ if(kind==='richBadge'){
+  const variant=variants.has(attrs.variant??'')?attrs.variant as 'neutral'|'success'|'warning'|'error'|'info':'neutral';
+  return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-badge"><Badge label={inner} variant={variant}/></NodeViewWrapper>;
+ }
+ const description=kind==='richAbbr'?attrs.title:attrs.content;
+ return <NodeViewWrapper as="span" className={'rk-rich-inline '+(kind==='richAbbr'?'rk-inline-abbr':'rk-inline-tip')}>
+   <span title={description||undefined} tabIndex={0}>{inner}</span>
+ </NodeViewWrapper>;
+}
+function makeInline(kind:'badge'|'abbr'|'tip'){
+ const name='rich'+kind[0]!.toUpperCase()+kind.slice(1);
+ return Node.create({
+  name,inline:true,group:'inline',content:'text*',priority:1800,
+  addAttributes(){return {variant:{default:'neutral'},title:{default:''},content:{default:''}};},
+  parseHTML(){return [{tag:'span[data-rk-inline="'+kind+'"]'}];},
+  renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-rk-inline':kind}),0];},
+  addNodeView(){return ReactNodeViewRenderer(InlineView);},
+  parseMarkdown(token:RichToken){
+   return {type:name,attrs:token.attrs??{},content:token.label?[{type:'text',text:token.label}]:[]};
+  },
+  renderMarkdown(node:JSONContent){
+   const label=(node.content??[]).map(x=>x.text??'').join('').replace(/[\r\n\]]/g,' ');
+   const attrs=node.attrs??{};
+   const key=kind==='badge'?'variant':kind==='abbr'?'title':'content';
+   const val=String(attrs[key]??'');
+   const clean=kind==='badge'&&val==='neutral'?'':val;
+   return ':'+kind+'['+label+']'+(clean?'{'+key+'="'+clean.replace(/"/g,'&quot;')+'"}':'');
+  },
+  markdownTokenizer:{
+   name,level:'inline' as const,
+   start:(source:string)=>source.indexOf(':'+kind+'['),
+   tokenize:(source:string):RichToken|undefined=>{
+    const match=new RegExp('^:'+kind+'\\[([^\\]\\r\\n]+)\\](?:\\{([^}\\r\\n]*)\\})?').exec(source);
+    if(!match)return undefined;
+    return {type:name,raw:match[0],label:match[1],attrs:readAttrs(match[2]??'')};
+   }
+  }
+ });
+}
+export const RichBadge=makeInline('badge');
+export const RichAbbr=makeInline('abbr');
+export const RichTip=makeInline('tip');

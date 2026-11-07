@@ -410,3 +410,17 @@
     max-width: 100%;
   }
 }
+
+/* Rich links: native-site favicon, not a third-party UI icon set or copied assets. */
+.record-main :is(.tiptap,.markdown-preview) .rk-site-favicon{
+ display:inline-block;width:1em;height:1em;object-fit:contain;
+ vertical-align:-.14em;margin-right:.24em;
+}
+.record-main :is(.tiptap,.markdown-preview) .rk-link-fallback{
+ display:inline-block;vertical-align:-.16em;margin-right:.25em;opacity:.7;
+}
+.record-main .tiptap a[data-rk-site-icon="loaded"]::before{
+ content:"";display:inline-block;width:1em;height:1em;
+ vertical-align:-.16em;margin-right:.24em;
+ background:var(--rk-site-icon) center / contain no-repeat;
+}

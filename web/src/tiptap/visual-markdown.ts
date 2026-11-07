@@ -3,15 +3,21 @@ import {unified} from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkDirective from 'remark-directive';
+import {richContainerKinds,richInlineKinds,richLeafKinds} from './rich-schema';
 import {prepareVisualMarkdown} from './visual-input';
 import {rawMarkdownBlock} from './raw-markdown';
 import {postProcessTableAlignment} from './table-alignment';
 import {findMarkedDisplayMath} from './marked-display-math';
+import {extractFootnoteBody,safeFootnoteId} from './rich-footnote-utils';
+import {isYamlFrontmatter} from './frontmatter-utils';
+import {explicitHeadingAnchor,explicitBlockAnchor} from '../wiki-slug';
+import {extractWikiReferences} from '../../../src/wiki-syntax.js';
 
 type MarkdownDriver={parse:(source:string)=>JSONContent};
-type AstNode={type:string;value?:string;children?:AstNode[];
+type AstNode={type:string;name?:string;value?:string;children?:AstNode[];data?:{directiveLabel?:boolean};
  position?:{start?:{offset?:number};end?:{offset?:number}}};
-const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkDirective);
 const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/;
 
 
@@ -21,10 +27,20 @@ const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)
 const supportedAstNodes=new Set([
  'root','paragraph','heading','blockquote','list','listItem','thematicBreak',
  'break','code','inlineCode','text','emphasis','strong','delete','link','image',
- 'table','tableRow','tableCell','html','inlineMath','math'
+ 'table','tableRow','tableCell','html','inlineMath','math',
+ 'containerDirective','textDirective','leafDirective','footnoteReference','footnoteDefinition'
 ]);
-function hasUnsupportedSyntax(node:AstNode):boolean{
+type SafeSpan={start:number;end:number};
+function hasUnsupportedSyntax(node:AstNode,allowedWiki:SafeSpan[]=[]):boolean{
+ // remark-directive also treats the colon in [[id:UUID]] and
+ // {{embed:id:UUID}} as a directive. Restore the Wiki grammar priority for
+ // spans that our shared authoritative Wiki parser has already validated.
+ if((node.type==='textDirective'||node.type==='leafDirective')&&node.position?.start?.offset!==undefined&&node.position?.end?.offset!==undefined&&
+   allowedWiki.some(span=>span.start<=node.position!.start!.offset!&&span.end>=node.position!.end!.offset!))return false;
  if(!supportedAstNodes.has(node.type))return true;
+ if(node.type==='containerDirective'&&!richContainerKinds.has(node.name??''))return true;
+ if(node.type==='textDirective'&&!richInlineKinds.has(node.name??''))return true;
+ if(node.type==='leafDirective'&&!richLeafKinds.has(node.name??''))return true;
  const htmlChildren=(node.children??[]).filter(child=>child.type==='html').map(child=>child.value?.trim().toLowerCase());
  if(htmlChildren.filter(value=>value==='<mark>').length!==htmlChildren.filter(value=>value==='</mark>').length)return true;
  if(node.type==='html'){
@@ -32,12 +48,40 @@ function hasUnsupportedSyntax(node:AstNode):boolean{
   const tag=/^<\/?([\w-]+)(?:\s[^>]*)?>$/i.exec(value)?.[1]?.toLowerCase();
   if(!tag||!['mark','u','sup','sub','br'].includes(tag))return true;
  }
- return (node.children??[]).some(hasUnsupportedSyntax);
+ return (node.children??[]).some(child=>hasUnsupportedSyntax(child,allowedWiki));
 }
 
+function assignExplicitHeadingIds(nodes:JSONContent[]):JSONContent[]{
+ for(const node of nodes){
+  if(node.type==='heading'){
+   const last=node.content?.at(-1);
+   if(last?.type==='text'&&last.text){
+    const match=explicitHeadingAnchor(last.text);
+    if(match&&(match.body||node.content!.length>1)){
+     last.text=match.body;
+     if(!last.text)node.content?.pop();
+     node.attrs={...node.attrs,id:match.id};
+    }
+   }
+  }
+  if(node.type==='paragraph'){
+   const last=node.content?.at(-1);
+   if(last?.type==='text'&&last.text){
+    const match=explicitBlockAnchor(last.text);
+    if(match&&(match.body||node.content!.length>1)){
+     last.text=match.body;
+     if(!last.text)node.content?.pop();
+     node.attrs={...node.attrs,blockId:match.id};
+    }
+   }
+  }
+  if(node.content)assignExplicitHeadingIds(node.content);
+ }
+ return nodes;
+}
 function parseSafe(source:string,manager:MarkdownDriver):JSONContent[]{
  const result=postProcessTableAlignment(manager.parse(prepareVisualMarkdown(source)),source);
- return result.content??[];
+ return assignExplicitHeadingIds(result.content??[]);
 }
 
 /** Visual-first conversion with localized verbatim fallback nodes.
@@ -46,12 +90,14 @@ function parseSafe(source:string,manager:MarkdownDriver):JSONContent[]{
 export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONContent{
  const normalized=source.replace(/\r\n/g,'\n'),metadata=frontmatter.exec(normalized);
  const tail=metadata?normalized.slice(metadata[0].length).replace(/^\n+/,''):normalized;
- const content:JSONContent[]=metadata?[rawMarkdownBlock(metadata[0])]:[];
+ const content:JSONContent[]=metadata?[isYamlFrontmatter(metadata[0])?{type:'richFrontMatter',attrs:{source:metadata[0]}}:rawMarkdownBlock(metadata[0])]:[];
  try{
   const ast=parser.parse(tail) as AstNode;
   const blocks=ast.children??[];
+  const wikiRanges=extractWikiReferences(tail).map(ref=>({start:ref.offset,end:ref.offset+ref.raw.length}));
   const containsMarkedMath=blocks.some((_,index)=>Boolean(findMarkedDisplayMath(blocks,index)));
-  if(!blocks.some(hasUnsupportedSyntax)&&!containsMarkedMath){
+  const containsContainer=blocks.some(block=>block.type==='containerDirective'||block.type==='leafDirective'||block.type==='footnoteDefinition');
+  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer){
    content.push(...parseSafe(tail,manager));
   }else{
    // Parse the rest of the document as rich text. Standalone HTML-marked
@@ -68,7 +114,34 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
     if(start===undefined||end===undefined)continue;
     const fragment=tail.slice(start,end);
     if(!fragment.trim())continue;
-    if(hasUnsupportedSyntax(block))content.push(rawMarkdownBlock(fragment));
+    if(block.type==='footnoteDefinition'){
+     const note=block as AstNode&{identifier?:string;label?:string};
+     const id=safeFootnoteId(String(note.label??note.identifier??''));
+     const inner=extractFootnoteBody(fragment);
+     if(!id||!inner){content.push(rawMarkdownBlock(fragment));continue;}
+     const nodes=buildVisualMarkdown(inner,manager).content??[];
+     content.push({type:'richFootnoteDefinition',attrs:{id},content:nodes.length?nodes:[{type:'paragraph'}]});
+     continue;
+    }
+    if(block.type==='leafDirective'&&block.name==='link-card'){
+     const source=block as AstNode&{attributes?:Record<string,string>};
+     const url=String(source.attributes?.url??'');
+     const title=(block.children??[]).map(child=>child.value??'').join('');
+     if(!url){content.push(rawMarkdownBlock(fragment));continue;}
+     content.push({type:'richLinkCard',attrs:{url,title}});
+     continue;
+    }
+    if(block.type==='containerDirective'&&richContainerKinds.has(block.name??'')){
+     const label=block.children?.find(child=>child.data?.directiveLabel);
+     const title=(label?.children??[]).map(x=>x.value??'').join('');
+     const firstNewline=fragment.indexOf('\n'),lastNewline=fragment.lastIndexOf('\n');
+     if(firstNewline<0||lastNewline<=firstNewline){content.push(rawMarkdownBlock(fragment));continue;}
+     const inner=fragment.slice(firstNewline+1,lastNewline).replace(/^\n+|\n+$/g,'');
+     const innerNodes=inner?buildVisualMarkdown(inner,manager).content??[]:[];
+     content.push({type:'richContainer',attrs:{kind:block.name,title,...(block.name==='message'?{sender:(block as AstNode&{attributes?:Record<string,string>}).attributes?.sender??'assistant'}:{})},content:innerNodes.length?innerNodes:[{type:'paragraph'}]});
+     continue;
+    }
+    if(hasUnsupportedSyntax(block,wikiRanges))content.push(rawMarkdownBlock(fragment));
     else{
      try{content.push(...parseSafe(fragment,manager));}
      catch{content.push(rawMarkdownBlock(fragment));}

@@ -5,7 +5,8 @@ import {FileInput,Link2,AlertCircle,ExternalLink} from 'lucide-react';
 import {api,record} from './api';
 import {queryString} from './api';
 import type {RecordDetail} from './types';
-import {slugHeading,headingAnchor} from './wiki-slug';
+import {headingAnchor} from './wiki-slug';
+import {extractWikiSection} from './wiki-section';
 
 export type ResolvedWiki={
  target:string;targetId:string|null;status:'resolved'|'missing'|'path_changed';
@@ -17,21 +18,6 @@ export const wikiResolution=(target:string,sourceId?:string)=>({
  queryFn:()=>api<ResolvedWiki>('/wiki/resolve?'+queryString({target,sourceId})),
  staleTime:30_000
 });
-const makeHash=(anchor?:string|null)=>slugHeading(anchor??'');
-function section(content:string,anchor?:string|null):string{
- if(!anchor)return content;
- const slug=makeHash(anchor);
- const lines=content.split(/\r?\n/);
- let from=-1,level=0;
- for(let i=0;i<lines.length;i++){
-  const h=/^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(lines[i]??'');
-  if(!h)continue;
-  if(from<0&&makeHash(h[2])===slug){from=i;level=h[1].length;continue;}
-  if(from>=0&&h[1].length<=level)return lines.slice(from,i).join('\n');
- }
- return from>=0?lines.slice(from).join('\n'):'';
-}
-
 /** Browser-side resolver is deliberately read-only. A path reference with a
  * known source binding continues pointing at the original UUID after rename. */
 export function WikiInline({target,alias,anchor,sourceId,plain=false}:{
@@ -64,7 +50,7 @@ export function WikiEmbed({target,anchor,sourceId,trail=[],depth=0,render}:{
   staleTime:20_000
  });
  const data=detail.data as RecordDetail|undefined;
- let body=data?section(data.content,anchor):'';
+ let body=data?extractWikiSection(data.content,anchor):'';
  const sectionMissing=Boolean(data&&anchor&&!body);
  const truncated=body.length>50000;
  if(truncated)body=body.slice(0,50000)+'\n\n> 嵌入内容过长，剩余部分请打开源文档查看。';

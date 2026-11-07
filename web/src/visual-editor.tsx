@@ -25,6 +25,13 @@ import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
 import {buildVisualMarkdown} from './tiptap/visual-markdown';
 import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
+import {RichContainer,RichBadge,RichAbbr,RichTip} from './tiptap/rich-directives';
+import {RichLinkCard} from './tiptap/rich-link-card';
+import {RichFrontMatter} from './tiptap/rich-frontmatter';
+import {RichFootnoteRef,RichFootnoteDefinition} from './tiptap/rich-footnotes';
+import {VisibleComment} from './tiptap/comment-mark';
+import Link from '@tiptap/extension-link';
+import {decorateEditorLinks} from './link-metadata-client';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
@@ -120,8 +127,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(cell&&surface)setTableToolbarTop(tableToolbarOffset(cell,surface,compactRef.current));
  };
  const extensions=useMemo(()=>[
-  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:{openOnClick:false}}),
-  ScrollCodeBlock,
+  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:false}),
+  Link.configure({openOnClick:false}),
+  ScrollCodeBlock.configure({defaultTheme:'github-dark',themes:{light:'github-light',dark:'github-dark'}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
@@ -131,6 +139,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
+  RichContainer,RichBadge,RichAbbr,RichTip,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
@@ -218,6 +227,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   }
   finally{applying.current=false;setReady(true);}
  },[editor,value]);
+ useEffect(()=>{
+  if(!editor||!ready)return;
+  return decorateEditorLinks(editor.view.dom);
+ },[editor,ready]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
