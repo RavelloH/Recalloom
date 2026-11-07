@@ -105,7 +105,7 @@ MCP 服务提供简短的全局使用说明、每个工具的操作描述，以�
 
 支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
 
-帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`；修改后运行 `pnpm help:generate` 更新编译模块。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
+帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`。`get_help` 会返回 `schemaVersion`、根据文档内容生成的 `helpVersion` 和完整 SHA-256 `contentHash`；帮助索引 Resource 也展示这些标识，以便识别过期的帮助。修改文档后运行 `pnpm help:generate` 更新编译模块，或在开发时使用 `pnpm help:watch` 自动更新。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
 
 ## 本地开发
 
@@ -116,6 +116,10 @@ cp .dev.vars.example .dev.vars
 pnpm db:local
 pnpm dev
 ```
+
+`pnpm dev` 会监听帮助文档与目录清单的修改，并自动重建 Workers 可导入的帮助模块。单独编辑文档时也可运行 `pnpm help:watch`；提交前仍需通过 `pnpm help:check`。MCP `manage_record` 和 `manage_folder` 修改元数据时必须提供 `expectedMetadataRevision`。
+
+需要验证文档示例实际渲染与编辑行为时，可在本地测试 Worker（已应用本地迁移、监听 `127.0.0.1`）运行的情况下执行 `pnpm test:help:e2e`；可用 `RECALLOOM_TEST_BASE` 指定本地端口。该脚本只允许连接 `127.0.0.1`，并且会在本地测试数据库中创建验证记录；**不可对生产环境执行**。
 
 本地 MCP 地址为 `http://localhost:8787/mcp`。如需开发网页，在另一个终端运行 `pnpm dev:web`，打开 `http://localhost:5173`；它会将 API 请求代理到本地 Worker。运行 `pnpm check`、`pnpm test` 和 `pnpm build:web` 验证更改。
 

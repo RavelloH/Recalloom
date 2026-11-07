@@ -7,6 +7,15 @@ import remarkMath from 'remark-math';
 import {HELP_TOPICS,getHelp,listHelpResources} from '../src/help/index.js';
 import {markedDisplayLatex} from '../web/src/tiptap/marked-display-math';
 import {extractWikiReferences,parseWikiTarget} from '../src/wiki-syntax.js';
+import {Markdown,MarkdownManager} from '@tiptap/markdown';
+import StarterKit from '@tiptap/starter-kit';
+import {CustomHeading} from '../web/src/tiptap/custom-heading';
+import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
+import {BlockMathWithHighlight} from '../web/src/tiptap/block-math-highlight';
+import {InlineMathWithHighlight} from '../web/src/tiptap/inline-math-highlight';
+import {HighlightWithMarkdown} from '../web/src/tiptap/markdown-extensions';
+import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
+import {wikiRemark} from '../web/src/wiki-remark';
 
 const examples=(doc:string)=>[...doc.matchAll(/~~~markdown\n([\s\S]*?)\n~~~/g)].map(x=>x[1]);
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
@@ -74,4 +83,76 @@ test('Markdown help explicitly distinguishes supported and unsupported formats',
  assert.match(md,/不.*任意.*HTML/);
  const parsed=parser.parse(md);
  assert.ok(parsed.children.some(x=>x.type==='code'),'must contain fenced syntax examples');
+});
+
+
+test('help metadata exposes a deterministic content fingerprint for clients',()=>{
+ const index=getHelp();
+ assert.equal(index.schemaVersion,1);
+ assert.match(index.helpVersion,/^1\.[a-f0-9]{12}$/);
+ assert.match(index.contentHash,/^[a-f0-9]{64}$/);
+ assert.ok(index.helpVersion.endsWith(index.contentHash.slice(0,12)));
+ assert.ok(index.content.includes(index.contentHash));
+ for(const topic of HELP_TOPICS){
+  const page=getHelp(topic);
+  assert.equal(page.helpVersion,index.helpVersion);
+  assert.equal(page.contentHash,index.contentHash);
+  assert.equal(page.schemaVersion,index.schemaVersion);
+ }
+});
+
+const editorManager=new MarkdownManager({extensions:[
+ StarterKit.configure({heading:false,paragraph:false,underline:false}),
+ CustomHeading,CustomParagraph,Markdown,HighlightWithMarkdown,
+ InlineMathWithHighlight,BlockMathWithHighlight
+]});
+type VisualNode={type?:string;attrs?:Record<string,unknown>;marks?:{type:string}[];content?:VisualNode[]};
+const flatten=(root:VisualNode):VisualNode[]=>[root,...(root.content??[]).flatMap(flatten)];
+
+test('published math examples survive real Tiptap import, serialization and reopen',()=>{
+ const blocks=examples(getHelp('math').content);
+ const highlighted=blocks.find(x=>x.startsWith('<mark>\n$$\n'));
+ assert.ok(highlighted);
+ const imported=buildVisualMarkdown(highlighted,editorManager);
+ const rendered=flatten(imported).find(x=>x.type==='blockMath');
+ assert.equal(rendered?.attrs?.highlighted,true);
+ assert.match(String(rendered?.attrs?.latex),/\\frac/);
+ const saved=editorManager.serialize(imported);
+ assert.match(saved,/^<mark>\n\$\$\n/);
+ const restored=buildVisualMarkdown(saved,editorManager);
+ const reopened=flatten(restored).find(x=>x.type==='blockMath');
+ assert.equal(reopened?.attrs?.highlighted,true);
+ assert.equal(reopened?.attrs?.latex,rendered?.attrs?.latex);
+ const inline=blocks.find(x=>x.includes('<mark>$'));
+ assert.ok(inline);
+ const visual=buildVisualMarkdown(inline,editorManager);
+ const atoms=flatten(visual).filter(x=>x.type==='inlineMath');
+ assert.equal(atoms.length,1,'highlighted inline fraction should be a real inline math node');
+ assert.ok(atoms[0]?.marks?.some(x=>x.type==='highlight'));
+ const savedInline=editorManager.serialize(visual);
+ assert.match(savedInline,/<mark>\$\\frac/);
+ const reopenedInline=flatten(buildVisualMarkdown(savedInline,editorManager)).find(x=>x.type==='inlineMath');
+ assert.ok(reopenedInline?.marks?.some(x=>x.type==='highlight'));
+ assert.equal(reopenedInline?.attrs?.latex,atoms[0]?.attrs?.latex);
+});
+
+test('published Markdown mark and Wiki samples go through actual editor and preview AST transformations',()=>{
+ const markdown=examples(getHelp('markdown').content);
+ const marked=markdown.find(x=>x.includes('<mark>结论及'));
+ assert.ok(marked);
+ const markedNodes=flatten(buildVisualMarkdown(marked,editorManager));
+ assert.ok(markedNodes.some(x=>x.type==='text'&&x.marks?.some(m=>m.type==='highlight')));
+ const saved=editorManager.serialize(buildVisualMarkdown(marked,editorManager));
+ assert.match(saved,/<mark>/);
+ assert.match(saved,/U_N/);
+ const wikiExamples=examples(getHelp('wiki').content);
+ for(const [index,kind,count] of [[0,'wiki-ref',3],[1,'wiki-embed',3]] as const){
+  const source=wikiExamples[index];
+  assert.ok(source);
+  const ast=parser.parse(source);
+  wikiRemark(source)(ast as any);
+  const html=JSON.stringify(ast);
+  const found=html.split('<'+kind+' ').length-1;
+  assert.equal(found,count,kind+' should survive the actual preview AST transformation: '+html.slice(0,600));
+ }
 });

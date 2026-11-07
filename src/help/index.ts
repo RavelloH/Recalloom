@@ -1,4 +1,4 @@
-import {HELP_PAGES} from './catalog.generated.js';
+import {HELP_META,HELP_PAGES} from './catalog.generated.js';
 
 export type HelpTopic=keyof typeof HELP_PAGES;
 export const HELP_TOPICS=Object.keys(HELP_PAGES) as HelpTopic[];
@@ -13,15 +13,22 @@ const indexContent=[
  ...HELP_TOPICS.map(topic=>'- **'+topic+'** — '+HELP_PAGES[topic].title+'：'+HELP_PAGES[topic].summary),
  '',
  '调用 get_help({topic: "math"}) 或读取 MCP Resource recalloom://help/math 获取完整说明。',
- '未指定 topic 的 get_help 返回本目录。'
+ '未指定 topic 的 get_help 返回本目录。',
+ '',
+ '帮助版本：'+HELP_META.helpVersion+'（格式版本：'+HELP_META.schemaVersion+'）',
+ '内容 SHA-256：'+HELP_META.contentHash
 ].join('\n');
 
-export type HelpDocument={topic:string;title:string;summary:string;uri:string;content:string};
+export type HelpDocument={
+ topic:string;title:string;summary:string;uri:string;content:string;
+ schemaVersion:number;helpVersion:string;contentHash:string
+};
 
 export function getHelp(topic?:HelpTopic):HelpDocument{
- if(!topic)return {topic:'index',title:'帮助主题索引',summary:'可用帮助主题及读取方式',uri:INDEX_URI,content:indexContent};
- const page=HELP_PAGES[topic];
- return {topic,...page};
+ const page=topic?{topic,...HELP_PAGES[topic]}:{
+  topic:'index',title:'帮助主题索引',summary:'可用帮助主题及读取方式',uri:INDEX_URI,content:indexContent
+ };
+ return {...page,...HELP_META};
 }
 
 export function listHelpResources():HelpDocument[]{

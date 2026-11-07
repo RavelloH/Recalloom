@@ -95,7 +95,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     (x)=>store.createFolder(env,x.name,x.parentId??null,x.description,actor));
   register('manage_folder',z.object({
     id:uuid,name:z.string().min(1).max(180).optional(),
-    parentId:uuid.nullable().optional(),description:z.string().max(5000).optional(),expectedMetadataRevision:expectedMetadataRevision.optional()
+    parentId:uuid.nullable().optional(),description:z.string().max(5000).optional(),expectedMetadataRevision
   }),true,(x)=>store.manageFolder(env,x.id,x,actor));
   register('create_record',z.object({name:z.string().min(1).max(180),folderId:uuid.nullable().optional(),kind:z.enum(['document','task_list']).optional(),content:z.string().max(500000).optional(),description:z.string().max(5000).optional(),tags:z.array(z.string().min(1).max(64)).max(32).optional()}),true,
     (x)=>store.createRecord(env,x,actor));
@@ -106,7 +106,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
       const row=await store.getRecord(env,x.id);
       return store.editRecord(env,x.id,x.expectedRevision,mappedEdit(x,row.content),x.message??'Edited',actor,x.dryRun??false);
     });
-  register('manage_record',z.object({id:uuid,name:z.string().max(180).optional(),folderId:uuid.nullable().optional(),status:statuses.optional(),description:z.string().max(5000).optional(),expectedMetadataRevision:expectedMetadataRevision.optional()}),true,
+  register('manage_record',z.object({id:uuid,name:z.string().max(180).optional(),folderId:uuid.nullable().optional(),status:statuses.optional(),description:z.string().max(5000).optional(),expectedMetadataRevision}),true,
     (x)=>store.updateMeta(env,x.id,x,actor));
   register('tag_record',z.object({id:uuid,tag:z.string().min(1).max(64),action:z.enum(['add','remove'])}),true,
     (x)=>store.tagRecord(env,x.id,x.tag,x.action,actor));

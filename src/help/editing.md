@@ -23,7 +23,7 @@ Recalloom 把最新正文与 text-version 历史版本分开管理。所有正�
 3. 构造最小必要修改，保留无关内容及特殊 Markdown/LaTeX 字符。
 4. 如需试算，先用 edit_record 的 dryRun 验证。
 5. 真实提交时提供 expectedRevision（来自刚读取的当前版本）；发生 VERSION_CONFLICT 时，重读正文、人工协调差异，不能盲目重试或覆盖。
-6. 修改元数据时用 expectedMetadataRevision，注意它与正文 revision 不同。
+6. 使用 MCP 的 manage_record 或 manage_folder 修改元数据时，**必须**提供读取到的 expectedMetadataRevision；注意它与正文 revision 不同。旧版本会收到 METADATA_CONFLICT，不能省略预期版本来绕过冲突。Web API 的参数约束可能与 MCP 不同。
 
 ## 精确替换与行操作
 
