@@ -7,7 +7,7 @@ const INDEX_URI='recalloom://help/index';
 const indexContent=[
  '# Recalloom 帮助目录',
  '',
- 'Recalloom 支持 CommonMark/GFM、KaTeX 数学公式、mark 高亮、WikiLink 与只读内容嵌入。',
+ 'Recalloom 支持 CommonMark/GFM、KaTeX 数学公式、mark 高亮、WikiLink、只读内容嵌入，以及独立归档与安全删除。',
  '优先通过当前工具描述调用常规操作；需要详细语法或完整操作规则时读取对应主题。',
  '',
  ...HELP_TOPICS.map(topic=>'- **'+topic+'** — '+HELP_PAGES[topic].title+'：'+HELP_PAGES[topic].summary),

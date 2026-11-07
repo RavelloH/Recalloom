@@ -40,6 +40,7 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
+    assert.equal(tools.length,32);
     assert.equal(tools.length,Object.keys(TOOL_GUIDANCE).length);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){
@@ -77,6 +78,14 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
       return t;
     };
     assert.match(tool('get_help').description,/KaTeX/);
+    for(const name of ['list_archived','delete_archived_record','delete_folder'])assert.ok(tool(name));
+    assert.equal(tool('list_archived').annotations?.readOnlyHint,true);
+    assert.equal(tool('delete_archived_record').annotations?.destructiveHint,true);
+    assert.equal(tool('delete_folder').annotations?.destructiveHint,true);
+    for(const name of ['delete_archived_record','delete_folder'])assert.ok(tool(name).inputSchema.required?.includes('expectedMetadataRevision'));
+    assert.ok(tool('delete_archived_record').inputSchema.required?.includes('expectedRevision'));
+    const life=await request('tools/call',{name:'get_help',arguments:{topic:'lifecycle'}});
+    assert.match(JSON.parse(life.content[0].text).content,/previewToken/);
     for(const name of ['manage_record','manage_folder']){
       assert.ok(tool(name).inputSchema.required?.includes('expectedMetadataRevision'),name+' requires revision');
       const missing=await request('tools/call',{name,arguments:{id:'11111111-1111-4111-8111-111111111111',name:'Updated'}});

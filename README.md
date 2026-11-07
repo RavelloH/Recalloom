@@ -11,6 +11,7 @@ Recalloom 是一个可自部署的版本化个人知识库，同时提供 Web �
 - **多种检索方式**：支持关键词、语义和混合搜索，以及标签、关联记录和指定目录范围内的查找。
 - **知识关系网**：D1 保存可编辑的有向文档关系和反向链接，Vectorize 按现有文本块推荐相似文档；提供交互式图谱、聚焦子图、缩放与节点筛选。
 - **版本历史**：保留记录修改历史，支持差异查看、冲突保护和恢复旧版本。
+- **归档与删除**：归档记录脱离活动目录，保留原路径、正文与历史；仅归档记录可永久删除。删除文件夹会递归归档其下的记录，再删除目录结构。
 - **协作与审计**：追踪 Agent 的修改，避免不同客户端无意覆盖彼此的工作。
 - **备份与恢复**：提供知识库快照导出和恢复前检查，便于迁移与备份。
 - **安全连接**：使用 OAuth 授权 MCP 客户端，可分别授予读取与写入权限。
@@ -101,7 +102,7 @@ Recalloom 不会自动保存每条对话；需要由客户端根据你的要求�
 
 ### MCP 帮助与扩展 Markdown
 
-MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、`<mark>` 高亮（包含行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务及备份。
+MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、`<mark>` 高亮（包含行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务、归档生命周期及备份。通过 `get_help({"topic":"lifecycle"})` 可查看安全归档、永久删除及递归目录删除的完整规则。
 
 支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
 
@@ -117,7 +118,7 @@ pnpm db:local
 pnpm dev
 ```
 
-`pnpm dev` 会监听帮助文档与目录清单的修改，并自动重建 Workers 可导入的帮助模块。单独编辑文档时也可运行 `pnpm help:watch`；提交前仍需通过 `pnpm help:check`。MCP `manage_record` 和 `manage_folder` 修改元数据时必须提供 `expectedMetadataRevision`。
+`pnpm dev` 会监听帮助文档与目录清单的修改，并自动重建 Workers 可导入的帮助模块。单独编辑文档时也可运行 `pnpm help:watch`；提交前仍需通过 `pnpm help:check`。MCP `manage_record` 和 `manage_folder` 修改元数据时必须提供 `expectedMetadataRevision`。新增的 `list_archived` 是归档记录专用列表，`delete_archived_record` 必须先预览且只能永久删除已归档记录，`delete_folder` 必须先用 `dryRun` 获取 `previewToken`，再递归归档记录并删除文件夹。迁移 `0015_archive_lifecycle.sql` 在部署前应用；可运行 `pnpm test:migrations` 和本地隔离环境下的 `pnpm test:archive` 验证升级和操作。
 
 需要验证文档示例实际渲染与编辑行为时，可在本地测试 Worker（已应用本地迁移、监听 `127.0.0.1`）运行的情况下执行 `pnpm test:help:e2e`；可用 `RECALLOOM_TEST_BASE` 指定本地端口。该脚本只允许连接 `127.0.0.1`，并且会在本地测试数据库中创建验证记录；**不可对生产环境执行**。
 

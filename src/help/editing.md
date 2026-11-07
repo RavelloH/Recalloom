@@ -37,4 +37,4 @@ Recalloom 把最新正文与 text-version 历史版本分开管理。所有正�
 
 edit_record 保存的是 Markdown 源码，不是渲染后的 HTML。行内 KaTeX 使用 $...$，块公式使用独立 $$ 行；使用 <mark> 包裹公式时须遵守 math 的换行规则。Wiki 引用的 UUID 与路径应依据已确认的记录解析，详见 wiki。
 
-结构化 task_list 的具体状态、优先级和条目管理详见 tasks。归档、删除、历史恢复等影响较大的操作需要符合用户意图。
+结构化 task_list 的具体状态、优先级和条目管理详见 tasks。归档会从活动路径移除记录，删除文件夹将归档其所有后代，永久删除只允许已归档记录；详细安全和并发规则参见 lifecycle。

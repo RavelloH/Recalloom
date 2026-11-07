@@ -19,6 +19,11 @@ mkdirSync(legacyMigrations);
 for(const name of readdirSync(liveMigrations).filter(name=>/^00(0[1-9]|1[0-2])_.*\.sql$/.test(name)))
   copyFileSync(join(liveMigrations,name),join(legacyMigrations,name));
 
+const preLifecycleMigrations=join(tmp,'through-0014');
+mkdirSync(preLifecycleMigrations);
+for(const name of readdirSync(liveMigrations).filter(name=>/^00(0[1-9]|1[0-4])_.*\.sql$/.test(name)))
+  copyFileSync(join(liveMigrations,name),join(preLifecycleMigrations,name));
+
 const config=(label,migrationsDir)=>{
  const path=join(tmp,label+'.json');
  writeFileSync(path,JSON.stringify({
@@ -35,6 +40,7 @@ const config=(label,migrationsDir)=>{
 };
 const complete=config('complete',liveMigrations);
 const staged=config('staged',legacyMigrations);
+const staged14=config('staged14',preLifecycleMigrations);
 
 function wr(state,configuration,command,{expectFailure=false}={}){
  const args=['d1',...command,'--local','--persist-to',join(tmp,state),'--config',configuration];
@@ -91,6 +97,27 @@ try{
  migrate('empty',complete);
  assert.equal(query('empty',complete,'SELECT COUNT(*) AS n FROM d1_migrations')[0].n,latestMigrationCount);
  console.log('PASS: new D1 applies all '+latestMigrationCount+' migrations and reapply is a no-op');
+
+ // Replay an upgrade with already archived records and occupied historical paths.
+ migrate('archived-upgrade',staged14);
+ const archivedFixture=join(tmp,'archived-upgrade-fixture.sql');
+ writeFileSync(archivedFixture,[
+  "INSERT INTO folders(id,name,description,created_at,updated_at) VALUES('legacy-folder','Legacy','', '2026-01-01','2026-01-01')",
+  "INSERT INTO folders(id,name,description,created_at,updated_at) VALUES('legacy-other-root','old.md','', '2026-01-01','2026-01-01')",
+  "INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES('legacy-archived','legacy-folder','old.md','document','archived','', '2026-01-01','2026-01-02')",
+  "INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES('legacy-root',NULL,'root.md','document','archived','', '2026-01-01','2026-01-03')"
+ ].join(';\n')+';\n');
+ wr('archived-upgrade',staged14,['execute','DB','--file',archivedFixture]);
+ migrate('archived-upgrade',complete);
+ assert.deepEqual(query('archived-upgrade',complete,
+  "SELECT folder_id AS folderId,archived_from_folder_id AS originalFolder,archived_from_path AS originalPath FROM records WHERE id='legacy-archived'"),
+  [{folderId:null,originalFolder:'legacy-folder',originalPath:'/Legacy/old.md'}]);
+ assert.deepEqual(query('archived-upgrade',complete,
+  "SELECT folder_id AS folderId,archived_from_path AS originalPath FROM records WHERE id='legacy-root'"),
+  [{folderId:null,originalPath:'/root.md'}]);
+ wr('archived-upgrade',complete,['execute','DB','--command',
+  "INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES('new-active','legacy-folder','old.md','document','active','','2026-02-01','2026-02-01')"]);
+ console.log('PASS: 0015 detaches existing archives, preserves original paths and releases active names');
 
  // A quarantined, SHA-consistent single-head record can be repaired.
  migrate('repaired',staged);

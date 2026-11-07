@@ -22,6 +22,9 @@ export interface StoredRecord {
   created_at: string;
   updated_at: string;
   metadata_revision: number;
+  archived_from_path: string | null;
+  archived_from_folder_id: string | null;
+  archived_at: string | null;
   content: string;
   history_metadata: string;
   revision: number;

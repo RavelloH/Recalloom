@@ -20,10 +20,10 @@ import {wikiRemark} from '../web/src/wiki-remark';
 const examples=(doc:string)=>[...doc.matchAll(/~~~markdown\n([\s\S]*?)\n~~~/g)].map(x=>x[1]);
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
-test('help catalog has nine documented topics with stable resource URIs',()=>{
- assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','backup']);
+test('help catalog has ten documented topics with stable resource URIs',()=>{
+ assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','lifecycle','backup']);
  const resources=listHelpResources();
- assert.equal(resources.length,10);
+ assert.equal(resources.length,11);
  assert.equal(resources[0].topic,'index');
  assert.match(resources[0].content,/math.*LaTeX|math.*公式|math.*数学/);
  for(const topic of HELP_TOPICS){

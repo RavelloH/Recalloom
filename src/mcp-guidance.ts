@@ -9,18 +9,19 @@ export const SERVER_INSTRUCTIONS=[
  'For navigation use browse/search/resolve_path; get_overview/get_outline give bounded navigation aids. Always use read_record/read_many for authoritative content. related_records and get_knowledge_graph show known and suggested relations; semantic suggestions are not confirmed links.',
  'Before writing document content, read the latest revision and supply expectedRevision. For metadata supply expectedMetadataRevision; on conflict re-read and reconcile rather than silently overwriting. Use mutate_task for structured task_list entries. See get_help({topic:"editing"}) and get_help({topic:"tasks"}).',
  'Use literal/metadata search for exact or newly changed data; semantic indexing may lag. Follow page.nextCursor or nextOffsetChars when a complete response is needed. Do not fabricate facts, record IDs, task states or revision availability.',
+ 'Archive removes records from active folders, browse and search; list_archived is the only enumeration of archived records. delete_archived_record requires archived status and explicit permission; delete_folder archives all descendants and removes only directory structure. Preview before irreversible operations. See get_help({topic:"lifecycle"}).',
  'Avoid duplicate records and speculative writes. Snapshot imports, restoring content, archiving or other consequential operations require appropriate user intent; use import_snapshot dryRun first. See get_help({topic:"versions"}) and get_help({topic:"backup"}).'
 ].join('\n');
 
 export const TOOL_GUIDANCE={
  get_help:{
   title:'Read Recalloom help and Markdown syntax',
-  description:'Read the topic index or detailed, current documentation: markdown/GFM, KaTeX math and <mark> highlights (including display equations), WikiLink/embeds, editing, versions, search, tasks and backups. Use before writing unfamiliar extended syntax. Read only.',
+  description:'Read current documentation: markdown/GFM, KaTeX, <mark>, Wiki embeds, editing, versions, search, tasks, lifecycle (archive/delete) and backup. Use before unfamiliar syntax or irreversible actions. Read only.',
   destructive:false
  },
  browse:{
   title:'Browse a folder',
-  description:'List a folder UUID\'s child folders and records, or the root when folderId is omitted. Follow page.nextCursor as needed; use resolve_path when the absolute path is known.',
+  description:'List only ACTIVE child folders/records, or root. Archived records are absent; use list_archived to enumerate them. Follow page.nextCursor; resolve_path for known active paths.',
   destructive:false
  },
  resolve_path:{
@@ -36,6 +37,11 @@ export const TOOL_GUIDANCE={
  manage_folder:{
   title:'Update a folder',
   description:'Rename, describe or reparent a folder with expectedMetadataRevision. Moves alter descendant paths and reject cycles.',
+  destructive:true
+ },
+ delete_folder:{
+  title:'Delete a folder and archive its subtree',
+  description:'Preview first (dryRun default true), then supply previewToken and expectedMetadataRevision to atomically archive descendant records and delete folders. Never permanently deletes records; max 100 folders and 500 records per operation.',
   destructive:true
  },
  create_record:{
@@ -55,7 +61,17 @@ export const TOOL_GUIDANCE={
  },
  manage_record:{
   title:'Update record metadata or archive',
-  description:'Rename, move, describe, change status or archive without changing content revision. Supply expectedMetadataRevision; archived records are excluded from ordinary search.',
+  description:'Rename, move, describe or change status with expectedMetadataRevision. Archiving detaches active paths; restoring tries original folder and requires an explicit destination if missing. See get_help(lifecycle).',
+  destructive:true
+ },
+ list_archived:{
+  title:'List archived records',
+  description:'Dedicated paginated archive listing by name/original path; ordinary browse, resolve_path and search never return archived records.',
+  destructive:false
+ },
+ delete_archived_record:{
+  title:'Permanently delete an archived record',
+  description:'ONLY archived records. Requires both expectedMetadataRevision and expectedRevision; dryRun defaults true and reports impact. false irreversibly deletes content/history and queues Vectorize cleanup.',
   destructive:true
  },
  tag_record:{
@@ -100,7 +116,7 @@ export const TOOL_GUIDANCE={
  },
  index_pending:{
   title:'Process queued index jobs',
-  description:'Process a small batch of queued/stale semantic indexing tasks. Cron normally handles this; mutates Vectorize, not document content. Use when immediate indexing is needed.',
+  description:'Process queued semantic indexing and permanent-deletion vector cleanup. Cron normally handles both; alters Vectorize, not remaining record content.',
   destructive:false
  },
  read_many:{

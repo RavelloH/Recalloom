@@ -135,10 +135,14 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     const row=item.record,recordId=id(row.id),folder=row.folder_id===null?null:id(row.folder_id),recordName=name(row.name);
     if(folder&&!knownFolders.has(folder)&&!(await env.DB.prepare('SELECT 1 FROM folders WHERE id=?').bind(folder).first()))fail('FOLDER_NOT_FOUND');
     if(await env.DB.prepare('SELECT 1 FROM records WHERE id=?').bind(recordId).first())fail('IMPORT_CONFLICT','Record ID already exists');
-    const k=key(folder,recordName);
-    if(stagedNames.has(k))fail('PATH_CONFLICT');stagedNames.add(k);
-    if(await env.DB.prepare('SELECT 1 FROM records WHERE folder_id IS ? AND name=? UNION ALL SELECT 1 FROM folders WHERE parent_id IS ? AND name=? LIMIT 1')
-      .bind(folder,recordName,folder,recordName).first())fail('PATH_CONFLICT');
+    const archived=row.status==='archived';
+    // Archived records are not part of the active virtual namespace.
+    if(!archived){
+      const k=key(folder,recordName);
+      if(stagedNames.has(k))fail('PATH_CONFLICT');stagedNames.add(k);
+      if(await env.DB.prepare("SELECT 1 FROM records WHERE folder_id IS ? AND name=? AND status!='archived' UNION ALL SELECT 1 FROM folders WHERE parent_id IS ? AND name=? LIMIT 1")
+        .bind(folder,recordName,folder,recordName).first())fail('PATH_CONFLICT');
+    }
     if(!['document','checkpoint','task_list'].includes(String(row.kind))||!['draft','active','completed','superseded','archived'].includes(String(row.status)))fail('INVALID_SNAPSHOT');
     const content=string(row.content),history=string(row.history_metadata,2_000_000);
     string(row.description,5000);
@@ -156,8 +160,28 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     }
     const legacyCheckpoint=row.kind==='checkpoint';
     const restoredKind=legacyCheckpoint?'document':row.kind;
-    statements.push(env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,metadata_revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
-      .bind(recordId,folder,recordName,restoredKind,row.status,row.description,Number(row.metadata_revision??1)+(legacyCheckpoint?1:0),row.created_at,row.updated_at));
+    // Snapshot-v2 exported before lifecycle migration can still hold archived
+    // records inside folders. Detach them while preserving their original path.
+    let archivedFromPath:string|null=null;
+    if(archived){
+      if(row.archived_from_path!=null)archivedFromPath=string(row.archived_from_path,2048);
+      else {
+        const names=[recordName];
+        let current=folder,depth=0;
+        while(current&&depth++<32){
+          const staged=byId.get(current);
+          const f=staged??await env.DB.prepare('SELECT id,parent_id,name FROM folders WHERE id=?').bind(current).first<AnyRow>();
+          if(!f)throw new StorageError('FOLDER_NOT_FOUND');
+          names.unshift(name(f.name));current=f.parent_id===null?null:id(f.parent_id);
+        }
+        archivedFromPath='/'+names.join('/');
+      }
+    }
+    const previousFolder=archived?(row.archived_from_folder_id==null?folder:id(row.archived_from_folder_id)):null;
+    statements.push(env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,metadata_revision,created_at,updated_at,archived_from_path,archived_from_folder_id,archived_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(recordId,archived?null:folder,recordName,restoredKind,row.status,row.description,
+       Number(row.metadata_revision??1)+(legacyCheckpoint?1:0),row.created_at,row.updated_at,
+       archivedFromPath,previousFolder,archived?row.archived_at??row.updated_at:null));
     statements.push(env.DB.prepare('INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES(?,?,?,?)')
       .bind(recordId,content,revision,row.content_sha256));
     statements.push(env.DB.prepare('INSERT INTO record_histories(record_id,history_metadata) VALUES(?,?)').bind(recordId,history));
@@ -186,7 +210,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     }
     if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
       .bind(crypto.randomUUID(),recordId,revision,new Date().toISOString()));
-    statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:folder,kind:restoredKind,legacyCheckpoint}));
+    statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:archived?null:folder,kind:restoredKind,legacyCheckpoint,archivedFromPath}));
   }
   for(const link of links){
     const source=id(link.source_id),target=id(link.target_id),relation=string(link.relation,64);

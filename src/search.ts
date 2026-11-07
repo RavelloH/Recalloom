@@ -49,8 +49,11 @@ export async function processIndexJobs(env:Env,limit=3) {
       // A stale index can exist briefly; semantic results always validate against D1.
       const obsolete=old.filter(id=>!ids.includes(id));
       if(obsolete.length) await env.VECTORIZE.deleteByIds(obsolete);
-      const latest=await env.DB.prepare('SELECT revision FROM record_contents WHERE record_id=?').bind(job.record_id).first<{revision:number}>();
-      if(latest?.revision!==job.revision){
+      const latest=await env.DB.prepare('SELECT c.revision,r.status FROM record_contents c JOIN records r ON r.id=c.record_id WHERE c.record_id=?').bind(job.record_id).first<{revision:number;status:string}>();
+      if(!latest||latest.revision!==job.revision||(latest.status==='archived'&&record.status!=='archived')){
+        // A record can be archived or permanently removed while AI embeddings
+        // are being computed. Undo any vectors written by this stale job.
+        for(let i=0;i<ids.length;i+=100)await env.VECTORIZE.deleteByIds(ids.slice(i,i+100));
         await env.DB.prepare('UPDATE index_jobs SET state=\'done\' WHERE id=?').bind(job.id).run();
         results.push({id:job.id,skipped:'changed_during_index'});continue;
       }

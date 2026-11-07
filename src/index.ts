@@ -2,6 +2,7 @@ import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/w
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
+import {processVectorDeleteJobs} from './lifecycle.js';
 import { webApi } from './web-api.js';
 import { cleanupWebAuth } from './web-auth.js';
 import { rememberOAuthActor } from './web-activity.js';
@@ -150,6 +151,7 @@ export default {
     return provider(env,request).fetch(request,env,ctx);
   },
   scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
+    ctx.waitUntil(processVectorDeleteJobs(env,5).then(x=>console.log('Recalloom vector cleanup',JSON.stringify(x))).catch(e=>console.error('Recalloom vector cleanup failed',e)));
     ctx.waitUntil(processIndexJobs(env,5).then(x=>console.log('Recalloom indexing',JSON.stringify(x))).catch(e=>console.error('Recalloom indexing failed',e)));
     ctx.waitUntil(cleanupWebAuth(env).catch(e=>console.error('Recalloom Web auth cleanup failed',e)));
   }

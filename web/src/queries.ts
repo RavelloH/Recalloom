@@ -26,10 +26,10 @@ export const folderPagesQuery=(folderId:string|null)=>infiniteQueryOptions({
  queryFn:({pageParam})=>browse(folderId,pageParam),
  getNextPageParam:last=>last.page.hasMore&&last.page.nextCursor!=null?String(last.page.nextCursor):undefined
 });
-export const archivedRecordsQuery=()=>infiniteQueryOptions({
- queryKey:['archived-records'],
+export const archivedRecordsQuery=(query='')=>infiniteQueryOptions({
+ queryKey:['archived-records',query],
  initialPageParam:undefined as string|undefined,
- queryFn:({pageParam})=>api<{items:Array<{id:string;name:string;kind:'document'|'task_list';folderId:string|null;folderName:string|null;metadataRevision:number;revision:number;updatedAt:string}>;page:{hasMore:boolean;nextCursor:string|null}}>('/archives?'+queryString({cursor:pageParam,limit:50})),
+ queryFn:({pageParam})=>api<{items:Array<{id:string;name:string;kind:'document'|'task_list';folderId:string|null;folderName:string|null;archivedFromPath:string|null;archivedAt:string|null;metadataRevision:number;revision:number;updatedAt:string}>;page:{hasMore:boolean;nextCursor:string|null}}>('/archives?'+queryString({cursor:pageParam,limit:50,query})),
  getNextPageParam:last=>last.page.hasMore?last.page.nextCursor??undefined:undefined
 });
 export const tasksQuery=(recordId?:string)=>queryOptions({queryKey:['tasks',recordId??'all'],queryFn:()=>tasks(recordId?{recordId}:undefined)});

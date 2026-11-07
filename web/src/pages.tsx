@@ -14,7 +14,7 @@ import {Selector} from '@astryxdesign/core/Selector';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
-import {FileText,Folder,FolderPlus,Plus,Search,RefreshCw,Archive,Clock,Shield,Settings,Database,Tag,ListTodo,FolderOpen,Lock,Library,PanelRight,Copy,Shapes,CircleDot,MoveHorizontal,Command,Network} from 'lucide-react';
+import {FileText,Folder,FolderPlus,Plus,Search,RefreshCw,Archive,Clock,Shield,Settings,Database,Tag,ListTodo,FolderOpen,Lock,Library,PanelRight,Copy,Shapes,CircleDot,MoveHorizontal,Command,Network,Trash2} from 'lucide-react';
 import {ApiError,api,mutate,sessions,queryString} from './api';
 import type {Task} from './types';
 import {useAppearance} from './theme';
@@ -114,11 +114,18 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
  const deleteFolder=async()=>{
   const current=currentFolder.data;
   if(!folderId||!current||deletingFolder)return;
-  if(!(await askConfirm({title:'永久删除空文件夹？',description:'将删除「'+current.name+'」这个目录，但不会删除任何文档或子文件夹。只要仍有子项（包括归档记录），服务器就会拒绝删除。',actionLabel:'删除空文件夹',destructive:true})))return;
   setDeletingFolder(true);setError(null);
   try{
-   await mutate('/folders/'+folderId,{expectedMetadataRevision:current.metadataRevision,expectedName:current.name},'DELETE');
-   await Promise.all([qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['folder-trail']})]);
+   const preview=await api<{previewToken:string;foldersToDelete:number;recordsToArchive:number;alreadyArchived:number}>(
+    '/folders/'+folderId+'/delete-preview?'+queryString({expectedMetadataRevision:current.metadataRevision}));
+   if(!(await askConfirm({title:'删除文件夹并归档内容？',
+    description:'即将删除 '+preview.foldersToDelete+' 个文件夹，归档 '+preview.recordsToArchive+
+     ' 份记录。所有文件正文与历史版本将保留在归档区，永久删除记录数为 0。',
+    actionLabel:'删除文件夹',destructive:true})))return;
+   await mutate('/folders/'+folderId,{expectedMetadataRevision:current.metadataRevision,previewToken:preview.previewToken},'DELETE');
+   await Promise.all([qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),
+     qc.invalidateQueries({queryKey:['folder-trail']}),qc.invalidateQueries({queryKey:['archived-records']}),
+     qc.invalidateQueries({queryKey:['tasks']}),qc.invalidateQueries({queryKey:['knowledge-graph']})]);
    if(current.parentId)await nav({to:'/library/$folderId',params:{folderId:current.parentId}});
    else await nav({to:'/library'});
   }catch(e){setError(e);}finally{setDeletingFolder(false);}
@@ -131,7 +138,7 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
   <div className="page-icon" aria-hidden="true">{folderId?<FolderOpen size={34} strokeWidth={1.6}/>:<Library size={34} strokeWidth={1.6}/>}</div>
   {folderId&&currentFolder.isPending?<Skeleton width="45%" height={40} radius={2}/>:currentFolder.isError?<ErrorText error={currentFolder.error}/>:<InlineTitle value={title} onRename={folderId?renameFolder:undefined} autoFocus={focusTitle}/>}
   {subtitle&&<p className="page-subtitle">{subtitle}</p>}
-  <div className="doc-header-actions"><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/>{folderId&&<Button label="删除空文件夹" variant="ghost" size="sm" isDisabled={deletingFolder||currentFolder.isPending} isLoading={deletingFolder} onClick={()=>void deleteFolder()}/>}</div>
+  <div className="doc-header-actions"><Button label="新建文件夹" icon={<FolderPlus size={15}/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Plus size={15}/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/>{folderId&&<Button label="删除文件夹" variant="ghost" size="sm" isDisabled={deletingFolder||currentFolder.isPending} isLoading={deletingFolder} onClick={()=>void deleteFolder()}/>}</div>
  </header>
  <AutoResizer><AutoTransition transitionKey={creating?'form':'none'} type="slideUp">{creating&&<Card className="inline-form create-surface" padding={4}><form className="create-form" onSubmit={e=>{e.preventDefault();void create();}}><div className="create-fields"><div className="inline-selector"><Selector label="类型" size="md" width="100%" value={creating} options={[{value:'folder',label:'文件夹'},{value:'document',label:'文档'},{value:'checkpoint_template',label:'阶段总结（文档模板）'},{value:'task_list',label:'任务列表'}]} onChange={value=>setCreating(value as typeof creating)}/></div><div className="inline-field"><TextInput label="名称" hasAutoFocus width="100%" placeholder="名称" value={name} onChange={setName} onEnter={create} onKeyDown={e=>{if(e.key==='Escape')setCreating(null);}}/></div>{creating!=='folder'&&<div className="inline-field"><TextInput label="标签" width="100%" placeholder="标签（逗号分隔，可选）" value={tagInput} onChange={setTagInput}/></div>}</div><div className="create-actions"><Button type="submit" label="创建" variant="primary" isDisabled={!name.trim()}/><Button label="取消" onClick={()=>setCreating(null)}/></div></form></Card>}</AutoTransition></AutoResizer>
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
@@ -146,37 +153,72 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
  * Archived items are intentionally absent from the active page tree. */
 export function ArchivePage(){
  const qc=useQueryClient();
- const q=useInfiniteQuery(archivedRecordsQuery());
+ const [filter,setFilter]=useState('');
+ const q=useInfiniteQuery(archivedRecordsQuery(filter));
  const [restoring,setRestoring]=useState<string|null>(null);
+ const [deleting,setDeleting]=useState<string|null>(null);
+ const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [error,setError]=useState<unknown>(null);
  const items=q.data?.pages.flatMap(page=>page.items)??[];
  const restore=async(item:typeof items[number])=>{
-  if(restoring)return;
+  if(restoring||deleting)return;
   setRestoring(item.id);setError(null);
-  try{
-   await mutate('/records/'+item.id+'/meta',{status:'active',expectedMetadataRevision:item.metadataRevision},'PATCH');
-   await Promise.all([
-    qc.invalidateQueries({queryKey:['archived-records']}),
-    qc.invalidateQueries({queryKey:['browse']}),
-    qc.invalidateQueries({queryKey:['browse-pages']}),
-    qc.invalidateQueries({queryKey:['record',item.id]})
-   ]);
-  }catch(e){setError(e);}finally{setRestoring(null);}
+  const doRestore=async(folderId?:string|null)=>{
+   await mutate('/records/'+item.id+'/meta',{
+    status:'active',expectedMetadataRevision:item.metadataRevision,
+    ...(folderId===undefined?{}:{folderId})
+   },'PATCH');
+   await Promise.all([qc.invalidateQueries({queryKey:['archived-records']}),
+    qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),
+    qc.invalidateQueries({queryKey:['record',item.id]})]);
+  };
+  try{await doRestore();}
+  catch(e){
+   if(e instanceof ApiError&&['RESTORE_DESTINATION_REQUIRED','PATH_CONFLICT'].includes(e.code)){
+    const yes=await askConfirm({title:'恢复到知识库根目录？',
+     description:'原文件夹已不存在，或原路径有同名记录。可以改为恢复至根目录；若名称仍冲突，请先打开归档记录重命名。',
+     actionLabel:'恢复到根目录'});
+    if(yes)try{await doRestore(null);}catch(error){setError(error);}
+   }else setError(e);
+  }finally{setRestoring(null);}
  };
- return <div className="page archive-page">
+ const remove=async(item:typeof items[number])=>{
+  if(deleting||restoring)return;
+  setDeleting(item.id);setError(null);
+  try{
+   const preview=await api<{revisions:number;tasks:number;incomingWikiReferences:number;manualRelations:number}>(
+    '/records/'+item.id+'/deletion-preview?'+queryString({
+     expectedMetadataRevision:item.metadataRevision,expectedRevision:item.revision
+    }));
+   if(!(await askConfirm({title:'永久删除已归档记录？',
+    description:'「'+item.name+'」及其 '+preview.revisions+' 个正文版本和 '+preview.tasks+
+     ' 条任务将被永久清除。涉及 '+preview.incomingWikiReferences+
+     ' 个 Wiki 引用、'+preview.manualRelations+' 个手动关联；此操作不可撤销。',
+    actionLabel:'永久删除',destructive:true})))return;
+   await mutate('/records/'+item.id,{
+    expectedMetadataRevision:item.metadataRevision,expectedRevision:item.revision
+   },'DELETE');
+   await Promise.all([qc.invalidateQueries({queryKey:['archived-records']}),
+    qc.invalidateQueries({queryKey:['record',item.id]}),qc.invalidateQueries({queryKey:['knowledge-graph']})]);
+  }catch(e){setError(e);}finally{setDeleting(null);}
+ };
+ return <div className="page archive-page">{confirmation}
   <PageTitle title="归档" description="这里保存不再参与日常工作的页面。所有内容和历史版本都会保留，可以随时恢复。"
    actions={<Link to="/library" className="small text-link">返回知识库</Link>}/>
   {Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}
+  <div className="archive-filter"><TextInput label="搜索归档" placeholder="搜索归档名称或原路径" width="100%" value={filter} onChange={setFilter}/></div>
   {q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:
    items.length?<div className="archive-list">{items.map(item=><div className="archive-item" key={item.id}>
     <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link">
      {item.kind==='task_list'?<ListTodo size={18}/>:<FileText size={18}/>}
      <span className="archive-item-text"><strong className="truncate">{item.name}</strong>
-      <small className="muted truncate">{item.folderName?'来自「'+item.folderName+'」 · ':''}{fmt(item.updatedAt)} · R{item.revision??'—'}</small>
+      <small className="muted truncate">{item.archivedFromPath?'原路径 '+item.archivedFromPath+' · ':''}{fmt(item.archivedAt??item.updatedAt)} · R{item.revision??'—'}</small>
      </span>
     </Link>
-    <Button label="恢复" variant="secondary" size="sm" isLoading={restoring===item.id} isDisabled={Boolean(restoring)}
+    <Button label="恢复" variant="secondary" size="sm" isLoading={restoring===item.id} isDisabled={Boolean(restoring||deleting)}
       onClick={()=>void restore(item)}/>
+    <Button label="永久删除" variant="ghost" size="sm" isLoading={deleting===item.id} isDisabled={Boolean(restoring||deleting)}
+      onClick={()=>void remove(item)}/>
    </div>)}</div>:<Empty title="暂无归档内容" description="在记录页面使用“归档记录”后，它会出现在这里；归档不会删除数据。"/>}
   {q.hasNextPage&&<div className="load-more"><Button label="加载更多" variant="ghost" size="sm" isLoading={q.isFetchingNextPage}
    onClick={()=>void q.fetchNextPage()}/></div>}
@@ -206,7 +248,24 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  const saveMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');await refresh();};
  const updateMeta=async(fields:Record<string,unknown>)=>{setError(null);try{await saveMeta(fields);setMetaOpen(false);}catch(e){setError(e);}};
  const changeTag=async(tag:string,action:'add'|'remove')=>{await mutate('/records/'+recordId+'/tags',{tag,action});await refresh();};
- const archive=async()=>{if(!(await askConfirm({title:'归档此记录？',description:'归档后记录将不再显示在常用列表中，但内容和历史版本仍会保留。',actionLabel:'归档记录',destructive:true})))return;setArchiving(true);await updateMeta({status:'archived'});setArchiving(false);};
+ const archive=async()=>{if(!(await askConfirm({title:'归档此记录？',description:'归档后记录将不再显示在活动文件夹中，但内容和历史版本仍会保留。',actionLabel:'归档记录',destructive:true})))return;setArchiving(true);try{await updateMeta({status:'archived'});}finally{setArchiving(false);}};
+ const deleteArchived=async()=>{
+  if(!item||item.status!=='archived'||archiving)return;
+  setArchiving(true);setError(null);
+  try{
+   const preview=await api<{revisions:number;incomingWikiReferences:number}>('/records/'+item.id+'/deletion-preview?'+queryString({
+    expectedMetadataRevision:item.metadataRevision,expectedRevision:item.revision
+   }));
+   if(!(await askConfirm({title:'永久删除已归档记录？',
+    description:'将永久清除「'+item.name+'」以及全部 '+preview.revisions+
+      ' 个正文版本。'+preview.incomingWikiReferences+' 个引用将失去目标，此操作不可撤销。',
+    actionLabel:'永久删除',destructive:true})))return;
+   await mutate('/records/'+item.id,{expectedMetadataRevision:item.metadataRevision,expectedRevision:item.revision},'DELETE');
+   forgetPage(item.id);
+   qc.invalidateQueries({queryKey:['archived-records']});
+   await nav({to:'/archive'});
+  }catch(e){setError(e);}finally{setArchiving(false);}
+ };
  if(q.isPending)return <div className="page record-page"><div className="doc-header"><Skeleton width={56} height={56} radius={3}/><div className="doc-skeleton-title"><Skeleton width="55%" height={40} radius={2}/></div><Skeleton width="38%" height={14} radius={1}/></div></div>;
  if(q.isError||!item)return <div className="page"><ErrorText error={q.error}/></div>;
  const pageActions=<>
@@ -216,7 +275,8 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
    {label:fullWidth?'恢复标准宽度':'全宽显示',icon:<MoveHorizontal size={15}/>,onClick:()=>setFullWidth(!fullWidth)},
    {label:'查看关系网',icon:<Network size={15}/>,onClick:()=>void nav({to:'/graph',search:{focus:item.id}})},
    {type:'divider'},
-   {label:'归档记录',icon:<Archive size={15}/>,variant:'destructive',isDisabled:archiving||item.status==='archived',onClick:()=>void archive()}
+   {label:'归档记录',icon:<Archive size={15}/>,variant:'destructive',isDisabled:archiving||item.status==='archived',onClick:()=>void archive()},
+   ...(item.status==='archived'?[{label:'永久删除归档记录',icon:<Trash2 size={15}/>,variant:'destructive' as const,isDisabled:archiving,onClick:()=>void deleteArchived()}]:[])
   ]}/>
  </>;
  return <div className="page record-page">{confirmation}

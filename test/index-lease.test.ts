@@ -16,7 +16,7 @@ function fixture(claimed=true,stale=true){
         },
         first:async()=>{
           if(sql.includes('SELECT r.id,r.name,r.status'))return {id:'record1',name:'archived',status:'archived',content:'',revision:1};
-          if(sql.includes('SELECT revision FROM record_contents'))return {revision:1};
+          if(sql.includes('SELECT c.revision,r.status FROM record_contents'))return {revision:1,status:'archived'};
           throw Error('Unexpected first '+sql);
         },
         run:async()=>{

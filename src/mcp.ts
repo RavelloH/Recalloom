@@ -3,8 +3,10 @@ import { z } from 'zod';
 import type { Env, EditInput } from './types.js';
 import { StorageError } from './types.js';
 import * as store from './storage.js';
+import * as lifecycle from './lifecycle.js';
 import * as agent from './agent-tools.js';
 import { processIndexJobs, search } from './search.js';
+import {processVectorDeleteJobs} from './lifecycle.js';
 import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
 import {getHelp,listHelpResources,HELP_TOPICS,type HelpTopic} from './help/index.js';
@@ -85,7 +87,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   };
   register('get_help',z.object({
     topic:z.enum(HELP_TOPICS as [HelpTopic,...HelpTopic[]]).optional()
-      .describe('Help topic: overview, markdown, math, wiki, editing, versions, search, tasks or backup. Omit for topic index.')
+      .describe('Help topic: overview, markdown, math, wiki, editing, versions, search, tasks, lifecycle or backup. Omit for topic index.')
   }),false,(x)=>Promise.resolve(getHelp(x.topic)));
   register('browse',z.object({folderId:uuid.nullable().describe('Folder UUID; omit or null to browse root.').optional(),limit,cursor:pageCursor}),false,
     (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
@@ -97,6 +99,13 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     id:uuid,name:z.string().min(1).max(180).optional(),
     parentId:uuid.nullable().optional(),description:z.string().max(5000).optional(),expectedMetadataRevision
   }),true,(x)=>store.manageFolder(env,x.id,x,actor));
+  register('delete_folder',z.object({
+    id:uuid,expectedMetadataRevision,
+    dryRun:z.boolean().describe('Default true; inspect an entire subtree before deleting folders and archiving records.').optional(),
+    previewToken:z.string().regex(/^[a-f0-9]{64}$/).describe('Exact previewToken from the preceding dryRun. Required to execute.').optional()
+  }),true,async(x)=>x.dryRun===false
+    ?lifecycle.deleteFolder(env,x.id,x.expectedMetadataRevision,x.previewToken??'',actor)
+    :lifecycle.previewDeleteFolder(env,x.id,x.expectedMetadataRevision));
   register('create_record',z.object({name:z.string().min(1).max(180),folderId:uuid.nullable().optional(),kind:z.enum(['document','task_list']).optional(),content:z.string().max(500000).optional(),description:z.string().max(5000).optional(),tags:z.array(z.string().min(1).max(64)).max(32).optional()}),true,
     (x)=>store.createRecord(env,x,actor));
   register('read_record',z.object({id:uuid,revision:z.number().int().positive().optional(),metadataOnly:z.boolean().optional(),lineStart:z.number().int().positive().optional(),maxLines:z.number().int().min(1).max(2000).optional()}),false,
@@ -108,6 +117,13 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     });
   register('manage_record',z.object({id:uuid,name:z.string().max(180).optional(),folderId:uuid.nullable().optional(),status:statuses.optional(),description:z.string().max(5000).optional(),expectedMetadataRevision}),true,
     (x)=>store.updateMeta(env,x.id,x,actor));
+  register('list_archived',z.object({
+    limit,cursor:pageCursor,query:z.string().max(200).describe('Optional archived name or original-path substring.').optional()
+  }),false,(x)=>store.archivedRecords(env,x.limit,x.cursor,x.query));
+  register('delete_archived_record',z.object({
+    id:uuid,expectedMetadataRevision,expectedRevision,
+    dryRun:z.boolean().describe('Defaults to true: preview permanent deletion impact. false deletes all content and history irreversibly.').optional()
+  }),true,(x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor));
   register('tag_record',z.object({id:uuid,tag:z.string().min(1).max(64),action:z.enum(['add','remove'])}),true,
     (x)=>store.tagRecord(env,x.id,x.tag,x.action,actor));
   register('list_tasks',z.object({
@@ -129,13 +145,14 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     minScore:z.number().min(0).max(1).describe('Raw semantic similarity threshold, default 0.43; unrelated to lexical search.').optional()
   }),false,async (x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};});
   register('index_diagnostics',z.object({}),false,
-    async()=>{const [counts,failures]=await Promise.all([
+    async()=>{const [counts,failures,vectorCleanup]=await Promise.all([
       env.DB.prepare("SELECT state,COUNT(*) AS count, SUM(CASE WHEN state='running' AND (started_at IS NULL OR started_at<?) THEN 1 ELSE 0 END) AS stale FROM index_jobs GROUP BY state")
         .bind(new Date(Date.now()-5*60*1000).toISOString()).all(),
-      env.DB.prepare("SELECT id,record_id,revision,attempts,last_error,started_at FROM index_jobs WHERE state='failed' ORDER BY created_at DESC LIMIT 10").all()
-    ]);return {counts:counts.results,recentFailures:failures.results};});
+      env.DB.prepare("SELECT id,record_id,revision,attempts,last_error,started_at FROM index_jobs WHERE state='failed' ORDER BY created_at DESC LIMIT 10").all(),
+      env.DB.prepare('SELECT record_id AS recordId,state,attempts,last_error AS lastError FROM vector_delete_jobs ORDER BY created_at DESC LIMIT 20').all()
+    ]);return {counts:counts.results,recentFailures:failures.results,vectorCleanup:vectorCleanup.results};});
   register('index_pending',z.object({limit:z.number().int().min(1).max(10).optional()}),true,
-    (x)=>processIndexJobs(env,x.limit??3));
+    async(x)=>({vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3)}));
   register('read_many',
     z.object({items:z.array(z.object({id:uuid,revision:z.number().int().positive().optional(),offsetChars:z.number().int().nonnegative().describe('Zero-based UTF-16 character offset from previous item.nextOffsetChars.').optional()})).min(1).max(12),maxChars:z.number().int().min(1000).max(60000).describe('Shared JSON output character budget across records.').optional()}),false,
     (x)=>agent.readMany(env,x.items,x.maxChars));

@@ -40,6 +40,11 @@
     "summary": "task_list 的任务状态、优先级和并发修改"
   },
   {
+    "topic": "lifecycle",
+    "title": "归档与文件生命周期",
+    "summary": "独立归档、不可恢复删除、文件夹递归归档和预览并发校验"
+  },
+  {
     "topic": "backup",
     "title": "快照备份与恢复",
     "summary": "分页导出、SHA-256、一致性和谨慎导入"
