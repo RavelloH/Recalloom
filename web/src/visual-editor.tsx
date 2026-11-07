@@ -29,6 +29,7 @@ import {RichContainer,RichBadge,RichAbbr,RichTip} from './tiptap/rich-directives
 import {RichLinkCard} from './tiptap/rich-link-card';
 import {RichFrontMatter} from './tiptap/rich-frontmatter';
 import {RichFootnoteRef,RichFootnoteDefinition} from './tiptap/rich-footnotes';
+import {RichCritic} from './tiptap/rich-critic';
 import {VisibleComment} from './tiptap/comment-mark';
 import Link from '@tiptap/extension-link';
 import {decorateEditorLinks} from './link-metadata-client';
@@ -129,7 +130,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const extensions=useMemo(()=>[
   StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:false}),
   Link.configure({openOnClick:false}),
-  ScrollCodeBlock.configure({defaultTheme:'github-dark',themes:{light:'github-light',dark:'github-dark'}}),
+  ScrollCodeBlock.configure({defaultTheme:'github-light-high-contrast',themes:{light:'github-light-high-contrast',dark:'github-dark-high-contrast'}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
   Markdown,
@@ -139,7 +140,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
-  RichContainer,RichBadge,RichAbbr,RichTip,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+  RichContainer,RichBadge,RichAbbr,RichTip,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),

@@ -162,7 +162,12 @@ export function decorateEditorLinks(root:HTMLElement):()=>void{
     const selector='.record-main .tiptap a[href="'+CSS.escape(href)+'"]::before';
     const background='url("'+proxy.replace(/\\/g,'%5C').replace(/"/g,'%22')+'")';
     try{
-     sheet.insertRule(selector+'{content:"";display:inline-block;width:1em;height:1em;vertical-align:-.16em;margin-right:.24em;background:'+background+' center / contain no-repeat}',sheet.cssRules.length);
+     const tile='linear-gradient(140deg,#f8fafc 0%,#e3e8ee 54%,#778391 100%)';
+     const css='content:"";display:inline-block;box-sizing:border-box;width:1.18em;height:1.18em;vertical-align:-.21em;margin-right:.3em;border-radius:.27em;'+
+      'background-image:'+background.replace(/^url\(/,'url(').replace(/ center \/ contain no-repeat$/,'')+','+tile+';'+
+      'background-position:center,center;background-size:calc(100% - .18em) calc(100% - .18em),cover;'+
+      'background-repeat:no-repeat,no-repeat;box-shadow:inset 0 0 0 1px rgba(15,23,42,.28),0 1px 2px rgba(15,23,42,.18)';
+     sheet.insertRule(selector+'{'+css+'}',sheet.cssRules.length);
      inserted.add(href);
     }catch{
      // An unusual URL must not break editing or trigger a DOM update.

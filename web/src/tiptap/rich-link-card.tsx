@@ -15,9 +15,10 @@ export function LinkCardView({url,title}:{url:string;title?:string}){
  const [data,setData]=useState<LinkPreviewMetadata|null>(null);
  const [loaded,setLoaded]=useState(false);
  const [imageError,setImageError]=useState(false);
+ const [iconError,setIconError]=useState(false);
  const valid=normalizedLinkUrl(url);
  useEffect(()=>{
-  let live=true;setData(null);setLoaded(false);setImageError(false);
+  let live=true;setData(null);setLoaded(false);setImageError(false);setIconError(false);
   if(!valid){setLoaded(true);return;}
   void resolveLinkMetadata(valid).then(result=>{if(live){setData(result);setLoaded(true);}});
   return()=>{live=false;};
@@ -30,7 +31,7 @@ export function LinkCardView({url,title}:{url:string;title?:string}){
    {preview&&!imageError&&<img src={preview} className="rk-link-card-image" alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setImageError(true)}/>}
    <div className="rk-link-card-text">
     <div className="rk-link-card-head">
-     {icon?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display='none';}}/>:<Link2 size={16} aria-hidden="true"/>}
+     {icon&&!iconError?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setIconError(true)}/>:<Link2 size={16} aria-hidden="true"/>}
      <span>{data?.siteName||'外部链接'}</span>
     </div>
     <div className="rk-link-card-title">{displayTitle}</div>

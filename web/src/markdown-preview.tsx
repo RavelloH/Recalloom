@@ -23,6 +23,8 @@ import 'katex/dist/katex.min.css';
 import {OverlayScroll} from './scrollbars';
 import {remarkMarkedDisplayMath} from './tiptap/marked-display-math';
 import {prepareWikiMarkdown} from './wiki-remark';
+import {prepareCriticMarkdown,type CriticKind} from './critic-syntax';
+import {CriticDisplay} from './tiptap/rich-critic';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
 import {slugHeading,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
 
@@ -69,13 +71,14 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-badge','rk-abbr','rk-tip','rk-comment'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-comment'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
   'wiki-embed':['dataTarget','dataAnchor'],
   'rk-callout':['dataKind','dataTitle','dataSender'],
   'rk-link-card':['dataUrl','dataTitle'],
+  'rk-critic':['dataKind','dataValue','dataBefore'],
   'rk-badge':['dataVariant'],
   'rk-abbr':['dataTitle'],
   'rk-tip':['dataContent'],
@@ -94,13 +97,19 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  const source=content.replace(/\r\n/g,'\n');
  const frontmatter=yamlFrontMatter.exec(source);
  const body=frontmatter?source.slice(frontmatter[0].length).replace(/^\n+/, ''):source;
- const prepared=prepareWikiMarkdown(body);
+ const prepared=prepareCriticMarkdown(prepareWikiMarkdown(body));
  const chain=trail??(sourceId?[sourceId]:[]);
  const custom={
   'wiki-ref':({node:_node,...props}:Record<string,unknown>)=>
    <WikiInline target={wikiDecode(String(props['data-target']??''))}
     alias={wikiDecode(String(props['data-alias']??''))||null}
     anchor={wikiDecode(String(props['data-anchor']??''))||null} sourceId={sourceId}/> ,
+  'rk-critic':({node:_node,...props}:Record<string,unknown>)=>{
+   const kind=String(props['data-kind']??props.dataKind??'comment');
+   if(!['addition','deletion','substitution','comment','highlight'].includes(kind))return null;
+   const decode=(raw:unknown)=>{try{return decodeURIComponent(String(raw??''));}catch{return '';}};
+   return <CriticDisplay kind={kind as CriticKind} text={decode(props['data-value']??props.dataValue)} before={decode(props['data-before']??props.dataBefore)}/>;
+  },
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
    const kind=String(props['data-kind']??props.dataKind??'info'),title=String(props['data-title']??props.dataTitle??'');

@@ -11,6 +11,7 @@ import {RichFrontMatter} from '../web/src/tiptap/rich-frontmatter';
 import {frontMatterEntries} from '../web/src/tiptap/frontmatter-utils';
 import {extractWikiSection} from '../web/src/wiki-section';
 import {RichFootnoteRef,RichFootnoteDefinition} from '../web/src/tiptap/rich-footnotes';
+import {RichCritic} from '../web/src/tiptap/rich-critic';
 import {WikiLinkNode,WikiEmbedNode} from '../web/src/tiptap/wiki-nodes';
 import {RawMarkdown} from '../web/src/tiptap/raw-markdown';
 import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
@@ -19,7 +20,7 @@ import type {JSONContent} from '@tiptap/core';
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false}),
  CustomHeading,CustomParagraph,Markdown,RawMarkdown,RichContainer,WikiLinkNode,WikiEmbedNode,
- RichBadge,RichAbbr,RichTip,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+ RichBadge,RichAbbr,RichTip,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
 ]});
 const walk=(n:JSONContent,cb:(item:JSONContent)=>void)=>{
  cb(n);for(const x of n.content??[])walk(x,cb);
@@ -51,6 +52,28 @@ describe('Rich Markdown structural directives',()=>{
   assert.equal(containers[0]?.attrs?.kind,'details');
   assert.equal(containers[1]?.attrs?.kind,'warning');
   assert.match(manager.serialize(doc),/::::details/);
+ });
+ it('preserves all five CriticMarkup review types without applying suggestions',()=>{
+  const source='增加 {++推荐文字++}，删除 {--过时文字--}，替换 {~~老内容~>新内容~~}，标记 {==重点==}{>>Agent A：查证来源<<}。';
+  const doc=buildVisualMarkdown(source,manager);
+  const items=nodes(doc,'richCritic');
+  assert.equal(items.length,5,JSON.stringify(doc));
+  assert.deepEqual(items.map(x=>x.attrs?.kind),['addition','deletion','substitution','highlight','comment']);
+  assert.equal(items[2]?.attrs?.before,'老内容');
+  assert.equal(items[2]?.content?.[0]?.text,'新内容');
+  const output=manager.serialize(doc);
+  assert.ok(output.includes('{++推荐文字++}'));
+  assert.ok(output.includes('{--过时文字--}'));
+  assert.ok(output.includes('{~~老内容~>新内容~~}'));
+  assert.ok(output.includes('{==重点==}{>>Agent A：查证来源<<}'));
+  assert.equal(nodes(buildVisualMarkdown(output,manager),'richCritic').length,5);
+ });
+ it('keeps CriticMarkup inside code fences and inline code as literal code',()=>{
+  const tick=String.fromCharCode(96);
+  const source='正文 '+tick+'{++不是建议++}'+tick+'。\n\n~~~markdown\n{--仍是代码--}\n~~~';
+  const doc=buildVisualMarkdown(source,manager);
+  assert.equal(nodes(doc,'richCritic').length,0);
+  assert.ok(manager.serialize(doc).includes('{--仍是代码--}'));
  });
  it('serializes nested tabs and preserves every editable panel and inline mark',()=>{
   const source=['::::tabs','',':::tab[预览]','','这是**第一项**。','',':::','',':::tab[源代码]','','这里是 `const x=1`。','',':::','','::::'].join('\n');

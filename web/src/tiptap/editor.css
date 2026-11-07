@@ -123,44 +123,83 @@
 }
 .record-main .rk-comment::before {content:'·';margin-inline-end:.24em;opacity:.75;}
 
-/* Shiki code blocks use native Astryx controls for actions and typography tokens. */
+/* Shiki decorates the outer Tiptap React NodeView wrapper too. That wrapper
+ * was retaining an opaque WHITE background behind the rounded code card,
+ * exposing four white triangles at its clipped corners in dark mode. */
+.record-main .tiptap .react-renderer.node-codeBlock.shiki {
+ background:transparent!important;
+ border-radius:10px;
+}
+/* Shiki code blocks use Astryx controls and the effective (not OS) theme.
+ * Use the SAME opaque surface for every layer; transparent nested pre and
+ * OverlayScrollbars corners must never expose a contrasting background. */
+.record-main {
+ --rk-code-surface:#f6f8fa;
+ --rk-code-ink:#17212b;
+ --rk-code-stroke:#cfd6df;
+}
+html[data-effective-theme="dark"] .record-main {
+ --rk-code-surface:#171b22;
+ --rk-code-ink:#eef2f7;
+ --rk-code-stroke:#394351;
+}
 .record-main .rk-code-block {
-  display:block;
-  border:1px solid var(--rk-document-border);
-  border-radius:10px;
-  background:var(--rk-document-wash)!important;
-  margin-block:22px;
-  min-width:0;
-  overflow:hidden;
+ display:block;
+ position:relative;
+ isolation:isolate;
+ border:1px solid var(--rk-code-stroke);
+ border-radius:10px;
+ background:var(--rk-code-surface)!important;
+ color:var(--rk-code-ink);
+ margin-block:22px;
+ min-width:0;
+ overflow:hidden;
 }
 .record-main .rk-code-header {
-  display:flex;align-items:center;justify-content:space-between;gap:.5rem;
-  padding:5px 9px;
-  border-bottom:1px solid var(--rk-document-border);
-  color:var(--color-text-secondary);
-  font-size:12px;
+ display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+ padding:5px 9px;
+ border-bottom:1px solid var(--rk-code-stroke);
+ color:var(--color-text-secondary);
+ font-size:12px;
+ background:var(--rk-code-surface)!important;
 }
 .record-main .rk-code-title,.record-main .rk-code-actions {
-  display:inline-flex;align-items:center;gap:.25rem;min-width:0;
+ display:inline-flex;align-items:center;gap:.25rem;min-width:0;
 }
 .record-main .rk-code-title {flex:1;}
 .record-main .rk-code-title > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .record-main .rk-code-title input {max-width:260px;}
-.record-main .rk-code-viewport {overflow-x:auto;overscroll-behavior-inline:contain;}
-.record-main .rk-code-block pre {
-  border:0;border-radius:0;margin:0;background:transparent!important;
-  overflow:visible;padding:14px 18px;
+.record-main .rk-code-viewport {
+ overflow-x:auto;overscroll-behavior-inline:contain;
+ background:var(--rk-code-surface)!important;
 }
+.record-main .rk-code-block :is(pre,.shiki,.rk-shiki-html) {
+ border:0!important;border-radius:0!important;
+ background:transparent!important;
+ color:var(--rk-code-ink);
+}
+.record-main .rk-code-block pre {margin:0!important;overflow:visible;padding:14px 18px;}
 .record-main .rk-code-block pre code {white-space:pre;}
 .record-main .rk-code-block.rk-code-wrap pre code {white-space:pre-wrap;overflow-wrap:anywhere;}
 .record-main .rk-code-folded .rk-code-viewport {max-height:18rem;overflow-y:hidden;}
-.record-main .rk-code-fold-button {display:flex;justify-content:center;border-top:1px solid var(--rk-document-border);}
-.record-main .tiptap .rk-code-block.shiki span[style] {background:transparent!important;}
-@media (prefers-color-scheme:dark) {
-  .record-main .tiptap .rk-code-block.shiki span[style] {color:var(--shiki-dark)!important;}
+.record-main .rk-code-fold-button {
+ display:flex;justify-content:center;
+ background:var(--rk-code-surface);border-top:1px solid var(--rk-code-stroke);
 }
-[data-theme="dark"] .record-main .tiptap .rk-code-block.shiki span[style],
-html.dark .record-main .tiptap .rk-code-block.shiki span[style] {color:var(--shiki-dark)!important;}
+/* Tiptap's Shiki plugin places --shiki-dark on token spans without
+ * requiring a .shiki ancestor. Target the actual dual-theme tokens, not
+ * the ancestor class; the previous selector missed editable code entirely. */
+.record-main .rk-code-block span[style*="--shiki-dark"] {
+ /* Light Shiki tokens already have correct inline colors. Do not replace
+  * every token with --rk-code-ink or all syntax categories become monochrome. */
+ background:transparent!important;
+}
+html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shiki-dark"] {
+ color:var(--shiki-dark,var(--rk-code-ink))!important;
+}
+/* Prevent native scrollbar corner paints from bleeding white at rounded edges. */
+.record-main .rk-code-viewport::-webkit-scrollbar-corner,
+.record-main .rk-code-block pre::-webkit-scrollbar-corner {background:var(--rk-code-surface);}
 
 /* Rich semantic highlights inherit Astryx neutral palette in both themes. */
 .record-main :is(.tiptap,.markdown-preview) mark[data-rk-color] {color:inherit;}
@@ -231,3 +270,24 @@ html.dark .record-main .tiptap .rk-code-block.shiki span[style] {color:var(--shi
 .record-main .rk-tabs-unscoped {border-top:1px solid var(--rk-document-border);padding-top:.5rem;}
 .record-main .rk-tabs-read-panel .rk-tab-pane > :first-child {margin-top:0;}
 .record-main .rk-tabs-read-panel .rk-tab-pane > :last-child {margin-bottom:0;}
+
+/* CriticMarkup is a visible review annotation, not accepted body text.
+ * Keep comments subdued but never display:none or remove from the editor. */
+.record-main .rk-critic {display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;
+ border-radius:.28em;padding:.08em .18em;overflow-wrap:anywhere;font-size:inherit;}
+.record-main .rk-critic-content {display:inline;}
+.record-main .rk-critic-indicator {font-size:.74em;font-weight:700;margin-inline-end:.18em;user-select:none;}
+.record-main .rk-critic-addition {background:color-mix(in srgb,var(--color-success,#4a9d66) 13%,transparent);
+ text-decoration:underline;text-decoration-color:var(--color-success,#4a9d66);text-underline-offset:.15em;}
+.record-main .rk-critic-deletion {background:color-mix(in srgb,var(--color-danger,#bd5d5d) 11%,transparent);}
+.record-main .rk-critic-deletion .rk-critic-content {text-decoration:line-through;text-decoration-thickness:1px;opacity:.72;}
+.record-main .rk-critic-substitution {background:var(--rk-document-wash);}
+.record-main .rk-critic-before-wrapper,.record-main .rk-critic-substitution .rk-critic-before {color:var(--color-text-secondary);}
+.record-main .rk-critic-substitution svg,.record-main .rk-critic-comment svg {vertical-align:middle;margin-inline:0 .18em;}
+.record-main .rk-critic-substitution .rk-critic-before {text-decoration:line-through;}
+.record-main .rk-critic-substitution .rk-critic-content {text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.15em;}
+.record-main .rk-critic-comment {font-size:.85em;opacity:.73;color:var(--color-text-secondary);
+ background:var(--rk-document-wash);border:1px dotted var(--rk-document-border);}
+.record-main .rk-critic-highlight {background:color-mix(in srgb,var(--color-warning,#a88520) 15%,transparent);
+ border-bottom:1px dashed var(--color-warning,#a88520);}
+.record-main .rk-critic-comment:focus-within {opacity:1;}

@@ -19,7 +19,7 @@ export default function ShikiCodePreview({code,language,filename,wrap:defaultWra
    try{
     const shiki=await import('shiki');
     const lang=(language&&Object.prototype.hasOwnProperty.call(shiki.bundledLanguages,language))?language:'plaintext';
-    const output=await shiki.codeToHtml(code,{lang,themes:{light:'github-light',dark:'github-dark'}});
+    const output=await shiki.codeToHtml(code,{lang,themes:{light:'github-light-high-contrast',dark:'github-dark-high-contrast'}});
     if(alive)setHtml(output);
    }catch{if(alive)setHtml(null);}
   })();
