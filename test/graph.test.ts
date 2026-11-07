@@ -114,6 +114,7 @@ describe('knowledge graph D1 binding limits',()=>{
      all:async()=>{
       assert.ok(params.length<=100,'D1 max 100 parameters');
       if(sql.includes('ORDER BY r.updated_at DESC LIMIT ?'))return {results:nodes};
+      if(sql.includes('FROM record_references WHERE target_id IS NOT NULL'))return {results:[]};
       if(sql.includes('FROM record_links WHERE source_id IN')){
        linkParams=params;
        return {results:[{sourceId:nodes[0]!.id,targetId:nodes[1]!.id,relation:'references'}]};
@@ -141,6 +142,7 @@ describe('knowledge graph D1 binding limits',()=>{
      },
      all:async()=>{
       assert.ok(params.length<=100,'D1 max 100 parameters');
+      if(sql.includes('FROM record_references WHERE target_id IS NOT NULL'))return {results:[]};
       if(sql.includes('FROM record_links WHERE source_id=? OR target_id=?'))
        return {results:ids.map(id=>({sourceId:id,targetId:'aaa',relation:'related'}))};
       if(sql.includes('r.id IN (SELECT value FROM json_each(?))')){

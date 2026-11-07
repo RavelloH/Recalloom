@@ -30,6 +30,7 @@ import {revealFolder} from './page-tree';
 import {createUntitled,consumeTitleFocus} from './create-page';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import {RecordEditorChunk} from './editor-chunks';
+import {WikiIndexPanel} from './wiki-index-panel';
 import {setFullWidth,useFullWidth} from './preferences';
 import {activityPagesQuery,activityQuery,folderPagesQuery,folderQuery,recordQuery,archivedRecordsQuery,searchModes,searchQuery,tasksQuery,type SearchMode} from './queries';
 
@@ -280,6 +281,7 @@ export function SettingsPage(){const {confirm:askConfirm,confirmation}=useConfir
  {oauth&&<Card className="settings-panel oauth-panel" padding={5}><h2>已授权的 Agent</h2><p className="muted small">在此撤销 OAuth 授权。撤销后相关令牌失效；重新连接时需要再次授权。</p>{grants.isPending?<Loading/>:grants.isError?<ErrorText error={grants.error}/>:grantItems.length?grantItems.map(g=><div className="grant-row" key={g.id}><div className="grant-details"><strong>{g.clientName}</strong><p className="muted small">{g.redirectHost||'OAuth 客户端'} · 授权于 {fmt(g.createdAt*1000)}</p><p className="grant-scopes">{g.scope.length?g.scope.join(' · '):'未声明权限范围'}</p></div><Button label="撤销授权" variant="secondary" size="sm" onClick={()=>revokeGrant(g.id)}/></div>):<Empty title="暂无已授权 Agent" description="Agent 通过 OAuth 连接后会显示在这里。"/>}{grants.hasNextPage&&<Button label="加载更多授权" size="sm" variant="secondary" isLoading={grants.isFetchingNextPage} onClick={()=>grants.fetchNextPage()}/>} </Card>}
  {ses&&<Card className="settings-panel" padding={5}><h2>已登录的会话</h2><p className="muted small">撤销后，对应浏览器需要重新输入 OAuth 授权密钥。</p>{ss.isPending?<Loading/>:ss.isError?<ErrorText error={ss.error}/>:ss.data?.items.map(s=><div className="session-row" key={s.id}><div><strong>{s.id===ss.data?.currentSessionId?'当前会话':'其他会话'}</strong><p className="muted small">{s.userAgent||'未知浏览器'} · {fmt(s.createdAt)}</p></div><Button label="撤销" variant="secondary" size="sm" onClick={()=>revoke(s.id)}/></div>)}</Card>}
  {idx&&<Card className="settings-panel" padding={5}><h2>向量索引状态</h2>{index.isPending?<Loading/>:index.isError?<ErrorText error={index.error}/>:<><div className="dashboard-stats">{index.data?.counts.map(x=><div className="stat" key={x.state}><Database size={18}/><strong>{x.count}</strong><span>{x.state}</span></div>)}</div>{index.data?.recentFailures?.length>0&&<><h3>最近失败</h3>{index.data.recentFailures.map(x=><Banner key={x.id} status="error" container="section" title="索引失败" description={x.lastError}/>)}</>}</>}</Card>}
+ {idx&&<WikiIndexPanel/>}
  {backup&&<Card className="settings-panel" padding={5}><h2>备份</h2><p className="muted">网页备份管理尚未开放。当前可通过 MCP 快照工具或 Cloudflare D1 官方备份完成备份。为了安全，网页不会提供尚未验证的恢复按钮。</p></Card>}
  </div>;
 }

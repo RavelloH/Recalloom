@@ -13,6 +13,7 @@ const wrangler=join(root,'node_modules','wrangler','bin','wrangler.js');
 assert.ok(existsSync(wrangler),'Run pnpm install before checking migrations');
 const tmp=mkdtempSync(join(tmpdir(),'recalloom-migrations-'));
 const liveMigrations=join(root,'migrations');
+const latestMigrationCount=readdirSync(liveMigrations).filter(name=>/^\d{4}_.*\.sql$/.test(name)).length;
 const legacyMigrations=join(tmp,'through-0012');
 mkdirSync(legacyMigrations);
 for(const name of readdirSync(liveMigrations).filter(name=>/^00(0[1-9]|1[0-2])_.*\.sql$/.test(name)))
@@ -84,12 +85,12 @@ function insertSidecarCase(state,includeQuarantine,corruptSnapshot=false){
 try{
  // Full from-zero replay, then no-op second run.
  migrate('empty',complete);
- assert.equal(query('empty',complete,'SELECT COUNT(*) AS n FROM d1_migrations')[0].n,13);
+ assert.equal(query('empty',complete,'SELECT COUNT(*) AS n FROM d1_migrations')[0].n,latestMigrationCount);
  assert.equal(query('empty',complete,
   "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('record_revision_snapshots','record_history_quarantine')")[0].n,0);
  migrate('empty',complete);
- assert.equal(query('empty',complete,'SELECT COUNT(*) AS n FROM d1_migrations')[0].n,13);
- console.log('PASS: new D1 applies all 13 migrations and reapply is a no-op');
+ assert.equal(query('empty',complete,'SELECT COUNT(*) AS n FROM d1_migrations')[0].n,latestMigrationCount);
+ console.log('PASS: new D1 applies all '+latestMigrationCount+' migrations and reapply is a no-op');
 
  // A quarantined, SHA-consistent single-head record can be repaired.
  migrate('repaired',staged);

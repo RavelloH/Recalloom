@@ -16,6 +16,8 @@
  --kg-focus-fill:light-dark(#dceaff,#29435f);
  --kg-focus-border:light-dark(#346cba,#add0ff);
  --kg-edge-explicit:light-dark(#4e78b1,#9ac4ff);
+ --kg-edge-reference:light-dark(#358576,#7cd6bb);
+ --kg-edge-embed:light-dark(#a9773f,#e2b46b);
  --kg-edge-semantic:light-dark(#9168b2,#d3a8ff);
  --kg-edge-folder:light-dark(#a0a8b2,#8793a5);
  --kg-hover:light-dark(#eef2f8,#313c49);
@@ -37,6 +39,8 @@
 .graph-legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .graph-legend i{display:inline-block;width:18px;border-top:2px solid var(--kg-edge-explicit);}
 .graph-legend i[data-relation="semantic"]{border-top:2px dashed var(--kg-edge-semantic);margin-inline-start:8px;}
+.graph-legend i[data-relation="reference"]{border-top:2px solid var(--kg-edge-reference);margin-inline-start:8px;}
+.graph-legend i[data-relation="embed"]{border-top:2px solid var(--kg-edge-embed);margin-inline-start:8px;}
 .graph-legend i[data-relation="folder"]{border-top:2px dotted var(--kg-edge-folder);margin-inline-start:8px;}
 .knowledge-graph-canvas{flex:1;min-height:250px;width:100%;background:radial-gradient(circle at 50% 50%,var(--kg-wash),transparent 72%);outline-offset:-3px;touch-action:none;}
 .graph-bottomline{margin:0;padding:10px 15px;border-top:1px solid var(--kg-border);color:var(--kg-muted);font-size:11.5px;line-height:1.6;}

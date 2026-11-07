@@ -59,10 +59,10 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
      {link.direction==='outgoing'?<ArrowUpRight size={15}/>:<ArrowDownLeft size={15}/>}
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:link.other.id}} onClick={onNavigate} className="relation-name">{link.other.name}</Link>
-      <small className="muted">{link.direction==='outgoing'?'指向':'来自'} · {relationLabel(link.relation)}{link.other.status==='archived'?' · 已归档':''}</small>
+      <small className="muted">{link.direction==='outgoing'?'指向':'来自'} · {relationLabel(link.relation)}{link.type==='reference'||link.type==='embed'?' · 正文自动生成':''}{link.other.status==='archived'?' · 已归档':''}</small>
      </div>
-     <Button size="sm" variant="ghost" label="解除关系" icon={<Unlink size={13}/>}
-      isDisabled={Boolean(busy)} onClick={()=>void apply(link.sourceId,link.targetId,link.relation,'remove')}/>
+     {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<Unlink size={13}/>}
+      isDisabled={Boolean(busy)} onClick={()=>void apply(link.sourceId,link.targetId,link.relation,'remove')}/>:<span className="muted small" title="请修改源文档中的 Wiki 语法以解除关系">自动</span>}
     </div>)}</div>:<p className="relation-placeholder">尚未建立显式关系。可以在下方搜索文档并关联。</p>}
     <div className="relation-group-heading"><Sparkles size={14}/>语义相似 <span>{data?.suggestions.length??0}</span></div>
     <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>

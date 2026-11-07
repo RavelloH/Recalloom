@@ -6,6 +6,8 @@
  */
 
 import Heading from "@tiptap/extension-heading";
+import {mergeAttributes} from '@tiptap/core';
+import {headingAnchor} from '../wiki-slug';
 import type { JSONContent } from "@tiptap/react";
 
 
@@ -39,6 +41,12 @@ export const CustomHeading = Heading.extend({
         },
       },
     };
+  },
+
+  renderHTML({node,HTMLAttributes}){
+    return ['h'+node.attrs.level,mergeAttributes(this.options.HTMLAttributes,HTMLAttributes,{
+      id:headingAnchor(node.textContent)
+    }),0];
   },
 
   renderMarkdown(
