@@ -6,11 +6,12 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Card} from '@astryxdesign/core/Card';
+import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {Pencil} from 'lucide-react';
+import {Pencil,Eye,EyeOff} from 'lucide-react';
 import {richTitle} from './rich-schema';
 export {richTitle} from './rich-schema';
 
@@ -23,6 +24,8 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
  const sender=node.attrs.sender==='user'?'user':node.attrs.sender==='system'?'system':'assistant';
  const tabs=node.content?.content.filter(child=>child.type.name==='richContainer'&&child.attrs.kind==='tab')??[];
  const [selected,setSelected]=useState('0');
+ const [flashcardOpen,setFlashcardOpen]=useState(false);
+ const activeTab=Math.min(Math.max(0,Number(selected)||0),Math.max(0,tabs.length-1));
  const [editing,setEditing]=useState(false);
  const [draft,setDraft]=useState(title);
  const editTitle=<span className="rk-directive-title" contentEditable={false}>
@@ -34,10 +37,10 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
  </span>;
  return <NodeViewWrapper className={'rk-directive rk-directive-'+kind} data-rk-kind={kind}>
   {kind==='tabs'
-   ?<Card variant="default" padding={3} className="rk-tabs-edit">
+   ?<Card variant="default" padding={3} className="rk-tabs-edit" data-rk-active-tab={tabs.length<=32?String(activeTab):undefined}>
       <div className="rk-tabs-heading" contentEditable={false}>{editTitle}</div>
       {tabs.length>0&&<div contentEditable={false}>
-       <TabList value={String(Math.min(Number(selected)||0,tabs.length-1))} onChange={setSelected} hasDivider>
+       <TabList value={String(activeTab)} onChange={setSelected} hasDivider>
         {tabs.map((tab,index)=><Tab key={index} value={String(index)} label={richTitle('tab',String(tab.attrs.title??''))}/>) }
        </TabList>
       </div>}
@@ -49,8 +52,16 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <NodeViewContent className="rk-directive-body rk-tab-content"/>
      </Card>
    :kind==='flashcard'
-   ?<Card variant="default" padding={3} className="rk-flashcard rk-flashcard-edit">
-      <div contentEditable={false} className="rk-flashcard-heading">{editTitle}</div>
+   ?<Card variant="default" padding={3} className="rk-flashcard rk-flashcard-edit" data-rk-answer-open={String(flashcardOpen)}>
+      <div contentEditable={false} className="rk-flashcard-heading">
+       {editTitle}
+       <Button variant="ghost" label={flashcardOpen?"收起答案":"显示答案"}
+        icon={flashcardOpen?<EyeOff size={16} aria-hidden="true"/>:<Eye size={16} aria-hidden="true"/>}
+        aria-expanded={flashcardOpen}
+        onMouseDown={event=>event.preventDefault()}
+        onClick={()=>setFlashcardOpen(open=>!open)}/>
+      </div>
+      {/* Keep ProseMirror's question and answer DOM mounted at all times. */}
       <NodeViewContent className="rk-directive-body rk-flashcard-body"/>
      </Card>
    :kind==='front'||kind==='back'
@@ -102,9 +113,17 @@ const variants=new Set(['neutral','info','success','warning','error','blue','cya
 function InlineView({node}:NodeViewProps){
  const kind=node.type.name;
  const attrs=node.attrs as {variant?:string;title?:string;content?:string;hint?:string};
+ const [clozeOpen,setClozeOpen]=useState(false);
  const inner=<NodeViewContent as={"span" as "div"} className="rk-inline-editable"/>;
- if(kind==='richCloze')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-cloze" title={attrs.hint||'复习挖空；编辑时答案可见'}>
-  <span contentEditable={false} className="rk-cloze-label">挖空</span>
+ if(kind==='richCloze')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-cloze" data-rk-cloze-open={String(clozeOpen)}>
+  <button type="button" className="rk-cloze-trigger" contentEditable={false}
+   aria-expanded={clozeOpen} aria-label={clozeOpen?'隐藏挖空答案':'显示挖空答案'}
+   title={attrs.hint||'点击揭示答案'}
+   onMouseDown={event=>event.preventDefault()}
+   onClick={()=>setClozeOpen(open=>!open)}>
+   {clozeOpen?'隐藏':attrs.hint||'显示答案'}
+  </button>
+  {/* Keep the editable answer DOM mounted across reveal/hide. */}
   <NodeViewContent as={"span" as "div"} className="rk-inline-editable rk-cloze-editor-answer"/>
  </NodeViewWrapper>;
  if(kind==='richKbd')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-kbd">
@@ -115,8 +134,12 @@ function InlineView({node}:NodeViewProps){
   return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-badge"><Badge label={inner} variant={variant}/></NodeViewWrapper>;
  }
  const description=kind==='richAbbr'?attrs.title:attrs.content;
+ // Editable ProseMirror NodeViews must not mount a stateful Tooltip trigger:
+ // Astryx Tooltip can update its DOM attributes on mount, which Tiptap
+ // incorrectly observes as a content edit. A CSS pseudo tooltip is inert.
  return <NodeViewWrapper as="span" className={'rk-rich-inline '+(kind==='richAbbr'?'rk-inline-abbr':'rk-inline-tip')}>
-   <span title={description||undefined} tabIndex={0}>{inner}</span>
+  <span className="rk-tooltip-inline" tabIndex={0} data-rk-tooltip={description||undefined}
+   aria-label={description?'查看解释：'+description:undefined}>{inner}</span>
  </NodeViewWrapper>;
 }
 function makeInline(kind:'badge'|'abbr'|'tip'|'kbd'|'cloze'){

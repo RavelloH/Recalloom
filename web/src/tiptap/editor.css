@@ -259,8 +259,30 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-flashcard-content {min-width:0;overflow-wrap:anywhere;}
 .record-main .rk-flashcard-content > :first-child {margin-block-start:0;}
 .record-main .rk-flashcard-content > :last-child {margin-block-end:0;}
+/* The Notion-style visual editor is also the reader: flashcard answer
+ * disclosure works here, while its ProseMirror content stays mounted. */
+.record-main .rk-flashcard-edit .rk-flashcard-heading {display:flex;align-items:center;gap:.7rem;justify-content:space-between;flex-wrap:wrap;}
+.record-main .rk-flashcard-edit[data-rk-answer-open="false"] .rk-directive-back {display:none!important;}
 .record-main .rk-flashcard-front {padding-block:.25rem .55rem;}
 .record-main .rk-flashcard-answer {padding-top:.5rem;}
+/* Static tooltip inside ProseMirror: pure CSS pseudo element, no DOM
+ * mutations or dynamic overlays. Match Astryx token colors and geometry. */
+.record-main .rk-tooltip-inline[data-rk-tooltip] {position:relative;cursor:help;
+ text-decoration-line:underline;text-decoration-style:dotted;text-decoration-color:var(--color-text-secondary);
+ text-underline-offset:.2em;}
+.record-main .rk-tooltip-inline:is(:hover,:focus-visible)::after {
+ content:attr(data-rk-tooltip);position:absolute;z-index:60;
+ inset-block-start:calc(100% + .35em);inset-inline-start:0;
+ display:block;width:max-content;max-width:min(28rem,70vw);
+ background:var(--color-background-primary,var(--rk-document-wash));
+ color:var(--rk-document-ink);border:1px solid var(--rk-document-border);
+ border-radius:.5rem;padding:.45rem .65rem;
+ box-shadow:0 8px 24px rgba(0,0,0,.17);
+ white-space:pre-wrap;overflow-wrap:anywhere;
+ font-size:.84rem;font-weight:400;line-height:1.45;
+ pointer-events:none;text-decoration:none;}
+.record-main .rk-tooltip-inline:focus-visible {outline:2px solid var(--color-text-secondary);outline-offset:2px;}
+
 /* Keyboard shortcut uses native kbd semantics and Astryx design tokens. */
 .record-main .rk-keycap {display:inline-block;vertical-align:baseline;
  font:600 .8em/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
@@ -276,6 +298,14 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  background:var(--rk-document-wash);padding-inline:.14em;border-radius:.2em;}
 .record-main .rk-cloze-label {font-size:.7em;font-weight:650;margin-inline-end:.26em;
  color:var(--color-text-secondary);user-select:none;}
+.record-main .rk-inline-cloze {display:inline;white-space:normal;}
+.record-main .rk-cloze-trigger {cursor:pointer;font:inherit;font-size:.83em;
+ background:var(--rk-document-wash);color:var(--color-text-secondary);
+ border:1px dashed var(--rk-document-border);border-radius:.28em;padding:.07em .3em;}
+.record-main .rk-cloze-trigger:hover,.record-main .rk-cloze-trigger:focus-visible {color:var(--rk-document-ink);border-color:var(--color-text-secondary);}
+.record-main .rk-inline-cloze[data-rk-cloze-open="false"] .rk-cloze-editor-answer {display:none!important;}
+.record-main .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-editor-answer {display:inline;}
+.record-main .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-trigger {border-style:solid;}
 .record-main .rk-cloze-editor-answer {font-weight:550;}
 .record-main .rk-cloze-read {display:inline;}
 .record-main .rk-cloze-reveal {cursor:pointer;font:inherit;line-height:inherit;
@@ -296,10 +326,46 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-frontmatter-node textarea {min-width:0;max-width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;}
 .record-main .markdown-preview>.rk-frontmatter-card {margin-block:1rem;}
 
-/* Astryx Tabs: every editable panel remains mounted in ProseMirror.
- * Only read-only Markdown hides inactive panels. */
+/* Astryx Tabs: interactive even in the canonical Notion-style visual editor.
+ * Inactive panels are CSS-hidden but remain mounted editable ProseMirror nodes. */
 .record-main .rk-tabs-edit,.record-main .rk-tabs-preview {max-width:100%;min-width:0;}
 .record-main .rk-tabs-editor-body {display:flex;flex-direction:column;gap:.8rem;padding-top:.8rem;}
+/* Editor panels are real ProseMirror nodes: tab switching only changes
+ * visibility. Never unmount or replace NodeViewContent on tab click. */
+.record-main .rk-tabs-edit[data-rk-active-tab] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer > [data-rk-kind="tab"] {display:none;}
+.record-main .rk-tabs-edit[data-rk-active-tab="0"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(1) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="1"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(2) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="2"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(3) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="3"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(4) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="4"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(5) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="5"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(6) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="6"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(7) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="7"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(8) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="8"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(9) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="9"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(10) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="10"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(11) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="11"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(12) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="12"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(13) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="13"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(14) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="14"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(15) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="15"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(16) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="16"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(17) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="17"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(18) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="18"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(19) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="19"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(20) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="20"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(21) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="21"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(22) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="22"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(23) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="23"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(24) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="24"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(25) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="25"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(26) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="26"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(27) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="27"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(28) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="28"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(29) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="29"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(30) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="30"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(31) > [data-rk-kind="tab"] {display:block;}
+.record-main .rk-tabs-edit[data-rk-active-tab="31"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(32) > [data-rk-kind="tab"] {display:block;}
+/* Beyond the 32-panel UI cap, keep all panels accessible rather than hide. */
 .record-main .rk-tab-edit {margin:0!important;min-width:0;}
 .record-main .rk-tab-title {font-weight:600;margin-bottom:.5rem;}
 .record-main .rk-tabs-heading {font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.5rem;}

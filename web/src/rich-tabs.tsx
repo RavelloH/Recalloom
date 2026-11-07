@@ -3,7 +3,7 @@ import {Card} from '@astryxdesign/core/Card';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 
 type TabChildProps={'data-kind'?:string;'data-title'?:string;children?:React.ReactNode};
-/** Read-only Astryx tabs. ReactMarkdown's nested rk-callout elements retain
+/** Wiki-embed Markdown projection tabs (not a separate app read-only mode). ReactMarkdown's nested rk-callout elements retain
  * data-kind and data-title on their React element props, before rendering.
  */
 export function TabsPreview({children}:{children:React.ReactNode}){

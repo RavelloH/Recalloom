@@ -188,6 +188,20 @@ try{
  console.log('DIRTY_AFTER_OPEN',dirty,'ICON_STATE',await page.locator(selectors.brand).first().getAttribute('data-rk-site-icon'));
 
  assert.ok(!dirty,'open does not change Markdown');
+ const abbrAnchor=page.locator('.tiptap .rk-inline-abbr .rk-tooltip-inline').first();
+ await abbrAnchor.hover();
+ const abbrTooltip=await abbrAnchor.evaluate(node=>({
+  text:getComputedStyle(node,'::after').content,
+  bg:getComputedStyle(node,'::after').backgroundColor
+ }));
+ assert.ok(abbrTooltip.text.includes('Durable Objects'),'Inline abbreviations need a visible non-mutating CSS tooltip');
+ const tipAnchor=page.locator('.tiptap .rk-inline-tip .rk-tooltip-inline').first();
+ await tipAnchor.hover();
+ const tipText=await tipAnchor.evaluate(node=>getComputedStyle(node,'::after').content);
+ assert.ok(tipText.includes('额外内容'),'Inline tips need a real hover explanation in visual editing');
+ assert.ok(await page.getByRole('button',{name:'保存'}).isDisabled(),
+  'Tooltip hover must not cause ProseMirror DOMObserver to create a ghost edit');
+
  const initial=await request('/records/'+id);
  assert.equal(initial.body.content,input,'open must not rewrite Markdown');
  await page.locator('.tiptap h2').last().click();
