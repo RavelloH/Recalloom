@@ -9,6 +9,7 @@
     "deploy": "pnpm build:web && node scripts/predeploy-check.mjs && wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc && wrangler deploy --config wrangler.deploy.jsonc",
     "check": "tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "tsx --test test/*.test.ts",
+    "test:migrations": "node scripts/verify-migrations.mjs",
     "test:web": "node scripts/web-api-e2e.mjs",
     "test:oauth": "node scripts/oauth-flow-e2e.mjs",
     "db:local": "wrangler d1 migrations apply recalloom --local",
