@@ -7,6 +7,7 @@ import * as agent from './agent-tools.js';
 import { processIndexJobs, search } from './search.js';
 import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
+import {getHelp,listHelpResources,HELP_TOPICS,type HelpTopic} from './help/index.js';
 
 const uuid=z.string().uuid().describe('Stable record/folder UUID returned by browse, search, or resolve_path.');
 const limit=z.number().int().min(1).max(200).describe('Maximum items per page (1–200).').optional();
@@ -46,6 +47,17 @@ function mappedEdit(input:z.infer<typeof editSchema>, original:string):EditInput
 }
 export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-client') {
   const mcp=new McpServer({name:'recalloom',version:'0.1.0'}, {instructions:SERVER_INSTRUCTIONS});
+  // Same canonical Markdown as get_help: MCP clients may discover/read these
+  // static resources without accessing D1, Vectorize, or user records.
+  for(const doc of listHelpResources()){
+    mcp.registerResource('recalloom-help-'+doc.topic,doc.uri,{
+      title:doc.title,description:doc.summary,mimeType:'text/markdown'
+    },async uri=>{
+      if(!scopes.includes('notes:read'))
+        throw new StorageError('INSUFFICIENT_SCOPE','Reading help requires notes:read');
+      return {contents:[{uri:uri.href,mimeType:'text/markdown',text:doc.content}]};
+    });
+  }
   const register=(name:RecalloomToolName,schema:z.ZodTypeAny,write:boolean,action:(input:any)=>Promise<unknown>)=>{
     const guidance=TOOL_GUIDANCE[name];
     mcp.registerTool(name,{
@@ -71,6 +83,10 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
       }
     });
   };
+  register('get_help',z.object({
+    topic:z.enum(HELP_TOPICS as [HelpTopic,...HelpTopic[]]).optional()
+      .describe('Help topic: overview, markdown, math, wiki, editing, versions, search, tasks or backup. Omit for topic index.')
+  }),false,(x)=>Promise.resolve(getHelp(x.topic)));
   register('browse',z.object({folderId:uuid.nullable().describe('Folder UUID; omit or null to browse root.').optional(),limit,cursor:pageCursor}),false,
     (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
   register('resolve_path',z.object({path:z.string().startsWith('/').max(2048).describe('Absolute Recalloom virtual path such as /Notes/Example/note.md, not a local disk path.')}),false,

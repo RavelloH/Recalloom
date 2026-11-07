@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { InMemoryTransport, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from '../src/mcp.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE } from '../src/mcp-guidance.js';
+import {getHelp,HELP_TOPICS} from '../src/help/index.js';
 import type { Env } from '../src/types.js';
 
 type ResultMessage={jsonrpc:string;id:number;result?:any;error?:any};
@@ -47,11 +48,29 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
       assert.equal(tool.description,guidance.description);
       assert.equal(tool.annotations?.destructiveHint,guidance.destructive);
     }
+    const resources=await request('resources/list',{});
+    assert.equal(resources.resources.length,HELP_TOPICS.length+1);
+    const expectedUris=['recalloom://help/index',...HELP_TOPICS.map(x=>'recalloom://help/'+x)];
+    assert.deepEqual(new Set(resources.resources.map((x:{uri:string})=>x.uri)),new Set(expectedUris));
+    const read=await request('resources/read',{uri:'recalloom://help/math'});
+    assert.deepEqual(read.contents,[{
+      uri:'recalloom://help/math',
+      mimeType:'text/markdown',
+      text:getHelp('math').content
+    }]);
+    const viaTool=await request('tools/call',{name:'get_help',arguments:{topic:'math'}});
+    assert.equal(viaTool.isError,undefined);
+    assert.equal(JSON.parse(viaTool.content[0].text).content,read.contents[0].text);
+    const index=await request('tools/call',{name:'get_help',arguments:{}});
+    assert.equal(JSON.parse(index.content[0].text).topic,'index');
+    const invalid=await request('tools/call',{name:'get_help',arguments:{topic:'unknown'}});
+    assert.equal(invalid.isError,true,'unknown topic should fail validation');
     const tool=(name:string)=>{
       const t=tools.find(t=>t.name===name);
       assert.ok(t,'expected '+name);
       return t;
     };
+    assert.match(tool('get_help').description,/KaTeX/);
     assert.match(tool('browse').inputSchema.properties?.cursor?.description??'',/page\.nextCursor/);
     assert.match(tool('edit_record').inputSchema.properties?.expectedRevision?.description??'',/concurrent/);
     assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v2/);

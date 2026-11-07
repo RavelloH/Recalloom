@@ -1,0 +1,47 @@
+[
+  {
+    "topic": "overview",
+    "title": "使用指南",
+    "summary": "Recalloom 能力概览、选用工具、可信度与安全规范"
+  },
+  {
+    "topic": "markdown",
+    "title": "Markdown 与扩展语法",
+    "summary": "CommonMark/GFM、任务列表、表格、安全 HTML、格式高亮"
+  },
+  {
+    "topic": "math",
+    "title": "LaTeX 与数学公式",
+    "summary": "KaTeX 行内/块级公式、mark 包裹公式和合法换行"
+  },
+  {
+    "topic": "wiki",
+    "title": "WikiLink 与文档嵌入",
+    "summary": "UUID/路径引用、别名、章节、只读嵌入和身份固定"
+  },
+  {
+    "topic": "editing",
+    "title": "文档编辑",
+    "summary": "局部编辑、dryRun、预期版本与多 Agent 并发保护"
+  },
+  {
+    "topic": "versions",
+    "title": "历史版本",
+    "summary": "版本审计、内容校验、Diff、恢复和版本边界"
+  },
+  {
+    "topic": "search",
+    "title": "检索与知识关系",
+    "summary": "字面/语义检索、索引延迟、反向链接及图谱"
+  },
+  {
+    "topic": "tasks",
+    "title": "结构化任务",
+    "summary": "task_list 的任务状态、优先级和并发修改"
+  },
+  {
+    "topic": "backup",
+    "title": "快照备份与恢复",
+    "summary": "分页导出、SHA-256、一致性和谨慎导入"
+  }
+]

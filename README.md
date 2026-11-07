@@ -99,6 +99,14 @@ https://<你的 Worker 域名>/mcp
 
 Recalloom 不会自动保存每条对话；需要由客户端根据你的要求调用工具进行读取或保存。
 
+### MCP 帮助与扩展 Markdown
+
+MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、`<mark>` 高亮（包含行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务及备份。
+
+支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
+
+帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`；修改后运行 `pnpm help:generate` 更新编译模块。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
+
 ## 本地开发
 
 ```bash

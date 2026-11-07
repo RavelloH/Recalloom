@@ -6,9 +6,9 @@
   "description": "Versioned cross-session context storage for AI agents",
   "scripts": {
     "dev": "pnpm build:web && wrangler dev",
-    "deploy": "pnpm build:web && node scripts/predeploy-check.mjs && wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc && wrangler deploy --config wrangler.deploy.jsonc",
-    "check": "tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "deploy": "pnpm help:check && pnpm build:web && node scripts/predeploy-check.mjs && wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc && wrangler deploy --config wrangler.deploy.jsonc",
+    "check": "pnpm help:check && tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "pnpm help:check && tsx --test test/*.test.ts",
     "test:migrations": "node scripts/verify-migrations.mjs",
     "test:web": "node scripts/web-api-e2e.mjs",
     "test:oauth": "node scripts/oauth-flow-e2e.mjs",
@@ -26,7 +26,9 @@
     "test:archive": "node scripts/archive-management-e2e.mjs",
     "test:graph": "node scripts/knowledge-graph-e2e.mjs",
     "test:graph-theme": "node scripts/graph-theme-e2e.mjs",
-    "test:wiki": "node scripts/wiki-e2e.mjs"
+    "test:wiki": "node scripts/wiki-e2e.mjs",
+    "help:generate": "node scripts/generate-help.mjs",
+    "help:check": "node scripts/generate-help.mjs --check"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",
