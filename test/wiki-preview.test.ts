@@ -18,12 +18,12 @@ const find=(ast:Ast,name:string):Ast[]=>[
 ];
 describe('shared read-only RMD Wiki AST projection',()=>{
  it('projects an explicit valid embed and preserves surrounding Markdown',()=>{
-  const source=['# 标题','','::: embed id:'+id+'#^important-block :::','','正文 **强调**。'].join('\n');
+  const source=['# 标题','','::: embed id:'+id+'#important-block :::','','正文 **强调**。'].join('\n');
   const ast=parse(source);
   const nodes=find(ast,'wiki-embed');
   assert.equal(nodes.length,1,JSON.stringify(ast));
   assert.equal(nodes[0]?.data?.hProperties?.dataTarget,'id:'+id);
-  assert.equal(nodes[0]?.data?.hProperties?.dataAnchor,'^important-block');
+  assert.equal(nodes[0]?.data?.hProperties?.dataAnchor,'important-block');
   assert.ok(JSON.stringify(ast).includes('strong'));
  });
  it('never interprets code, inline code, malformed names or old-style embeds',()=>{

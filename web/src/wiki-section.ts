@@ -23,13 +23,15 @@ export function extractWikiSection(content:string,anchor?:string|null):string{
    const standalone=lines[line]?.trimStart().startsWith('@ attrs')??false;
    return {...token,line:standalone?line-1:line,modifierLine:line};
   }).filter(token=>token.line>=0);
- const requested=anchor.startsWith('^')?anchor.slice(1).toLowerCase():slugHeading(anchor);
+ // Explicit heading/paragraph IDs share a single namespace: #anchor-id.
+ // Resolve literal IDs before heading slugs, so a paragraph ID is never
+ // shadowed by a naturally matching title in another section.
+ if(anchor.startsWith('^'))return '';
+ const requested=slugHeading(anchor);
  if(!requested)return '';
- if(anchor.startsWith('^')){
-  if(!/^[a-z][a-z0-9-]{0,79}$/.test(requested))return '';
-  const token=modifiers.find(item=>item.name==='paragraph'&&item.attributes.id===requested);
-  if(!token)return '';
-  let from=token.line,to=Math.max(token.line,token.modifierLine);
+ const explicit=modifiers.find(item=>(item.name==='paragraph'||item.name==='heading')&&item.attributes.id===requested);
+ if(explicit?.name==='paragraph'){
+  let from=explicit.line,to=Math.max(explicit.line,explicit.modifierLine);
   while(from>0&&lines[from-1]?.trim())from--;
   while(to+1<lines.length&&lines[to+1]?.trim())to++;
   return lines.slice(from,to+1).join('\n');
@@ -42,7 +44,7 @@ export function extractWikiSection(content:string,anchor?:string|null):string{
   const attr=modifiers.find(token=>token.name==='heading'&&token.line===i);
   const title=attr&&attr.modifierLine===i?match[2]!.replace(attr.raw,'').trim():match[2]!;
   const headingSlug=slugHeading(title);
-  if(from<0&&(headingSlug===requested||attr?.attributes.id===requested)){
+  if(from<0&&(explicit?attr?.attributes.id===requested:headingSlug===requested)){
    from=i;level=match[1]!.length;continue;
   }
   if(from>=0&&match[1]!.length<=level)return lines.slice(from,i).join('\n');

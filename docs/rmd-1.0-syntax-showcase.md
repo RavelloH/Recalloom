@@ -1,6 +1,6 @@
 # RMD 1.0 · 完整语法展示 @ attrs rmd-complete-guide @
 
-这份文档可以直接复制到 Recalloom 的 Markdown 正文中。它采用真正的 RMD 1.0 语法，不是旧 Directive。请在**可视化 / 源码 / 预览**之间切换查看差异。示例中的图片路径与 UUID 仅作格式示意，实际使用请替换为已有资源。
+这份文档可以直接复制到 Recalloom 的 Markdown 正文中。它采用真正的 RMD 1.0 语法，不是旧 Directive。请在**可视化 / 源码 / 预览**之间切换查看差异。图像使用内置的实际 SVG 示意图；示例 UUID 仅用于展示引用格式，在个人知识库中使用时请替换为真实目标。
 
 ## 01 · CommonMark、GFM 与数学 @ attrs section-standard @
 
@@ -248,9 +248,9 @@ $$
 | 额定功率 | kW | 220 |
 @ attrs tbl-measurements | caption=设备参数表 @
 
-图片是示例路径，需替换为实际上传的图片：
+下面使用项目自带的示意 SVG，不会出现失效图片占位：
 
-![实验装置](examples/device.png "实验装置") @ attrs fig-device | width=480 | caption=实验装置接线示意 @
+![实验装置](/examples/device.svg "实验装置") @ attrs fig-device | width=480 | caption=实验装置接线示意 @
 
 ~~~typescript
 interface Device {
@@ -288,7 +288,7 @@ ID 以 ASCII 字母开头，最长 80 字符，规范化为小写。图片宽、
 
 ::: embed id:550e8400-e29b-41d4-a716-446655440000#section-wiki :::
 
-::: embed id:550e8400-e29b-41d4-a716-446655440000#^important-paragraph :::
+::: embed id:550e8400-e29b-41d4-a716-446655440000#important-paragraph :::
 
 嵌入始终是只读投影，不会向目标记录写入修订。
 

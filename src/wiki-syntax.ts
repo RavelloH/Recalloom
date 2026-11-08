@@ -33,7 +33,9 @@ export function parseWikiTarget(raw:string,allowAlias=true):WikiTarget|null{
  const hash=expression.indexOf('#');
  const base=(hash<0?expression:expression.slice(0,hash)).trim();
  const anchor=hash<0?null:expression.slice(hash+1).trim();
- if(hash>=0&&(!anchor||anchor.length>180))return null;
+ // Every anchor (heading or paragraph) uses the same #anchor-id suffix.
+ // The Obsidian-style #^paragraph form is not part of RMD 1.0.
+ if(hash>=0&&(!anchor||anchor.length>180||anchor.startsWith('^')))return null;
  if(base.startsWith('id:')){
   const id=base.slice(3);
   if(!wikiUuid.test(id))return null;

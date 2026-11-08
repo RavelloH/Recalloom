@@ -78,7 +78,7 @@ Markdown 源码（D1/草稿）
 
 - `src/wiki-syntax.ts` 服务端自动提取 `[[id:UUID]]`、`[[/绝对路径]]` 和独立 `::: embed 目标 :::`；`src/wiki-references.ts` 首次绑定 UUID、支持补建及并发控制。服务端解析前可统一 LF，但返回的 `sourceOffset` **必须映射回原始 CRLF 正文位置**，不可把规范化后的位移直接写入 D1。
 - `web/src/rmd-lexer.ts` 与服务端使用相同的 `parseWikiTarget` 权威 UUID/路径校验。
-- `web/src/wiki-section.ts` 根据同一个 `@ attrs` 词法定位标题 ID、段落 `#^id` 锚点，必须跳过围栏代码/公式中的伪标题。无 ID 标题使用常规 slug。
+- `web/src/wiki-section.ts` 根据同一个 `@ attrs` 词法定位标题 ID、段落 `#id` 锚点，必须跳过围栏代码/公式中的伪标题。无 ID 标题使用常规 slug。
 - **同文档 `[[#id]]` 同时支持标题、段落、代码块、图、公式和表**：`cross-reference.ts` 对可视化 JSON 与预览 `parseRmdVisual(source)` 语义 AST 共建索引。标题/段落/代码显示非编号标签，只有 fig/eq/tbl 派生编号。代码块的 `@ attrs code-id | file=… @` 必须写入 CodeBlock 属性，Shiki 只读预览和 Tiptap 共用唯一 `user-content-` 安全锚点前缀。
 - 嵌入只读，循环、深度、长度受限。旧 `{{embed:...}}` 不再属于主路径，不应被新的代理、帮助或补建索引误用。
 - 前端“嵌入 Wiki 文档”自动补全按钮及帮助必须生成 `::: embed`，而不是旧双花括号。
@@ -92,12 +92,13 @@ Markdown 源码（D1/草稿）
 5. `test/rmd-wiki-section.test.ts`、`test/wiki.test.ts`：Wiki 图谱关系、章节/块 ID、服务端安全边界。
 6. **隔离 Wrangler D1** 上的 Edge E2E `scripts/rmd-v1-e2e.mjs`、`scripts/rmd-visual-e2e.mjs`：三视图、未保存草稿、显式保存、刷新、暗/亮色 Mark 比色、390px 移动端、预览无写库。
 7. 额外测试真实可视化交叉引用的 **`attrs.id`**、普通标题/段落/代码 `[[#id]]`、“图 1 / 公式 1 / 表 1”，以及斜杠菜单的 `toggleWrap('blockquote')`。它们此前暴露出单元测试无法发现的 UI 与节点字段不一致。CodeMirror 采用虚拟渲染，E2E 必须读取完整 `state.doc`，不能把可见 `innerText` 当成全部正文。
-8. `scripts/rmd-wiki-e2e.mjs` 在隔离 D1 + Edge 实际创建三篇文档，验证独立 `::: embed`、自动双向引用、章节 `#id` 与段落 `#^id`、无意外写库、手机工具栏 Wiki Picker 与保存；已成功执行。
+8. `scripts/rmd-wiki-e2e.mjs` 在隔离 D1 + Edge 实际创建三篇文档，验证独立 `::: embed`、自动双向引用、章节 `#id` 与段落 `#id`、无意外写库、手机工具栏 Wiki Picker 与保存；已成功执行。
 9. 数学中的 Critic 伪标记、无效 `@ attrs` 不阻断后续有效属性、代码 ID、含特殊围栏的代码、标准链接图片 `title`、Windows CRLF 的 Wiki 源码偏移均须进入往返回归。
 10. `pnpm exec tsx scripts/rmd-performance.ts`：生成 30/90/180/300/480 个独立代码属性块，分别测量词法与视觉解析，并强制检查 token 总数和保存幂等。ASUS 本轮 300 块从词法 1590ms/可视化 5474ms 优化为 28ms/114ms（数值仅为环境基准）；480 块新基准约 44ms/175ms。性能测试不要引入硬编码的 CI 耗时阈值。
-11. 发布前必须执行 `test/rmd-security.test.ts` 与 `scripts/rmd-security-e2e.mjs`：覆盖 24 层异常嵌套、过长围栏、Unicode 组合字符、Markdown 原文往返、CRLF、HTML void、`<script>`/`onerror`/SVG/iframe、`javascript:` 链接、320px 小屏和预览不写库。实际浏览器审计确认 JS 注入未执行、DOM 无危险属性、320px 页面没有水平溢出。
-12. 以 `test/rmd-gallery.test.ts` 验证 [RMD 1.0 完整示例](rmd-1.0-syntax-showcase.md) 涵盖**全部 RMD_SCHEMA 组件类型**、九色 Highlight，且经真实视觉 AST 保存两次字节相同、无整块 rawFallback。
-13. 发布前检查 `git diff --check` 和工作树来源；用户未明确授权提交/推送时只保留本地变更。**Git 推送不等于 Cloudflare 部署成功**，需单独核验部署流程。
+11. 视觉修复必须通过 `scripts/rmd-ui-polish-e2e.mjs`：检查 HTML `<u>` / `<sup>` / `<sub>` 被解析为可编辑 marks；Mark 在原黄底使用深色正文；八类 Banner 通过 Astryx 自身 `icon` 属性各展示单个图标；标题编辑动作按需显现；表格图注随 OverlayScrollbars 重排仍位于表格下方；链接卡片缩略图不被通用 `img` 样式撑大，内置 SVG 插图成功加载，320px 无横向溢出。
+12. 发布前必须执行 `test/rmd-security.test.ts` 与 `scripts/rmd-security-e2e.mjs`：覆盖 24 层异常嵌套、过长围栏、Unicode 组合字符、Markdown 原文往返、CRLF、HTML void、`<script>`/`onerror`/SVG/iframe、`javascript:` 链接、320px 小屏和预览不写库。实际浏览器审计确认 JS 注入未执行、DOM 无危险属性、320px 页面没有水平溢出。
+13. 以 `test/rmd-gallery.test.ts` 验证 [RMD 1.0 完整示例](rmd-1.0-syntax-showcase.md) 涵盖**全部 RMD_SCHEMA 组件类型**、九色 Highlight，且经真实视觉 AST 保存两次字节相同、无整块 rawFallback。
+14. 发布前检查 `git diff --check` 和工作树来源；用户未明确授权提交/推送时只保留本地变更。**Git 推送不等于 Cloudflare 部署成功**，需单独核验部署流程。
 
 ## Help、示例与知识库记录
 

@@ -51,7 +51,7 @@ const voltage = 220;
 
 `@ attrs` ID 以 ASCII 字母开头，只能含字母、数字和连字符，最多 80 字符，统一小写。同文档 `[[#id]]` 可引用标题、段落、代码块、图、公式与表格；前三者显示对应可读标题/摘要/文件名，图、公式、表格的 `fig-` / `eq-` / `tbl-` ID 才会按本文顺序派生可读编号（图 1、公式 1、表 1），并非数据库持久化编号。
 
-指定另一个文档的单段内容使用目标后缀 `#^important-block`，该段在目标 Markdown 中须有 `@ attrs important-block @`；**旧版 `^block-id` 文本后缀不是新语法**。定位标题时可用 `#transformer-test` 或未显式标识的正常标题 slug。列表项、表格单元格不能假装具备已实现的稳定块 ID。
+指定另一个文档的单段内容统一使用 `#important-block`，该段在目标 Markdown 中须有 `@ attrs important-block @`；标题、段落共用 `#anchor-id`，不需要 `^`，旧版 `#^block-id` 是非法语法。定位标题时可用 `#transformer-test` 或未显式标识的正常标题 slug。列表项、表格单元格不能假装具备已实现的稳定块 ID。
 
 ## 只读文档嵌入
 
@@ -60,7 +60,7 @@ const voltage = 220;
 
 ::: embed id:550e8400-e29b-41d4-a716-446655440000#transformer-test :::
 
-::: embed id:550e8400-e29b-41d4-a716-446655440000#^important-block :::
+::: embed id:550e8400-e29b-41d4-a716-446655440000#important-block :::
 
 ::: embed /Projects/电力系统分析/核心知识.md#总结 :::
 ~~~~

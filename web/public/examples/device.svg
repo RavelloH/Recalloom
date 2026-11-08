@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320" role="img" aria-labelledby="title desc">
+<title id="title">电力系统实验接线示意图</title>
+<desc id="desc">可调电源连接数字万用表与测试负载的简化接线示意图</desc>
+<rect width="720" height="320" rx="20" fill="#f5f7fa"/>
+<g stroke="#435466" stroke-width="3" fill="#fff" stroke-linejoin="round">
+<rect x="40" y="82" width="185" height="156" rx="12"/>
+<rect x="273" y="102" width="172" height="118" rx="12"/>
+<rect x="493" y="82" width="187" height="156" rx="12"/>
+</g>
+<g font-family="system-ui,sans-serif" fill="#243344" text-anchor="middle">
+<text x="132" y="115" font-size="20" font-weight="600">电源</text>
+<text x="359" y="132" font-size="20" font-weight="600">测量仪表</text>
+<text x="585" y="115" font-size="20" font-weight="600">实验负载</text>
+<text x="132" y="182" font-size="35" font-weight="700">U</text>
+<text x="359" y="179" font-size="34" font-weight="700">V / A</text>
+<text x="585" y="182" font-size="35" font-weight="700">R</text>
+</g>
+<g stroke="#3668b1" stroke-width="6" fill="none" stroke-linecap="round">
+<path d="M225 157H273"/>
+<path d="M445 157H493"/>
+</g>
+<g fill="#3668b1"><path d="M263 146l16 11-16 11z"/><path d="M483 146l16 11-16 11z"/></g>
+<g font-family="system-ui,sans-serif" fill="#516275" font-size="16" text-anchor="middle">
+<text x="360" y="277">RMD 示例插图 · 独立 SVG 静态资源</text>
+</g>
+</svg>

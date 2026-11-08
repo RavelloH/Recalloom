@@ -50,11 +50,16 @@ describe('RMD 1.0 readonly Wiki graph and section resolution',()=>{
   assert.ok(result.includes('正文。'),result);
   assert.ok(!result.includes('其他内容。'),result);
  });
- it('selects one paragraph by RMD block ID without the old ^id suffix',()=>{
+ it('selects one paragraph via the same #anchor-id used for headings',()=>{
   const source=['## 开头','','前一段。','','这是段落的第一行。','仍然属于同一段。 @ attrs important-block @','','后续段落。'].join('\n');
-  const selected=extractWikiSection(source,'^important-block');
+  const selected=extractWikiSection(source,'important-block');
   assert.equal(selected,'这是段落的第一行。\n仍然属于同一段。 @ attrs important-block @');
-  assert.equal(extractWikiSection(source,'^missing'),'');
+  assert.equal(extractWikiSection(source,'missing'),'');
+  assert.equal(extractWikiSection(source,'^important-block'),'','obsolete caret anchor must not be recognized');
+ });
+ it('resolves explicit paragraph ID rather than colliding generated heading slug',()=>{
+  const source='## important-block\n\n错误章节。\n\n正文段落。 @ attrs important-block @\n\n## 结束章节\n\n其他正文。';
+  assert.equal(extractWikiSection(source,'important-block'),'正文段落。 @ attrs important-block @');
  });
  it('does not treat fenced Markdown heading examples as real anchors',()=>{
   const source='~~~markdown\n## 伪标题\n~~~\n\n## 真实标题 @ attrs real-heading @\n\n有效内容。';

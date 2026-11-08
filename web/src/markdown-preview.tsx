@@ -8,7 +8,7 @@ import {projectRmdPreview} from './rmd-preview';
 import {remarkRmdSyntax} from './rmd-remark';
 import {shieldRmdTablePipes} from './rmd-lexer';
 import {richTitle} from './tiptap/rich-schema';
-import {calloutTitle} from './callout-title';
+import {calloutIcon} from './callout-icon';
 import {asAstryBadgeVariant} from './rmd-badge';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
@@ -194,7 +194,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
-   return <Banner status={status} title={calloutTitle(kind,richTitle(kind,title))} collapsible={false}>{props.children as React.ReactNode}</Banner>;
+   return <Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false}>{props.children as React.ReactNode}</Banner>;
   },
   'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className="rk-rmd-block-mark" data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{

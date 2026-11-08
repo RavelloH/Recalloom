@@ -44,7 +44,7 @@ try{
  ].join('\n');
  const target=created(await api('/records','POST',{kind:'document',name:targetName,content:source}),'target');
  const embed='::: embed id:'+target.id+'#stable-heading :::';
- const paragraphEmbed='::: embed id:'+target.id+'#^important-block :::';
+ const paragraphEmbed='::: embed id:'+target.id+'#important-block :::';
  const hostMarkdown=['# Host','','参见 [[id:'+target.id+']]。','',embed,'',paragraphEmbed].join('\n');
  const host=created(await api('/records','POST',{kind:'document',name:'RMD 关系主文档 '+suffix+'.md',content:hostMarkdown}),'host');
  const refs=await api('/records/'+host.id+'/wiki-references');

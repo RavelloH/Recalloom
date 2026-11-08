@@ -6,6 +6,8 @@ describe('stable Wiki references',()=>{
  it('accepts only UUID or absolute virtual paths; names are search-only',()=>{
   assert.deepEqual(parseWikiTarget('id:'+ID+'#Overview|说明'),{target:'id:'+ID,anchor:'Overview',alias:'说明'});
   assert.deepEqual(parseWikiTarget('/Projects/Recalloom/Note.md|笔记'),{target:'/Projects/Recalloom/Note.md',anchor:null,alias:'笔记'});
+  assert.deepEqual(parseWikiTarget('id:'+ID+'#target-paragraph'),{target:'id:'+ID,anchor:'target-paragraph',alias:null});
+  assert.equal(parseWikiTarget('id:'+ID+'#^target-paragraph'),null,'obsolete Obsidian caret anchor is invalid for both links and embeds');
   for(const bad of ['Note.md','folder/note.md','../note.md','/../note.md','/','id:invalid','/folder//note.md','#heading','/folder/a.md|'])
    assert.equal(parseWikiTarget(bad),null,bad);
  });

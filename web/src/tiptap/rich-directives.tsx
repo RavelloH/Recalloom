@@ -12,7 +12,7 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Pencil,Eye,EyeOff} from 'lucide-react';
 import {richTitle} from './rich-schema';
-import {calloutTitle} from '../callout-title';
+import {calloutIcon} from '../callout-icon';
 import {asAstryBadgeVariant} from '../rmd-badge';
 export {richTitle} from './rich-schema';
 
@@ -93,7 +93,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
     </section>
    :kind==='comment'
    ?<section className="rk-rmd-comment-block"><NodeViewContent className="rk-directive-body"/></section>
-   :<Banner status={bannerStatus(kind)} title={calloutTitle(kind,editTitle)} collapsible={false} container="card">
+   :<Banner status={bannerStatus(kind)} icon={calloutIcon(kind)} title={editTitle} collapsible={false} container="card">
       <NodeViewContent className="rk-directive-body"/>
      </Banner>}
  </NodeViewWrapper>;

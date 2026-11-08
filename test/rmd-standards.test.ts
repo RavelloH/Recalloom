@@ -51,6 +51,20 @@ describe('RMD standard Markdown and modifier fidelity',()=>{
   assert.ok((code[0]?.content??[]).some(n=>n.text?.includes(quad)),output);
   assert.ok((code[0]?.content??[]).some(n=>n.text?.includes('~~~~')),output);
  });
+ it('maps balanced safe HTML u/sup/sub to editable marks with stable Markdown source',()=>{
+  const input='粗体 **电压**、<u>下划线</u>、H<sub>2</sub>O、x<sup>2</sup>，<u>组合 **重点**</u>。';
+  const {b,output}=repeat(input);
+  for(const name of ['underline','subscript','superscript'])assert.ok(walk(b,'text').some(n=>n.marks?.some(m=>m.type===name)),'missing '+name+' '+JSON.stringify(b));
+  assert.ok(output.includes('<u>下划线</u>'),output);
+  assert.ok(output.includes('<sup>2</sup>'),output);
+  assert.ok(output.includes('<sub>2</sub>'),output);
+  assert.ok(!walk(b,'rawInline').length,JSON.stringify(b));
+ });
+ it('keeps malformed unsafe HTML tags as literal text rather than guessing a style',()=>{
+  const {b,output}=repeat('未配对 <u>下划线 普通正文。');
+  assert.ok(output.includes('<u>'),output);
+  assert.equal(walk(b,'text').some(n=>n.marks?.some(m=>m.type==='underline')),false);
+ });
  it('standalone safe HTML br remains editable soft line break rather than a raw block',()=>{
   const src='第一行<br/>第二行';
   const {b,output}=repeat(src);

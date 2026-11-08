@@ -445,7 +445,17 @@
 /* GFM table caption is part of its Markdown source, never document metadata. */
 .record-main .tiptap {counter-reset:rk-table;}
 .record-main .tiptap .rk-hscroll[data-rk-table-id] {counter-increment:rk-table;}
+/* Captioned table view has a scroll viewport and a caption as siblings.
+ * Stack these vertically: flex row would put caption left of the table. */
+.record-main .tiptap .tableWrapper.rk-hscroll:has(> .rk-table-caption) {
+ display:flex!important;flex-direction:column!important;align-items:stretch;min-width:0;max-width:100%;
+}
+.record-main .tiptap .tableWrapper.rk-hscroll > .rk-scroll-viewport {
+ width:100%;max-width:100%;min-width:0;flex:none;order:1;
+}
 .record-main .tiptap .rk-table-caption {
+ box-sizing:border-box;width:100%;flex:none;display:block;order:2;
+ margin-block:.25rem .15rem;
  padding:.55rem .8rem;text-align:center;font-size:.87rem;line-height:1.5;
  color:var(--color-text-secondary);overflow-wrap:anywhere;}
 .record-main .tiptap .rk-hscroll[data-rk-table-id] .rk-table-caption::before {
@@ -471,14 +481,6 @@
  text-underline-offset:.16em;white-space:nowrap;}
 .record-main .rk-cross-reference-read.rk-cross-reference-missing {text-decoration-style:dashed;color:var(--color-danger,#b94a48);}
 
-/* Eight semantic callouts share Astryx Banner variants but retain distinct icons. */
-.rk-callout-heading {display:inline-flex;align-items:center;gap:.45rem;vertical-align:middle;}
-.rk-callout-heading svg {flex:none;opacity:.86;}
-.rk-callout-heading[data-callout-kind="note"] svg {color:var(--color-text-secondary);}
-.rk-callout-heading[data-callout-kind="question"] svg {color:var(--color-primary);}
-.rk-callout-heading[data-callout-kind="example"] svg {color:var(--color-primary);}
-.rk-callout-heading[data-callout-kind="tip"] svg {color:var(--color-success, #16835a);}
-
 
 /* RMD 1.0 block Mark keeps the existing #f5d870 visual baseline.
  * Colored Highlight uses EXACTLY the existing inline color tokens.
@@ -495,6 +497,12 @@
  background:var(--rk-rmd-block-background);
  border-radius:4px;
  overflow-x:auto;
+}
+/* A colored block uses its theme text colors, while default Mark keeps
+ * dark, readable ink on the established #f5d870 background in dark mode. */
+.record-main .tiptap .rk-rmd-block-mark:not([data-rk-color]) .rk-directive-body :is(p,li,blockquote,span),
+.record-main .markdown-preview .rk-rmd-block-mark:not([data-rk-color]) :is(p,li,blockquote,span) {
+ color:#251e0e;
 }
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color] {color:inherit;}
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="red"] {--rk-rmd-block-background:var(--color-background-red,#fddede);}

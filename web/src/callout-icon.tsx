@@ -7,9 +7,9 @@ const icons:Record<string,LucideIcon>={
  note:StickyNote,info:Info,tip:Lightbulb,success:CheckCircle2,
  warning:AlertTriangle,danger:ShieldAlert,example:BookOpen,question:HelpCircle
 };
-export function calloutTitle(kind:string,title:React.ReactNode):React.ReactNode{
+/** Supply the semantic icon through Banner's own `icon` prop.
+ * Putting another icon in title duplicates Banner's status icon. */
+export function calloutIcon(kind:string):React.ReactNode{
  const Icon=icons[kind];
- return Icon?<span className="rk-callout-heading" data-callout-kind={kind}>
-  <Icon size={16} strokeWidth={2} aria-hidden="true"/><span>{title}</span>
- </span>:title;
+ return Icon?<Icon size={17} strokeWidth={2} aria-hidden="true"/>:undefined;
 }

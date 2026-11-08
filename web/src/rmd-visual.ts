@@ -30,8 +30,33 @@ const addMark=(nodes:JSONContent[],name:string,attrs?:Record<string,unknown>)=>n
 }));
 const props=(node:AstNode)=>node.data?.hProperties??{};
 
+/** Safe, balanced CommonMark HTML phrasing tags become editable marks.
+ * Raw/unknown/unpaired HTML stays literal and never becomes executable DOM.
+ */
 function children(node:AstNode,source:string):JSONContent[]{
- return (node.children??[]).flatMap(child=>inlineNode(child,source));
+ const parts=node.children??[],out:JSONContent[]=[];
+ const tags:Record<string,string>={u:'underline',sup:'superscript',sub:'subscript'};
+ for(let i=0;i<parts.length;i++){
+  const part=parts[i]!;
+  const raw=part.type==='html'?(part.value??at(part,source)).trim():'';
+  const opener=/^<(u|sup|sub)>$/i.exec(raw);
+  if(opener){
+   const tag=opener[1]!.toLowerCase();let depth=1,close=-1;
+   for(let j=i+1;j<parts.length;j++){
+    const other=parts[j]!;
+    if(other.type!=='html')continue;
+    const t=(other.value??at(other,source)).trim().toLowerCase();
+    if(t==='<'+tag+'>')depth++;
+    else if(t==='</'+tag+'>'){if(--depth===0){close=j;break;}}
+   }
+   if(close>i+1){
+    const inside=children({type:'span',children:parts.slice(i+1,close)},source);
+    out.push(...addMark(inside,tags[tag]!));i=close;continue;
+   }
+  }
+  out.push(...inlineNode(part,source));
+ }
+ return out;
 }
 function inlineNode(node:AstNode,source:string):JSONContent[]{
  switch(node.type){
