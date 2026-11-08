@@ -64,6 +64,24 @@ function hasUnsupportedSyntax(node:AstNode,allowedWiki:SafeSpan[]=[]):boolean{
  return (node.children??[]).some(child=>hasUnsupportedSyntax(child,allowedWiki));
 }
 
+/* Nested directives must use a strictly longer outer fence. Remark can
+ * otherwise consume the inner close as the outer close and leave a trailing
+ * ::: paragraph. Never turn such ambiguous input into an empty edit node:
+ * preserve the malformed source verbatim until the author fixes the fences. */
+function ambiguousNestedFence(block:AstNode,source:string):boolean{
+ if(block.type!=='containerDirective')return false;
+ const start=block.position?.start?.offset;
+ if(start===undefined)return false;
+ const outer=/^(:{3,})[\w-]+/.exec(source.slice(start))?.[1]?.length;
+ if(!outer)return false;
+ return (block.children??[]).some(child=>{
+  if(child.type!=='containerDirective')return false;
+  const offset=child.position?.start?.offset;
+  if(offset===undefined)return false;
+  const inner=/^(:{3,})[\w-]+/.exec(source.slice(offset))?.[1]?.length;
+  return inner!==undefined&&inner>=outer;
+ });
+}
 function assignExplicitHeadingIds(nodes:JSONContent[]):JSONContent[]{
  for(const node of nodes){
   if(node.type==='heading'){
@@ -147,6 +165,16 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
      const title=(block.children??[]).map(child=>child.value??'').join('');
      if(!url){content.push(rawMarkdownBlock(fragment));continue;}
      content.push({type:'richLinkCard',attrs:{url,title}});
+     continue;
+    }
+    if(ambiguousNestedFence(block,tail)){
+     // Include a dangling close fence if remark parsed it as a paragraph.
+     const after=blocks[i+1];
+     const nextStart=after?.position?.start?.offset,nextEnd=after?.position?.end?.offset;
+     const trailing=nextStart!==undefined&&nextEnd!==undefined&&
+      /^:{3,}[ \t]*$/.test(tail.slice(nextStart,nextEnd));
+     content.push(rawMarkdownBlock(tail.slice(start,trailing?nextEnd:end)));
+     if(trailing)i++;
      continue;
     }
     if(block.type==='containerDirective'&&richContainerKinds.has(block.name??'')){

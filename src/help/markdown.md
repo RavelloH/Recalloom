@@ -78,6 +78,23 @@ const value = 42;
 ### 折叠 / Details
 
 使用 `:::details[标题]` 开始、`:::` 结束，内部为普通可编辑 Markdown，视觉上使用 Astryx Collapsible。
+**嵌套容器必须使用更长的外层围栏。** 例如外层 Details 四个冒号、内层 Warning 三个冒号：
+
+~~~~markdown
+::::details[展开细节]
+
+这里是外层正文。
+
+:::warning[嵌套提示]
+
+这里是提示正文。
+
+:::
+
+::::
+~~~~
+
+使用相同长度的 `:::details` 与 `:::warning` 嵌套会使解析器混淆闭合位置；这种歧义语法只保留为普通可编辑原文，不能静默生成正文为空的提示框。改用 `::::` 外层。
 
 ### 始终可见的注释
 
@@ -93,7 +110,7 @@ Cloudflare 的 :abbr[DO]{title="Durable Objects"} 负责有状态计算。
 查看 :tip[这里]{content="额外说明"} 获取提示。
 ~~~~
 
-缩略词 `:abbr[文字]{title="解释"` 有明确的结束界限，不使用自由文本形式 `*[DO]: Durable Objects`，避免与后续正文合并。**可视化编辑器内采用纯 CSS 提示层（颜色、边框和阴影遵循 Astryx 主题）**，悬停或键盘聚焦显示解释；其伪元素没有运行时 DOM 变更，Tiptap 正文可直接编辑，解释文字绝不能进入 Markdown。Wiki 嵌入的 Markdown 投影仍可使用 Astryx Tooltip 原组件。
+缩略词 `:abbr[文字]{title="解释"}` 有明确的结束界限，不使用自由文本形式 `*[DO]: Durable Objects`，避免与后续正文合并。**可视化编辑器内采用纯 CSS 提示层（颜色、边框和阴影遵循 Astryx 主题）**，悬停或键盘聚焦显示解释；其伪元素没有运行时 DOM 变更，Tiptap 正文可直接编辑，解释文字绝不能进入 Markdown。Wiki 嵌入的 Markdown 投影仍可使用 Astryx Tooltip 原组件。
 
 ### 主题彩色高亮
 

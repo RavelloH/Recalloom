@@ -391,7 +391,13 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-critic-deletion .rk-critic-content {text-decoration:line-through;text-decoration-thickness:1px;opacity:.72;}
 .record-main .rk-critic-substitution {background:var(--rk-document-wash);}
 .record-main .rk-critic-before-wrapper,.record-main .rk-critic-substitution .rk-critic-before {color:var(--color-text-secondary);}
-.record-main .rk-critic-substitution svg,.record-main .rk-critic-comment svg {vertical-align:middle;margin-inline:0 .18em;}
+/* Astryx normalizes all SVG to display:block; inside an inline review
+ * suggestion this creates a forced line break on narrow screens.
+ * Keep review icons on the same baseline as their editable text. */
+.record-main .rk-critic svg {display:inline-block;vertical-align:-.12em;flex-shrink:0;}
+.record-main .rk-critic-before-wrapper {display:inline-flex;align-items:baseline;gap:.16em;max-width:100%;vertical-align:baseline;}
+.record-main .rk-critic-substitution svg,.record-main .rk-critic-comment svg {margin-inline:0 .18em;}
+.record-main .rk-critic-comment > span[contenteditable="false"] {display:inline-flex;vertical-align:baseline;align-items:center;}
 .record-main .rk-critic-substitution .rk-critic-before {text-decoration:line-through;}
 .record-main .rk-critic-substitution .rk-critic-content {text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.15em;}
 .record-main .rk-critic-comment {font-size:.85em;opacity:.73;color:var(--color-text-secondary);

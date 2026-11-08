@@ -49,7 +49,16 @@ describe('Rich Markdown structural directives',()=>{
   assert.equal(containers.length,2,JSON.stringify(doc));
   assert.equal(containers[0]?.attrs?.kind,'details');
   assert.equal(containers[1]?.attrs?.kind,'warning');
+  assert.ok(JSON.stringify(containers[1]).includes('正文 **强调**')||JSON.stringify(containers[1]).includes('正文 '),'nested warning must keep its text');
   assert.match(manager.serialize(doc),/::::details/);
+ });
+ it('preserves ambiguous same-width nested fences as raw Markdown rather than losing warning text',()=>{
+  const source=':::details[更多细节]\n\n外层文字。\n\n:::warning[嵌套提示]\n\n被吞掉的正文 **不可丢失**。\n\n:::\n\n:::';
+  const doc=buildVisualMarkdown(source,manager);
+  assert.equal(nodes(doc,'richContainer').length,0,'ambiguous fences must not render blank child cards');
+  assert.equal(nodes(doc,'rawMarkdown').length,1,JSON.stringify(doc));
+  assert.ok(manager.serialize(doc).includes('被吞掉的正文 **不可丢失**'));
+  assert.ok(manager.serialize(doc).includes(':::warning[嵌套提示]'));
  });
  it('preserves all five CriticMarkup review types without applying suggestions',()=>{
   const source='增加 {++推荐文字++}，删除 {--过时文字--}，替换 {~~老内容~>新内容~~}，标记 {==重点==}{>>Agent A：查证来源<<}。';
