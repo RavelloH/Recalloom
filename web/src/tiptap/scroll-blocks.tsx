@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
 import CodeBlockShiki from 'tiptap-extension-code-block-shiki';
+import {optimizeShikiPlugins} from './shiki-transaction';
 import {TableView} from '@tiptap/extension-table';
 import type {Node as PMNode} from '@tiptap/pm/model';
 import type {EditorView} from '@tiptap/pm/view';
@@ -108,6 +109,7 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  </NodeViewWrapper>;
 };
 export const ScrollCodeBlock=CodeBlockShiki.extend({
+ addProseMirrorPlugins(){return optimizeShikiPlugins(this.parent?.()??[]);},
  addAttributes(){return {...this.parent?.(),id:{default:null},filename:{default:''},wrap:{default:false},expand:{default:false}};},
  addNodeView(){return ReactNodeViewRenderer(CodeView);}
 });

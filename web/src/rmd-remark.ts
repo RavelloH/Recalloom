@@ -2,7 +2,7 @@ import {unified} from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import {lexRmd,findRmdWikiSpans,protectedRmdRanges,RMD_PIPE_SENTINEL,type RmdSyntaxNode,type RmdSpan} from './rmd-lexer';
+import {analyzeRmd,RMD_PIPE_SENTINEL,type RmdAnalysis,type RmdSyntaxNode,type RmdSpan} from './rmd-lexer';
 import {findCriticMarkup} from './critic-syntax';
 import {isRmdId} from './rmd-schema';
 
@@ -200,13 +200,13 @@ function applyAttrs(root:RmdMdast,token:RmdSyntaxNode,source:string):void{
   }
  }
 }
-function applyRmdTree(root:RmdMdast,source:string,parentKind?:string){
- const tokens=lexRmd(source,parentKind);
- const protectedRanges=protectedRmdRanges(source);
+function applyRmdTree(root:RmdMdast,source:string,parentKind?:string,context?:RmdAnalysis){
+ const analysis=context?.source===source?context:analyzeRmd(source,parentKind);
+ const {tokens,protectedRanges,wikiSpans}=analysis;
  const isUnavailable=(start:number,end:number)=>tokens.some(t=>start<t.end&&end>t.start)||
   protectedRanges.some(t=>start<t.end&&end>t.start);
  const otherInline:RmdSyntaxNode[]=[];
- for(const ref of findRmdWikiSpans(source)){
+ for(const ref of wikiSpans){
   const {start,end}=ref;
   if(isUnavailable(start,end))continue;
   otherInline.push({type:'inline',name:ref.name,start,end,raw:ref.raw,
@@ -231,6 +231,6 @@ function applyRmdTree(root:RmdMdast,source:string,parentKind?:string){
  restore(root);
 }
 /** Supply precisely the same source that the Markdown parser sees. */
-export function remarkRmdSyntax(source:string){
- return (root:RmdMdast)=>applyRmdTree(root,source);
+export function remarkRmdSyntax(source:string,context?:RmdAnalysis){
+ return (root:RmdMdast)=>applyRmdTree(root,source,undefined,context);
 }

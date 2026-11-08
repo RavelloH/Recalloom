@@ -4,7 +4,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import {remarkRmdSyntax} from './rmd-remark';
-import {shieldRmdTablePipes} from './rmd-lexer';
+import {analyzeRmd,shieldRmdTablePipes,type RmdAnalysis} from './rmd-lexer';
 import {rawMarkdownBlock} from './tiptap/raw-markdown';
 import {normalizeKnownMarkdown} from './markdown-normalize';
 import {safeFootnoteId} from './tiptap/rich-footnote-utils';
@@ -109,16 +109,17 @@ function inlineNode(node:AstNode,source:string):JSONContent[]{
 }
 function blockNode(node:AstNode,source:string):JSONContent[]{
  const childrenBlock=(sub:string)=>node.children?.flatMap(child=>blockNode(child,sub))??[];
+ const nonemptyChildren=(sub:string)=>{const result=childrenBlock(sub);return result.length?result:[emptyBlock()];};
  if(node.type==='rmdBlock'){
   const p=props(node),body=node.data?.rmdBody??source;
   if(node.data?.hName==='rk-rmd-block-mark')return [{type:'richContainer',
    attrs:{kind:node.name??'mark',title:'',color:p.dataRkColor??null},
-   content:childrenBlock(body).length?childrenBlock(body):[emptyBlock()]}];
+   content:nonemptyChildren(body)}];
   if(node.data?.hName==='rk-rmd-comment-block')return [{type:'richContainer',
-   attrs:{kind:'comment',title:''},content:childrenBlock(body).length?childrenBlock(body):[emptyBlock()]}];
+   attrs:{kind:'comment',title:''},content:nonemptyChildren(body)}];
   if(node.data?.hName==='rk-callout')return [{type:'richContainer',
    attrs:{kind:p.dataKind??'note',title:p.dataTitle??'',sender:p.dataSender??null},
-   content:childrenBlock(body).length?childrenBlock(body):[emptyBlock()]}];
+   content:nonemptyChildren(body)}];
   if(node.data?.hName==='wiki-embed')return [{type:'wikiEmbed',attrs:{
    target:p.dataTarget??'',anchor:p.dataAnchor??null}}];
   if(node.data?.hName==='rk-link-card')return [{type:'richLinkCard',attrs:{
@@ -143,7 +144,7 @@ function blockNode(node:AstNode,source:string):JSONContent[]{
    if(content.length===1&&content[0]?.type==='image')return content;
    return [{type:'paragraph',attrs:{blockId:p.id??null},content}];
   }
-  case 'blockquote':return [{type:'blockquote',content:childrenBlock(source).length?childrenBlock(source):[emptyBlock()]}];
+  case 'blockquote':return [{type:'blockquote',content:nonemptyChildren(source)}];
   case 'list':{
    const task=node.children?.some(c=>c.type==='listItem'&&typeof c.checked==='boolean')??false;
    const items=(node.children??[]).map(c=>{
@@ -190,10 +191,16 @@ function blockNode(node:AstNode,source:string):JSONContent[]{
  * No old syntax rewrite, no placeholder substitution, no silent data loss:
  * unsupported structures remain their literal source.
  */
-export function parseRmdVisual(source:string):JSONContent{
+export function parseRmdVisual(source:string,context?:RmdAnalysis):JSONContent{
  const normalized=normalizeKnownMarkdown(source.replace(/\r\n/g,'\n'));
- const raw=parser.parse(shieldRmdTablePipes(normalized)) as AstNode;
- remarkRmdSyntax(normalized)(raw);
+ const analysis=context?.source===normalized?context:analyzeRmd(normalized);
+ // Without a GFM table, replacing RMD pipes cannot alter the block AST.
+ // Clone the original AST rather than running the full Markdown parser again.
+ // For documents containing tables, retain exact pipe-shielding semantics.
+ const raw=(analysis.hasGfmTable
+  ?parser.parse(shieldRmdTablePipes(normalized,analysis))
+  :structuredClone(analysis.ast)) as AstNode;
+ remarkRmdSyntax(normalized,analysis)(raw);
  const blocks=(raw.children??[]).flatMap(child=>blockNode(child,normalized));
  return {type:'doc',content:blocks.length?blocks:[emptyBlock()]};
 }

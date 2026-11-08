@@ -156,6 +156,16 @@ try{
  await edit('table','tbl-edited',{'图注':'更新后的图注'});
  await edit('codeBlock','code-edited',{'文件名':'edited.ts','默认展开':true});
  await edit('image','fig-edited',{'宽度 px':'480','图注':'新插图说明'});
+ // Mapped widgets must use the live position after text is inserted before them.
+ await page.locator('.tiptap > p').first().click();
+ await page.keyboard.press('Home');
+ await page.keyboard.type('移动前文位置 ');
+ await page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="codeBlock"]').first().click();
+ const shiftedPanel=page.getByRole('dialog',{name:'编辑代码块 Markdown 属性'});
+ await shiftedPanel.waitFor();
+ assert.equal(await shiftedPanel.getByRole('textbox',{name:'文件名'}).inputValue(),'edited.ts','the mapped widget must still edit its code block');
+ await shiftedPanel.getByRole('button',{name:'取消属性编辑'}).click();
+ await shiftedPanel.waitFor({state:'hidden'});
  assert.equal((await api('/records/'+id)).body.content,source,'all attribute panel edits remain unsaved');
  await page.getByRole('button',{name:'预览',exact:true}).click();
  await page.locator('.markdown-preview').waitFor();

@@ -22,8 +22,8 @@ const blockedTypes=new Set(['code','inlineCode','math','inlineMath','html','link
 const overlap=(range:RmdSpan,withRanges:readonly RmdSpan[])=>withRanges.some(r=>range.start<r.end&&range.end>r.start);
 const escapeCount=(text:string,pos:number)=>{let count=0;for(let i=pos-1;i>=0&&text[i]==='\\';i--)count++;return count};
 const escaped=(text:string,pos:number)=>escapeCount(text,pos)%2===1;
-export function protectedRmdRanges(source:string):RmdSpan[]{
- const root=parser.parse(source) as Mdast;
+export function protectedRmdRanges(source:string,parsed?:Mdast):RmdSpan[]{
+ const root=parsed??parser.parse(source) as Mdast;
  const spans:RmdSpan[]=[];
  const walk=(node:Mdast)=>{
   const start=node.position?.start?.offset,end=node.position?.end?.offset;
@@ -209,13 +209,13 @@ function blockType(last:Mdast|null):string|null{
 function previousBlockType(source:string,start:number):string|null{
  return blockType(((parser.parse(source.slice(0,start)) as Mdast).children??[]).at(-1)??null);
 }
-function scanAttrs(source:string,blocked:RmdSpan[],blocks:RmdSyntaxNode[]):RmdSyntaxNode[]{
+function scanAttrs(source:string,blocked:RmdSpan[],blocks:RmdSyntaxNode[],parsed?:Mdast):RmdSyntaxNode[]{
  const out:RmdSyntaxNode[]=[];
  // Top-level MDAST positions are monotonic. Reusing one parse avoids the old
  // quadratic behavior of reparsing source.slice(0,offset) for every modifier.
  // A table may contain its own trailing @ attrs line, so also retain the
  // last block whose start precedes this line (not only blocks already ended).
- const top=(parser.parse(source) as Mdast).children??[];
+ const top=(parsed??parser.parse(source) as Mdast).children??[];
  let blockIndex=0,lastBlock:Mdast|null=null;
  for(const {line,start,end}of linesOf(source)){
   while(blockIndex<top.length&&(top[blockIndex]!.position?.start?.offset??Infinity)<start){
@@ -271,8 +271,8 @@ function scanAttrs(source:string,blocked:RmdSpan[],blocks:RmdSyntaxNode[]):RmdSy
  */
 export type RmdWikiSpan={start:number;end:number;raw:string;name:'wikiLink'|'crossRef';
  target?:string;anchor?:string;alias?:string;id?:string};
-export function findRmdWikiSpans(source:string):RmdWikiSpan[]{
- const blocked=protectedRmdRanges(source),results:RmdWikiSpan[]=[];
+export function findRmdWikiSpans(source:string,blocked=protectedRmdRanges(source)):RmdWikiSpan[]{
+ const results:RmdWikiSpan[]=[];
  for(const m of source.matchAll(/\[\[([^\]\r\n]{1,2048})\]\]/g)){
   const start=m.index??0,end=start+m[0].length,raw=m[1]!;
   if(escaped(source,start)||overlap({start,end},blocked))continue;
@@ -293,9 +293,10 @@ export function findRmdWikiSpans(source:string):RmdWikiSpan[]{
  * Offsets remain identical, so source spans stay authoritative.
  */
 export const RMD_PIPE_SENTINEL='\uE000';
-export function shieldRmdTablePipes(source:string):string{
+export function shieldRmdTablePipes(source:string,context?:RmdAnalysis):string{
  if(source.includes(RMD_PIPE_SENTINEL))return source;
- const tokens=[...lexRmd(source).filter(t=>t.type==='inline'||t.type==='attrs'),...findRmdWikiSpans(source)];
+ const analysis=context?.source===source?context:analyzeRmd(source);
+ const tokens=[...analysis.tokens.filter(t=>t.type==='inline'||t.type==='attrs'),...analysis.wikiSpans];
  const chars=source.split('');
  for(const token of tokens){
   for(let i=token.start;i<token.end;i++){
@@ -304,19 +305,41 @@ export function shieldRmdTablePipes(source:string):string{
  }
  return chars.join('');
 }
+/** One request-scoped analysis is reused by the lexer, table shielding and
+ * both rendering adapters. No global cache, stale source state or retained AST.
+ */
+export type RmdAnalysis={
+ source:string;
+ /** Immutable input for cheap clones when GFM table shielding is unnecessary. */
+ ast:Mdast;
+ hasGfmTable:boolean;
+ protectedRanges:RmdSpan[];
+ tokens:RmdSyntaxNode[];
+ wikiSpans:RmdWikiSpan[];
+};
+export function analyzeRmd(input:string,parentKind?:string):RmdAnalysis{
+ const source=input.replace(/\r\n/g,'\n');
+ const root=parser.parse(source) as Mdast;
+ const protectedRanges=protectedRmdRanges(source,root);
+ const hasTable=(node:Mdast):boolean=>node.type==='table'||Boolean(node.children?.some(hasTable));
+ return {source,ast:root,hasGfmTable:hasTable(root),protectedRanges,
+  tokens:lexRmd(source,parentKind,{blocked:protectedRanges,root}),
+  wikiSpans:findRmdWikiSpans(source,protectedRanges)};
+}
+
 /** Shared RMD lexer. Only valid source spans become semantic tokens.
  * Unknown/malformed extensions remain the user's original Markdown text.
  * The rendering adapters consume the same nodes without reparsing attributes.
  */
-export function lexRmd(input:string,parentKind?:string):RmdSyntaxNode[]{
- const source=input.replace(/\r\n/g,'\n'),protectedRanges=protectedRmdRanges(source);
+export function lexRmd(input:string,parentKind?:string,precomputed?:{blocked:RmdSpan[];root:Mdast}):RmdSyntaxNode[]{
+ const source=input.replace(/\r\n/g,'\n'),protectedRanges=precomputed?.blocked??protectedRmdRanges(source);
  const comments=findRmdComments(source).map(c=>({
   type:'comment' as const,name:'comment',start:c.start,end:c.end,raw:c.raw,main:c.body,attributes:{}
  }));
  const blocks=scanBlocks(source,protectedRanges,parentKind);
  const excluded=[...blocks,...comments];
  const inline=scanInline(source,protectedRanges,excluded);
- const attrs=scanAttrs(source,protectedRanges,[...excluded,...inline]);
+ const attrs=scanAttrs(source,protectedRanges,[...excluded,...inline],precomputed?.root);
  return [...blocks,...comments.filter(t=>!isCovered(t.start,blocks)),...inline,...attrs]
   .sort((a,b)=>a.start-b.start);
 }

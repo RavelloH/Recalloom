@@ -4,6 +4,7 @@ import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {headingAnchor} from '../wiki-slug';
 import {collectCrossRefs,resolveCrossRef,type CrossRefIndex} from '../cross-reference';
+import {crossReferencesMayChange} from './cross-reference-update';
 
 type Store={subscribe:(listener:()=>void)=>()=>void;getSnapshot:()=>CrossRefIndex};
 const registries=new WeakMap<Editor,Store>();
@@ -11,8 +12,8 @@ function createRegistry(editor:Editor):Store{
  const callbacks=new Set<()=>void>();
  let snapshot=collectCrossRefs(editor.state.doc.toJSON());
  let signature=[...snapshot.values()].map(x=>x.id+':'+x.label).join('|');
- const update=({transaction}:{transaction:{docChanged:boolean}})=>{
-  if(!transaction.docChanged)return;
+ const update=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
+  if(!crossReferencesMayChange(transaction))return;
   const next=collectCrossRefs(editor.state.doc.toJSON());
   const nextSignature=[...next.values()].map(x=>x.id+':'+x.label).join('|');
   if(nextSignature===signature)return;

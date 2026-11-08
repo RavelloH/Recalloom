@@ -6,7 +6,7 @@ import remarkMath from 'remark-math';
 import {normalizeKnownMarkdown} from './markdown-normalize';
 import {projectRmdPreview} from './rmd-preview';
 import {remarkRmdSyntax} from './rmd-remark';
-import {shieldRmdTablePipes} from './rmd-lexer';
+import {analyzeRmd,shieldRmdTablePipes} from './rmd-lexer';
 import {richTitle} from './tiptap/rich-schema';
 import {calloutIcon} from './callout-icon';
 import {asAstryBadgeVariant} from './rmd-badge';
@@ -114,9 +114,10 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/.exec(source);
  const body=frontmatter?source.slice(frontmatter[0].length).replace(/^\n+/, ''):source;
  const prepared=body;
- const refIndex=useMemo(()=>collectRmdPreviewRefs(prepared),[prepared]);
  const syntaxSource=prepared;
- const parseSource=useMemo(()=>shieldRmdTablePipes(syntaxSource),[syntaxSource]);
+ const analysis=useMemo(()=>analyzeRmd(syntaxSource),[syntaxSource]);
+ const refIndex=useMemo(()=>collectRmdPreviewRefs(prepared,analysis),[prepared,analysis]);
+ const parseSource=useMemo(()=>shieldRmdTablePipes(syntaxSource,analysis),[syntaxSource,analysis]);
  const chain=trail??(sourceId?[sourceId]:[]);
  const custom={
   'wiki-ref':({node:_node,...props}:Record<string,unknown>)=>
@@ -214,7 +215,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  };
  return <article className="markdown-preview">
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
-  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource)]}
+  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource,analysis)]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}
    components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
  </article>;
