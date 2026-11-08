@@ -441,3 +441,22 @@
 }
 /* Editor link favicons use an isolated stylesheet in document.head.
  * Never mutate anchors managed by ProseMirror. */
+
+/* GFM table caption is part of its Markdown source, never document metadata. */
+.record-main .tiptap {counter-reset:rk-table;}
+.record-main .tiptap .rk-hscroll[data-rk-table-id] {counter-increment:rk-table;}
+.record-main .tiptap .rk-table-caption {
+ padding:.55rem .8rem;text-align:center;font-size:.87rem;line-height:1.5;
+ color:var(--color-text-secondary);overflow-wrap:anywhere;}
+.record-main .tiptap .rk-hscroll[data-rk-table-id] .rk-table-caption::before {
+ content:'表 ' counter(rk-table) '：';font-weight:650;margin-inline-end:.2em;}
+.record-main .tiptap .rk-table-caption[hidden] {display:none;}
+
+/* Read-only Wiki projection uses the same Markdown caption ID and CSS label. */
+.record-main .markdown-preview {counter-reset:rk-table-preview;}
+.record-main .markdown-preview .rk-table-caption-read {
+ counter-increment:rk-table-preview;text-align:center;font-size:.87rem;
+ color:var(--color-text-secondary);line-height:1.55;overflow-wrap:anywhere;
+ margin-block:-.35rem 1.15rem;padding:.35rem .6rem;}
+.record-main .markdown-preview .rk-table-caption-read::before {
+ content:'表 ' counter(rk-table-preview) '：';font-weight:650;margin-inline-end:.2em;}

@@ -418,3 +418,13 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  text-underline-offset:.16em;cursor:pointer;}
 .record-main .rk-cross-reference-missing > a {color:var(--color-danger,#b94a48);text-decoration-style:dashed;}
 .record-main .rk-cross-caption-number {margin-inline-end:.3em;font-weight:600;white-space:nowrap;}
+
+/* Editing the caption lives outside TableView's ProseMirror-managed cells. */
+.record-main .rk-table-caption-editor {position:absolute;z-index:14;left:12px;right:12px;
+ display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,2fr) auto;
+ align-items:end;gap:.75rem;padding:.8rem;background:var(--rk-popover,var(--color-background));
+ border:1px solid var(--rk-document-border);border-radius:.65rem;
+ box-shadow:0 8px 22px rgba(0,0,0,.12);}
+.record-main .rk-table-caption-editor-actions {display:flex;gap:.4rem;align-items:center;}
+@media(max-width:650px){.record-main .rk-table-caption-editor{
+ grid-template-columns:1fr;max-height:min(65vh,26rem);overflow-y:auto;}}

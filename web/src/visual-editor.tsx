@@ -3,6 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {searchQuery,type SearchHit} from './queries';
 import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
+import {TextInput} from '@astryxdesign/core/TextInput';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
@@ -16,14 +17,14 @@ import {InlineMathWithHighlight} from './tiptap/inline-math-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor,JSONContent} from '@tiptap/core';
-import {Link2,ImagePlus,Sigma,Table2,Rows3,Columns3,Trash2,AlignLeft,AlignCenter,AlignRight,Plus,Minus,Code} from 'lucide-react';
+import {Link2,ImagePlus,Sigma,Table2,Rows3,Columns3,Trash2,AlignLeft,AlignCenter,AlignRight,Plus,Minus,Code,Pencil} from 'lucide-react';
 import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {CrossReferenceNode} from './tiptap/cross-reference';
-import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
+import {ScrollCodeBlock,CaptionedScrollTableView} from './tiptap/scroll-blocks';
 import {buildVisualMarkdown} from './tiptap/visual-markdown';
 import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from './tiptap/rich-directives';
@@ -37,6 +38,7 @@ import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
 import {useCompactLayout} from './use-media';
+import {safeTableId,cleanTableCaption} from './table-caption';
 
 type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number};
 type WikiState=SlashState&{kind:'link'|'embed'};
@@ -62,6 +64,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const lastColumn=useRef<number|null>(null);
  const lastCellPos=useRef<number|null>(null);
  const [tableTarget,setTableTarget]=useState(false);
+ const [tableCaptionOpen,setTableCaptionOpen]=useState(false);
+ const [tableCaptionDraft,setTableCaptionDraft]=useState('');
+ const [tableIdDraft,setTableIdDraft]=useState('');
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const compact=useCompactLayout();
@@ -137,7 +142,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    RawMarkdown,
   WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),CrossReferenceNode,
   RichImage.configure({allowBase64:false}),
-  TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
+  TableWithMarkdown.configure({resizable:false,View:CaptionedScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
   RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
@@ -302,6 +307,24 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   }
   setDialog(null);
  };
+ const editTableCaption=()=>{
+  if(!editor)return;
+  const attrs=editor.getAttributes('table');
+  setTableCaptionDraft(String(attrs.caption??''));
+  setTableIdDraft(String(attrs.tableId??''));
+  setTableCaptionOpen(true);
+ };
+ const applyTableCaption=()=>{
+  if(!editor)return;
+  const tableId=tableIdDraft.trim().toLowerCase(),caption=cleanTableCaption(tableCaptionDraft);
+  if((tableId&&!safeTableId(tableId))||Boolean(tableId)!==Boolean(caption))return;
+  const attrs=editor.getAttributes('table');
+  if(String(attrs.tableId??'')===tableId&&String(attrs.caption??'')===caption){setTableCaptionOpen(false);return;}
+  const chain=editor.chain().focus();
+  if(lastCellPos.current!==null)chain.setTextSelection(lastCellPos.current);
+  chain.updateAttributes('table',{tableId:tableId||null,caption}).run();
+  setTableCaptionOpen(false);
+ };
  const tableCommand=(name:'addRowBefore'|'addRowAfter'|'deleteRow'|'addColumnBefore'|'addColumnAfter'|'deleteColumn')=>{
   if(!editor)return;
   const chain=editor.chain().focus();
@@ -332,7 +355,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
-  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;requestAnimationFrame(()=>setTableTarget(false));}return;}
+  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;setTableCaptionOpen(false);requestAnimationFrame(()=>setTableTarget(false));}return;}
   const row=cell.parentElement as HTMLTableRowElement;
   lastColumn.current=Array.from(row.cells).slice(0,cell.cellIndex).reduce((count,sibling)=>count+Math.max(1,sibling.colSpan),0);
   lastCellPos.current=editor.view.posAtDOM(cell,0);
@@ -416,8 +439,18 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    {action('当前列居中对齐',()=>alignTableColumn(editor,'center',lastColumn.current??undefined),<AlignCenter size={16}/>)}
    {action('当前列右对齐',()=>alignTableColumn(editor,'right',lastColumn.current??undefined),<AlignRight size={16}/>)}
    <span className="editor-table-sep"/>
+   {action('编辑表格图注与 ID',editTableCaption,<><Pencil size={16}/><span>表注</span></>)}
    {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<Trash2 size={16}/>,!tableTarget&&!editor.can().deleteTable())}
   </div>
+  {tableCaptionOpen&&<div className="rk-table-caption-editor" role="group" aria-label="编辑表格图注与 ID" style={{top:tableToolbarTop+55}}>
+   <TextInput label="表格 ID（tbl-...）" value={tableIdDraft} onChange={setTableIdDraft} placeholder="tbl-parameters"/>
+   <TextInput label="表格图注" value={tableCaptionDraft} onChange={setTableCaptionDraft} placeholder="系统参数"/>
+   <div className="rk-table-caption-editor-actions">
+    <Button label="取消表注编辑" size="sm" variant="ghost" onClick={()=>setTableCaptionOpen(false)}>取消</Button>
+    <Button label="保存表注" size="sm" onClick={applyTableCaption}
+      isDisabled={Boolean(tableIdDraft.trim())!==Boolean(tableCaptionDraft.trim())||Boolean(tableIdDraft.trim())&&!safeTableId(tableIdDraft.trim().toLowerCase())}>保存</Button>
+   </div>
+  </div>}
   <EditorContent editor={editor}/>
   {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
    <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>

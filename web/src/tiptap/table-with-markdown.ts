@@ -3,11 +3,17 @@ import { Table } from "@tiptap/extension-table";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TableRow from "@tiptap/extension-table-row";
+import {safeTableId,serializeTableCaption} from "../table-caption";
 
 /**
  * 自定义表格扩展，支持 Markdown 导出时的列对齐
  */
-export const TableWithMarkdown = Table.extend({
+export const TableWithMarkdown = Table.extend({  addAttributes(){return {...this.parent?.(),
+   tableId:{default:null,parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-id')||null,
+    renderHTML:(attrs:Record<string,unknown>)=>safeTableId(attrs.tableId)?{'data-rk-table-id':attrs.tableId}:{}},
+   caption:{default:'',parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-caption')||'',
+    renderHTML:()=>({})}
+  };},
   renderMarkdown(node, helpers) {
     if (!node.content || node.content.length === 0) {
       return "";
@@ -54,7 +60,8 @@ export const TableWithMarkdown = Table.extend({
       }
     });
 
-    return rows.join("\n");
+    const suffix=serializeTableCaption({caption:node.attrs?.caption,tableId:node.attrs?.tableId});
+    return rows.join('\n')+(suffix?'\n\n'+suffix:'');
   },
 });
 

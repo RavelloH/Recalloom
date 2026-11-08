@@ -9,6 +9,8 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {Copy,WrapText,FileCode2,Pencil,ChevronDown,ChevronUp} from 'lucide-react';
 import {attachScrollbars} from '../scrollbars';
 import {parseCodeFenceMeta} from '../code-meta';
+import {safeTableId,cleanTableCaption} from '../table-caption';
+import {headingAnchor} from '../wiki-slug';
 import MermaidDiagram from '../mermaid-diagram';
 export {parseCodeFenceMeta} from '../code-meta';
 
@@ -32,6 +34,39 @@ export class ScrollTableView extends TableView{
  destroy(){this.release();}
 }
 
+/** Keep editable GFM table cells managed exclusively by ProseMirror.
+ * A non-editable caption follows the scroll viewport, outside contentDOM.
+ * No DOM rewrite inside the table and no editor transaction on load. */
+export class CaptionedScrollTableView extends ScrollTableView{
+ private readonly captionElement:HTMLDivElement;
+ constructor(node:PMNode,cellMinWidth:number,view:EditorView,attrs:Record<string,unknown>={}){
+  super(node,cellMinWidth,view,attrs);
+  this.captionElement=document.createElement('div');
+  this.captionElement.className='rk-table-caption';
+  this.captionElement.contentEditable='false';
+  this.dom.appendChild(this.captionElement);
+  this.paint(node);
+ }
+ private paint(node:PMNode){
+  const id=safeTableId(node.attrs.tableId)?node.attrs.tableId as string:null;
+  const caption=cleanTableCaption(node.attrs.caption);
+  if(id){
+   this.dom.id=headingAnchor(id);
+   this.dom.dataset.rkTableId=id;
+  }else{this.dom.removeAttribute('id');delete this.dom.dataset.rkTableId;}
+  this.captionElement.hidden=!id||!caption;
+  this.captionElement.textContent=caption;
+ }
+ update(node:PMNode):boolean{
+  if(!super.update(node))return false;
+  this.paint(node);
+  return true;
+ }
+ ignoreMutation(record:Parameters<TableView['ignoreMutation']>[0]):boolean{
+  if(this.captionElement.contains(record.target))return true;
+  return super.ignoreMutation(record);
+ }
+}
 const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  const host=useRef<HTMLDivElement>(null);
  const [expanded,setExpanded]=useState(false);

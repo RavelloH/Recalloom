@@ -26,9 +26,11 @@ import {prepareCriticMarkdown,type CriticKind} from './critic-syntax';
 import {CriticDisplay} from './tiptap/rich-critic';
 import ClozeReveal from './cloze-reveal';
 import {remarkFigureAttributes} from './remark-figure';
+import {remarkTableCaptions} from './remark-table-caption';
+import {safeTableId,cleanTableCaption} from './table-caption';
 import {safeFigureImageSrc} from './figure-syntax';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
-import {slugHeading,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
+import {slugHeading,headingAnchor,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
 
 type HastNode={type:string;tagName?:string;properties?:Record<string,unknown>;children?:HastNode[]};
 /** The visual editor writes alignment as `style="text-align: …"`. Styles are
@@ -73,7 +75,7 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
@@ -86,6 +88,7 @@ const schema={
   'rk-tip':['dataContent'],
   'rk-cloze':['dataHint'],
   'rk-figure':['dataPayload'],
+  'rk-table-caption':['dataId','dataCaption'],
   code:[...(defaultSchema.attributes?.code??[]),'dataFile','dataWrap','dataExpand'],
   mark:[...(defaultSchema.attributes?.mark??[]),'dataRkColor']}
 };
@@ -130,6 +133,15 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
      loading="lazy" referrerPolicy="no-referrer" style={{width:width?width+'px':undefined,height:height?height+'px':undefined,objectFit:'contain'}}/>
     {caption&&<figcaption className="rk-rich-figcaption">{caption}</figcaption>}
    </figure>;
+  },
+  'rk-table-caption':({node:_node,...props}:Record<string,unknown>)=>{
+   let id='',caption='';
+   try{
+    id=decodeURIComponent(String(props['data-id']??props.dataId??''));
+    caption=cleanTableCaption(decodeURIComponent(String(props['data-caption']??props.dataCaption??'')));
+   }catch{return null;}
+   if(!safeTableId(id)||!caption)return null;
+   return <div className="rk-table-caption-read" data-rk-table-id={id} id={headingAnchor(id)}>{caption}</div>;
   },
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
@@ -183,7 +195,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  };
  return <article className="markdown-preview">
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
-  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
+  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,remarkTableCaptions,()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}
    components={{...components,...custom} as Components}>{prepared}</ReactMarkdown>
  </article>;

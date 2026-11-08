@@ -14,6 +14,7 @@ import {explicitHeadingAnchor,explicitBlockAnchor} from '../wiki-slug';
 import {extractWikiReferences} from '../../../src/wiki-syntax.js';
 import {parseFigureSuffix,safeFigureImageSrc} from '../figure-syntax';
 import {parseEquationId,shieldEquationIdClosers} from '../cross-reference';
+import {parseTableCaption} from '../table-caption';
 
 type MarkdownDriver={parse:(source:string)=>JSONContent};
 function parseStandaloneFigure(block:AstNode,source:string):JSONContent|null{
@@ -83,6 +84,14 @@ function ambiguousNestedFence(block:AstNode,source:string):boolean{
   return inner!==undefined&&inner>=outer;
  });
 }
+function tableCaptionFollowing(blocks:readonly AstNode[],index:number,source:string){
+ if(blocks[index]?.type!=='table')return null;
+ const after=blocks[index+1];
+ const start=after?.position?.start?.offset,end=after?.position?.end?.offset;
+ if(after?.type!=='paragraph'||start===undefined||end===undefined)return null;
+ const result=parseTableCaption(source.slice(start,end));
+ return result;
+}
 function assignExplicitHeadingIds(nodes:JSONContent[]):JSONContent[]{
  for(const node of nodes){
   if(node.type==='heading'){
@@ -133,7 +142,8 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
   const containsContainer=blocks.some(block=>block.type==='containerDirective'||block.type==='leafDirective'||block.type==='footnoteDefinition');
   const containsEquation=blocks.some(block=>block.type==='math'&&block.position?.start?.offset!==undefined&&block.position?.end?.offset!==undefined&&parseEquationId(tail.slice(block.position.start.offset,block.position.end.offset))!==null);
   const containsFigure=blocks.some(block=>parseStandaloneFigure(block,tail.slice(block.position?.start?.offset??0,block.position?.end?.offset??0))!==null);
-  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer&&!containsFigure&&!containsEquation){
+  const containsTableCaption=blocks.some((_,i)=>tableCaptionFollowing(blocks,i,tail)!==null);
+  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer&&!containsFigure&&!containsEquation&&!containsTableCaption){
    content.push(...parseSafe(tail,manager));
   }else{
    // Parse the rest of the document as rich text. Standalone HTML-marked
@@ -152,6 +162,15 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
     if(!fragment.trim())continue;
     const equation=block.type==='math'?parseEquationId(fragment):null;
     if(equation){content.push({type:'blockMath',attrs:{latex:equation.latex,equationId:equation.id}});continue;}
+    const caption=tableCaptionFollowing(blocks,i,tail);
+    if(caption){
+     const tableNodes=parseSafe(fragment,manager);
+     const tableNode=tableNodes.find(node=>node.type==='table');
+     if(tableNode){
+      tableNode.attrs={...tableNode.attrs,tableId:caption.id,caption:caption.caption};
+      content.push(...tableNodes);i++;continue;
+     }
+    }
     const figure=parseStandaloneFigure(block,fragment);
     if(figure){content.push(figure);continue;}
     if(block.type==='footnoteDefinition'){
