@@ -23,7 +23,9 @@ const validPath=(path:string)=>path.startsWith('/')&&path.length<=2048
  * {{embed:id:uuid}}. The #heading and |alias are optional.
  * Do not resolve names or infer paths from the current folder. */
 export function parseWikiTarget(raw:string,allowAlias=true):WikiTarget|null{
- const source=raw.trim();
+ // In GFM tables, the WikiLink alias separator must be escaped as \\| to avoid
+ // splitting the containing table cell. Decode only that Markdown escape.
+ const source=raw.trim().replace(/\\\|/g,'|');
  const separator=allowAlias?source.indexOf('|'):-1;
  const expression=separator<0?source:source.slice(0,separator).trim();
  const alias=separator<0?null:source.slice(separator+1).trim();

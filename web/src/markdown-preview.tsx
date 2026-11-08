@@ -3,7 +3,10 @@ import ReactMarkdown,{type Components} from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import {richRemarkDirective,remarkRichTransforms} from './rich-remark';
+import {normalizeKnownMarkdown} from './markdown-normalize';
 import {richTitle} from './tiptap/rich-schema';
+import {calloutTitle} from './callout-title';
+import {badgeVariants} from './tiptap/rich-directives';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Card} from '@astryxdesign/core/Card';
@@ -77,7 +80,7 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption','rk-cross-ref','rk-numbered-math'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tooltip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption','rk-cross-ref','rk-numbered-math'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
@@ -87,7 +90,7 @@ const schema={
   'rk-critic':['dataKind','dataValue','dataBefore'],
   'rk-badge':['dataVariant'],
   'rk-abbr':['dataTitle'],
-  'rk-tip':['dataContent'],
+  'rk-tooltip':['dataContent'],
   'rk-cloze':['dataHint'],
   'rk-figure':['dataPayload'],
   'rk-table-caption':['dataId','dataCaption'],
@@ -105,7 +108,7 @@ const components:Components={
 
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
 export default function MarkdownPreview({content,sourceId,trail,depth=0}:{content:string;sourceId?:string;trail?:string[];depth?:number}){
- const source=content.replace(/\r\n/g,'\n');
+ const source=normalizeKnownMarkdown(content.replace(/\r\n/g,'\n'));
  // A YAML-looking header is ordinary document text, not Recalloom metadata.
  // Isolate it from the CommonMark parser so --- is not reinterpreted as rules.
  const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/.exec(source);
@@ -199,15 +202,15 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
-   return <Banner status={status} title={richTitle(kind,title)} collapsible={false}>{props.children as React.ReactNode}</Banner>;
+   return <Banner status={status} title={calloutTitle(kind,richTitle(kind,title))} collapsible={false}>{props.children as React.ReactNode}</Banner>;
   },
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{
    const raw=String(props['data-variant']??props.dataVariant??'neutral');
-   const valid=['neutral','info','warning','error','success','blue','green','red','purple','orange','yellow'].includes(raw)?raw:'neutral';
+   const valid=badgeVariants.has(raw)?raw:'neutral';
    return <Badge variant={valid as 'neutral'|'success'} label={props.children as React.ReactNode}/>;
   },
   'rk-abbr':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-title']??props.dataTitle??'')}><span className="rk-inline-abbr" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
-  'rk-tip':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-content']??props.dataContent??'')}><span className="rk-inline-tip" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
+  'rk-tooltip':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-content']??props.dataContent??'')}><span className="rk-inline-tooltip" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
   'rk-kbd':({node:_node,...props}:Record<string,unknown>)=><kbd className="rk-keycap">{props.children as React.ReactNode}</kbd>,
   'rk-cloze':({node:_node,...props}:Record<string,unknown>)=><ClozeReveal hint={String(props['data-hint']??props.dataHint??'')}>{props.children as React.ReactNode}</ClozeReveal>,
   'rk-comment':({node:_node,...props}:Record<string,unknown>)=><span className="rk-comment" data-rk-comment="">{props.children as React.ReactNode}</span>,

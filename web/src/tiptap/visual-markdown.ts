@@ -4,8 +4,9 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkDirective from 'remark-directive';
-import {richContainerKinds,richInlineKinds,richLeafKinds} from './rich-schema';
+import {richContainerKinds,richInlineKinds,richLeafKinds,validContainerParent} from './rich-schema';
 import {prepareVisualMarkdown} from './visual-input';
+import {normalizeKnownMarkdown} from '../markdown-normalize';
 import {rawMarkdownBlock} from './raw-markdown';
 import {postProcessTableAlignment} from './table-alignment';
 import {findMarkedDisplayMath} from './marked-display-math';
@@ -38,7 +39,7 @@ const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)
 
 /** Unknown Markdown/HTML is displayed as plain editable text while its
  * original source is retained verbatim when other blocks are edited.
- * An unknown inline token makes only its containing block raw. */
+ * Unsupported inline tokens can remain literal without downgrading the paragraph. */
 const supportedAstNodes=new Set([
  'root','paragraph','heading','blockquote','list','listItem','thematicBreak',
  'break','code','inlineCode','text','emphasis','strong','delete','link','image',
@@ -60,7 +61,7 @@ function hasUnsupportedSyntax(node:AstNode,allowedWiki:SafeSpan[]=[]):boolean{
  if(htmlChildren.filter(value=>value==='<mark>').length!==htmlChildren.filter(value=>value==='</mark>').length)return true;
  if(node.type==='html'){
   const value=node.value?.trim()??'';
-  const tag=/^<\/?([\w-]+)(?:\s[^>]*)?>$/i.exec(value)?.[1]?.toLowerCase();
+  const tag=/^<\/?([\w-]+)(?:\s[^>]*)?\s*\/?>$/i.exec(value)?.[1]?.toLowerCase();
   if(!tag||!['mark','u','sup','sub','br'].includes(tag))return true;
  }
  return (node.children??[]).some(child=>hasUnsupportedSyntax(child,allowedWiki));
@@ -125,11 +126,61 @@ function parseSafe(source:string,manager:MarkdownDriver):JSONContent[]{
  return assignExplicitHeadingIds(result.content??[]);
 }
 
+/** In ordinary paragraphs, preserve only unknown spans as literal editable
+ * inline nodes. Do not downgrade adjacent formatting to a whole raw block.
+ * Complex unsupported structures still use the conservative block fallback.
+ */
+function parseWithInlineFallback(block:AstNode,fragment:string,manager:MarkdownDriver,allowedWiki:SafeSpan[]):JSONContent[]|null{
+ if(block.type!=='paragraph'||!block.children?.length)return null;
+ const base=block.position?.start?.offset;
+ if(base===undefined)return null;
+ const ranges=block.children.filter(child=>hasUnsupportedSyntax(child,allowedWiki)).map(child=>{
+  const start=child.position?.start?.offset,end=child.position?.end?.offset;
+  return start===undefined||end===undefined?null:{start:start-base,end:end-base};
+ });
+ if(!ranges.length||ranges.some(range=>!range||range.start<0||range.end>fragment.length))return null;
+ const originals:string[]=[],markers:string[]=[];
+ let masked=fragment;
+ for(let i=ranges.length-1;i>=0;i--){
+  const range=ranges[i]!;
+  const marker='RKVERBATIMINLINE'+i+'END';
+  if(fragment.includes(marker))return null;
+  originals[i]=fragment.slice(range.start,range.end);
+  markers[i]=marker;
+  masked=masked.slice(0,range.start)+marker+masked.slice(range.end);
+ }
+ let parsed:JSONContent[];
+ try{parsed=parseSafe(masked,manager);}catch{return null;}
+ if(parsed.length!==1||parsed[0]!.type!=='paragraph')return null;
+ const split=(children:JSONContent[]):JSONContent[]=>{
+  const out:JSONContent[]=[];
+  const pattern=/RKVERBATIMINLINE(\d+)END/g;
+  for(const node of children){
+   if(node.type!=='text'||!node.text?.includes('RKVERBATIMINLINE')){
+    out.push(node);continue;
+   }
+   let offset=0;
+   for(const match of node.text.matchAll(pattern)){
+    const start=match.index??0,raw=originals[Number(match[1])];
+    if(raw===undefined)return [];
+    if(start>offset)out.push({...node,text:node.text.slice(offset,start)});
+    out.push({type:'rawInline',content:[{type:'text',text:raw}]});
+    offset=start+match[0].length;
+   }
+   if(offset<node.text.length)out.push({...node,text:node.text.slice(offset)});
+  }
+  return out;
+ };
+ const items=split(parsed[0]!.content??[]);
+ if(items.filter(node=>node.type==='rawInline').length!==originals.length)return null;
+ return [{...parsed[0]!,content:items}];
+}
+
 /** Visual-first conversion with localized verbatim fallback nodes.
  * Supported Markdown is rich text; unsupported syntax remains editable
  * plain text and serializes without invented escapes or formatting. */
-export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONContent{
- const normalized=source.replace(/\r\n/g,'\n'),metadata=frontmatter.exec(normalized);
+export function buildVisualMarkdown(source:string,manager:MarkdownDriver,parentKind?:string):JSONContent{
+ const normalized=normalizeKnownMarkdown(source.replace(/\r\n/g,'\n')),metadata=frontmatter.exec(normalized);
  const tail=metadata?normalized.slice(metadata[0].length).replace(/^\n+/,''):normalized;
  // YAML-like headers are user prose, NEVER file metadata. Preserve source as
  // one editable plain-text block to prevent CommonMark from consuming fences.
@@ -200,18 +251,23 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
      if(trailing)i++;
      continue;
     }
-    if(block.type==='containerDirective'&&richContainerKinds.has(block.name??'')){
+    if(block.type==='containerDirective'&&richContainerKinds.has(block.name??'')&&!validContainerParent(block.name??'',parentKind)){
+     content.push(rawMarkdownBlock(fragment));continue;
+    }
+    if(block.type==='containerDirective'&&richContainerKinds.has(block.name??'')&&validContainerParent(block.name??'',parentKind)){
      const label=block.children?.find(child=>child.data?.directiveLabel);
      const title=(label?.children??[]).map(x=>x.value??'').join('');
      const firstNewline=fragment.indexOf('\n'),lastNewline=fragment.lastIndexOf('\n');
      if(firstNewline<0||lastNewline<=firstNewline){content.push(rawMarkdownBlock(fragment));continue;}
      const inner=fragment.slice(firstNewline+1,lastNewline).replace(/^\n+|\n+$/g,'');
-     const innerNodes=inner?buildVisualMarkdown(inner,manager).content??[]:[];
+     const innerNodes=inner?buildVisualMarkdown(inner,manager,block.name).content??[]:[];
      content.push({type:'richContainer',attrs:{kind:block.name,title,...(block.name==='message'?{sender:(block as AstNode&{attributes?:Record<string,string>}).attributes?.sender??'assistant'}:{})},content:innerNodes.length?innerNodes:[{type:'paragraph'}]});
      continue;
     }
-    if(hasUnsupportedSyntax(block,wikiRanges))content.push(rawMarkdownBlock(fragment));
-    else{
+    if(hasUnsupportedSyntax(block,wikiRanges)){
+     const inline=parseWithInlineFallback(block,fragment,manager,wikiRanges);
+     content.push(...(inline??[rawMarkdownBlock(fragment)]));
+    }else{
      try{content.push(...parseSafe(fragment,manager));}
      catch{content.push(rawMarkdownBlock(fragment));}
     }

@@ -4,31 +4,43 @@ import remarkParse from 'remark-parse';
 export type CriticKind='addition'|'deletion'|'substitution'|'comment'|'highlight';
 export type CriticMatch={kind:CriticKind;raw:string;text:string;before:string};
 
-/** First stage of CriticMarkup is single-line only: do not allow malformed
- * delimiters, nested changes or unbounded text into an inline node.
- * The original Markdown remains authoritative, never accept an edit by parsing.
+/** Bounded single-line review syntax. Balanced ordinary curly braces (JSON,
+ * template variables) are permitted; nested CriticMarkup remains forbidden.
+ * Backticks protect delimiters inside an inline code snippet.
  */
 export function parseCriticAt(source:string):CriticMatch|null{
- if(!source.startsWith('{'))return null;
  const forms=[
-  ['substitution',/^\{~~([^\r\n{}]{0,1024}?)~>([^\r\n{}]{0,1024}?)~~\}/],
-  ['addition',/^\{\+\+([^\r\n{}]{1,2048}?)\+\+\}/],
-  ['deletion',/^\{--([^\r\n{}]{1,2048}?)--\}/],
-  ['highlight',/^\{==([^\r\n{}]{1,2048}?)==\}/],
-  ['comment',/^\{>>([^\r\n{}]{1,2048}?)<<\}/]
- ] as const;
- for(const [kind,re] of forms){
-  const match=re.exec(source);
-  if(!match)continue;
-  if(kind==='substitution'){
-   const before=match[1]??'',text=match[2]??'';
-   if(!before&&!text)continue;
-   if(/\{\+\+|\{--|\{~~|\{==|\{>>/.test(before+text))continue;
-   return {kind,raw:match[0],before,text};
+  {open:'{~~',close:'~~}',kind:'substitution' as const},
+  {open:'{++',close:'++}',kind:'addition' as const},
+  {open:'{--',close:'--}',kind:'deletion' as const},
+  {open:'{==',close:'==}',kind:'highlight' as const},
+  {open:'{>>',close:'<<}',kind:'comment' as const}
+ ];
+ const form=forms.find(item=>source.startsWith(item.open));
+ if(!form)return null;
+ let depth=0,inCode=false,split=-1;
+ for(let i=form.open.length;i<source.length&&i<=4100;i++){
+  const ch=source[i]!;
+  if(ch==='\n'||ch==='\r')return null;
+  if(ch==='\\'){i++;continue;}
+  if(ch==='\x60'){inCode=!inCode;continue;}
+  if(inCode)continue;
+  if(source.startsWith(form.close,i)&&depth===0){
+   const body=source.slice(form.open.length,i);
+   if(body.length>2048||!body)return null;
+   if(form.kind!=='substitution')return {kind:form.kind,raw:source.slice(0,i+form.close.length),text:body,before:''};
+   if(split<0)return null;
+   const before=body.slice(0,split-form.open.length),text=body.slice(split-form.open.length+2);
+   if(!before&&!text||before.length>1024||text.length>1024)return null;
+   return {kind:'substitution',raw:source.slice(0,i+form.close.length),text,before};
   }
-  const text=match[1]??'';
-  if(/\{\+\+|\{--|\{~~|\{==|\{>>/.test(text))continue;
-  return {kind,raw:match[0],text,before:''};
+  if(source.slice(i).match(/^\{(?:\+\+|--|~~|==|>>)/))return null;
+  if(ch==='{')depth++;
+  else if(ch==='}'){if(--depth<0)return null;}
+  else if(form.kind==='substitution'&&depth===0&&source.startsWith('~>',i)){
+   if(split>=0)return null;
+   split=i;i++;
+  }
  }
  return null;
 }

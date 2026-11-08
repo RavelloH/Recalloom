@@ -16,7 +16,7 @@ const lines=[
 '---','title: Rich Markdown browser test','tags: [rich, qa]','# user comment','status: draft','---','','# Rich Markdown browser test','',
 ':::warning[安全提示]','','正文 **重要**，需要备份。','','- 第一步','- 第二步','',':::','',
 ':::details[补充说明]','','该内容应当可折叠。','',':::','',
-'状态 :badge[已验证]{variant=success}，缩写 :abbr[DO]{title="Durable Objects"}，提示 :tip[点击]{content="额外内容"}。','',
+'状态 :badge[已验证]{variant=success}，缩写 :abbr[DO]{title="Durable Objects"}，提示 :tooltip[点击]{content="额外内容"}。','',
 '用户注释：%%暂不部署%%，应当可见且变小。','',
 '审阅建议：{++QA_CRITIC_ADD++} {--QA_CRITIC_DELETE--} {~~QA_CRITIC_BEFORE~>QA_CRITIC_AFTER~~} {==QA_CRITIC_HIGHLIGHT==}{>>QA_CRITIC_COMMENT 始终显示<<}。','',
 '多色 :highlight[危险]{color=red}。','',
@@ -65,7 +65,7 @@ try{
   details:'.tiptap [data-rk-kind="details"]',
   badge:'.tiptap .rk-inline-badge',
   abbr:'.tiptap .rk-inline-abbr',
-  tip:'.tiptap .rk-inline-tip',
+  tip:'.tiptap .rk-inline-tooltip',
   comment:'.tiptap [data-rk-comment]',
   criticAddition:'.tiptap [data-rk-critic="addition"]',
   criticDeletion:'.tiptap [data-rk-critic="deletion"]',
@@ -197,7 +197,7 @@ try{
   bg:getComputedStyle(node,'::after').backgroundColor
  }));
  assert.ok(abbrTooltip.text.includes('Durable Objects'),'Inline abbreviations need a visible non-mutating CSS tooltip');
- const tipAnchor=page.locator('.tiptap .rk-inline-tip .rk-tooltip-inline').first();
+ const tipAnchor=page.locator('.tiptap .rk-inline-tooltip .rk-tooltip-inline').first();
  await tipAnchor.hover();
  const tipText=await tipAnchor.evaluate(node=>getComputedStyle(node,'::after').content);
  assert.ok(tipText.includes('额外内容'),'Inline tips need a real hover explanation in visual editing');

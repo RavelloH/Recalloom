@@ -11,7 +11,7 @@ export function explicitHeadingAnchor(text:string):{body:string;id:string}|null{
  return {body:text.slice(0,match.index).trimEnd(),id:match[1]!.toLowerCase()};
 }
 
-/** Obsidian-compatible paragraph ^block-id, restricted to safe stable IDs. */
+/** Obsidian-like paragraph ^block-id, intentionally restricted to letter-first safe stable IDs. */
 export function explicitBlockAnchor(text:string):{body:string;id:string}|null{
  const match=/(?:^|\s)\^([a-z][a-z0-9-]{0,79})\s*$/i.exec(text);
  if(!match)return null;

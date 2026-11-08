@@ -13,11 +13,14 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Pencil,Eye,EyeOff} from 'lucide-react';
 import {richTitle} from './rich-schema';
+import {calloutTitle} from '../callout-title';
+import {parseInlineDirectiveSource,directiveAttributeString} from '../markdown-attrs';
 export {richTitle} from './rich-schema';
 
 const bannerStatus=(kind:string):'info'|'warning'|'error'|'success'=>
  kind==='warning'?'warning':kind==='danger'?'error':kind==='success'?'success':'info';
-const safeTitle=(v:string)=>v.replace(/[\r\n\[\]]/g,' ').slice(0,180);
+const safeTitle=(v:string)=>v.replace(/[\r\n]/g,' ').slice(0,180);
+const escapeDirectiveTitle=(value:string)=>safeTitle(value).replace(/\\/g,'\\\\').replace(/\[/g,'\\[').replace(/\]/g,'\\]');
 
 function ContainerView({node,updateAttributes}:NodeViewProps){
  const kind=String(node.attrs.kind??'note'),title=String(node.attrs.title??'');
@@ -85,7 +88,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
    ?<ChatMessage sender={sender}><ChatMessageBubble name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></ChatMessageBubble></ChatMessage>
    :kind==='details'
    ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
-   :<Banner status={bannerStatus(kind)} title={editTitle} collapsible={false} container="card">
+   :<Banner status={bannerStatus(kind)} title={calloutTitle(kind,editTitle)} collapsible={false} container="card">
       <NodeViewContent className="rk-directive-body"/>
      </Banner>}
  </NodeViewWrapper>;
@@ -106,20 +109,12 @@ export const RichContainer=Node.create({
   // In particular, a chat wraps :::message with ::::chat / ::::.
   const colons=(body.match(/^:{3,}(?=[\[{\w\s]|$)/gm)??[]).reduce((max,line)=>Math.max(max,line.length),2)+1;
   const fence=':'.repeat(Math.max(3,colons));
-  return fence+kind+(title?'['+title+']':'')+sender+'\n\n'+body+'\n\n'+fence;
+  return fence+kind+(title?'['+escapeDirectiveTitle(title)+']':'')+sender+'\n\n'+body+'\n\n'+fence;
  }
 });
 
 type RichToken={type?:string;raw?:string;label?:string;attrs?:Record<string,string>};
-function readAttrs(value:string):Record<string,string>{
- const attrs:Record<string,string>={};
- for(const match of value.matchAll(/(?:^|\s)([\w-]+)=("[^"]*"|'[^']*'|[^\s]+)/g)){
-  const key=match[1]??'',raw=match[2]??'';
-  if(key==='title'||key==='variant'||key==='content'||key==='hint')attrs[key]=raw.replace(/^['"]|['"]$/g,'').slice(0,300);
- }
- return attrs;
-}
-const variants=new Set(['neutral','info','success','warning','error','blue','cyan','green','orange','pink','purple','red','teal','yellow']);
+export const badgeVariants=new Set(['neutral','info','success','warning','error','blue','cyan','green','orange','pink','purple','red','teal','yellow']);
 function InlineView({node}:NodeViewProps){
  const kind=node.type.name;
  const attrs=node.attrs as {variant?:string;title?:string;content?:string;hint?:string};
@@ -140,19 +135,19 @@ function InlineView({node}:NodeViewProps){
   <kbd className="rk-keycap"><NodeViewContent as={"span" as "div"} className="rk-inline-editable"/></kbd>
  </NodeViewWrapper>;
  if(kind==='richBadge'){
-  const variant=variants.has(attrs.variant??'')?attrs.variant as 'neutral'|'success'|'warning'|'error'|'info':'neutral';
+  const variant=badgeVariants.has(attrs.variant??'')?attrs.variant as 'neutral'|'success'|'warning'|'error'|'info':'neutral';
   return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-badge"><Badge label={inner} variant={variant}/></NodeViewWrapper>;
  }
  const description=kind==='richAbbr'?attrs.title:attrs.content;
  // Editable ProseMirror NodeViews must not mount a stateful Tooltip trigger:
  // Astryx Tooltip can update its DOM attributes on mount, which Tiptap
  // incorrectly observes as a content edit. A CSS pseudo tooltip is inert.
- return <NodeViewWrapper as="span" className={'rk-rich-inline '+(kind==='richAbbr'?'rk-inline-abbr':'rk-inline-tip')}>
+ return <NodeViewWrapper as="span" className={'rk-rich-inline '+(kind==='richAbbr'?'rk-inline-abbr':'rk-inline-tooltip')}>
   <span className="rk-tooltip-inline" tabIndex={0} data-rk-tooltip={description||undefined}
    aria-label={description?'查看解释：'+description:undefined}>{inner}</span>
  </NodeViewWrapper>;
 }
-function makeInline(kind:'badge'|'abbr'|'tip'|'kbd'|'cloze'){
+function makeInline(kind:'badge'|'abbr'|'tooltip'|'kbd'|'cloze'){
  const name='rich'+kind[0]!.toUpperCase()+kind.slice(1);
  return Node.create({
   name,inline:true,group:'inline',content:'text*',priority:1800,
@@ -169,21 +164,21 @@ function makeInline(kind:'badge'|'abbr'|'tip'|'kbd'|'cloze'){
    const key=kind==='badge'?'variant':kind==='abbr'?'title':kind==='cloze'?'hint':'content';
    const val=String(attrs[key]??'');
    const clean=kind==='badge'&&val==='neutral'?'':val;
-   return ':'+kind+'['+label+']'+(clean?'{'+key+'="'+clean.replace(/"/g,'&quot;')+'"}':'');
+   return ':'+kind+'['+label.replace(/\\/g,'\\\\').replace(/\[/g,'\\[').replace(/\]/g,'\\]')+']'+(clean?'{'+key+'='+directiveAttributeString(clean)+'}':'');
   },
   markdownTokenizer:{
    name,level:'inline' as const,
    start:(source:string)=>source.indexOf(':'+kind+'['),
    tokenize:(source:string):RichToken|undefined=>{
-    const match=new RegExp('^:'+kind+'\\[([^\\]\\r\\n]+)\\](?:\\{([^}\\r\\n]*)\\})?').exec(source);
-    if(!match)return undefined;
-    return {type:name,raw:match[0],label:match[1],attrs:readAttrs(match[2]??'')};
+    const parsed=parseInlineDirectiveSource(source,kind);
+    if(!parsed||Object.keys(parsed.attrs).some(key=>!['title','variant','content','hint'].includes(key)))return undefined;
+    return {type:name,raw:parsed.raw,label:parsed.label,attrs:parsed.attrs};
    }
   }
  });
 }
 export const RichBadge=makeInline('badge');
 export const RichAbbr=makeInline('abbr');
-export const RichTip=makeInline('tip');
+export const RichTooltip=makeInline('tooltip');
 export const RichKbd=makeInline('kbd');
 export const RichCloze=makeInline('cloze');

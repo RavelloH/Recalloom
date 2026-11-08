@@ -106,6 +106,8 @@ MCP 服务提供简短的全局使用说明、每个工具的操作描述，以�
 
 支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
 
+实现细节、扩展节点的安全边界、格式回退和回归测试清单见 [Rich Markdown 开发规范](docs/rich-markdown.md)。
+
 帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`。`get_help` 会返回 `schemaVersion`、根据文档内容生成的 `helpVersion` 和完整 SHA-256 `contentHash`；帮助索引 Resource 也展示这些标识，以便识别过期的帮助。修改文档后运行 `pnpm help:generate` 更新编译模块，或在开发时使用 `pnpm help:watch` 自动更新。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
 
 ## 本地开发

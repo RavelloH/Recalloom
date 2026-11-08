@@ -30,15 +30,18 @@ export const slashCommands:SlashCommand[]=[
    {type:'richContainer',attrs:{kind:'definition',title:'DO'},content:[{type:'paragraph',content:[{type:'text',text:'Durable Objects'}]}]},
    {type:'richContainer',attrs:{kind:'definition',title:'D1'},content:[{type:'paragraph',content:[{type:'text',text:'Cloudflare SQL 数据库'}]}]}
   ]}).run()},
- {id:'flashcard',title:'学习闪卡',description:'问题与答案分开编辑，阅读时折叠答案',keywords:['flashcard','card','study','quiz','fuxi'],icon:BookOpenCheck,
+ {id:'flashcard',title:'学习闪卡',description:'问题与答案分开编辑，可视化编辑器中折叠答案',keywords:['flashcard','card','study','quiz','fuxi'],icon:BookOpenCheck,
   run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'flashcard',title:'知识闪卡'},content:[
    {type:'richContainer',attrs:{kind:'front',title:'问题'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入问题'}]}]},
    {type:'richContainer',attrs:{kind:'back',title:'答案'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入答案'}]}]}
   ]}).run()},
- {id:'cloze',title:'复习挖空',description:'插入可在阅读态揭示答案的 Cloze 提示',keywords:['cloze','blank','fill','study','wankong'],icon:Highlighter,
+ {id:'cloze',title:'复习挖空',description:'插入可在可视化编辑器中揭示答案的 Cloze 提示',keywords:['cloze','blank','fill','study','wankong'],icon:Highlighter,
   run:e=>chain(e).insertContent({type:'richCloze',attrs:{hint:'点击揭示'},content:[{type:'text',text:'答案'}]}).run()},
  {id:'kbd',title:'快捷键键帽',description:'插入 Ctrl+Shift+P 等快捷键提示',keywords:['kbd','keyboard','shortcut','keycap','anjian'],icon:Keyboard,
-  run:e=>chain(e).insertContent({type:'richKbd',content:[{type:'text',text:'Ctrl+Shift+P'}]}).run()},
+  run:e=>chain(e).insertContent(['Ctrl','Shift','P'].flatMap((key,i)=>[
+   ...(i?[{type:'text',text:' + '}]:[]),
+   {type:'richKbd',content:[{type:'text',text:key}]}
+  ])).run()},
  {id:'chat',title:'对话记录',description:'插入 Astryx 聊天气泡和多 Agent 消息',keywords:['chat','agent','messages','duihua'],icon:MessagesSquare,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'chat'},content:[{type:'richContainer',attrs:{kind:'message',title:'Agent',sender:'assistant'},content:[{type:'paragraph',content:[{type:'text',text:'Agent 的观点'}]}]},{type:'richContainer',attrs:{kind:'message',title:'User',sender:'user'},content:[{type:'paragraph',content:[{type:'text',text:'用户的回复'}]}]}]}).run()},
  {id:'link-card',title:'链接卡片',description:'从原文 URL 获取站点预览内容',keywords:['linkcard','card','link','url','kapian'],icon:Link2,run:e=>chain(e).insertContent({type:'richLinkCard',attrs:{url:'https://example.com/'}}).run()},
  {id:'footnote',title:'脚注引用',description:'插入 GFM 脚注引用，随后添加同名定义',keywords:['footnote','reference','cite','jiaozhu'],icon:Footprints,run:e=>chain(e).insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run()},

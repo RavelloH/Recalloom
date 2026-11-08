@@ -111,7 +111,7 @@
 .record-main .rk-rich-inline {display:inline;}
 .record-main .rk-inline-editable {display:inline;}
 .record-main .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
-.record-main .rk-inline-tip {text-decoration:underline dashed;text-underline-offset:.17em;cursor:help;}
+.record-main .rk-inline-tooltip {text-decoration:underline dashed;text-underline-offset:.17em;cursor:help;}
 .record-main .rk-comment,
 .record-main .tiptap [data-rk-comment] {
   color:var(--color-text-tertiary,var(--rk-ink-faint));
@@ -428,3 +428,15 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-table-caption-editor-actions {display:flex;gap:.4rem;align-items:center;}
 @media(max-width:650px){.record-main .rk-table-caption-editor{
  grid-template-columns:1fr;max-height:min(65vh,26rem);overflow-y:auto;}}
+
+/* Compact, explicit CriticMarkup review controls. No hidden actions and no
+ * state mutation until a user clicks; stays accessible on touch devices. */
+.record-main .rk-critic-actions {display:inline-flex;gap:.14rem;margin-inline-start:.3em;
+ vertical-align:middle;align-items:center;white-space:nowrap;}
+.record-main .rk-critic-actions button {display:inline-flex;align-items:center;justify-content:center;
+ border:1px solid var(--rk-document-border);border-radius:5px;background:var(--rk-document-wash);
+ color:var(--color-text-secondary);min-width:25px;min-height:25px;cursor:pointer;padding:3px;}
+.record-main .rk-critic-actions button:hover,.record-main .rk-critic-actions button:focus-visible {
+ color:var(--color-text-primary);outline:1px solid var(--color-primary);}
+.record-main .rk-critic-actions .rk-critic-accept:hover {color:var(--color-success, #16835a);}
+.record-main .rk-critic-actions .rk-critic-reject:hover {color:var(--color-danger, #b94a48);}

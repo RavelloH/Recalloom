@@ -7,13 +7,13 @@ import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
 import {HighlightWithMarkdown,UnderlineWithMarkdown} from '../web/src/tiptap/markdown-extensions';
 import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
-import {RawMarkdown} from '../web/src/tiptap/raw-markdown';
+import {RawMarkdown,RawInline} from '../web/src/tiptap/raw-markdown';
 import {RichFootnoteRef,RichFootnoteDefinition} from '../web/src/tiptap/rich-footnotes';
 import type {JSONContent} from '@tiptap/core';
 
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false}),
- CustomHeading,CustomParagraph,CodeBlock,Markdown,RawMarkdown,RichFootnoteRef,RichFootnoteDefinition,
+ CustomHeading,CustomParagraph,CodeBlock,Markdown,RawMarkdown,RawInline,RichFootnoteRef,RichFootnoteDefinition,
  HighlightWithMarkdown,UnderlineWithMarkdown,
 ]});
 const walk=(node:JSONContent,fn:(node:JSONContent)=>void)=>{
@@ -88,7 +88,8 @@ describe('visual-first Markdown import',()=>{
  it('keeps unsupported inline syntax plain but nearby rich paragraphs rich',()=>{
   const input='## Header\n\nBefore <custom-token name="X"/> after.\n\nThis is **rich**.';
   const doc=buildVisualMarkdown(input,manager);
-  assert.equal(doc.content?.[1]?.type,'rawMarkdown');
+  assert.equal(doc.content?.[1]?.type,'paragraph');
+  assert.ok(doc.content?.[1]?.content?.some(node=>node.type==='rawInline'&&node.content?.[0]?.text==='<custom-token name="X"/>'));
   assert.equal(doc.content?.[2]?.type,'paragraph');
   assert.ok(doc.content?.[2]?.content?.some(n=>n.marks?.some(m=>m.type==='bold')));
   const output=manager.serialize(doc);

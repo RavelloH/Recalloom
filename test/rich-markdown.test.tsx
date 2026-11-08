@@ -4,7 +4,7 @@ import {Markdown,MarkdownManager} from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
 import {CustomHeading} from '../web/src/tiptap/custom-heading';
 import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
-import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from '../web/src/tiptap/rich-directives';
+import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from '../web/src/tiptap/rich-directives';
 import {VisibleComment} from '../web/src/tiptap/comment-mark';
 import {RichLinkCard} from '../web/src/tiptap/rich-link-card';
 import {extractWikiSection} from '../web/src/wiki-section';
@@ -18,7 +18,7 @@ import type {JSONContent} from '@tiptap/core';
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false}),
  CustomHeading,CustomParagraph,Markdown,RawMarkdown,RichContainer,WikiLinkNode,WikiEmbedNode,
- RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+ RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
 ]});
 const walk=(n:JSONContent,cb:(item:JSONContent)=>void)=>{
  cb(n);for(const x of n.content??[])walk(x,cb);
@@ -277,12 +277,12 @@ describe('Rich Markdown structural directives',()=>{
   assert.ok(manager.serialize(doc).includes(raw));
   assert.equal(nodes(doc,'heading').length,2);
  });
- it('parses badges and nonambiguous inline abbreviations and tips',()=>{
-  const sample='状态 :badge[已验证]{variant=success}。缩写 :abbr[DO]{title="Durable Objects"}，提示 :tip[阅读]{content="查看帮助"}。';
+ it('parses badges, inline abbreviations, and tooltip directives',()=>{
+  const sample='状态 :badge[已验证]{variant=success}。缩写 :abbr[DO]{title="Durable Objects"}，提示 :tooltip[阅读]{content="查看帮助"}。';
   const doc=buildVisualMarkdown(sample,manager);
   assert.equal(nodes(doc,'richBadge').length,1,JSON.stringify(doc));
   assert.equal(nodes(doc,'richAbbr').length,1);
-  assert.equal(nodes(doc,'richTip').length,1);
+  assert.equal(nodes(doc,'richTooltip').length,1);
   assert.equal(nodes(doc,'richAbbr')[0]?.attrs?.title,'Durable Objects');
   const exported=manager.serialize(doc);
   assert.ok(exported.includes(':abbr[DO]{title="Durable Objects"}'),exported);

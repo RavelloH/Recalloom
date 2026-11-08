@@ -1,26 +1,29 @@
 import remarkDirective from 'remark-directive';
-import {richContainerKinds,richInlineKinds} from './tiptap/rich-schema';
+import {richContainerKinds,richInlineKinds,validContainerParent} from './tiptap/rich-schema';
+import {parseInlineDirectiveSource} from './markdown-attrs';
 
 type RichAst={type:string;name?:string;value?:string;attributes?:Record<string,string|null>;
  children?:RichAst[];data?:{hName?:string;hProperties?:Record<string,string> ;directiveLabel?:boolean};
  position?:{start?:{offset?:number};end?:{offset?:number}}};
-const supported=(kind:string)=>kind==='badge'||kind==='abbr'||kind==='tip'||kind==='kbd'||kind==='cloze';
+const supported=(kind:string)=>kind==='badge'||kind==='abbr'||kind==='tooltip'||kind==='kbd'||kind==='cloze';
 const escapeText=(value:string)=>value;
-const commentRx=/%%([\s\S]*?)%%/g;
+// Align with the visual editor: comments are single-line, visible annotations.
+const commentRx=/%%((?:[^%\r\n]|%(?!%))+)%%/g;
 export function remarkRichTransforms(source:string){
  return (root:RichAst)=>{
-  function walk(node:RichAst){
+  function walk(node:RichAst,parentKind?:string){
    if(!node.children)return;
    const updated:RichAst[]=[];
-   for(const child of node.children){
+   for(let i=0;i<node.children.length;i++){
+    const child=node.children[i]!;
     if(child.type==='containerDirective'){
      const kind=String(child.name??'');
-     if(richContainerKinds.has(kind)){
+     if(richContainerKinds.has(kind)&&validContainerParent(kind,parentKind)){
       const label=child.children?.find(item=>item.data?.directiveLabel===true);
       const title=(label?.children??[]).map(x=>x.value??'').join('');
       child.data={...(child.data??{}),hName:'rk-callout',hProperties:{dataKind:kind,dataTitle:title,...(kind==='message'?{dataSender:child.attributes?.sender??'assistant'}:{})}};
       child.children=(child.children??[]).filter(item=>!item.data?.directiveLabel);
-      walk(child);
+      walk(child,kind);
       updated.push(child);
      }else updated.push(asLiteral(child,source));
      continue;
@@ -35,13 +38,26 @@ export function remarkRichTransforms(source:string){
       child.data={...(child.data??{}),hName:'mark',hProperties:{dataRkColor:String(child.attributes?.color)}};
       walk(child);updated.push(child);
      }else if(supported(kind)&&richInlineKinds.has(kind)&&child.type==='textDirective'){
+      const start=child.position?.start?.offset,end=child.position?.end?.offset;
+      const explicit=start!==undefined?parseInlineDirectiveSource(source.slice(start),kind):null;
+      // remark-directive does not parse JSON-escaped quotes in {...} and
+      // leaves that attribute suffix as the following text sibling. Consume
+      // only the proven source suffix, not any ordinary text after it.
+      if(explicit&&start!==undefined&&end!==undefined&&start+explicit.raw.length>end){
+       const next=node.children[i+1],limit=next?.position?.end?.offset;
+       if(next?.type==='text'&&next.position?.start?.offset===end&&
+          limit!==undefined&&limit>=start+explicit.raw.length){
+        const rest=source.slice(start+explicit.raw.length,limit);
+        if(rest)next.value=rest;
+        else i++;
+       }else{updated.push(asLiteral(child,source));continue;}
+      }
+      const attrs=explicit?.attrs??child.attributes??{};
       child.data={...(child.data??{}),hName:'rk-'+kind,hProperties:{
-       dataVariant:child.attributes?.variant??'neutral',
-       dataTitle:child.attributes?.title??'',
-       dataContent:child.attributes?.content??'',
-       dataHint:child.attributes?.hint??''
+       dataVariant:attrs.variant??'neutral',dataTitle:attrs.title??'',
+       dataContent:attrs.content??'',dataHint:attrs.hint??''
       }};
-      walk(child); updated.push(child);
+      walk(child);updated.push(child);
      }else updated.push(asLiteral(child,source));
      continue;
     }
@@ -59,7 +75,7 @@ export function remarkRichTransforms(source:string){
      else if(prev<sourceText.length)updated.push({type:'text',value:sourceText.slice(prev)});
      continue;
     }
-    walk(child);
+    walk(child,parentKind);
     updated.push(child);
    }
    node.children=updated;

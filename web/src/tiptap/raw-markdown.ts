@@ -25,3 +25,20 @@ export const RawMarkdown=Node.create({
 export function rawMarkdownBlock(source:string):JSONContent{
  return {type:'rawMarkdown',content:source?[{type:'text',text:source}]:[]};
 }
+
+/** Unsupported inline syntax stays an ordinary editable inline span.
+ * Its source is serialized literally while adjacent Markdown remains rich.
+ */
+export const RawInline=Node.create({
+ name:'rawInline',
+ group:'inline',
+ inline:true,
+ content:'text*',
+ defining:true,
+ priority:65,
+ parseHTML(){return [{tag:'span[data-raw-inline]'}];},
+ renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-raw-inline':''}),0];},
+ renderMarkdown(node:JSONContent){
+  return (node.content??[]).map(child=>child.text??'').join('');
+ }
+});

@@ -470,3 +470,11 @@
 .record-main .rk-cross-reference-read {color:var(--color-primary,#3988dc);text-decoration:underline;
  text-underline-offset:.16em;white-space:nowrap;}
 .record-main .rk-cross-reference-read.rk-cross-reference-missing {text-decoration-style:dashed;color:var(--color-danger,#b94a48);}
+
+/* Eight semantic callouts share Astryx Banner variants but retain distinct icons. */
+.rk-callout-heading {display:inline-flex;align-items:center;gap:.45rem;vertical-align:middle;}
+.rk-callout-heading svg {flex:none;opacity:.86;}
+.rk-callout-heading[data-callout-kind="note"] svg {color:var(--color-text-secondary);}
+.rk-callout-heading[data-callout-kind="question"] svg {color:var(--color-primary);}
+.rk-callout-heading[data-callout-kind="example"] svg {color:var(--color-primary);}
+.rk-callout-heading[data-callout-kind="tip"] svg {color:var(--color-success, #16835a);}

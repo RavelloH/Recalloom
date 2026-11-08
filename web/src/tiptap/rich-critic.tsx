@@ -2,7 +2,8 @@ import React from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import type {JSONContent} from '@tiptap/core';
 import {NodeViewContent,ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
-import {MessageSquareText,ArrowRight} from 'lucide-react';
+import {MessageSquareText,ArrowRight,Check,X} from 'lucide-react';
+import {resolveCriticSuggestion} from '../critic-review';
 import {criticStartIndex,parseCriticAt,type CriticKind} from '../critic-syntax';
 
 const titles:Record<CriticKind,string>={
@@ -22,13 +23,23 @@ export function CriticDisplay({kind,text,before}:{kind:CriticKind;text:string;be
   <span className="rk-critic-content">{text}</span>
  </span>;
 }
-/** An inline but non-atomic node: its proposed/current text remains directly
- * editable. In a substitution the old content stays in an attr; changing that
- * side requires Markdown source editing until the review UI is implemented.
+/** Keep suggestions editable until the user explicitly accepts/rejects them.
+ * Decisions are ordinary ProseMirror transactions, so the existing revision,
+ * undo and CAS save mechanisms remain the only authoritative write path.
  */
-function CriticEditorView({node}:NodeViewProps){
+function CriticEditorView({node,editor,getPos}:NodeViewProps){
  const kind=isCriticKind(node.attrs.kind)?node.attrs.kind:'comment';
  const before=String(node.attrs.before??'');
+ const decide=(choice:'accept'|'reject'|'resolve')=>{
+  const from=typeof getPos==='function'?getPos():undefined;
+  if(typeof from!=='number')return;
+  const result=resolveCriticSuggestion(kind,node.textContent,before,choice);
+  if(!result)return;
+  const range={from,to:from+node.nodeSize};
+  if(!result.text){editor.chain().focus().deleteRange(range).run();return;}
+  const replacement={type:'text',text:result.text,...(result.highlight?{marks:[{type:'highlight'}]}:{})};
+  editor.chain().focus().insertContentAt(range,replacement).run();
+ };
  return <NodeViewWrapper as="span" data-rk-critic={kind} className={'rk-critic rk-critic-'+kind} title={titles[kind]}>
   {kind==='substitution'&&<span contentEditable={false} className="rk-critic-before-wrapper">
    <del className="rk-critic-before">{before}</del><ArrowRight size={12} aria-hidden="true"/>
@@ -36,6 +47,15 @@ function CriticEditorView({node}:NodeViewProps){
   {kind==='comment'&&<span contentEditable={false} aria-label="审阅批注"><MessageSquareText size={12} aria-hidden="true"/></span>}
   {(kind==='addition'||kind==='deletion')&&<span className="rk-critic-indicator" contentEditable={false} aria-hidden="true">{kind==='addition'?'+':'−'}</span>}
   <NodeViewContent as={"span" as "div"} className="rk-critic-content"/>
+  <span className="rk-critic-actions" contentEditable={false}>
+   {kind!=='comment'?<>
+    <button type="button" className="rk-critic-accept" aria-label={'接受'+titles[kind]} title="接受建议"
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('accept');}}><Check size={13}/></button>
+    <button type="button" className="rk-critic-reject" aria-label={'拒绝'+titles[kind]} title="拒绝建议"
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('reject');}}><X size={13}/></button>
+   </>:<button type="button" aria-label="解决审阅批注" title="解决批注并移除批注标记"
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('resolve');}}><Check size={13}/></button>}
+  </span>
  </NodeViewWrapper>;
 }
 type CriticToken={kind?:CriticKind;before?:string;text?:string;tokens?:unknown[]};

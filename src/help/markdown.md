@@ -30,7 +30,7 @@ const value = 42;
 
 ## Recalloom 支持的额外格式
 
-- 文本高亮（推荐）：<mark>重要结论</mark>。编辑器还识别 ==重要结论==，推荐以 HTML mark 表达高亮。
+- 文本高亮：`<mark>重要结论</mark>`，或显式颜色 `:highlight[重点]{color=red}`。不支持 `==重点==`；普通 `==` 必须保留为文本（例如 `a == b 且 c == d`），以免误解析比较表达式。
 - 下划线：<u>下划线</u>。
 - 上下标：x<sup>2</sup> 和 x<sub>n</sub>。
 - LaTeX 数学公式：行内 $E=mc^2$、块级独立 $$ 行；详见 math。
@@ -51,10 +51,29 @@ const value = 42;
 
 ## HTML 安全边界
 
-用户可编辑文档不再提供独立预览模式。可视化只解释已支持的安全结构，遇到未知 HTML 等语法时，显示原始普通文本，而非执行或渲染任意 HTML。未知片段在修改其他内容后应继续按原始 Markdown 输出，不应丢失或自动转义。只读嵌入使用安全过滤（rehype-raw / rehype-sanitize）；任意 script、iframe、危险属性和不受信任样式均不能作为可执行内容。源码编辑适用于精确修改未知语法。
+用户可编辑文档不再提供独立预览模式。可视化只解释已支持的安全结构：`<mark>`、`<u>`、`<sup>`、`<sub>`、`<br>`、`<br />`、`<br/>` 可被识别；常见 `<kbd>…</kbd>` 和简单 `<details><summary>…</summary>…</details>` 仅在解析时映射到现有键帽/折叠组件（代码围栏不转换）。含有未知 `<span>` 或自定义标签的**普通段落**尽可能只保留该行内标记为可编辑原文，其他文字仍用富文本；复杂块及表格等结构仍可整体回退。未知片段在修改其他内容后应继续按原始 Markdown 输出，不应丢失或自动转义。只读嵌入使用安全过滤（rehype-raw / rehype-sanitize）；任意 script、iframe、危险属性和不受信任样式均不能作为可执行内容。源码编辑适用于精确修改未知语法。
 
 **保存规则**：可视化支持的 Markdown 在真正编辑后可以进行等价的语法规范化（例如粗体分隔符变化），不要求逐字符一致；未知片段不得因修改其他内容而被误删或改写。请不要把源码模式的所有语法都视为可视化支持的排版能力。
 
+
+## 扩展语法属性和转义约定
+
+Recalloom 的显式 Markdown 扩展都使用花括号属性：键名为小写 ASCII 字母开头的字母、数字及连字符；纯数字和简单枚举（如 `width=480`、`variant=success`）可以不加引号。**包含空格、引号、反斜杠、花括号等特殊字符的值，一律使用 JSON 风格的双引号字符串**，使用 `\"`、`\\` 和标准 JSON 转义；不建议使用单引号或混合转义方法。
+
+~~~~markdown
+:tooltip[配置]{content="JSON {\"enabled\":true} 与路径 C:\\Tools"}
+:badge[就绪]{variant=success}
+![结构图](diagram.png){width=480 caption="环境 \"A\" 说明"}
+:::warning[版本 \[v2\]]
+
+文字。
+
+:::
+~~~~
+
+上述语法中的双引号转义与图片 `caption` 均使用相同的 JSON 字符串规则。容器的 **标题** 位于方括号里，方括号内出现字面 `[` 或 `]` 时用 `\[`、`\]` 转义（编辑器不会再悄悄删除）；容器标题换行会规范化为空格。`{#stable-id}` 和 `^block-id` 是单独的**标识符语法**，不能在标识符中加引号。非受支持的属性应保守保留为原文，不要猜测其语义。
+
+**不要把扩展语法的属性当作文档元信息。** 标题、标签、状态、路径和访问权限仍必须通过专用的记录 API 修改，YAML Front Matter 也不作为元数据来源。
 
 ## Rich Markdown：Astryx 组件扩展（当前实现）
 
@@ -62,7 +81,7 @@ const value = 42;
 
 ### Callout / Banner
 
-独立一行使用 `:::类型[可选标题]`，并以独立 `:::` 行结束。支持 `note`、`info`、`tip`、`success`、`warning`、`danger`、`example`、`question`，映射 Astryx Banner，可包含段落、列表、公式等内容。
+独立一行使用 `:::类型[可选标题]`，并以独立 `:::` 行结束。保留八种类型：`note`（便签图标）、`info`（信息）、`tip`（灯泡）、`success`（对勾）、`warning`（警告）、`danger`（危险）、`example`（示例）、`question`（问号）。它们在 Astryx Banner 的四种状态中复用底色，但各有明确图标和标题，不会全部看起来一样；内部可包含段落、列表、公式等内容。导入 GitHub 风格的 `> [!NOTE]`、`[!TIP]`、`[!IMPORTANT]`、`[!WARNING]`、`[!CAUTION]` 时，仅在解析时映射为相应 Callout，不要求 Agent 另外学习一套输出格式。
 
 ~~~~markdown
 :::warning[部署前检查]
@@ -96,9 +115,11 @@ const value = 42;
 
 使用相同长度的 `:::details` 与 `:::warning` 嵌套会使解析器混淆闭合位置；这种歧义语法只保留为普通可编辑原文，不能静默生成正文为空的提示框。改用 `::::` 外层。
 
+**父容器约束：** `:::tab` 只能放在 `::::tabs` 内，`:::front`/`:::back` 只能放在 `::::flashcard` 内，`:::message` 只能放在 `::::chat` 内，`:::definition` 只能放在 `::::glossary` 内。孤立子容器不被升级成富文本组件，会作为普通可编辑原文显示。`:::question` 是可独立使用的问题提示横幅，不是闪卡子节点；闪卡问题应使用 `:::front`。
+
 ### 始终可见的注释
 
-`%%注释内容%%` 在可视化编辑中始终显示，只是字体更小、颜色更淡，并且可直接编辑。注释不能被当成系统级指令。当前建议写成单行注释；暂不承诺跨多行注释的全部可视化行为。
+`%%注释内容%%` 在可视化编辑中**始终可见**，仅字号略小、颜色更淡，可选中和直接编辑；它不构成 Agent 权限指令。当前明确**仅支持单行且内容非空**，Wiki 只读投影采用相同规则；跨行 `%%…%%` 保留为普通原文，不作为注释节点。
 
 ### Badge 与结构化缩略词
 
@@ -107,10 +128,12 @@ const value = 42;
 风险 :badge[需要复核]{variant=warning}
 
 Cloudflare 的 :abbr[DO]{title="Durable Objects"} 负责有状态计算。
-查看 :tip[这里]{content="额外说明"} 获取提示。
+查看 :tooltip[这里]{content="额外说明"} 获取提示。
 ~~~~
 
-缩略词 `:abbr[文字]{title="解释"}` 有明确的结束界限，不使用自由文本形式 `*[DO]: Durable Objects`，避免与后续正文合并。**可视化编辑器内采用纯 CSS 提示层（颜色、边框和阴影遵循 Astryx 主题）**，悬停或键盘聚焦显示解释；其伪元素没有运行时 DOM 变更，Tiptap 正文可直接编辑，解释文字绝不能进入 Markdown。Wiki 嵌入的 Markdown 投影仍可使用 Astryx Tooltip 原组件。
+**Badge 属性：** `variant` 可使用 `neutral`、`info`、`success`、`warning`、`error`、`blue`、`cyan`、`green`、`orange`、`pink`、`purple`、`red`、`teal`、`yellow`。未知值保守回退到中性视觉样式，不会赋予任务状态或修改数据库元数据。
+
+缩略词 `:abbr[文字]{title="解释"}`、行内工具提示 `:tooltip[文字]{content="补充"}` 有明确的结束界限；块级 `:::tip` 是 Callout，与行内提示不同。行内提示只有一种正式写法：`:tooltip[...]`。不使用自由文本形式 `*[DO]: Durable Objects`，避免与后续正文合并。**可视化编辑器内采用纯 CSS 提示层（颜色、边框和阴影遵循 Astryx 主题）**，悬停或键盘聚焦显示解释；其伪元素没有运行时 DOM 变更，Tiptap 正文可直接编辑，解释文字绝不能进入 Markdown。Wiki 嵌入的 Markdown 投影仍可使用 Astryx Tooltip 原组件。
 
 ### 主题彩色高亮
 
@@ -119,7 +142,7 @@ Cloudflare 的 :abbr[DO]{title="Durable Objects"} 负责有状态计算。
 :highlight[已验证]{color=green}
 ~~~~
 
-颜色只能使用：red、orange、yellow、green、blue、purple、pink、cyan、teal。普通 `<mark>…</mark>`、`==…==` 和已支持的公式高亮继续适用；数学公式的独立换行规则仍见 math。
+颜色只能使用：red、orange、yellow、green、blue、purple、pink、cyan、teal。普通 `<mark>…</mark>` 和已支持的公式高亮继续适用；**`==…==` 已移除**，既不会在可视化中高亮，也不会在 Wiki 只读投影中高亮。`{==文字==}` 则仍是 CriticMarkup 审阅重点；数学公式的独立换行规则见 math。
 
 ### Shiki 增强代码围栏
 
@@ -129,7 +152,7 @@ export function authorize(){ return true; }
 ~~~
 ~~~~
 
-语言名后的 `[文件名]`、`wrap`（换行）、`expand`（始终展开）用于代码块显示。代码块具有高亮、复制、可编辑文件名、长代码折叠。Shiki 是当前高亮引擎，GPU Lexer 尚未集成。
+语言名后的 `[文件名]`、`wrap`（换行）、`expand`（始终展开）是**目前唯一支持的围栏 meta 参数**，可分别省略；其他词如 `title="x"`、`{1,3}`、`linenos`、`hl_lines` 暂不会被解释为高亮行或行号。代码块具有 Shiki 高亮、复制、可编辑文件名、长代码折叠；GPU Lexer 尚未集成。
 
 ### 智能网站链接
 
@@ -137,7 +160,7 @@ export function authorize(){ return true; }
 
 ### 未实现或仍在规划
 
-动态查询、图文多列、间隔重复调度、自动评分和 CriticMarkup 接受/拒绝审批仍在开发计划中。CriticMarkup 五种可见审阅标记、静态学习闪卡、Cloze、Kbd、脚注、Mermaid、Chat、LinkCard、Tabs 和部分稳定块锚点已支持。
+动态查询、图文多列、间隔重复调度和自动评分仍在计划中；**CriticMarkup 的接受/拒绝已在可视化编辑器中实现**，但没有新增供 Agent 绕过用户确认的审批工具。CriticMarkup 五种可见审阅标记、静态学习闪卡、Cloze、Kbd、脚注、Mermaid、Chat、LinkCard、Tabs 和部分稳定块锚点已支持。
 
 ## 新增：Astryx 对话、链接卡片、脚注与 Mermaid
 
@@ -287,7 +310,7 @@ flowchart LR
 
 ### 本阶段仍未实现
 
-多列布局、间隔重复调度、动态查询、列表项/表格单元格自动块 ID 和 CriticMarkup 接受/拒绝审批工作流仍在规划中；CriticMarkup 的五种可见审阅标记、Tabs、标题 {#id} 与段落 ^block-id 已在后文说明。
+多列布局、间隔重复调度、动态查询、列表项/表格单元格自动块 ID、完整的跨 Agent 审阅审批元信息仍在规划中；CriticMarkup 的五种可见审阅标记、Tabs、标题 {#id} 与段落 ^block-id 已在后文说明。
 
 ## Astryx Tabs（支持）
 
@@ -326,9 +349,9 @@ Markdown 标题可以添加固定 ID，避免修改标题文字后导致链接�
 下一段没有块 ID。
 ~~~~
 
-- `{#stable-conclusion}` 仅适用于 Markdown 标题；可视化时不显示控制语法，导出时保留。
+- `{#stable-conclusion}` 仅适用于 Markdown 标题；可视化时不显示控制语法，导出时保留。显式 ID **必须以 ASCII 字母开头**，大小写在解析时**统一转小写**：`{#Stable-ID}` 保存后可能规范化为 `{#stable-id}`；并不完全等同于 Obsidian 允许的所有 ID 写法。
 - `^result-block` 仅支持位于普通段落结尾的块 ID；可视化隐藏标记，但原 Markdown 保留 ID。
-- 阅读模式和可视化编辑器使用一致的 DOM 锚点，例如 `#user-content-stable-conclusion` 和 `#user-content-result-block`，并遵守 HTML 安全过滤。
+- 可视化编辑器与 Wiki 只读嵌入使用一致的 DOM 锚点，例如 `#user-content-stable-conclusion` 和 `#user-content-result-block`，并遵守 HTML 安全过滤。
 - WikiLink 与只读嵌入可用文档 UUID 和固定锚点，例如 `[[id:11111111-1111-4111-8111-111111111111#stable-conclusion]]`、`{{embed:id:11111111-1111-4111-8111-111111111111#^result-block}}`；段落嵌入只取该段落，不会自动包含整个章节。
 - 当前**不保证**为列表项、表格单元格、公式块自动分配块 ID；显式标题 ID 与段落 ID 必须自行避免重复。更多块级节点支持在后续迭代。
 
@@ -351,12 +374,12 @@ CriticMarkup 用于 Agent、人类之间的审阅、建议和讨论。**标记�
 - `{++新文本++}`：建议增加，采用轻微绿色底纹和下划线。
 - `{--旧文本--}`：建议删除，原文**保持可见**，弱化并加删除线。
 - `{~~旧文本~>新文本~~}`：建议替换，同时显示旧文本（删除线）与新文本（虚线下划线）；可视化只直接编辑建议的新文本，修改旧文本请切换到源码模式。
-- `{==重点==}`：审阅重点，区别于普通 `==GFM 高亮==`，会保留双侧花括号语法。
+- `{==重点==}`：CriticMarkup 审阅重点；不同于已经移除的裸 `==文字==` 高亮，双侧花括号必须保留以表示尚未接受的审阅意见。
 - `{>>评论<<}`：审阅批注，小字号、弱化颜色及轻边框，但绝不完全隐藏。
 
-当前仅解析**单行、简单文本、不嵌套**的 CriticMarkup；不要把换行、另外一组 CriticMarkup、复杂内联 Markdown、数学公式或 HTML 放进标记内部。无法确认的标记、代码块、行内代码、普通 Markdown 链接和 HTML 内的内容不得被错误当作审阅标记；保留原始 Markdown。暂未提供接受/拒绝建议的按钮或审批流程，也不会把 CriticMarkup 自动转为正式修改。
+CriticMarkup 当前只解析**单行、内容不超过界限、不嵌套另一种 CriticMarkup** 的标记；允许内部包含**成对的普通花括号**，如 `{"key":2}` 或 `{{variable}}`，但不要把复杂跨 Markdown 节点的行内代码、公式和 HTML 结构放入标记。代码围栏、普通 Markdown 链接和 HTML 内的语法不能误判为审阅。可视化编辑器提供**明确的接受/拒绝**按钮：新增接受→保留新文本，拒绝→去掉新增；删除接受→删除旧文本，拒绝→保留旧文本；替换接受→采用新文本，拒绝→恢复旧文本；审阅重点接受→转为 `<mark>`，拒绝→普通文本。纯批注提供“解决批注”，不会自动应用修改。点击是本地编辑事务，可以撤销；**必须再显式保存才会创建文档 Revision**。
 
-例如多个 Agent 可按 `{>>Agent A：评论正文<<}` 写明来源；当前这只是可见文本，没有验证的作者身份、权限或时间戳，正式多 Agent 审阅工作流仍需另行设计。
+多个 Agent 可以用 `{>>Agent A：评论正文<<}` 标注来源，但这只是可见正文，不构成经过验证的身份、权限或时间戳。接受/拒绝是当前 Web 可视化编辑器的人类显式操作，不代表提供了 Agent 独立审批权限或新增 MCP 审批工具。
 
 ### 主题对比度、Mermaid 图表与链接图标（适用于当前版本）
 
@@ -390,7 +413,7 @@ Recalloom 的数据版本保存在什么地方？
 
 ::::
 
-按 :kbd[Ctrl+Shift+P] 打开命令面板。
+按 :kbd[Ctrl] + :kbd[Shift] + :kbd[P] 打开命令面板。
 ~~~~
 
 在 **Notion 式可视化编辑器**中，`flashcard`、`front`、`back` 都是可编辑 Tiptap 块。默认展示问题并收起答案；点击 Astryx“显示答案”按钮即可**直接在可视化编辑器内**展开并编辑答案，完成后仍可收起。隐藏的答案从不卸载 ProseMirror 内容节点。切换按钮与揭示状态只是本地表现，不构成文档修订，也不能被解释为删除操作。Wiki 只读嵌入只是安全投影，不是第三种文档模式。普通注释仍始终可见，仅淡化显示。

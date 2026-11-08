@@ -16,18 +16,17 @@ export const HighlightWithMarkdown=Highlight.extend({
  markdownTokenizer:{
   name:'highlight',level:'inline' as const,
   start:(source:string)=>{
-   const candidates=[source.indexOf('<mark'),source.indexOf('=='),source.indexOf(':highlight[')].filter(x=>x>=0);
+   const candidates=[source.indexOf('<mark'),source.indexOf(':highlight[')].filter(x=>x>=0);
    return candidates.length?Math.min(...candidates):-1;
   },
   tokenize(source,_tokens,lexer){
    const directive=/^:highlight\[([^\]\r\n]+)\]\{color=(red|orange|yellow|green|blue|purple|pink|cyan|teal)\}/.exec(source);
    const colored=/^<mark\s+data-rk-color=["'](red|orange|yellow|green|blue|purple|pink|cyan|teal)["']>([^\r\n]*?)<\/mark>/i.exec(source);
    const html=/^<mark>([^\r\n]*?)<\/mark>/i.exec(source);
-   const md=/^(==)([^=]+)(==)/.exec(source);
-   const match=directive??colored??html??md;
+   const match=directive??colored??html;
    if(!match)return undefined;
    const color=directive?directive[2]:colored?colored[1]:null;
-   const body=directive?directive[1]:colored?colored[2]:html?html[1]:(md?.[2]??'').trim();
+   const body=directive?directive[1]:colored?colored[2]:html?.[1]??'';
    return {type:'highlight',raw:match[0],text:body,color,tokens:lexer.inlineTokens(body)};
   }
  },
