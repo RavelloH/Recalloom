@@ -33,4 +33,12 @@
 .rk-help-prose :not(pre)>code{background:var(--rk-document-wash,rgba(128,128,128,.075));padding:.16em .38em;border-radius:4px;overflow-wrap:anywhere}
 .rk-help-prose code{font-family:var(--rk-font-mono,ui-monospace,Consolas,monospace);font-size:.9em}
 .rk-help-prose blockquote{border-left:3px solid var(--color-border,rgba(128,128,128,.3));padding-left:13px;margin-left:0;color:var(--color-text-secondary)}
+.rk-help-live-example{margin:8px 0 24px;border:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.22)));border-radius:10px;min-width:0;overflow:hidden;}
+.rk-help-live-heading{padding:9px 14px;font-size:12px;font-weight:650;letter-spacing:.02em;background:var(--rk-document-wash,rgba(128,128,128,.055));border-bottom:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.22)));}
+.rk-help-live-surface{min-width:0;max-width:100%;overflow:hidden;}
+.rk-help-live-surface .markdown-preview{min-height:65px;padding:18px 17px 21px;font-size:14px;line-height:1.7;}
+.rk-help-live-surface .markdown-preview > :first-child{margin-top:0;}
+.rk-help-live-surface .markdown-preview > :last-child{margin-bottom:0;}
+.rk-help-live-pending{padding:12px 16px;color:var(--color-text-secondary);font-size:12px;margin:0;}
+.rk-help-live-surface .markdown-preview .wiki-embed{max-width:100%;}
 @media(max-width:860px){.rk-help-layout{grid-template-columns:minmax(0,1fr);gap:14px}.rk-help-navigation{position:static;max-height:290px}.rk-help-prose{padding:18px 16px}.rk-help-document-head{padding-inline:16px}}

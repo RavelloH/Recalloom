@@ -33,7 +33,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: mark 重要结论 ::
 ~~~~
 
@@ -58,7 +58,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: highlight 高风险 | red ::
 ~~~~
 
@@ -81,7 +81,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: badge 已完成 | success ::
 ~~~~
 
@@ -104,7 +104,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: tooltip Durable Objects | description="有状态计算" ::
 ~~~~
 
@@ -127,7 +127,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: abbr API | description="Application Programming Interface" ::
 ~~~~
 
@@ -148,7 +148,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: kbd Ctrl ::
 ~~~~
 
@@ -171,7 +171,7 @@
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :: cloze 欧姆定律 | hint="点击查看答案" ::
 ~~~~
 
@@ -198,7 +198,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: note 笔记
 
 这是一段示例正文。
@@ -229,7 +229,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: info 说明
 
 这是一段示例正文。
@@ -260,7 +260,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: tip 建议
 
 这是一段示例正文。
@@ -291,7 +291,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: success 成功
 
 这是一段示例正文。
@@ -322,7 +322,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: warning 警告
 
 这是一段示例正文。
@@ -353,7 +353,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: danger 危险
 
 这是一段示例正文。
@@ -384,7 +384,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: example 示例
 
 这是一段示例正文。
@@ -415,7 +415,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: question 问题
 
 这是一段示例正文。
@@ -446,7 +446,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: mark
 
 $$
@@ -482,7 +482,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: highlight | color=blue
 
 彩色强调正文。
@@ -513,7 +513,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: details 展开说明
 
 详细内容。
@@ -546,7 +546,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: tabs
 
 ::: tab 概览
@@ -581,7 +581,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: tabs
 
 ::: tab 概览
@@ -618,7 +618,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: chat
 
 ::: message 用户 | sender=user
@@ -655,7 +655,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: chat
 
 ::: message Assistant | sender=assistant
@@ -696,7 +696,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: flashcard
 
 ::: front
@@ -737,7 +737,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: flashcard
 
 ::: front
@@ -778,7 +778,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: flashcard
 
 ::: front
@@ -821,7 +821,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: glossary
 
 ::: definition 负载率
@@ -856,7 +856,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 :::: glossary
 
 ::: definition 负载率
@@ -887,7 +887,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: embed id:550e8400-e29b-41d4-a716-446655440000#chapter-one :::
 ~~~~
 
@@ -912,7 +912,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ::: link-card https://github.com/RavelloH/Recalloom | title=Recalloom :::
 ~~~~
 
@@ -941,7 +941,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ## 研究方案 @ attrs chapter-one @
 ~~~~
 
@@ -959,7 +959,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 这一段可被引用。 @ attrs paragraph-one @
 ~~~~
 
@@ -982,7 +982,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ![实验装置](/examples/device.svg) @ attrs fig-device | width=480 | caption=实验装置 @
 ~~~~
 
@@ -1002,7 +1002,7 @@ Markdown 正文
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 $$
 P=UI
 $$
@@ -1026,7 +1026,7 @@ $$
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 | 项目 | 数值 |
 | --- | --- |
 | 电压 | 220 |
@@ -1050,7 +1050,7 @@ $$
 
 **完整示例**：
 
-~~~~markdown
+~~~~rmd-example
 ~~~ts
 const x = 1;
 ~~~

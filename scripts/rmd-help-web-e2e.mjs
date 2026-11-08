@@ -36,6 +36,12 @@ try{
  await expectHelpContent('variant');
  await expectHelpContent('neutral');
  await expectHelpContent(':: badge 已完成 | success ::');
+ const badges=page.locator('.rk-help-live-example');
+ assert.equal(await badges.count(),1,'single component example has one matching rendered preview');
+ const badgePreview=badges.first().locator('.markdown-preview');
+ await badgePreview.waitFor();
+ assert.ok((await badgePreview.innerText()).includes('已完成'),'Badge visual preview must render from source');
+ assert.ok(await page.getByText('实际渲染效果').count(),'live preview has a visible label');
  const badgeRendered=await page.locator('.rk-help-prose table').count();
  assert.ok(badgeRendered>=1,'generated schema tables should be readable');
 
@@ -44,12 +50,23 @@ try{
  await expectHelpContent('40–1800');
  await expectHelpContent('width');
  await expectHelpContent('caption');
+ const figurePreview=page.locator('.rk-help-live-example .markdown-preview');
+ await figurePreview.waitFor();
+ assert.ok(await figurePreview.locator('figure.rk-rich-figure').count(),'image attributes render a real figure');
+ assert.ok(await figurePreview.locator('figcaption').count(),'figure caption is visible');
  assert.ok(await page.locator('.rk-help-prose pre').count(),'Markdown examples should render as literal code');
+ await nav.getByRole('button',{name:/mark/}).first().click();
+ assert.equal(await page.locator('.rk-help-live-example').count(),2,'Mark shows both inline and block forms');
+ await nav.getByRole('button',{name:/tabs/}).click();
+ const tabExample=page.locator('.rk-help-live-example .markdown-preview');
+ await tabExample.waitFor();
+ assert.ok(await tabExample.getByText('第一项。').count(),'nested child component renders inside tabs');
 
  await nav.getByRole('button',{name:'完整参考手册'}).click();
  await expectHelpContent('RMD 1.0 完整语法参考（自动生成）');
  await expectHelpContent('29 种语法形式');
  await expectHelpContent('flashcard');
+ assert.equal(await page.locator('.rk-help-live-example').count(),35,'every registered syntax form and @ attrs node shows a live example');
  assert.equal(await page.locator('.rk-help-prose script').count(),0,'help may not execute script tags');
 
  const search=nav.getByRole('searchbox',{name:'搜索 RMD 语法'});

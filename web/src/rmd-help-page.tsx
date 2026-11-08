@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import {BookOpen,Search,X,Code2,Tags} from 'lucide-react';
 import {HELP_META,HELP_PAGES,HELP_RMD_COMPONENTS,HELP_RMD_NODES} from '../../src/help/catalog.generated';
 import {RMD_REGISTRY} from './rmd-schema';
+import {RmdHelpPre} from './rmd-help-example';
 import './rmd-help-page.css';
 
 type Topic='intro'|'all'|'component'|'node';
@@ -87,7 +88,7 @@ export default function RmdHelpPage(){
    </nav>
    <article className="rk-help-document" aria-label={title}>
     <div className="rk-help-document-head"><span>{title}</span><small>帮助版本 {HELP_META.helpVersion}</small></div>
-    <div className="rk-help-prose"><ReactMarkdown remarkPlugins={[remarkGfm]}>{content??intro}</ReactMarkdown></div>
+    <div className="rk-help-prose"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{pre:RmdHelpPre}}>{content??intro}</ReactMarkdown></div>
    </article>
   </div>
  </div>;

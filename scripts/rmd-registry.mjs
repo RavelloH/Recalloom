@@ -36,7 +36,7 @@ export function readRegistry(){
  if(!r.components.length||!r.nodes.length)throw Error('RMD registry must define components and attribute targets');
  return r;
 }
-const code=s=>'~~~~markdown\n'+s+'\n~~~~';
+const code=(s,live=false)=>'~~~~'+(live?'rmd-example':'markdown')+'\n'+s+'\n~~~~';
 const types={inline:'行内',block:'多行块级',leaf:'独立单行块级'};
 const main={required:'必填',optional:'选填',forbidden:'禁止'};
 function valueHint(t,r){
@@ -81,7 +81,7 @@ export function renderComponent(c,r){
  if(c.name==='highlight')out.push('**必须显式提供颜色**；不提供时回退为纯文本，不等于默认 Mark。','');
  if(c.name==='embed')out.push('**目标**：`id:UUID` 或绝对虚拟路径；标题和段落统一使用 `#anchor-id`。','');
  if(c.name==='link-card')out.push('**目标**：HTTP(S) URL，不允许 javascript: 等脚本协议。','');
- out.push('**完整示例**：','',code(c.example),'');
+ out.push('**完整示例**：','',code(c.example,true),'');
  return out.join('\n');
 }
 export function renderNode(n,r){
@@ -92,7 +92,7 @@ export function renderNode(n,r){
   params(n.attributes,[],[],{},r),
   ...(n.editorIdPrefix?['**可视化编辑器的 ID 规则**：ID 须以 `'+n.editorIdPrefix+'` 开头；源码级 RMD 解析器仍接受所有合法 ID。','']:[]),
   '**可视化编辑限制**：字符串参数不超过 '+r.constraints.stringEditorMaximumLength+' 字符、不能包含换行；这些限制不等于源码 `string` 解析器的最大长度。','',
-  '**完整示例**：','',code(n.example),''
+  '**完整示例**：','',code(n.example,true),''
  ].join('\n');
 }
 export function renderRegistry(r){

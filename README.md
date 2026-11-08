@@ -23,7 +23,7 @@ Recalloom 是一个可自部署的版本化个人知识库，同时提供 Web �
 Recalloom 使用统一的 RMD 1.0 词法与渲染管线，在标准 CommonMark/GFM/KaTeX 基础上提供：**行内/块级 Mark、九色 Highlight、八种 Callout、Badge、Tooltip、Abbr、Kbd、Cloze、Details、Tabs、Flashcard、Glossary、Chat、CriticMarkup 多 Agent 审阅、单行/多行注释、块属性、同文档引用与只读 Wiki 嵌入、链接卡片**。语法统一采用对称的 `::` 行内、`:::` 块级和 `@ attrs` 修饰符。只有完整有效的扩展被解释为组件；格式错误原样显示为文本。
 
 - [**完整可复制语法展示与交互示例**](docs/rmd-1.0-syntax-showcase.md)：逐类展示全部 RMD 1.0 语法，涵盖正例、非法写法和三种视图区别。
-- [**自动生成的完整 RMD 参数规范**](docs/rmd-syntax-reference.generated.md)：29 种语法形式、全部组件参数、父子约束、默认值与 6 类块属性。唯一权威来源是 `src/rmd/registry.json`，修改后运行 `pnpm help:generate`。MCP `get_help` 可用 `component`、`kind`、`node` 精确查询；CodeMirror 源码模式提供同源自动补全。Web 登录后可从侧边栏「语法帮助」打开 `/help`，按组件/块属性检索并查看生成的参数表。
+- [**自动生成的完整 RMD 参数规范**](docs/rmd-syntax-reference.generated.md)：29 种语法形式、全部组件参数、父子约束、默认值与 6 类块属性。唯一权威来源是 `src/rmd/registry.json`，修改后运行 `pnpm help:generate`。MCP `get_help` 可用 `component`、`kind`、`node` 精确查询；CodeMirror 源码模式提供同源自动补全。Web 登录后可从侧边栏「语法帮助」打开 `/help`，按组件/块属性检索并查看生成的参数表。每条「完整示例」会在代码下方显示由正式只读预览管线生成的**实际渲染效果**；完整手册的预览按滚动位置懒加载，避免所有组件同时初始化。
 - [渲染管线、属性规则和安全审计](docs/rich-markdown.md)：架构、测试和安全边界。
 - Web 中也可使用 MCP `get_help({"topic":"markdown"})`、`get_help({"topic":"wiki"})` 阅读相同的权威帮助说明。
 
