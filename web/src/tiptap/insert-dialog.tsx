@@ -8,16 +8,17 @@ import {Link2,Image as ImageIcon,Sigma} from 'lucide-react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import {validLink,validImage} from './editor-actions';
+import {validCrossRefId} from '../cross-reference';
 
 export type InsertDialogState=
  |{kind:'link';from:number;to:number;text:string;url:string;existing:boolean}
  |{kind:'image';src:string;alt:string;title:string;existing:boolean}
- |{kind:'math';latex:string;type:'inline'|'block';position?:number;existing:boolean};
+ |{kind:'math';latex:string;type:'inline'|'block';position?:number;existing:boolean;equationId?:string};
 
 export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:InsertDialogState;onClose:()=>void;onApply:(state:InsertDialogState)=>void;onRemove:()=>void}){
  const [draft,setDraft]=useState<InsertDialogState>(value);
  const update=(fields:Record<string,unknown>)=>setDraft(prev=>({...prev,...fields}) as InsertDialogState);
- const valid=draft.kind==='link'?validLink(draft.url):draft.kind==='image'?validImage(draft.src):!!draft.latex.trim();
+ const valid=draft.kind==='link'?validLink(draft.url):draft.kind==='image'?validImage(draft.src):!!draft.latex.trim()&&(draft.type!=='block'||!draft.equationId?.trim()||validCrossRefId(draft.equationId.trim().toLowerCase(),'eq'));
  const mathPreview=useMemo(()=>{
   if(draft.kind!=='math'||!draft.latex.trim())return '';
   try{return katex.renderToString(draft.latex,{throwOnError:false,trust:false,strict:'warn',displayMode:draft.type==='block'});}
@@ -40,6 +41,7 @@ export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:Inser
    {draft.kind==='math'&&<>
     <Selector label="公式类型" width="100%" value={draft.type} options={[{value:'inline',label:'行内公式 $…$'},{value:'block',label:'块级公式 $$…$$'}]} onChange={type=>update({type})}/>
     <TextArea label="LaTeX 公式" width="100%" rows={4} value={draft.latex} onChange={latex=>update({latex})} placeholder="例如：\\frac{a}{b}" hasAutoFocus/>
+    {draft.type==='block'&&<TextInput label="公式 ID（可选，eq-...）" width="100%" value={draft.equationId??''} onChange={equationId=>update({equationId})} placeholder="eq-power"/>}
     <div className="editor-math-preview" aria-label="数学公式预览">{mathPreview?<div dangerouslySetInnerHTML={{__html:mathPreview}}/>:<span className="muted small">输入 LaTeX 后实时显示预览</span>}</div>
    </>}
    {!valid&&((draft.kind==='link'&&draft.url)||(draft.kind==='image'&&draft.src))&&<p className="muted small" role="status">仅支持安全的 HTTP(S) 地址，以及适用的相对路径或协议。</p>}

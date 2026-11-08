@@ -7,7 +7,7 @@
   {
     "topic": "markdown",
     "title": "Markdown 与扩展语法",
-    "summary": "GFM、图片尺寸与图注、术语定义列表、Astryx Banner/Chat/Tabs/LinkCard、CriticMarkup、学习闪卡/Cloze、脚注、锚点、Mermaid"
+    "summary": "GFM、图片尺寸与图注、图/公式/表格的显式 ID 与交叉引用、术语定义列表、Astryx Banner/Chat/Tabs/LinkCard、CriticMarkup、学习闪卡/Cloze、脚注、锚点、Mermaid"
   },
   {
     "topic": "math",

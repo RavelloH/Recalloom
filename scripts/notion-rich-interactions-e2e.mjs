@@ -125,10 +125,15 @@ try{
  await clozeAnswer.fill('QA_CLOZE_EDITED');
  assert.ok(await page.getByRole('button',{name:'保存'}).isEnabled(),'Editing content must create real dirty state');
  await page.getByRole('button',{name:'保存'}).click();
- await page.waitForFunction(()=>document.querySelector('button[aria-label="保存"]')?.hasAttribute('disabled'),null,{timeout:15000});
+ // A disabled Save button can also mean the request is still in flight.
+ // Verify the server actually persisted the changed answer before reading it.
+ await page.waitForFunction(async id=>{
+  const response=await fetch('/api/records/'+id);
+  return response.ok&&(await response.json()).content.includes('QA_CLOZE_EDITED');
+ },created.data.id,{timeout:20000,polling:200});
  const saved=await page.evaluate(async id=>await(await fetch('/api/records/'+id)).json(),created.data.id);
  const normalized=saved.content.replaceAll('\\_','_');
- assert.ok(saved.content.includes(':cloze[QA_CLOZE_EDITED]{hint="点击揭示"}'),'Edited Cloze must serialize back into Markdown');
+ assert.ok(normalized.includes(':cloze[QA_CLOZE_EDITED]{hint="点击揭示"}'),'Edited Cloze must serialize back into Markdown: '+saved.content);
  assert.ok(normalized.includes('QA_TAB_FIRST')&&normalized.includes('QA_TAB_SECOND'),'Tabs must not lose hidden panels');
  assert.ok(normalized.includes('QA_COMMENT_ALWAYS_VISIBLE'),'Comment remains');
  // Reload the persisted Markdown: hidden data must remain editable after reparse.

@@ -460,3 +460,13 @@
  margin-block:-.35rem 1.15rem;padding:.35rem .6rem;}
 .record-main .markdown-preview .rk-table-caption-read::before {
  content:'表 ' counter(rk-table-preview) '：';font-weight:650;margin-inline-end:.2em;}
+
+/* Cross-document Markdown projection computes IDs/numbers from the source. */
+.record-main .rk-numbered-math-projection {display:flex;align-items:center;justify-content:safe center;
+ position:relative;gap:.75rem;max-width:100%;padding-inline:.6rem;margin-block:1rem;}
+.record-main .rk-numbered-math-content {min-width:0;overflow-x:auto;flex:1;max-width:100%;}
+.record-main .rk-numbered-math-projection .katex-display {margin-block:.3rem;}
+.record-main .rk-numbered-math-label {flex:0 0 auto;color:var(--color-text-secondary);font-size:.85rem;}
+.record-main .rk-cross-reference-read {color:var(--color-primary,#3988dc);text-decoration:underline;
+ text-underline-offset:.16em;white-space:nowrap;}
+.record-main .rk-cross-reference-read.rk-cross-reference-missing {text-decoration-style:dashed;color:var(--color-danger,#b94a48);}

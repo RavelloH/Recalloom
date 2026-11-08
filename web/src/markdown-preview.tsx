@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useMemo} from 'react';
 import ReactMarkdown,{type Components} from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -28,6 +28,8 @@ import ClozeReveal from './cloze-reveal';
 import {remarkFigureAttributes} from './remark-figure';
 import {remarkTableCaptions} from './remark-table-caption';
 import {safeTableId,cleanTableCaption} from './table-caption';
+import {collectPreviewRefs,remarkCrossRefDisplay} from './markdown-cross-reference';
+import {shieldEquationIdClosers,validCrossRefId} from './cross-reference';
 import {safeFigureImageSrc} from './figure-syntax';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
 import {slugHeading,headingAnchor,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
@@ -75,7 +77,7 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption','rk-cross-ref','rk-numbered-math'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
@@ -89,6 +91,8 @@ const schema={
   'rk-cloze':['dataHint'],
   'rk-figure':['dataPayload'],
   'rk-table-caption':['dataId','dataCaption'],
+  'rk-cross-ref':['dataId'],
+  'rk-numbered-math':['dataId'],
   code:[...(defaultSchema.attributes?.code??[]),'dataFile','dataWrap','dataExpand'],
   mark:[...(defaultSchema.attributes?.mark??[]),'dataRkColor']}
 };
@@ -107,6 +111,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/.exec(source);
  const body=frontmatter?source.slice(frontmatter[0].length).replace(/^\n+/, ''):source;
  const prepared=prepareCriticMarkdown(prepareWikiMarkdown(body));
+ const refIndex=useMemo(()=>collectPreviewRefs(prepared),[prepared]);
+ const parseSource=useMemo(()=>shieldEquationIdClosers(prepared),[prepared]);
  const chain=trail??(sourceId?[sourceId]:[]);
  const custom={
   'wiki-ref':({node:_node,...props}:Record<string,unknown>)=>
@@ -123,18 +129,36 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    let raw:unknown;
    try{raw=JSON.parse(decodeURIComponent(String(props['data-payload']??props.dataPayload??'')));}catch{return null;}
    if(!raw||typeof raw!=='object')return null;
-   const attrs=raw as {src?:string;alt?:string;title?:string;width?:number;height?:number;caption?:string};
+   const attrs=raw as {src?:string;alt?:string;title?:string;width?:number;height?:number;caption?:string;id?:string};
    if(!safeFigureImageSrc(String(attrs.src??'')))return null;
    const size=(n:unknown)=>typeof n==='number'&&Number.isInteger(n)&&n>=40&&n<=1800?n:undefined;
    const width=size(attrs.width),height=size(attrs.height);
    const caption=String(attrs.caption??'').slice(0,240);
-   return <figure className="rk-rich-figure rk-rich-figure-projection">
+   const id=validCrossRefId(attrs.id,'fig')?attrs.id:null;
+   const number=id?refIndex.get(id)?.label:null;
+   return <figure id={id?headingAnchor(id):undefined} data-rk-figure-id={id??undefined} className="rk-rich-figure rk-rich-figure-projection">
     <img src={attrs.src} alt={String(attrs.alt??'')} title={String(attrs.title??'')||undefined}
      loading="lazy" referrerPolicy="no-referrer" style={{width:width?width+'px':undefined,height:height?height+'px':undefined,objectFit:'contain'}}/>
-    {caption&&<figcaption className="rk-rich-figcaption">{caption}</figcaption>}
+    {(caption||number)&&<figcaption className="rk-rich-figcaption">{number&&<strong className="rk-cross-caption-number">{number}{caption?'：':''}</strong>}{caption}</figcaption>}
    </figure>;
   },
-  'rk-table-caption':({node:_node,...props}:Record<string,unknown>)=>{
+    'rk-cross-ref':({node:_node,...props}:Record<string,unknown>)=>{
+   const id=String(props['data-id']??props.dataId??'');
+   if(!validCrossRefId(id))return null;
+   const item=refIndex.get(id);
+   return item?<a href={'#'+headingAnchor(id)} className="rk-cross-reference-read">{item.label}</a>
+    :<span className="rk-cross-reference-read rk-cross-reference-missing" title={'缺少目标块 '+id}>{'引用不存在：'+id}</span>;
+  },
+  'rk-numbered-math':({node:_node,...props}:Record<string,unknown>)=>{
+   const id=String(props['data-id']??props.dataId??'');
+   if(!validCrossRefId(id,'eq'))return null;
+   const item=refIndex.get(id);
+   return <div className="rk-numbered-math-projection" id={headingAnchor(id)} data-rk-equation-id={id}>
+    <div className="rk-numbered-math-content">{props.children as React.ReactNode}</div>
+    {item&&<span className="rk-numbered-math-label">({item.number})</span>}
+   </div>;
+  },
+'rk-table-caption':({node:_node,...props}:Record<string,unknown>)=>{
    let id='',caption='';
    try{
     id=decodeURIComponent(String(props['data-id']??props.dataId??''));
@@ -195,8 +219,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  };
  return <article className="markdown-preview">
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
-  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,remarkTableCaptions,()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
+  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,remarkTableCaptions,()=>remarkCrossRefDisplay(prepared),()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}
-   components={{...components,...custom} as Components}>{prepared}</ReactMarkdown>
+   components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
  </article>;
 }

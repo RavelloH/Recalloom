@@ -148,7 +148,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
-  BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
+  BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true,equationId:String(node.attrs.equationId??'')})}),
   Placeholder.configure({placeholder:({editor:e,node})=>node.type.name==='heading'?'标题 '+String(node.attrs.level??''):e.isEmpty?'输入“/”插入内容，或直接开始写作…':'输入“/”插入块'}),
  ],[recordId]);
  const editor=useEditor({
@@ -283,16 +283,16 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    if(current){
     if(current.type.name===(item.type==='inline'?'inlineMath':'blockMath')){
      if(item.type==='inline')editor.chain().focus().setNodeSelection(item.position).updateInlineMath({latex:item.latex.trim()}).run();
-     else editor.chain().focus().setNodeSelection(item.position).updateBlockMath({latex:item.latex.trim()}).run();
+     else editor.chain().focus().setNodeSelection(item.position).updateAttributes('blockMath',{latex:item.latex.trim(),equationId:item.equationId?.trim().toLowerCase()||null}).run();
     }else{
      editor.chain().focus().setNodeSelection(item.position).deleteSelection().run();
      if(item.type==='inline')editor.chain().focus().insertInlineMath({latex:item.latex.trim()}).run();
-     else editor.chain().focus().insertBlockMath({latex:item.latex.trim()}).run();
+     else editor.chain().focus().insertContent({type:'blockMath',attrs:{latex:item.latex.trim(),equationId:item.equationId?.trim().toLowerCase()||null}}).run();
     }
    }
   }else if(item.kind==='math'){
    if(item.type==='inline')editor.chain().focus().insertInlineMath({latex:item.latex.trim()}).run();
-   else editor.chain().focus().insertBlockMath({latex:item.latex.trim()}).run();
+   else editor.chain().focus().insertContent({type:'blockMath',attrs:{latex:item.latex.trim(),equationId:item.equationId?.trim().toLowerCase()||null}}).run();
   }
   setDialog(null);
  };

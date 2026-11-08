@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';
 import {chromium} from 'playwright-core';
-const base='http://127.0.0.1:8788';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8788';
+assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Mobile UI tests must use a local-only Worker');
 const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 const entry=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(entry&&bin);
