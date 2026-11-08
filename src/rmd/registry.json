@@ -1,0 +1,484 @@
+{
+  "formatVersion": 1,
+  "description": "RMD 1.0 组件和块属性的权威注册表。Web 解析器、MCP 语法帮助和源码补全从此派生。",
+  "colors": [
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple",
+    "pink",
+    "cyan",
+    "teal"
+  ],
+  "variants": [
+    "neutral",
+    "info",
+    "success",
+    "warning",
+    "danger"
+  ],
+  "constraints": {
+    "idPattern": "^[A-Za-z][A-Za-z0-9-]{0,79}$",
+    "idMaximumLength": 80,
+    "integerMinimum": 40,
+    "integerMaximum": 1800,
+    "containerDepthMaximum": 10,
+    "fenceLengthMaximum": 64,
+    "stringEditorMaximumLength": 240
+  },
+  "components": [
+    {
+      "type": "inline",
+      "name": "mark",
+      "main": "required",
+      "positions": [],
+      "attributes": {},
+      "summary": "默认黄色语义标记，与彩色 Highlight 独立。",
+      "example": ":: mark 重要结论 ::"
+    },
+    {
+      "type": "inline",
+      "name": "highlight",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color"
+      },
+      "requiredAttributes": [
+        "color"
+      ],
+      "summary": "九色强调，必须显式提供 color，不存在默认颜色。",
+      "example": ":: highlight 高风险 | red ::"
+    },
+    {
+      "type": "inline",
+      "name": "badge",
+      "main": "required",
+      "positions": [
+        "variant"
+      ],
+      "attributes": {
+        "variant": "variant"
+      },
+      "defaults": {
+        "variant": "neutral"
+      },
+      "summary": "状态标签；variant 未提供时界面使用中性变体。",
+      "example": ":: badge 已完成 | success ::"
+    },
+    {
+      "type": "inline",
+      "name": "tooltip",
+      "main": "required",
+      "positions": [
+        "description"
+      ],
+      "attributes": {
+        "description": "string"
+      },
+      "summary": "为行内内容提供悬停/聚焦说明。",
+      "example": ":: tooltip Durable Objects | description=\"有状态计算\" ::"
+    },
+    {
+      "type": "inline",
+      "name": "abbr",
+      "main": "required",
+      "positions": [
+        "description"
+      ],
+      "attributes": {
+        "description": "string"
+      },
+      "summary": "缩写及其解释文本。",
+      "example": ":: abbr API | description=\"Application Programming Interface\" ::"
+    },
+    {
+      "type": "inline",
+      "name": "kbd",
+      "main": "required",
+      "positions": [],
+      "attributes": {},
+      "summary": "显示键盘按键名称。",
+      "example": ":: kbd Ctrl ::"
+    },
+    {
+      "type": "inline",
+      "name": "cloze",
+      "main": "required",
+      "positions": [
+        "hint"
+      ],
+      "attributes": {
+        "hint": "string"
+      },
+      "summary": "显示需要用户主动揭示的填空项。",
+      "example": ":: cloze 欧姆定律 | hint=\"点击查看答案\" ::"
+    },
+    {
+      "type": "block",
+      "name": "note",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "一般性笔记提示",
+      "example": "::: note 笔记\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "info",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "背景信息及解释",
+      "example": "::: info 说明\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "tip",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "推荐做法和经验",
+      "example": "::: tip 建议\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "success",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "完成或成功状态",
+      "example": "::: success 成功\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "warning",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "需要注意或检查",
+      "example": "::: warning 警告\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "danger",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "高风险或不可逆操作",
+      "example": "::: danger 危险\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "example",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "独立示例内容",
+      "example": "::: example 示例\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "question",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "独立问答提示，不要求闪卡父容器",
+      "example": "::: question 问题\n\n这是一段示例正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "mark",
+      "main": "forbidden",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "块级黄色 Mark，可包含正文、公式。纯公式 Mark 宽度跟随公式。",
+      "example": "::: mark\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "highlight",
+      "main": "forbidden",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "id": "id",
+        "color": "color"
+      },
+      "requiredAttributes": [
+        "color"
+      ],
+      "summary": "块级九色 Highlight，必须传 color。",
+      "example": "::: highlight | color=blue\n\n彩色强调正文。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "details",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "summary": "可折叠的正文容器，展开状态不产生版本。",
+      "example": "::: details 展开说明\n\n详细内容。\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "tabs",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "children": [
+        "tab"
+      ],
+      "summary": "选项卡容器，仅包含 tab 子容器。",
+      "example": ":::: tabs\n\n::: tab 概览\n\n第一项。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "tab",
+      "main": "required",
+      "positions": [],
+      "attributes": {},
+      "allowedParents": [
+        "tabs"
+      ],
+      "summary": "单个选项卡，只能用于 tabs 内。",
+      "example": ":::: tabs\n\n::: tab 概览\n\n正文。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "chat",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "children": [
+        "message"
+      ],
+      "summary": "聊天会话容器，只允许 message 子容器。",
+      "example": ":::: chat\n\n::: message 用户 | sender=user\n\n你好。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "message",
+      "main": "required",
+      "positions": [],
+      "attributes": {
+        "sender": "string"
+      },
+      "allowedParents": [
+        "chat"
+      ],
+      "summary": "消息，需要 chat 父容器，sender 是用户或 Agent 标签文本。",
+      "example": ":::: chat\n\n::: message Assistant | sender=assistant\n\n好的。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "flashcard",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "children": [
+        "front",
+        "back"
+      ],
+      "note": "必须恰好包含一组 front、back，且按 front → back 排列。",
+      "summary": "闪卡，严格包含 front 和 back，且顺序固定。",
+      "example": ":::: flashcard\n\n::: front\n\n问题？\n\n:::\n\n::: back\n\n答案。\n\n:::\n\n::::",
+      "orderedChildren": [
+        "front",
+        "back"
+      ]
+    },
+    {
+      "type": "block",
+      "name": "front",
+      "main": "forbidden",
+      "positions": [],
+      "attributes": {},
+      "allowedParents": [
+        "flashcard"
+      ],
+      "summary": "闪卡正面，无标题。",
+      "example": ":::: flashcard\n\n::: front\n\n问题？\n\n:::\n\n::: back\n\n答案。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "back",
+      "main": "forbidden",
+      "positions": [],
+      "attributes": {},
+      "allowedParents": [
+        "flashcard"
+      ],
+      "summary": "闪卡背面，无标题。",
+      "example": ":::: flashcard\n\n::: front\n\n问题？\n\n:::\n\n::: back\n\n答案。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "glossary",
+      "main": "optional",
+      "positions": [],
+      "attributes": {
+        "id": "id"
+      },
+      "children": [
+        "definition"
+      ],
+      "summary": "术语表，只允许 definition 子容器。",
+      "example": ":::: glossary\n\n::: definition 负载率\n\n实际负载与额定容量的比例。\n\n:::\n\n::::"
+    },
+    {
+      "type": "block",
+      "name": "definition",
+      "main": "required",
+      "positions": [],
+      "attributes": {},
+      "allowedParents": [
+        "glossary"
+      ],
+      "summary": "术语定义，只能在 glossary 中出现。",
+      "example": ":::: glossary\n\n::: definition 负载率\n\n实际负载与额定容量的比例。\n\n:::\n\n::::"
+    },
+    {
+      "type": "leaf",
+      "name": "embed",
+      "main": "required",
+      "positions": [],
+      "attributes": {},
+      "summary": "按文档 UUID 或绝对路径嵌入只读投影；支持 #anchor-id。",
+      "example": "::: embed id:550e8400-e29b-41d4-a716-446655440000#chapter-one :::"
+    },
+    {
+      "type": "leaf",
+      "name": "link-card",
+      "main": "required",
+      "positions": [],
+      "attributes": {
+        "title": "string"
+      },
+      "summary": "将 HTTP(S) 页面显示为元信息卡片，不执行页面脚本。",
+      "example": "::: link-card https://github.com/RavelloH/Recalloom | title=Recalloom :::"
+    }
+  ],
+  "nodes": [
+    {
+      "node": "heading",
+      "label": "标题",
+      "summary": "为标题设稳定 ID。",
+      "attributes": {
+        "id": "id"
+      },
+      "example": "## 研究方案 @ attrs chapter-one @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）"
+      }
+    },
+    {
+      "node": "paragraph",
+      "label": "段落",
+      "summary": "为段落设稳定 ID，不支持列表项 ID。",
+      "attributes": {
+        "id": "id"
+      },
+      "example": "这一段可被引用。 @ attrs paragraph-one @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）"
+      }
+    },
+    {
+      "node": "image",
+      "label": "图片",
+      "summary": "图片的稳定 ID、宽高及说明文字。",
+      "attributes": {
+        "id": "id",
+        "width": "integer",
+        "height": "integer",
+        "caption": "string"
+      },
+      "example": "![实验装置](/examples/device.svg) @ attrs fig-device | width=480 | caption=实验装置 @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）",
+        "width": "宽度 px",
+        "height": "高度 px",
+        "caption": "图注"
+      },
+      "editorIdPrefix": "fig-"
+    },
+    {
+      "node": "math",
+      "label": "块级公式",
+      "summary": "数学公式锚点，仅适用于独立 $$ 数学块。",
+      "attributes": {
+        "id": "id"
+      },
+      "example": "$$\nP=UI\n$$\n@ attrs eq-power @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）"
+      },
+      "editorIdPrefix": "eq-"
+    },
+    {
+      "node": "table",
+      "label": "表格",
+      "summary": "表格稳定 ID 与图注；表格默认居中。",
+      "attributes": {
+        "id": "id",
+        "caption": "string"
+      },
+      "example": "| 项目 | 数值 |\n| --- | --- |\n| 电压 | 220 |\n@ attrs tbl-power | caption=测量数据 @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）",
+        "caption": "图注"
+      },
+      "editorIdPrefix": "tbl-"
+    },
+    {
+      "node": "code",
+      "label": "代码块",
+      "summary": "代码块 ID、文件名、换行与展开状态。",
+      "attributes": {
+        "id": "id",
+        "file": "string",
+        "wrap": "boolean",
+        "expand": "boolean"
+      },
+      "example": "~~~ts\nconst x = 1;\n~~~\n@ attrs code-example | file=example.ts | wrap=true | expand=false @",
+      "fieldLabels": {
+        "id": "稳定 ID（可选）",
+        "file": "文件名",
+        "wrap": "自动换行",
+        "expand": "默认展开"
+      }
+    }
+  ]
+}

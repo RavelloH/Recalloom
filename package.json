@@ -29,6 +29,7 @@
     "test:graph-theme": "node scripts/graph-theme-e2e.mjs",
     "test:wiki": "node scripts/wiki-e2e.mjs",
     "test:help:e2e": "node scripts/help-examples-e2e.mjs",
+    "test:help:ui": "node scripts/rmd-help-web-e2e.mjs",
     "help:generate": "node scripts/generate-help.mjs",
     "help:watch": "node scripts/generate-help.mjs --watch",
     "help:check": "node scripts/generate-help.mjs --check"
@@ -38,6 +39,7 @@
     "@astryxdesign/theme-neutral": "^0.7.4",
     "@cap.js/wasm": "^0.0.8",
     "@cloudflare/workers-oauth-provider": "^1.2.4",
+    "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/language": "^6.13.1",
     "@codemirror/state": "^6.7.6",

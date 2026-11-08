@@ -27,7 +27,7 @@ Recalloom 是用户控制的版本化知识库。它提供 Markdown 文档、文
 
 使用 get_help（不传参数返回索引）按需阅读：
 
-- markdown：常规 Markdown、GFM 与安全 HTML 扩展
+- markdown：常规 Markdown、GFM、RMD 组件和完整的自动生成参数表；支持按 `component`、`kind`、`node` 精确查询
 - math：行内/块级 LaTeX、KaTeX、公式高亮与换行限制
 - wiki：UUID/路径引用、章节、别名、只读嵌入
 - editing：编辑模式、乐观并发与 dryRun

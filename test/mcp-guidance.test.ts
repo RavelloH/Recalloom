@@ -64,6 +64,22 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     const helpFromTool=JSON.parse(viaTool.content[0].text);
     assert.equal(helpFromTool.content,read.contents[0].text);
     assert.match(helpFromTool.contentHash,/^[0-9a-f]{64}$/);
+    const badge=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'badge'}});
+    assert.match(JSON.parse(badge.content[0].text).content,/variant/);
+    const multi=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'mark',kind:'block'}});
+    assert.match(JSON.parse(multi.content[0].text).content,/多行块级/);
+    assert.doesNotMatch(JSON.parse(multi.content[0].text).content,/行内组件/);
+    const attrs=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',node:'image'}});
+    assert.match(JSON.parse(attrs.content[0].text).content,/width/);
+    assert.match(JSON.parse(attrs.content[0].text).content,/40–1800/);
+    for(const args of [{topic:'markdown',component:'unknown'},
+      {topic:'math',component:'badge'},
+      {topic:'markdown',component:'badge',node:'table'},
+      {topic:'markdown',node:'table',kind:'inline'},
+      {topic:'markdown',component:'badge',kind:'leaf'}]){
+     const invalidHelp=await request('tools/call',{name:'get_help',arguments:args});
+     assert.equal(invalidHelp.isError,true,'invalid help selector must be rejected '+JSON.stringify(args));
+    }
     assert.match(helpFromTool.helpVersion,/^1\.[0-9a-f]{12}$/);
     assert.equal(helpFromTool.schemaVersion,1);
     const indexResource=await request('resources/read',{uri:'recalloom://help/index'});
@@ -78,6 +94,8 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
       return t;
     };
     assert.match(tool('get_help').description,/KaTeX/);
+    assert.ok(tool('get_help').inputSchema.properties?.component,'component selector must be discoverable');
+    assert.ok(tool('get_help').inputSchema.properties?.node,'node selector must be discoverable');
     for(const name of ['list_archived','delete_archived_record','delete_folder'])assert.ok(tool(name));
     assert.equal(tool('list_archived').annotations?.readOnlyHint,true);
     assert.equal(tool('delete_archived_record').annotations?.destructiveHint,true);

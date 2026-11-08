@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import {findRmdComments} from './rmd-comment';
 import {parseWikiTarget} from '../../src/wiki-syntax.js';
-import {attrsByBlock,getRmdSchema,isRmdId,isValidRmdValue,type RmdNodeType,type RmdSchema} from './rmd-schema';
+import {RMD_REGISTRY,attrsByBlock,getRmdSchema,isRmdId,isValidRmdValue,type RmdNodeType,type RmdSchema} from './rmd-schema';
 
 type Mdast={type:string;children?:Mdast[];position?:{start?:{offset?:number};end?:{offset?:number}}};
 export type RmdSpan={start:number;end:number};
@@ -16,8 +16,8 @@ export type RmdSyntaxNode={
 };
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 /** Bound nested AST re-projection. Invalid over-depth input stays verbatim. */
-export const MAX_RMD_CONTAINER_DEPTH=10;
-export const MAX_RMD_FENCE_LENGTH=64;
+export const MAX_RMD_CONTAINER_DEPTH=RMD_REGISTRY.constraints.containerDepthMaximum;
+export const MAX_RMD_FENCE_LENGTH=RMD_REGISTRY.constraints.fenceLengthMaximum;
 const blockedTypes=new Set(['code','inlineCode','math','inlineMath','html','link','linkReference','imageReference','definition']);
 const overlap=(range:RmdSpan,withRanges:readonly RmdSpan[])=>withRanges.some(r=>range.start<r.end&&range.end>r.start);
 const escapeCount=(text:string,pos:number)=>{let count=0;for(let i=pos-1;i>=0&&text[i]==='\\';i--)count++;return count};
@@ -90,8 +90,7 @@ export function parseRmdArguments(input:string,schema:RmdSchema):{main:string;at
   values[key]=type==='id'?decoded.toLowerCase():decoded;
  }
  // Do not treat missing color as the default Mark: they have different meaning.
- if(schema.name==='highlight'&&!values.color)return null;
- if(schema.name==='badge'&&values.variant&&values.color)return null;
+ if(schema.requiredAttributes?.some(field=>!Object.hasOwn(values,field)))return null;
  return {main,attributes:values};
 }
 const linesOf=(source:string)=>{
@@ -124,7 +123,8 @@ function scanBlocks(source:string,protectedRanges:RmdSpan[],parentKind?:string):
   const schema=getRmdSchema('block',entry.node.name)!;
   if(schema.children){
    if(children.length===0||children.some(c=>!schema.children!.includes(c.name)))return;
-   if(entry.node.name==='flashcard'&&(children.length!==2||children[0]?.name!=='front'||children[1]?.name!=='back'))return;
+   if(schema.orderedChildren&&(children.length!==schema.orderedChildren.length||
+     children.some((child,i)=>child.name!==schema.orderedChildren![i])))return;
   }
   if(!source.slice(entry.openLine,end).trim())return;
   if(stack.length)stack[stack.length-1]!.node.children!.push(entry.node);

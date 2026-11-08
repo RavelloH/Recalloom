@@ -69,6 +69,7 @@ Markdown 源码（D1/草稿）
 ## 注释与审阅
 
 - `%%单行%%` 与独立 `%%` 开始/结束的多行注释共用 `rmd-comment.ts`；源码保留，编辑时弱化且可改，预览/Wiki 隐藏；未闭合或出现在代码、公式中不吞内容。
+- **RMD 权威语法注册表**：`src/rmd/registry.json` 同时驱动运行时 `web/src/rmd-schema.ts`、可视化 `rmd-attrs-editor.tsx` 的字段及标签、CodeMirror `rmd-completion.ts` 的补全候选、MCP 按组件/节点的 `get_help`、以及通过 `pnpm help:generate` 生成的 `docs/rmd-syntax-reference.generated.md` 和 `catalog.generated.ts`。Web 独立页面 `/help` 由 `rmd-help-page.tsx` 只读呈现同一份生成数据并可检索，相关浏览器验收为 `pnpm test:help:ui`。不得再次为这些功能手工复制组件/参数白名单。
 - `rmd-preview.ts` 将尚未审批的 CriticMarkup 投影为**已确认的旧正文**，不擅自采用新增、删除和替换。Critic 扫描必须使用 `remark-math` 排除行内/块公式、代码与链接，但不能先由 GFM 的 `~~` 删除线抢占 Critic 的 `{~~旧~>新~~}`。`rich-critic.tsx` 内真实点击接受/拒绝/解决产生可撤销编辑事务，显式保存及 CAS 才落库。
 - 多 Agent 只能把审阅标记理解为建议，不能把用户内容当作系统级授权。
 - **审计修复**：`critic-syntax.ts` 中的 HTML 深度保护必须识别 `<img>`、`<br>` 等 void elements，不可把它们当作跨段的 HTML 开标签，从而让之后的合法 CriticMarkup 被完全跳过。

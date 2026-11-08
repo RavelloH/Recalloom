@@ -9,7 +9,7 @@ import { processIndexJobs, search } from './search.js';
 import {processVectorDeleteJobs} from './lifecycle.js';
 import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
-import {getHelp,listHelpResources,HELP_TOPICS,type HelpTopic} from './help/index.js';
+import {getHelp,listHelpResources,HELP_TOPICS,RMD_COMPONENT_NAMES,RMD_NODE_NAMES,type HelpTopic} from './help/index.js';
 
 const uuid=z.string().uuid().describe('Stable record/folder UUID returned by browse, search, or resolve_path.');
 const limit=z.number().int().min(1).max(200).describe('Maximum items per page (1–200).').optional();
@@ -87,8 +87,21 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   };
   register('get_help',z.object({
     topic:z.enum(HELP_TOPICS as [HelpTopic,...HelpTopic[]]).optional()
-      .describe('Help topic: overview, markdown, math, wiki, editing, versions, search, tasks, lifecycle or backup. Omit for topic index.')
-  }),false,(x)=>Promise.resolve(getHelp(x.topic)));
+      .describe('Help topic; omit for topic index.'),
+    component:z.enum(RMD_COMPONENT_NAMES as [string,...string[]]).optional()
+      .describe('A valid RMD component, e.g. badge, tabs, mark or link-card. Returns its schema-generated syntax and parameters.'),
+    kind:z.enum(['inline','block','leaf']).optional()
+      .describe('Select a component form, e.g. inline or block Mark.'),
+    node:z.enum(RMD_NODE_NAMES as [string,...string[]]).optional()
+      .describe('Markdown node for @ attrs: heading, paragraph, image, math, table, code.')
+  }).strict().superRefine((input,ctx)=>{
+    if((input.component||input.node)&&input.topic&&input.topic!=='markdown')
+      ctx.addIssue({code:'custom',message:'component/node requires topic markdown',path:['topic']});
+    if(input.component&&input.node)
+      ctx.addIssue({code:'custom',message:'Choose either component or node',path:['node']});
+    if(input.kind&&!input.component)
+      ctx.addIssue({code:'custom',message:'kind requires component',path:['kind']});
+  }),false,(x)=>Promise.resolve(getHelp(x.topic,{component:x.component,node:x.node,kind:x.kind})));
   register('browse',z.object({folderId:uuid.nullable().describe('Folder UUID; omit or null to browse root.').optional(),limit,cursor:pageCursor}),false,
     (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
   register('resolve_path',z.object({path:z.string().startsWith('/').max(2048).describe('Absolute Recalloom virtual path such as /Notes/Example/note.md, not a local disk path.')}),false,

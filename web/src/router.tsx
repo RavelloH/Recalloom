@@ -8,6 +8,8 @@ import {LoginPage,HomePage,LibraryPage,ArchivePage,RecordPage,TasksPage,SearchPa
 import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 const KnowledgeGraphPage=React.lazy(()=>import('./knowledge-graph'));
+const RmdHelpPage=React.lazy(()=>import('./rmd-help-page'));
+const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="status">正在加载 RMD 语法帮助…</div>}><RmdHelpPage/></React.Suspense>;
 const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
@@ -46,6 +48,7 @@ const list=[
   loaderDeps:({search})=>({q:search.q,mode:search.mode}),
   loader:({deps})=>deps.q?warm(queryClient.ensureQueryData(searchQuery(deps.q,deps.mode??'auto'))):undefined}),
  createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>warm(queryClient.ensureInfiniteQueryData(activityPagesQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage}),
  createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:()=> <Navigate to="/settings" replace/>}),
  createRoute({getParentRoute:()=>root,path:'/settings/oauth',component:SettingsPage}),

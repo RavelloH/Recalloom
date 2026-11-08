@@ -3,6 +3,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import {markdown,markdownLanguage} from '@codemirror/lang-markdown';
 import {HighlightStyle,syntaxHighlighting} from '@codemirror/language';
 import {EditorView} from '@codemirror/view';
+import {autocompletion} from '@codemirror/autocomplete';
+import {rmdCompletionSource} from './rmd-completion';
 import {tags as t} from '@lezer/highlight';
 
 /* Obsidian-style source mode: the Markdown stays literal, but it reads like
@@ -42,7 +44,12 @@ const documentTheme=EditorView.theme({
 });
 
 export default function SourceEditor({value,onChange,focusLine,focusToken}:{value:string;onChange:(v:string)=>void;focusLine?:number;focusToken?:number}){
- const extensions=useMemo(()=>[markdown({base:markdownLanguage}),syntaxHighlighting(markdownHighlight),documentTheme,EditorView.lineWrapping,EditorView.contentAttributes.of({spellcheck:'false','aria-label':'Markdown 源码编辑器'})],[]);
+ const extensions=useMemo(()=>[
+  markdown({base:markdownLanguage}),syntaxHighlighting(markdownHighlight),documentTheme,
+  EditorView.lineWrapping,
+  autocompletion({override:[rmdCompletionSource],activateOnTyping:true,defaultKeymap:true}),
+  EditorView.contentAttributes.of({spellcheck:'false','aria-label':'Markdown 源码编辑器'})
+ ],[]);
  const view=useRef<EditorView|null>(null);
  const jump=(v:EditorView|null)=>{
   if(!v||!focusLine)return;

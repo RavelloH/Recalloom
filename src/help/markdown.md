@@ -2,6 +2,15 @@
 
 Recalloom 的**文档正文只存 Markdown**，不把渲染树、Tiptap JSON、目录、文件属性或数据库元信息混进正文。标准 Markdown 使用 CommonMark/GFM，扩展使用本页约定的 **RMD 1.0**。这是 Agent 应当生成的语法，不是对旧版 Directive 的别名表。
 
+**RMD 1.0 的全部组件形式与全部 `@ attrs` 参数**不再依靠手工表格维护，而是根据唯一的 `src/rmd/registry.json` 自动生成，完整参数规格表已经附在本帮助文档末尾，并同时生成仓库的 `docs/rmd-syntax-reference.generated.md`。可直接调用：
+
+- `get_help({topic:"markdown",component:"badge"})`：只返回 Badge 的可选参数、取值、示例与回退规则。
+- `get_help({topic:"markdown",component:"mark",kind:"block"})`：只返回 Mark 的块级形式；省略 `kind` 会返回同名组件的全部形式。
+- `get_help({topic:"markdown",component:"tabs"})`：查看父子约束及完整的嵌套例子。
+- `get_help({topic:"markdown",node:"image"})`：仅返回图片 `@ attrs` 的字段说明；`node` 还支持 `heading`、`paragraph`、`math`、`table`、`code`。
+
+所有未知组件、未知节点、无效查询组合均会被拒绝，禁止 Agent 猜测不存在的属性。CodeMirror 源码编辑器从同一注册表提供 `::`、`:::`、参数名、枚举值与 `@ attrs` 候选补全，不会擅自插入不支持的组件。
+
 完整覆盖八种 Callout、九色 Highlight、五类行内组件、Details/Tabs/Flashcard/Glossary/Chat、注释与 CriticMarkup、图片/表格/公式/代码修饰、WikiLink/Embed 的可复制示例见仓库 `docs/rmd-1.0-syntax-showcase.md`，其内容会通过自动化测试实际解析并验证规范化保存不漂移。
 
 可视化模式中，合法的 `@ attrs … @` 显示为**可点击、可键盘聚焦的灰色斜体属性按钮**，支持直接编辑标题、段落、公式、表格、代码和图片的节点属性。点击后修改 ID、图注、尺寸、代码文件名或开关，点击「保存属性」只更新本地草稿，再点击整篇文档的「保存」才会落库；取消或非法 ID 不写入。没有必要切换到源码模式才能修改已有属性。纯公式的块级 Mark 仅包裹公式宽度并居中，含正文的 Mark 仍是普通块；表格及公式属性在两种视图中均居中。

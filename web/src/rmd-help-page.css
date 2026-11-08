@@ -1,0 +1,36 @@
+.rk-help-page{max-width:1350px;width:100%;margin-inline:auto;min-width:0}
+.rk-help-header{padding:3px 0 24px;max-width:880px}
+.rk-help-header h1{margin:.4rem 0 .4rem;font-size:clamp(23px,2.6vw,30px);font-weight:720;letter-spacing:-.025em}
+.rk-help-header p{margin:0;color:var(--color-text-secondary);font-size:14px;line-height:1.65}
+.rk-help-eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:12px;font-weight:700;letter-spacing:.045em;color:var(--color-text-secondary)}
+.rk-help-layout{display:grid;grid-template-columns:minmax(210px,248px) minmax(0,1fr);align-items:start;gap:24px;max-width:100%}
+.rk-help-navigation{border:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)));border-radius:12px;padding:13px;max-height:min(78vh,920px);overflow-y:auto;min-width:0;position:sticky;top:10px}
+.rk-help-search{display:flex;align-items:center;gap:7px;border:1px solid var(--rk-document-border,var(--color-border));border-radius:9px;padding:0 9px;margin-bottom:12px;background:var(--color-background-body);color:var(--color-text-secondary)}
+.rk-help-search input{border:none;background:transparent;color:var(--color-text-primary);font:inherit;font-size:13px;outline:none;width:100%;min-width:0;height:37px}
+.rk-help-search button{border:none;background:none;color:inherit;display:grid;place-items:center;padding:4px;cursor:pointer}
+.rk-help-navigation h2{display:flex;align-items:center;gap:5px;margin:15px 8px 5px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--color-text-secondary)}
+.rk-help-links,.rk-help-navigation section{display:flex;flex-direction:column;gap:2px}
+.rk-help-navigation button:not(.rk-help-search button){display:flex;align-items:center;gap:7px;width:100%;padding:7px 9px;border:0;background:transparent;color:var(--color-text-primary);font:inherit;font-size:13px;border-radius:7px;cursor:pointer;text-align:left;min-width:0}
+.rk-help-navigation button:not(.rk-help-search button):hover{background:var(--rk-document-wash,rgba(128,128,128,.08))}
+.rk-help-navigation button.active:not(.rk-help-search button){background:color-mix(in srgb,var(--color-primary,#3979bd) 10%,transparent);color:var(--color-primary,#3979bd);font-weight:650}
+.rk-help-navigation button span{margin-left:auto;color:var(--color-text-secondary);font-size:11px;opacity:.75}
+.rk-help-empty{font-size:12px;color:var(--color-text-secondary);margin:15px 6px}
+.rk-help-document{min-width:0;max-width:100%;border:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)));border-radius:12px;overflow:hidden}
+.rk-help-document-head{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 20px;background:var(--rk-document-wash,rgba(128,128,128,.045));border-bottom:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)))}
+.rk-help-document-head span{font-size:13px;font-weight:650}
+.rk-help-document-head small{font-size:11px;color:var(--color-text-secondary)}
+.rk-help-prose{padding:22px 26px 36px;min-width:0;overflow-wrap:anywhere;line-height:1.75;font-size:14px}
+.rk-help-prose>:first-child{margin-top:0}
+.rk-help-prose h1{font-size:24px;line-height:1.3;margin:0 0 22px}
+.rk-help-prose h2{font-size:17px;line-height:1.5;margin:27px 0 10px}
+.rk-help-prose h3{font-size:15px;margin:20px 0 8px}
+.rk-help-prose p,.rk-help-prose ul,.rk-help-prose ol{margin:9px 0 14px}
+.rk-help-prose li{margin-bottom:5px}
+.rk-help-prose table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto;font-size:12px;margin:16px 0}
+.rk-help-prose th,.rk-help-prose td{border:1px solid var(--rk-document-border,var(--color-border));padding:8px 11px;text-align:left}
+.rk-help-prose th{background:var(--rk-document-wash,rgba(128,128,128,.06));white-space:nowrap}
+.rk-help-prose pre{max-width:100%;overflow:auto;padding:13px 15px;background:var(--rk-document-wash,rgba(128,128,128,.075));border-radius:8px;line-height:1.5}
+.rk-help-prose :not(pre)>code{background:var(--rk-document-wash,rgba(128,128,128,.075));padding:.16em .38em;border-radius:4px;overflow-wrap:anywhere}
+.rk-help-prose code{font-family:var(--rk-font-mono,ui-monospace,Consolas,monospace);font-size:.9em}
+.rk-help-prose blockquote{border-left:3px solid var(--color-border,rgba(128,128,128,.3));padding-left:13px;margin-left:0;color:var(--color-text-secondary)}
+@media(max-width:860px){.rk-help-layout{grid-template-columns:minmax(0,1fr);gap:14px}.rk-help-navigation{position:static;max-height:290px}.rk-help-prose{padding:18px 16px}.rk-help-document-head{padding-inline:16px}}
