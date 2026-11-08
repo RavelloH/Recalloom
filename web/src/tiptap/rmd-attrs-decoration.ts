@@ -3,9 +3,9 @@ import {Plugin} from '@tiptap/pm/state';
 import {Decoration,DecorationSet} from '@tiptap/pm/view';
 import {formatRmdBlockAttrs} from '../rmd-serialize';
 
-/** Pure presentation of source attributes. No extra ProseMirror child, no
- * transaction, no revision, no Markdown rewrite on decoration updates.
- * The original block attributes still have a single canonical serializer.
+/** Source-aware editable node properties. The widget remains outside the
+ * document model; opening it never edits content or creates a revision.
+ * The editor commits validated node attributes only on explicit Save.
  */
 export const RmdAttrsDecorations=Extension.create({
  name:'rmdAttrsDecorations',
@@ -19,15 +19,22 @@ export const RmdAttrsDecorations=Extension.create({
        const value=formatRmdBlockAttrs(node.toJSON());
        if(value){
         const position=node.isTextblock?pos+node.nodeSize-1:pos+node.nodeSize;
-        items.push(Decoration.widget(position,()=>{
-         const el=document.createElement('span');
+        items.push(Decoration.widget(position,view=>{
+         const el=document.createElement('button');
+         el.type='button';
          el.className='rk-rmd-attrs-decoration';
+         el.dataset.rkAttrsKind=node.type.name;
          el.textContent=value;
          el.contentEditable='false';
-         el.setAttribute('aria-label','Markdown 属性：'+value);
-         el.title='块属性（在源码模式中可精确修改）';
+         el.setAttribute('aria-label','编辑 Markdown 属性：'+value);
+         el.title='点击或按 Enter 修改当前块的 Markdown 属性';
+         el.addEventListener('mousedown',event=>event.preventDefault());
+         el.addEventListener('click',event=>{
+          event.preventDefault();event.stopPropagation();
+          view.dom.dispatchEvent(new CustomEvent('rmd-edit-attrs',{bubbles:true,detail:{pos}}));
+         });
          return el;
-        },{side:1,key:'rk-attrs-'+pos+'-'+value}));
+        },{side:1,key:'rk-attrs-'+pos+'-'+value,stopEvent:()=>true}));
        }
       }
       if(!node.isText||!node.text)return;

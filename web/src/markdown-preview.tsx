@@ -78,7 +78,7 @@ const schema={
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
   'wiki-embed':['dataTarget','dataAnchor'],
   'rk-callout':['dataKind','dataTitle','dataSender','dataId'],
-  'rk-rmd-block-mark':['dataRkColor','dataId'],
+  'rk-rmd-block-mark':['dataRkColor','dataRkMathOnly','dataId'],
   'rk-link-card':['dataUrl','dataTitle'],
   'rk-critic':['dataKind','dataValue','dataBefore'],
   'rk-badge':['dataVariant'],
@@ -194,9 +194,9 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
-   return <Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false}>{props.children as React.ReactNode}</Banner>;
+   return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false}>{props.children as React.ReactNode}</Banner></div>;
   },
-  'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className="rk-rmd-block-mark" data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
+  'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className={'rk-rmd-block-mark'+((props['data-rk-math-only']??props.dataRkMathOnly)==='true'?' rk-rmd-mark-math-only':'')} data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{
    const raw=String(props['data-variant']??props.dataVariant??'neutral');
    return <Badge variant={asAstryBadgeVariant(raw)} label={props.children as React.ReactNode}/>;

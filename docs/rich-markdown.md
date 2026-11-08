@@ -95,10 +95,11 @@ Markdown 源码（D1/草稿）
 8. `scripts/rmd-wiki-e2e.mjs` 在隔离 D1 + Edge 实际创建三篇文档，验证独立 `::: embed`、自动双向引用、章节 `#id` 与段落 `#id`、无意外写库、手机工具栏 Wiki Picker 与保存；已成功执行。
 9. 数学中的 Critic 伪标记、无效 `@ attrs` 不阻断后续有效属性、代码 ID、含特殊围栏的代码、标准链接图片 `title`、Windows CRLF 的 Wiki 源码偏移均须进入往返回归。
 10. `pnpm exec tsx scripts/rmd-performance.ts`：生成 30/90/180/300/480 个独立代码属性块，分别测量词法与视觉解析，并强制检查 token 总数和保存幂等。ASUS 本轮 300 块从词法 1590ms/可视化 5474ms 优化为 28ms/114ms（数值仅为环境基准）；480 块新基准约 44ms/175ms。性能测试不要引入硬编码的 CI 耗时阈值。
-11. 视觉修复必须通过 `scripts/rmd-ui-polish-e2e.mjs`：检查 HTML `<u>` / `<sup>` / `<sub>` 被解析为可编辑 marks；Mark 在原黄底使用深色正文；八类 Banner 通过 Astryx 自身 `icon` 属性各展示单个图标；标题编辑动作按需显现；表格图注随 OverlayScrollbars 重排仍位于表格下方；链接卡片缩略图不被通用 `img` 样式撑大，内置 SVG 插图成功加载，320px 无横向溢出。
-12. 发布前必须执行 `test/rmd-security.test.ts` 与 `scripts/rmd-security-e2e.mjs`：覆盖 24 层异常嵌套、过长围栏、Unicode 组合字符、Markdown 原文往返、CRLF、HTML void、`<script>`/`onerror`/SVG/iframe、`javascript:` 链接、320px 小屏和预览不写库。实际浏览器审计确认 JS 注入未执行、DOM 无危险属性、320px 页面没有水平溢出。
-13. 以 `test/rmd-gallery.test.ts` 验证 [RMD 1.0 完整示例](rmd-1.0-syntax-showcase.md) 涵盖**全部 RMD_SCHEMA 组件类型**、九色 Highlight，且经真实视觉 AST 保存两次字节相同、无整块 rawFallback。
-14. 发布前检查 `git diff --check` 和工作树来源；用户未明确授权提交/推送时只保留本地变更。**Git 推送不等于 Cloudflare 部署成功**，需单独核验部署流程。
+11. **语义属性编辑与跨模式视觉一致性**：`rmd-attrs-decoration.ts` 的有效按钮不能写入 ProseMirror 内容文本，而是发送当前节点位置给 `rmd-attrs-editor.tsx`。该面板校验 Schema、修改节点 attrs、走正常撤销/重做和明确保存；不存在合法 ID 的非法值不应进入正文。`scripts/rmd-parity-e2e.mjs` 在隔离 D1 与真实 Edge 上覆盖六类属性编辑、无意外写库、非法 ID、纯公式 Mark 收缩、混合 Mark 保持块宽、表格/数学属性居中、Callout 统一尺寸与色彩、链接卡片两种视图共用布局。纯公式 Mark 不得由脆弱的 DOM 子节点结构判断：可视化读取 `node.childCount`，预览由 `rmd-remark.ts` 在共享 MDAST 上标注 `dataRkMathOnly`，统一使用 `.rk-rmd-mark-math-only`。即使公式携带 `@ attrs eq-marked @`、Tiptap 额外渲染属性按钮或预览出现公式编号包装，仍必须两视图保持相同的紧凑宽度。
+12. 视觉修复必须通过 `scripts/rmd-ui-polish-e2e.mjs`：检查 HTML `<u>` / `<sup>` / `<sub>` 被解析为可编辑 marks；Mark 在原黄底使用深色正文；八类 Banner 通过 Astryx 自身 `icon` 属性各展示单个图标；标题编辑动作按需显现；表格图注随 OverlayScrollbars 重排仍位于表格下方；链接卡片缩略图不被通用 `img` 样式撑大，内置 SVG 插图成功加载，320px 无横向溢出。
+13. 发布前必须执行 `test/rmd-security.test.ts` 与 `scripts/rmd-security-e2e.mjs`：覆盖 24 层异常嵌套、过长围栏、Unicode 组合字符、Markdown 原文往返、CRLF、HTML void、`<script>`/`onerror`/SVG/iframe、`javascript:` 链接、320px 小屏和预览不写库。实际浏览器审计确认 JS 注入未执行、DOM 无危险属性、320px 页面没有水平溢出。
+14. 以 `test/rmd-gallery.test.ts` 验证 [RMD 1.0 完整示例](rmd-1.0-syntax-showcase.md) 涵盖**全部 RMD_SCHEMA 组件类型**、九色 Highlight，且经真实视觉 AST 保存两次字节相同、无整块 rawFallback。
+15. 发布前检查 `git diff --check` 和工作树来源；用户未明确授权提交/推送时只保留本地变更。**Git 推送不等于 Cloudflare 部署成功**，需单独核验部署流程。
 
 ## Help、示例与知识库记录
 

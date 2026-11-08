@@ -233,15 +233,21 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-chat-message {min-width:0;overflow-wrap:anywhere;}
 .record-main .rk-chat-message > :first-child {margin-block-start:0;}
 .record-main .rk-chat-message > :last-child {margin-block-end:0;}
-.record-main .rk-link-card {width:100%;max-width:100%;}
-.record-main .rk-link-card-row {display:flex;min-width:0;gap:.75rem;align-items:flex-start;}
-.record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {display:block;width:min(10rem,32%);max-width:10rem;height:7.5rem;aspect-ratio:4/3;object-fit:contain;flex-shrink:0;margin:0;border-radius:.5rem;background:var(--color-background-muted,rgba(128,128,128,.08));}
-@media(max-width:480px){.record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {width:6.5rem;height:5rem;}}
-.record-main .rk-link-card-text {display:flex;flex-direction:column;gap:.4rem;min-width:0;flex:1;}
-.record-main .rk-link-card-head {display:flex;align-items:center;gap:.3rem;color:var(--color-text-secondary);font-size:.8rem;}
-.record-main .rk-link-card-title {font-weight:600;overflow-wrap:anywhere;}
-.record-main .rk-link-card-desc {color:var(--color-text-secondary);font-size:.9rem;line-height:1.4;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
-.record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;}
+.record-main .rk-link-card {width:100%;max-width:100%;min-width:0;border:1px solid var(--rk-document-border);border-radius:12px;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease;}
+.record-main .rk-link-card:hover {border-color:color-mix(in srgb,var(--color-primary,#3988dc) 45%,var(--rk-document-border));box-shadow:0 5px 18px rgba(0,0,0,.08);}
+.record-main .rk-link-card-row {display:flex;min-width:0;gap:1rem;align-items:stretch;justify-content:space-between;}
+.record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {display:block;width:128px;max-width:32%;height:108px;aspect-ratio:auto;object-fit:contain;flex-shrink:0;margin:0;border:1px solid var(--rk-document-border);border-radius:8px;background:var(--rk-document-wash);}
+@media(max-width:480px){.record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {width:84px;height:80px;}.record-main .rk-link-card-row{gap:.6rem;}.record-main .rk-link-card-title{font-size:.92rem;}}
+.record-main .rk-link-card-text {display:flex;flex-direction:column;gap:.3rem;min-width:0;flex:1;justify-content:center;}
+.record-main .rk-link-card-head {display:flex;align-items:center;gap:.38rem;color:var(--color-text-secondary);font-size:.76rem;letter-spacing:.01em;min-width:0;}
+.record-main .rk-link-card-title {font-size:1rem;line-height:1.45;font-weight:650;letter-spacing:-.01em;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.record-main .rk-link-card-desc {color:var(--color-text-secondary);font-size:.81rem;line-height:1.5;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
+.record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.78rem;line-height:1.5;text-decoration:none!important;margin-top:.15rem;}
+.record-main .rk-link-card-open:hover{text-decoration:underline!important;}
+.record-main .rk-link-card-edit-actions{display:flex;align-items:center;justify-content:flex-end;margin-top:4px;}
+.record-main .rk-rich-link-card > .rk-link-card-edit-actions{opacity:0;transition:opacity .15s ease;}
+.record-main .rk-rich-link-card:hover > .rk-link-card-edit-actions,.record-main .rk-rich-link-card:focus-within > .rk-link-card-edit-actions{opacity:1;}
+@media(hover:none){.record-main .rk-rich-link-card > .rk-link-card-edit-actions{opacity:.8;}}
 .record-main .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
 .record-main .rk-rich-link-card {margin-block:1rem;}
 .record-main .rk-rich-link-card > button {margin-block:.3rem;}
@@ -466,3 +472,36 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  text-decoration-color:color-mix(in srgb,currentColor 40%,transparent);
  text-underline-offset:.15em;
 }
+
+/* Valid @ attrs is a keyboard-accessible editor control, not inserted prose. */
+.record-main .tiptap button.rk-rmd-attrs-decoration {
+ display:inline-flex;align-items:center;justify-content:center;
+ margin-inline-start:.45em;padding:1px .3em;
+ color:var(--rk-document-muted);background:transparent;
+ border:1px dashed transparent;border-radius:5px;
+ font-family:inherit;font-style:italic;font-weight:400;font-size:.73em;line-height:1.6;
+ letter-spacing:0;white-space:pre-wrap;vertical-align:baseline;
+ cursor:pointer;opacity:.76;max-width:100%;
+}
+.record-main .tiptap button.rk-rmd-attrs-decoration:hover,
+.record-main .tiptap button.rk-rmd-attrs-decoration:focus-visible{
+ color:var(--color-text-primary);background:var(--rk-document-wash);
+ border-color:var(--rk-document-border);opacity:1;outline-offset:2px;
+}
+.record-main .tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="blockMath"],
+.record-main .tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="table"] {
+ display:table;margin:.35rem auto .65rem;max-width:100%;text-align:center;
+}
+.record-main .rk-rmd-attrs-editor{
+ position:fixed;z-index:80;bottom:max(16px,env(safe-area-inset-bottom));
+ right:max(20px,env(safe-area-inset-right));
+ width:min(370px,calc(100vw - 32px));max-height:min(72vh,540px);overflow:auto;
+ background:var(--color-background-body,#fff);color:var(--color-text-primary);
+ border:1px solid var(--rk-document-border);box-shadow:0 14px 45px rgba(0,0,0,.24);
+ border-radius:13px;padding:18px;display:flex;flex-direction:column;gap:12px;
+}
+.record-main .rk-rmd-attrs-editor-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.record-main .rk-rmd-attrs-editor-heading span{color:var(--rk-document-muted);font-size:12px;}
+.record-main .rk-rmd-attrs-editor-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
+.record-main .rk-rmd-attrs-toggle{display:flex;align-items:center;gap:.65rem;font-size:14px;cursor:pointer;}
+.record-main .rk-rmd-attrs-error{color:var(--color-danger,#d6585b);font-size:13px;margin:0;}

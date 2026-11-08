@@ -17,7 +17,7 @@
     "build:web": "node scripts/stage-cap-wasm.mjs && vite build",
     "dev:web": "node scripts/stage-cap-wasm.mjs && vite --host 127.0.0.1",
     "test:ui": "node scripts/web-ui-e2e.mjs",
-    "test:editor": "node scripts/rmd-v1-e2e.mjs && node scripts/rmd-visual-e2e.mjs && node scripts/rmd-wiki-e2e.mjs && node scripts/rmd-security-e2e.mjs && node scripts/rmd-ui-polish-e2e.mjs",
+    "test:editor": "node scripts/rmd-v1-e2e.mjs && node scripts/rmd-visual-e2e.mjs && node scripts/rmd-wiki-e2e.mjs && node scripts/rmd-security-e2e.mjs && node scripts/rmd-ui-polish-e2e.mjs && node scripts/rmd-parity-e2e.mjs",
     "test:rmd:performance": "tsx scripts/rmd-performance.ts",
     "test:typography": "node scripts/markdown-typography-e2e.mjs",
     "test:confirm": "node scripts/alert-dialog-e2e.mjs",

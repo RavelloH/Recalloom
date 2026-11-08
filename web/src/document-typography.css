@@ -516,10 +516,6 @@
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="teal"] {--rk-rmd-block-background:var(--color-background-teal,#d6efef);}
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :first-child {margin-top:0;}
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :last-child {margin-bottom:0;}
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark:has(> .katex-display:only-child) {
- width:max-content;
- max-width:100%;
-}
 .record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display {
  background:transparent!important;
  color:inherit;
@@ -562,4 +558,52 @@
  border-inline-start:2px solid var(--rk-document-border);
  padding-inline-start:.8rem;
  margin-block:.7rem;
+}
+
+/* Identical status-icon geometry and semantic color in visual and preview.
+ * Banner retains Astryx layout and accessible icon slot. */
+.record-main .rk-rmd-callout {--rk-callout-accent:#5687bd;min-width:0;}
+.record-main .rk-rmd-callout[data-rk-kind="note"]{--rk-callout-accent:#7e94ac;}
+.record-main .rk-rmd-callout[data-rk-kind="info"]{--rk-callout-accent:#438bc8;}
+.record-main .rk-rmd-callout[data-rk-kind="tip"]{--rk-callout-accent:#3ba578;}
+.record-main .rk-rmd-callout[data-rk-kind="success"]{--rk-callout-accent:#2e9b62;}
+.record-main .rk-rmd-callout[data-rk-kind="warning"]{--rk-callout-accent:#da9a29;}
+.record-main .rk-rmd-callout[data-rk-kind="danger"]{--rk-callout-accent:#d15b60;}
+.record-main .rk-rmd-callout[data-rk-kind="example"]{--rk-callout-accent:#9980cc;}
+.record-main .rk-rmd-callout[data-rk-kind="question"]{--rk-callout-accent:#5789bb;}
+.record-main .rk-rmd-callout .astryx-banner-icon {
+ width:22px!important;min-width:22px!important;height:22px!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ color:var(--rk-callout-accent)!important;flex:none;
+}
+.record-main .rk-rmd-callout .astryx-banner-icon svg {
+ width:18px!important;height:18px!important;stroke-width:1.85!important;
+ stroke:currentColor;display:block;flex:none;
+}
+.record-main .rk-rmd-callout .astryx-banner {
+ border-left:3px solid var(--rk-callout-accent);
+}
+.record-main .rk-rmd-callout .astryx-banner > div:first-child {align-items:center;}
+
+/* Center the actual table rather than centering its full-width scroll host. */
+.record-main .tiptap .tableWrapper.rk-hscroll .rk-scroll-viewport > table {
+ margin-inline:auto!important;
+ min-width:0!important;
+}
+.record-main .markdown-preview table {
+ width:max-content;min-width:0;max-width:min(100%,var(--rk-wide-measure));
+ margin-inline:auto!important;
+}
+.record-main .tiptap .tableWrapper.rk-hscroll > .rk-table-caption {
+ text-align:center;
+}
+
+/* Prefer semantic NodeView child counts over DOM selectors: optional inline
+ * @ attrs widgets must never turn a math-only Mark into a wide block. */
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only {
+ display:table!important;width:max-content!important;min-width:0!important;
+ max-width:100%!important;margin-inline:auto!important;
+}
+.record-main .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only > .rk-directive-body {
+ display:table;width:max-content;max-width:100%;
 }

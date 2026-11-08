@@ -19,10 +19,12 @@ export {richTitle} from './rich-schema';
 const bannerStatus=(kind:string):'info'|'warning'|'error'|'success'=>
  kind==='warning'?'warning':kind==='danger'?'error':kind==='success'?'success':'info';
 const safeTitle=(v:string)=>v.replace(/[\r\n]/g,' ').slice(0,180);
+const calloutKinds=new Set(['note','info','tip','success','warning','danger','example','question']);
 
 function ContainerView({node,updateAttributes}:NodeViewProps){
  const kind=String(node.attrs.kind??'note'),title=String(node.attrs.title??'');
  const color=String(node.attrs.color??'');
+ const mathOnly=node.childCount===1&&node.firstChild?.type.name==='blockMath';
  const sender=node.attrs.sender==='user'?'user':node.attrs.sender==='system'?'system':'assistant';
  const tabs=node.content?.content.filter(child=>child.type.name==='richContainer'&&child.attrs.kind==='tab')??[];
  const [selected,setSelected]=useState('0');
@@ -37,7 +39,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
   :<span>{richTitle(kind,title)}</span>}
   {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<Pencil size={13}/>}/>}
  </span>;
- return <NodeViewWrapper className={'rk-directive rk-directive-'+kind} data-rk-kind={kind}>
+ return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')} data-rk-kind={kind}>
   {kind==='tabs'
    ?<Card variant="default" padding={3} className="rk-tabs-edit" data-rk-active-tab={tabs.length<=32?String(activeTab):undefined}>
       <div className="rk-tabs-heading" contentEditable={false}>{editTitle}</div>
@@ -88,7 +90,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
    :kind==='details'
    ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
    :kind==='mark'||kind==='highlight'
-   ?<section className="rk-rmd-block-mark" data-rk-color={kind==='highlight'?color||undefined:undefined}>
+   ?<section className={'rk-rmd-block-mark'+(mathOnly?' rk-rmd-mark-math-only':'')} data-rk-color={kind==='highlight'?color||undefined:undefined}>
      <NodeViewContent className="rk-directive-body"/>
     </section>
    :kind==='comment'

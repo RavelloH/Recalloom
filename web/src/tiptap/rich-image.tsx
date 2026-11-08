@@ -15,7 +15,7 @@ function sizeAttr(value:unknown):number|null{
 function cleanText(value:unknown,max=240):string{
  return String(value??'').replace(/[\r\n]/g,' ').slice(0,max);
 }
-function FigureNodeView({node,updateAttributes,selected,editor}:NodeViewProps){
+function FigureNodeView({node,updateAttributes,selected,editor,getPos}:NodeViewProps){
  const attrs=node.attrs as {src?:string;alt?:string;title?:string;width?:number;height?:number;caption?:string;figureId?:string};
  const [caption,setCaption]=useState(cleanText(attrs.caption));
  const [width,setWidth]=useState(attrs.width?String(attrs.width):'');
@@ -46,7 +46,11 @@ function FigureNodeView({node,updateAttributes,selected,editor}:NodeViewProps){
      style={{width:widthValue?widthValue+'px':undefined,height:heightValue?heightValue+'px':undefined,objectFit:'contain'}}/>
    :<div className="rk-rich-figure-invalid">图片地址不可用</div>}
   {(attrs.caption||number)&&<figcaption className="rk-rich-figcaption">{number&&<strong className="rk-cross-caption-number">{number}{attrs.caption?'：':''}</strong>}{cleanText(attrs.caption)}</figcaption>}
-  {formatRmdBlockAttrs({type:'image',attrs})&&<span contentEditable={false} className="rk-rmd-attrs-decoration" aria-label="图片 Markdown 属性">{formatRmdBlockAttrs({type:'image',attrs})}</span>}
+  {formatRmdBlockAttrs({type:'image',attrs})&&<button type="button" contentEditable={false} className="rk-rmd-attrs-decoration" data-rk-attrs-kind="image"
+    aria-label="编辑图片 Markdown 属性"
+    onMouseDown={e=>e.preventDefault()}
+    onClick={e=>{e.preventDefault();e.stopPropagation();const pos=typeof getPos==='function'?getPos():undefined;
+     if(typeof pos==='number')editor.view.dom.dispatchEvent(new CustomEvent('rmd-edit-attrs',{bubbles:true,detail:{pos}}));}}>{formatRmdBlockAttrs({type:'image',attrs})}</button>}
   {selected&&<div className="rk-rich-figure-controls" contentEditable={false}>
    <TextInput label="图注（可选）" width="100%" value={caption} onChange={setCaption} onBlur={commitCaption}
      placeholder="为这张图片添加说明"/>

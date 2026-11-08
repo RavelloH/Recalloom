@@ -83,6 +83,7 @@ const makeBlock=(token:RmdSyntaxNode):RmdMdast=>{
  let hName='rk-callout';
  if(token.name==='mark'||token.name==='highlight'){
   hName='rk-rmd-block-mark';
+  if(inner.children?.length===1&&inner.children[0]?.type==='math')props.dataRkMathOnly='true';
   if(token.name==='highlight')props.dataRkColor=token.attributes.color!;
  }else{
   props.dataKind=token.name;

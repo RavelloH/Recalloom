@@ -28,6 +28,7 @@ import {parseRmdVisual} from './rmd-visual';
 import {serializeRmdVisual} from './rmd-serialize';
 import {RmdMark} from './tiptap/rmd-mark';
 import {RmdAttrsDecorations} from './tiptap/rmd-attrs-decoration';
+import RmdAttrsEditor,{isRmdAttrsEditable} from './tiptap/rmd-attrs-editor';
 import {RawMarkdown,RawInline,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
@@ -71,6 +72,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableIdDraft,setTableIdDraft]=useState('');
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
+ const [attrsPos,setAttrsPos]=useState<number|null>(null);
  const compact=useCompactLayout();
  const compactRef=useRef(compact);
  compactRef.current=compact;
@@ -236,6 +238,18 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  useEffect(()=>{
   if(!editor||!ready)return;
   return decorateEditorLinks(editor.view.dom);
+ },[editor,ready]);
+ useEffect(()=>{
+  if(!editor||!ready)return;
+  const root=editor.view.dom;
+  const open=(event:Event)=>{
+   const position=(event as CustomEvent<{pos:number}>).detail?.pos;
+   if(!Number.isInteger(position))return;
+   const node=editor.state.doc.nodeAt(position);
+   if(node&&isRmdAttrsEditable(node.type.name))setAttrsPos(position);
+  };
+  root.addEventListener('rmd-edit-attrs',open);
+  return()=>root.removeEventListener('rmd-edit-attrs',open);
  },[editor,ready]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
   if(!editor)return null;
@@ -471,6 +485,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    </div>)}
    {Boolean(wiki.query)&&!wikiSearch.isFetching&&!wikiMatches.length&&<p className="muted small wiki-completion-status">没有匹配文档，请更换关键词。</p>}
   </div>}
+  {attrsPos!==null&&<RmdAttrsEditor key={attrsPos} editor={editor} pos={attrsPos} onClose={()=>setAttrsPos(null)}/>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>;
 });
