@@ -60,7 +60,7 @@ try{
  await page.goto(base+'/records/'+id,{waitUntil:'networkidle'});
  await page.locator('.tiptap').waitFor({timeout:25000});
  const selectors={
-  frontmatter:'.tiptap [data-rk-frontmatter]',
+  frontmatter:'.tiptap p[data-raw-markdown]',
   warning:'.tiptap [data-rk-kind="warning"]',
   details:'.tiptap [data-rk-kind="details"]',
   badge:'.tiptap .rk-inline-badge',
@@ -132,7 +132,9 @@ try{
  console.log('RICH_COMPONENT_COUNTS',JSON.stringify(counts));
  const visible=await page.locator('.tiptap').textContent();
  console.log('VISIBLE_TEXT',JSON.stringify(visible?.slice(0,700)));
- assert.equal(counts.frontmatter,1,'YAML front matter should appear as Astryx metadata card');
+ assert.ok(counts.frontmatter>=1,'YAML-looking header must remain editable ordinary text');
+ assert.equal(await page.locator('.tiptap [data-rk-frontmatter]').count(),0,'document headers must never become a metadata card');
+ assert.ok((await page.locator('.tiptap p[data-raw-markdown]').first().textContent())?.includes('title:'),'header content must remain visible text');
  assert.equal(counts.warning,1,'warning container must render');
  assert.equal(counts.details,1,'folding container must render');
  assert.equal(counts.badge,1,'Badge must render');

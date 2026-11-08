@@ -64,7 +64,8 @@ try{
    assert.equal(await page.locator('.raw-markdown-node').count(),0,name+' must never show a source-protection block');
    if(name==='unsupported-html')assert.ok((await page.locator('.tiptap').innerText()).includes('<div class="notice">Careful HTML</div>'),'unknown HTML appears literally');
    if(name==='yaml-frontmatter'){
-    assert.equal(await page.locator('.tiptap [data-rk-frontmatter]').count(),1,'front matter should render as metadata card');
+    assert.equal(await page.locator('.tiptap [data-rk-frontmatter]').count(),0,'YAML-looking text must never render a metadata card');
+    assert.ok((await page.locator('.tiptap p[data-raw-markdown]').first().textContent())?.includes('title:'),'YAML-like header remains visible as plain editable text');
     assert.ok((await page.locator('.tiptap').innerText()).includes('Example'),'front matter should show metadata values');
    }
   }

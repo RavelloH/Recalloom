@@ -13,8 +13,6 @@ import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {SmartLink} from './link-icons';
 import {LinkCardView} from './tiptap/rich-link-card';
 import {TabsPreview} from './rich-tabs';
-import {FrontMatterCard} from './tiptap/rich-frontmatter';
-import {yamlFrontMatter} from './tiptap/frontmatter-utils';
 import {remarkCodeMetadata} from './code-remark';
 import ShikiCodePreview,{codePropsFromElement} from './code-preview';
 import rehypeRaw from 'rehype-raw';
@@ -27,6 +25,8 @@ import {prepareWikiMarkdown} from './wiki-remark';
 import {prepareCriticMarkdown,type CriticKind} from './critic-syntax';
 import {CriticDisplay} from './tiptap/rich-critic';
 import ClozeReveal from './cloze-reveal';
+import {remarkFigureAttributes} from './remark-figure';
+import {safeFigureImageSrc} from './figure-syntax';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
 import {slugHeading,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
 
@@ -73,7 +73,7 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tip','rk-kbd','rk-cloze','rk-comment','rk-figure'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
@@ -85,6 +85,7 @@ const schema={
   'rk-abbr':['dataTitle'],
   'rk-tip':['dataContent'],
   'rk-cloze':['dataHint'],
+  'rk-figure':['dataPayload'],
   code:[...(defaultSchema.attributes?.code??[]),'dataFile','dataWrap','dataExpand'],
   mark:[...(defaultSchema.attributes?.mark??[]),'dataRkColor']}
 };
@@ -98,7 +99,9 @@ const components:Components={
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
 export default function MarkdownPreview({content,sourceId,trail,depth=0}:{content:string;sourceId?:string;trail?:string[];depth?:number}){
  const source=content.replace(/\r\n/g,'\n');
- const frontmatter=yamlFrontMatter.exec(source);
+ // A YAML-looking header is ordinary document text, not Recalloom metadata.
+ // Isolate it from the CommonMark parser so --- is not reinterpreted as rules.
+ const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/.exec(source);
  const body=frontmatter?source.slice(frontmatter[0].length).replace(/^\n+/, ''):source;
  const prepared=prepareCriticMarkdown(prepareWikiMarkdown(body));
  const chain=trail??(sourceId?[sourceId]:[]);
@@ -112,6 +115,21 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    if(!['addition','deletion','substitution','comment','highlight'].includes(kind))return null;
    const decode=(raw:unknown)=>{try{return decodeURIComponent(String(raw??''));}catch{return '';}};
    return <CriticDisplay kind={kind as CriticKind} text={decode(props['data-value']??props.dataValue)} before={decode(props['data-before']??props.dataBefore)}/>;
+  },
+  'rk-figure':({node:_node,...props}:Record<string,unknown>)=>{
+   let raw:unknown;
+   try{raw=JSON.parse(decodeURIComponent(String(props['data-payload']??props.dataPayload??'')));}catch{return null;}
+   if(!raw||typeof raw!=='object')return null;
+   const attrs=raw as {src?:string;alt?:string;title?:string;width?:number;height?:number;caption?:string};
+   if(!safeFigureImageSrc(String(attrs.src??'')))return null;
+   const size=(n:unknown)=>typeof n==='number'&&Number.isInteger(n)&&n>=40&&n<=1800?n:undefined;
+   const width=size(attrs.width),height=size(attrs.height);
+   const caption=String(attrs.caption??'').slice(0,240);
+   return <figure className="rk-rich-figure rk-rich-figure-projection">
+    <img src={attrs.src} alt={String(attrs.alt??'')} title={String(attrs.title??'')||undefined}
+     loading="lazy" referrerPolicy="no-referrer" style={{width:width?width+'px':undefined,height:height?height+'px':undefined,objectFit:'contain'}}/>
+    {caption&&<figcaption className="rk-rich-figcaption">{caption}</figcaption>}
+   </figure>;
   },
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
@@ -127,6 +145,14 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    if(kind==='back')return <Collapsible trigger="显示答案" defaultIsOpen={false}>
      <div className="rk-flashcard-content rk-flashcard-answer">{props.children as React.ReactNode}</div>
     </Collapsible>;
+   if(kind==='glossary')return <Card variant="muted" padding={3} className="rk-glossary-read">
+    <div className="rk-glossary-title">{richTitle(kind,title)}</div>
+    <div className="rk-glossary-entries">{props.children as React.ReactNode}</div>
+   </Card>;
+   if(kind==='definition')return <dl className="rk-definition-read">
+    <dt className="rk-definition-term">{richTitle(kind,title)}</dt>
+    <dd className="rk-definition-body">{props.children as React.ReactNode}</dd>
+   </dl>;
    if(kind==='tabs')return <TabsPreview>{props.children as React.ReactNode}</TabsPreview>;
    if(kind==='tab')return <div className="rk-tab-pane">{props.children as React.ReactNode}</div>;
    if(kind==='chat')return <ChatMessageList density="compact" align="top">{props.children as React.ReactNode}</ChatMessageList>;
@@ -156,8 +182,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
     render={(body,id,next,nextDepth)=><MarkdownPreview content={body} sourceId={id} trail={next} depth={nextDepth}/>}/>
  };
  return <article className="markdown-preview">
-  {frontmatter&&<FrontMatterCard source={frontmatter[0]}/>}
-  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
+  {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
+  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}
    components={{...components,...custom} as Components}>{prepared}</ReactMarkdown>
  </article>;

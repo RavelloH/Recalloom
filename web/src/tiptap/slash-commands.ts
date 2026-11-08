@@ -25,6 +25,11 @@ export const slashCommands:SlashCommand[]=[
  {id:'comment',title:'弱化注释',description:'在所选文字上添加可见注释',keywords:['comment','note','annotation','zs'],icon:MessageCircle,run:e=>chain(e).setMark('visibleComment').run()},
  {id:'color-highlight',title:'彩色高亮',description:'将选择内容设为红色主题高亮',keywords:['color','highlight','mark','gl'],icon:Highlighter,run:e=>chain(e).setHighlight({color:'red'}).run()},
  {id:'tabs',title:'标签页',description:'插入 Astryx 标签导航与可编辑内容面板',keywords:['tabs','tab','fenye','qiehuan'],icon:PanelsTopLeft,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'tabs'},content:[{type:'richContainer',attrs:{kind:'tab',title:'示例'},content:[{type:'paragraph',content:[{type:'text',text:'第一项内容'}]}]},{type:'richContainer',attrs:{kind:'tab',title:'说明'},content:[{type:'paragraph',content:[{type:'text',text:'第二项内容'}]}]}]}).run()},
+ {id:'glossary',title:'术语定义列表',description:'插入有明确范围的术语与定义，可直接编辑',keywords:['definition','glossary','term','cibiao','shuyu'],icon:BookOpenCheck,
+  run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'glossary',title:'术语表'},content:[
+   {type:'richContainer',attrs:{kind:'definition',title:'DO'},content:[{type:'paragraph',content:[{type:'text',text:'Durable Objects'}]}]},
+   {type:'richContainer',attrs:{kind:'definition',title:'D1'},content:[{type:'paragraph',content:[{type:'text',text:'Cloudflare SQL 数据库'}]}]}
+  ]}).run()},
  {id:'flashcard',title:'学习闪卡',description:'问题与答案分开编辑，阅读时折叠答案',keywords:['flashcard','card','study','quiz','fuxi'],icon:BookOpenCheck,
   run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'flashcard',title:'知识闪卡'},content:[
    {type:'richContainer',attrs:{kind:'front',title:'问题'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入问题'}]}]},

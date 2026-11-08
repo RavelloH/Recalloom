@@ -160,22 +160,59 @@ export function authorize(){ return true; }
 
 图标、封面从 Recalloom 的登录鉴权图片代理加载；**图片 URL 本身的查询参数继续保留**，否则可能破坏图片签名或尺寸变体。UI 图标仍只使用 Lucide。
 
-### YAML Front Matter（Astryx 属性卡片）
+### 文档内 YAML 字样不是 Recalloom 元信息
 
-文件顶部的 YAML Front Matter 采用独立的语义卡片展示，复用 Astryx Card、MetadataList 和 TextArea。原始 Markdown（包括注释、数组、顺序及分隔线）是唯一权威，卡片不会自动更新 Recalloom 数据库中的 title/tags/status 等独立元数据；需要以后专门设计映射才能进行双向同步。
+Recalloom **不支持 YAML Front Matter 作为文档元数据**，不推荐通过 Markdown 正文的 `title:`、`tags:`、`status:` 等字段管理文件属性。标题、标签、路径、状态等元信息应通过 Recalloom 自身的文件/记录 API 和数据库字段管理，具有独立的修改历史与权限语义。
+
+如果文档开头恰好存在 `---` 或 `+++` 包裹的 YAML/TOML 风格文本，Recalloom 只会把它当作 **普通可编辑文本** 显示，保留原始字符与换行；不会生成元信息卡片、解释键值、执行标签或同步数据库。Wiki 嵌入也只会原样显示该文本，不会把它当成文件元信息。
 
 ~~~~markdown
 ---
-title: "项目记录"
-tags: [knowledge, agent]
-status: draft
-# 备注：来自 Agent
+title: 这是用户写的普通内容
+tags: [示例, 原始文本]
 ---
-
-# 文档正文
 ~~~~
 
-可以直接编辑 YAML 原文，未知字段保留。拒绝未识别的 YAML 标签，解析失败时仍保留原始内容而不执行代码。该卡片限于文件顶部的 `---` YAML，不会把 `+++` TOML 误当 YAML。
+上述例子只说明兼容已有文本，不是推荐的元信息写法；新文档不应该主动生成这样的头部。
+
+### 图片尺寸与图注（支持：独立图片、可视化编辑）
+
+独立成段的标准 Markdown 图片允许附加受限的呈现属性，推荐语法如下：
+
+~~~~markdown
+![控制系统框图](https://example.com/diagram.png){width=480 caption="系统结构示意图"}
+
+![实验装置](https://example.com/equipment.png){width=600 height=400 caption="实验平台"}
+~~~~
+
+仅支持独立成段图片后的单行 `{width=数值 height=数值 caption="文字"}`，属性均可选，顺序不限；宽度和高度为 40～1800 的整数像素，实际显示不超过容器宽度。普通图片 `![描述](url)` 继续可用，原 Markdown 图片标题（title）与图注（caption）分开。点击可视化图片后可以用 Astryx 输入控件调整尺寸或图注；只有用户真正修改内容才创建修订。Wiki 嵌入会安全展示图注，但不把它当作文档元信息。包含未知属性、跨行属性、非独立图片或非法数值的写法不解析为增强图片，保留为原文字。
+
+### 术语定义列表（支持：边界明确的结构化 Glossary）
+
+避免使用 `*[DO]: Durable Objects` 或无闭合边界的缩写形式，以免无法确定解释的结束位置。推荐使用显式嵌套容器：
+
+~~~~markdown
+::::glossary[核心术语]
+
+:::definition[DO]
+
+**Durable Objects**：提供有状态计算能力。
+
+:::
+
+:::definition[D1]
+
+Cloudflare 的 SQL 数据库。
+
+- 支持查询
+- 支持版本记录
+
+:::
+
+::::
+~~~~
+
+外层 `::::glossary` 收纳多个术语，内层 `:::definition[术语]` 确定每项的完整内容边界。术语名和定义正文均可在 Tiptap 中直接编辑，定义支持段落、加粗、列表等普通 Markdown，整体保持源码往返。使用斜杠命令“术语定义列表”可以直接插入示例结构。该语法不是文件元数据，也不会修改 Recalloom 数据库中的标签或属性。
 
 ### GFM 脚注（支持可编辑引用与定义）
 

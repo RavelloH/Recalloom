@@ -249,6 +249,17 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-footnote-definition-content > :last-child {margin-bottom:0;}
 .record-main .rk-footnote-ref {font-size:.82em;vertical-align:super;color:var(--color-text-secondary);}
 
+/* Structured terms have explicit Markdown fence boundaries: no ambiguous
+ * [DO]: ... continuation or implicit document metadata fields. */
+.record-main :is(.tiptap,.markdown-preview) :is(.rk-glossary-edit,.rk-glossary-read) {margin-block:1.15rem;}
+.record-main .rk-glossary-title {font-weight:650;margin-bottom:.8rem;color:var(--rk-document-ink);}
+.record-main .rk-glossary-entries {display:flex;flex-direction:column;gap:.8rem;}
+.record-main :is(.rk-definition-edit,.rk-definition-read) {border-inline-start:2px solid var(--rk-document-border);padding-inline-start:.8rem;margin:0;}
+.record-main .rk-definition-term {font-weight:650;color:var(--rk-document-ink);margin-bottom:.25rem;}
+.record-main .rk-definition-body {margin:0;min-width:0;overflow-wrap:anywhere;}
+.record-main .rk-definition-body > :first-child {margin-block-start:0;}
+.record-main .rk-definition-body > :last-child {margin-block-end:0;}
+
 /* Knowledge flashcards: editor shows both sides for editing; reader only
  * reveals the answer on demand with Astryx Collapsible. No reveal state is saved. */
 .record-main .rk-flashcard {margin-block:1.15rem;max-width:100%;}
@@ -317,15 +328,8 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-cloze-open .rk-cloze-reveal {color:var(--rk-document-ink);
  border-style:solid;background:transparent;}
 
-/* YAML Front Matter is a semantic metadata card, but YAML source remains canonical. */
-.record-main .rk-frontmatter-node {margin-block:1rem;}
-.record-main .rk-frontmatter-heading {display:flex;gap:.5rem;align-items:center;font-size:.9rem;font-weight:600;margin-bottom:.6rem;}
-.record-main .rk-frontmatter-caption {font-size:.78rem;color:var(--color-text-tertiary);margin-top:.7rem;}
-.record-main .rk-frontmatter-controls {display:flex;align-items:center;justify-content:flex-end;gap:.4rem;margin-bottom:.35rem;}
-.record-main .rk-frontmatter-error {color:var(--color-text-secondary);font-size:.85rem;}
-.record-main .rk-frontmatter-node textarea {min-width:0;max-width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;}
-.record-main .markdown-preview>.rk-frontmatter-card {margin-block:1rem;}
-
+/* YAML-looking header text is not a metadata card, and never writes DB fields. */
+.record-main .rk-verbatim-document-text {white-space:pre-wrap;overflow-wrap:anywhere;}
 /* Astryx Tabs: interactive even in the canonical Notion-style visual editor.
  * Inactive panels are CSS-hidden but remain mounted editable ProseMirror nodes. */
 .record-main .rk-tabs-edit,.record-main .rk-tabs-preview {max-width:100%;min-width:0;}

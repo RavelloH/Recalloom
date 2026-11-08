@@ -11,6 +11,7 @@ describe('Rich Markdown slash commands do not shadow existing actions',()=>{
  });
  it('inserts new study syntax without displacing existing link and tab commands',()=>{
   assert.equal(filterSlashCommands(editor,'学习闪卡')[0]?.id,'flashcard');
+  assert.equal(filterSlashCommands(editor,'术语定义列表')[0]?.id,'glossary');
   assert.equal(filterSlashCommands(editor,'复习挖空')[0]?.id,'cloze');
   assert.equal(filterSlashCommands(editor,'快捷键键帽')[0]?.id,'kbd');
   assert.equal(filterSlashCommands(editor,'链接')[0]?.id,'link');

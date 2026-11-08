@@ -7,8 +7,6 @@ import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
 import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from '../web/src/tiptap/rich-directives';
 import {VisibleComment} from '../web/src/tiptap/comment-mark';
 import {RichLinkCard} from '../web/src/tiptap/rich-link-card';
-import {RichFrontMatter} from '../web/src/tiptap/rich-frontmatter';
-import {frontMatterEntries} from '../web/src/tiptap/frontmatter-utils';
 import {extractWikiSection} from '../web/src/wiki-section';
 import {RichFootnoteRef,RichFootnoteDefinition} from '../web/src/tiptap/rich-footnotes';
 import {RichCritic} from '../web/src/tiptap/rich-critic';
@@ -20,7 +18,7 @@ import type {JSONContent} from '@tiptap/core';
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false}),
  CustomHeading,CustomParagraph,Markdown,RawMarkdown,RichContainer,WikiLinkNode,WikiEmbedNode,
- RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+ RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
 ]});
 const walk=(n:JSONContent,cb:(item:JSONContent)=>void)=>{
  cb(n);for(const x of n.content??[])walk(x,cb);
@@ -74,6 +72,19 @@ describe('Rich Markdown structural directives',()=>{
   const doc=buildVisualMarkdown(source,manager);
   assert.equal(nodes(doc,'richCritic').length,0);
   assert.ok(manager.serialize(doc).includes('{--仍是代码--}'));
+ });
+ it('serializes an explicitly bounded glossary with multiple editable definitions',()=>{
+  const source=['::::glossary[核心术语]','',':::definition[DO]','','**Durable Objects** 负责有状态计算。','',':::','',':::definition[D1]','','SQL 数据库存储。','','- 持久性','- 版本化','',':::','','::::'].join('\n');
+  const doc=buildVisualMarkdown(source,manager);
+  const blocks=nodes(doc,'richContainer');
+  assert.deepEqual(blocks.map(n=>n.attrs?.kind),['glossary','definition','definition']);
+  assert.equal(blocks[1]?.attrs?.title,'DO');
+  assert.equal(nodes(blocks[2]!,'bulletList').length,1);
+  const saved=manager.serialize(doc);
+  assert.ok(saved.includes('::::glossary[核心术语]'));
+  assert.ok(saved.includes(':::definition[DO]'));
+  assert.ok(saved.includes('**Durable Objects**'));
+  assert.equal(nodes(buildVisualMarkdown(saved,manager),'richContainer').length,3);
  });
  it('serializes a knowledge flashcard with structured question and answer blocks',()=>{
   const source=['::::flashcard[架构复习]','',':::front[问题]','','Recalloom 为什么使用 **D1**？','',':::','',':::back[答案]','','因为需要版本化和可追踪的 **存储**。','','- 审计','- 回滚','',':::','','::::'].join('\n');
@@ -222,24 +233,22 @@ describe('Rich Markdown structural directives',()=>{
   assert.equal(extractWikiSection(text,'^referable-block'),'段落一。');
   assert.equal(extractWikiSection(text,'^does-not-exist'),'');
  });
- it('turns YAML Front Matter into Astryx metadata while preserving comments, arrays and source boundaries',()=>{
+ it('treats YAML-looking headers as editable raw text, never database metadata',()=>{
   const raw='---\ntitle: "My report"\ntags: [alpha, beta]\n# author note\nstatus: draft\n---';
-  const doc=buildVisualMarkdown(raw+'\n\n# Heading\n\nText.',manager);
-  assert.equal(nodes(doc,'richFrontMatter').length,1,JSON.stringify(doc));
-  assert.equal(nodes(doc,'richFrontMatter')[0]?.attrs?.source,raw);
+  const source=raw+'\n\n# Heading\n\nText.';
+  const doc=buildVisualMarkdown(source,manager);
+  assert.equal(nodes(doc,'richFrontMatter').length,0);
+  assert.equal(nodes(doc,'rawMarkdown').length,1,JSON.stringify(doc));
+  assert.equal(nodes(doc,'rawMarkdown')[0]?.content?.[0]?.text,raw);
   assert.equal(nodes(doc,'heading').length,1);
-  const values=frontMatterEntries(raw);
-  assert.equal(values.error,null);
-  assert.equal(values.entries.find(x=>x.key==='title')?.value,'My report');
-  assert.equal(values.entries.find(x=>x.key==='tags')?.value,'alpha, beta');
-  assert.ok(manager.serialize(doc).startsWith(raw));
+  assert.ok(manager.serialize(doc).startsWith(raw),'raw header text must remain byte-equivalent');
  });
- it('never executes YAML tags/aliases and keeps unsafe or invalid YAML editable',()=>{
+ it('preserves unsafe YAML-looking tags as literal user text without parsing or executing them',()=>{
   const raw='---\nx: !<tag:yaml.org,2002:js/function> evil\n---';
   const doc=buildVisualMarkdown(raw+'\n\nParagraph',manager);
-  assert.equal(nodes(doc,'richFrontMatter').length,1);
+  assert.equal(nodes(doc,'richFrontMatter').length,0);
+  assert.equal(nodes(doc,'rawMarkdown')[0]?.content?.[0]?.text,raw);
   assert.ok(manager.serialize(doc).includes(raw));
-  assert.ok(frontMatterEntries(raw).error);
  });
  it('lets WikiLink and WikiEmbed take precedence over colon directives without creating raw paragraphs',()=>{
   const id='11111111-1111-4111-8111-111111111111';

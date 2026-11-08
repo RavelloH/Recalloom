@@ -8,7 +8,7 @@ import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import {Markdown} from '@tiptap/markdown';
-import Image from '@tiptap/extension-image';
+import {RichImage} from './tiptap/rich-image';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import {BlockMathWithHighlight} from './tiptap/block-math-highlight';
@@ -27,7 +27,6 @@ import {buildVisualMarkdown} from './tiptap/visual-markdown';
 import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
-import {RichFrontMatter} from './tiptap/rich-frontmatter';
 import {RichFootnoteRef,RichFootnoteDefinition} from './tiptap/rich-footnotes';
 import {RichCritic} from './tiptap/rich-critic';
 import {VisibleComment} from './tiptap/comment-mark';
@@ -136,11 +135,11 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   Markdown,
    RawMarkdown,
   WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),
-  Image.configure({allowBase64:false}),
+  RichImage.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
   UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
-  RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
+  RichContainer,RichBadge,RichAbbr,RichTip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
   BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true})}),

@@ -69,6 +69,16 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <div contentEditable={false} className="rk-flashcard-panel-title">{editTitle}</div>
       <NodeViewContent className="rk-directive-body rk-flashcard-content"/>
      </Card>
+   :kind==='glossary'
+   ?<Card variant="muted" padding={3} className="rk-glossary-edit">
+      <div className="rk-glossary-title" contentEditable={false}>{editTitle}</div>
+      <NodeViewContent className="rk-directive-body rk-glossary-entries"/>
+     </Card>
+   :kind==='definition'
+   ?<div className="rk-definition-edit">
+      <div className="rk-definition-term" contentEditable={false}>{editTitle}</div>
+      <NodeViewContent className="rk-directive-body rk-definition-body"/>
+     </div>
    :kind==='chat'
    ?<ChatMessageList density="compact" align="top"><NodeViewContent className="rk-directive-body rk-chat-list"/></ChatMessageList>
    :kind==='message'

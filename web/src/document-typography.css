@@ -311,6 +311,23 @@
   margin: 20px auto;
   border-radius: 8px;
 }
+/* Standalone captioned images retain Markdown source and editable Tiptap attrs. */
+.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure {
+ display:flex;flex-direction:column;align-items:center;gap:.5rem;
+ margin-block:1.1rem;max-width:100%;min-width:0;}
+.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure > img {
+ display:block;max-width:100%;margin:0;object-fit:contain;}
+.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure > figcaption {
+ text-align:center;font-size:.88rem;line-height:1.55;
+ color:var(--color-text-secondary);max-width:100%;overflow-wrap:anywhere;}
+.record-main .rk-rich-figure-controls {display:flex;gap:.65rem;flex-wrap:wrap;
+ background:var(--rk-document-wash);border:1px solid var(--rk-document-border);
+ padding:.65rem;border-radius:.55rem;width:min(100%,42rem);}
+.record-main .rk-rich-figure-controls > :first-child {flex:2;min-width:13rem;}
+.record-main .rk-rich-figure-controls > :not(:first-child) {flex:1;min-width:7rem;}
+.record-main .rk-rich-figure-selected {outline:1px solid var(--rk-document-border);outline-offset:.35rem;}
+.record-main .rk-rich-figure-invalid {color:var(--color-text-secondary);font-size:.9rem;}
+
 /* Center display math in both editors. The Tiptap node view does not use
  * KaTeX's .katex-display wrapper, so it needs its own centered container.
  * Preserve horizontal scrolling when a long formula exceeds mobile width. */

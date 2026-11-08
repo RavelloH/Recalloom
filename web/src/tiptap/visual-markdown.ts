@@ -10,12 +10,25 @@ import {rawMarkdownBlock} from './raw-markdown';
 import {postProcessTableAlignment} from './table-alignment';
 import {findMarkedDisplayMath} from './marked-display-math';
 import {extractFootnoteBody,safeFootnoteId} from './rich-footnote-utils';
-import {isYamlFrontmatter} from './frontmatter-utils';
 import {explicitHeadingAnchor,explicitBlockAnchor} from '../wiki-slug';
 import {extractWikiReferences} from '../../../src/wiki-syntax.js';
+import {parseFigureSuffix,safeFigureImageSrc} from '../figure-syntax';
 
 type MarkdownDriver={parse:(source:string)=>JSONContent};
-type AstNode={type:string;name?:string;value?:string;children?:AstNode[];data?:{directiveLabel?:boolean};
+function parseStandaloneFigure(block:AstNode,source:string):JSONContent|null{
+ if(block.type!=='paragraph'||block.children?.length!==2)return null;
+ const [image,tail]=block.children;
+ if(image?.type!=='image'||tail?.type!=='text'||!image.position?.end?.offset||
+  !block.position?.start?.offset&&block.position?.start?.offset!==0)return null;
+ const offset=image.position.end.offset-block.position.start.offset;
+ const sourceText=source.slice(offset);
+ const attrs=parseFigureSuffix(sourceText);
+ if(!attrs||!image.url||!safeFigureImageSrc(image.url))return null;
+ return {type:'image',attrs:{src:image.url,alt:image.alt??'',title:image.title??null,
+  width:attrs.width,height:attrs.height,caption:attrs.caption}};
+}
+
+type AstNode={type:string;name?:string;value?:string;url?:string;alt?:string;title?:string;children?:AstNode[];data?:{directiveLabel?:boolean};
  position?:{start?:{offset?:number};end?:{offset?:number}}};
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkDirective);
 const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/;
@@ -90,14 +103,17 @@ function parseSafe(source:string,manager:MarkdownDriver):JSONContent[]{
 export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONContent{
  const normalized=source.replace(/\r\n/g,'\n'),metadata=frontmatter.exec(normalized);
  const tail=metadata?normalized.slice(metadata[0].length).replace(/^\n+/,''):normalized;
- const content:JSONContent[]=metadata?[isYamlFrontmatter(metadata[0])?{type:'richFrontMatter',attrs:{source:metadata[0]}}:rawMarkdownBlock(metadata[0])]:[];
+ // YAML-like headers are user prose, NEVER file metadata. Preserve source as
+ // one editable plain-text block to prevent CommonMark from consuming fences.
+ const content:JSONContent[]=metadata?[rawMarkdownBlock(metadata[0])]:[];
  try{
   const ast=parser.parse(tail) as AstNode;
   const blocks=ast.children??[];
   const wikiRanges=extractWikiReferences(tail).map(ref=>({start:ref.offset,end:ref.offset+ref.raw.length}));
   const containsMarkedMath=blocks.some((_,index)=>Boolean(findMarkedDisplayMath(blocks,index)));
   const containsContainer=blocks.some(block=>block.type==='containerDirective'||block.type==='leafDirective'||block.type==='footnoteDefinition');
-  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer){
+  const containsFigure=blocks.some(block=>parseStandaloneFigure(block,tail.slice(block.position?.start?.offset??0,block.position?.end?.offset??0))!==null);
+  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer&&!containsFigure){
    content.push(...parseSafe(tail,manager));
   }else{
    // Parse the rest of the document as rich text. Standalone HTML-marked
@@ -114,6 +130,8 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
     if(start===undefined||end===undefined)continue;
     const fragment=tail.slice(start,end);
     if(!fragment.trim())continue;
+    const figure=parseStandaloneFigure(block,fragment);
+    if(figure){content.push(figure);continue;}
     if(block.type==='footnoteDefinition'){
      const note=block as AstNode&{identifier?:string;label?:string};
      const id=safeFootnoteId(String(note.label??note.identifier??''));

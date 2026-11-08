@@ -8,13 +8,12 @@ import {CustomParagraph} from '../web/src/tiptap/custom-paragraph';
 import {HighlightWithMarkdown,UnderlineWithMarkdown} from '../web/src/tiptap/markdown-extensions';
 import {buildVisualMarkdown} from '../web/src/tiptap/visual-markdown';
 import {RawMarkdown} from '../web/src/tiptap/raw-markdown';
-import {RichFrontMatter} from '../web/src/tiptap/rich-frontmatter';
 import {RichFootnoteRef,RichFootnoteDefinition} from '../web/src/tiptap/rich-footnotes';
 import type {JSONContent} from '@tiptap/core';
 
 const manager=new MarkdownManager({extensions:[
  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false}),
- CustomHeading,CustomParagraph,CodeBlock,Markdown,RawMarkdown,RichFrontMatter,RichFootnoteRef,RichFootnoteDefinition,
+ CustomHeading,CustomParagraph,CodeBlock,Markdown,RawMarkdown,RichFootnoteRef,RichFootnoteDefinition,
  HighlightWithMarkdown,UnderlineWithMarkdown,
 ]});
 const walk=(node:JSONContent,fn:(node:JSONContent)=>void)=>{
@@ -52,11 +51,12 @@ describe('visual-first Markdown import',()=>{
   assert.ok(manager.serialize(doc).includes('[^footnote]'),'GFM footnote is now a structured reference');
   assert.ok(manager.serialize(doc).includes('<mark> incomplete.'),'unclosed HTML-like mark must remain in exported Markdown');
  });
- it('displays YAML front matter as a structured editable card while preserving its Markdown',()=>{
+ it('keeps YAML-looking document text literal and editable without metadata parsing',()=>{
   const doc=buildVisualMarkdown('---\ntitle: Note\ncategory: 学习\n---\n\n# Rich Heading\n\nMore **content**.',manager);
-  assert.equal(doc.content?.[0]?.type,'richFrontMatter','YAML is a structured editable metadata card');
+  assert.equal(doc.content?.[0]?.type,'rawMarkdown','YAML-looking text is not parsed as document metadata');
   assert.equal(doc.content?.[1]?.type,'heading');
-  assert.ok(String(doc.content?.[0]?.attrs?.source??'').includes('title: Note'));
+  assert.ok(String(doc.content?.[0]?.content?.[0]?.text??'').includes('title: Note'));
+  assert.ok(!doc.content?.some(node=>node.type==='richFrontMatter'));
   assert.ok(doc.content?.some(node=>node.type==='paragraph'&&node.content?.some(n=>n.marks?.some(m=>m.type==='bold'))));
  });
  it('keeps text editable when the Markdown parser throws',()=>{
