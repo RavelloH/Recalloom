@@ -13,6 +13,7 @@ import {extractFootnoteBody,safeFootnoteId} from './rich-footnote-utils';
 import {explicitHeadingAnchor,explicitBlockAnchor} from '../wiki-slug';
 import {extractWikiReferences} from '../../../src/wiki-syntax.js';
 import {parseFigureSuffix,safeFigureImageSrc} from '../figure-syntax';
+import {parseEquationId,shieldEquationIdClosers} from '../cross-reference';
 
 type MarkdownDriver={parse:(source:string)=>JSONContent};
 function parseStandaloneFigure(block:AstNode,source:string):JSONContent|null{
@@ -25,7 +26,7 @@ function parseStandaloneFigure(block:AstNode,source:string):JSONContent|null{
  const attrs=parseFigureSuffix(sourceText);
  if(!attrs||!image.url||!safeFigureImageSrc(image.url))return null;
  return {type:'image',attrs:{src:image.url,alt:image.alt??'',title:image.title??null,
-  width:attrs.width,height:attrs.height,caption:attrs.caption}};
+  width:attrs.width,height:attrs.height,caption:attrs.caption,figureId:attrs.id??null}};
 }
 
 type AstNode={type:string;name?:string;value?:string;url?:string;alt?:string;title?:string;children?:AstNode[];data?:{directiveLabel?:boolean};
@@ -125,13 +126,14 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
  // one editable plain-text block to prevent CommonMark from consuming fences.
  const content:JSONContent[]=metadata?[rawMarkdownBlock(metadata[0])]:[];
  try{
-  const ast=parser.parse(tail) as AstNode;
+  const ast=parser.parse(shieldEquationIdClosers(tail)) as AstNode;
   const blocks=ast.children??[];
   const wikiRanges=extractWikiReferences(tail).map(ref=>({start:ref.offset,end:ref.offset+ref.raw.length}));
   const containsMarkedMath=blocks.some((_,index)=>Boolean(findMarkedDisplayMath(blocks,index)));
   const containsContainer=blocks.some(block=>block.type==='containerDirective'||block.type==='leafDirective'||block.type==='footnoteDefinition');
+  const containsEquation=blocks.some(block=>block.type==='math'&&block.position?.start?.offset!==undefined&&block.position?.end?.offset!==undefined&&parseEquationId(tail.slice(block.position.start.offset,block.position.end.offset))!==null);
   const containsFigure=blocks.some(block=>parseStandaloneFigure(block,tail.slice(block.position?.start?.offset??0,block.position?.end?.offset??0))!==null);
-  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer&&!containsFigure){
+  if(!blocks.some(block=>hasUnsupportedSyntax(block,wikiRanges))&&!containsMarkedMath&&!containsContainer&&!containsFigure&&!containsEquation){
    content.push(...parseSafe(tail,manager));
   }else{
    // Parse the rest of the document as rich text. Standalone HTML-marked
@@ -148,6 +150,8 @@ export function buildVisualMarkdown(source:string,manager:MarkdownDriver):JSONCo
     if(start===undefined||end===undefined)continue;
     const fragment=tail.slice(start,end);
     if(!fragment.trim())continue;
+    const equation=block.type==='math'?parseEquationId(fragment):null;
+    if(equation){content.push({type:'blockMath',attrs:{latex:equation.latex,equationId:equation.id}});continue;}
     const figure=parseStandaloneFigure(block,fragment);
     if(figure){content.push(figure);continue;}
     if(block.type==='footnoteDefinition'){

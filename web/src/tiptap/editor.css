@@ -405,3 +405,16 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-critic-highlight {background:color-mix(in srgb,var(--color-warning,#a88520) 15%,transparent);
  border-bottom:1px dashed var(--color-warning,#a88520);}
 .record-main .rk-critic-comment:focus-within {opacity:1;}
+
+/* Markdown-sourced stable block IDs: numbering is a presentation counter,
+ * never a persisted database attribute. References read the live editor AST. */
+.record-main .tiptap {counter-reset:rk-equation;}
+.record-main .tiptap [data-rk-equation-id] {counter-increment:rk-equation;position:relative;padding-inline-end:3.2rem;}
+.record-main .tiptap [data-rk-equation-id]::after {content:'(' counter(rk-equation) ')';
+ position:absolute;inset-inline-end:.55rem;top:50%;transform:translateY(-50%);
+ color:var(--color-text-secondary);font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none;}
+.record-main .rk-cross-reference {display:inline;white-space:nowrap;}
+.record-main .rk-cross-reference > a {color:var(--color-primary,#3988dc);text-decoration:underline;
+ text-underline-offset:.16em;cursor:pointer;}
+.record-main .rk-cross-reference-missing > a {color:var(--color-danger,#b94a48);text-decoration-style:dashed;}
+.record-main .rk-cross-caption-number {margin-inline-end:.3em;font-weight:600;white-space:nowrap;}

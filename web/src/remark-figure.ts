@@ -24,7 +24,7 @@ export function remarkFigureAttributes(){
       if(attrs){
        const data=encodeURIComponent(JSON.stringify({
         src:image.url,alt:image.alt??'',title:image.title??'',
-        width:attrs.width,height:attrs.height,caption:attrs.caption
+        width:attrs.width,height:attrs.height,caption:attrs.caption,id:attrs.id??null
        }));
        container.children![i]={type:'html',value:'<rk-figure data-payload="'+data+'"></rk-figure>'};
        continue;

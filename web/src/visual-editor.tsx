@@ -22,6 +22,7 @@ import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
 import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeaderWithMarkdown} from './tiptap/table-with-markdown';
 import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
+import {CrossReferenceNode} from './tiptap/cross-reference';
 import {ScrollCodeBlock,ScrollTableView} from './tiptap/scroll-blocks';
 import {buildVisualMarkdown} from './tiptap/visual-markdown';
 import {RawMarkdown,rawMarkdownBlock} from './tiptap/raw-markdown';
@@ -134,7 +135,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   CustomParagraph,
   Markdown,
    RawMarkdown,
-  WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),
+  WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),CrossReferenceNode,
   RichImage.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:ScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
