@@ -8,12 +8,11 @@ import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
-import {Markdown} from '@tiptap/markdown';
 import {RichImage} from './tiptap/rich-image';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import {BlockMathWithHighlight} from './tiptap/block-math-highlight';
-import {InlineMathWithHighlight} from './tiptap/inline-math-highlight';
+import {RmdBlockMath} from './tiptap/rmd-block-math';
+import {InlineMath} from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor,JSONContent} from '@tiptap/core';
@@ -25,7 +24,10 @@ import {TableWithMarkdown,TableRowWithMarkdown,TableCellWithMarkdown,TableHeader
 import {WikiLinkNode,WikiEmbedNode} from './tiptap/wiki-nodes';
 import {CrossReferenceNode} from './tiptap/cross-reference';
 import {ScrollCodeBlock,CaptionedScrollTableView} from './tiptap/scroll-blocks';
-import {buildVisualMarkdown} from './tiptap/visual-markdown';
+import {parseRmdVisual} from './rmd-visual';
+import {serializeRmdVisual} from './rmd-serialize';
+import {RmdMark} from './tiptap/rmd-mark';
+import {RmdAttrsDecorations} from './tiptap/rmd-attrs-decoration';
 import {RawMarkdown,RawInline,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
@@ -55,7 +57,7 @@ const tableToolbarOffset=(cell:Element,surface:Element,compact:boolean)=>{
  return box.top-top-54>=(compact?60:8)?box.top-top-54:box.bottom-top+8;
 };
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null};
-/** NeutralPress Markdown extensions with Recalloom's authoritative revision/CAS saving. */
+/** Shared RMD AST with Recalloom's authoritative revision/CAS saving. */
 const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;recordId?:string}>(function VisualEditor({value,onChange,recordId},ref){
  const checked=useRef(false);
  const [ready,setReady]=useState(false);
@@ -91,12 +93,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const sel=e.state.selection,$from=sel.$from;
   if(!sel.empty||!e.isEditable||!$from.parent.isTextblock||$from.parent.type.spec.code){setWiki(null);return false;}
   const before=$from.parent.textBetween(0,$from.parentOffset,undefined,LEAF_PLACEHOLDER);
-  const embed=/^\{\{embed:([^}\n]{0,120})$/.exec(before.trimStart());
+  const embed=/^::: embed ([^\n]{0,120})$/.exec(before.trimStart());
   const link=/(?:^|[\s(])\[\[([^\]\n]{0,120})$/.exec(before);
   const kind=embed?'embed':link?'link':null;
   if(!kind){setWiki(null);return false;}
   const query=embed?.[1]??link?.[1]??'';
-  const from=$from.pos-query.length-(kind==='embed'?8:2);
+  const from=$from.pos-query.length-(kind==='embed'?10:2);
   const surface=surfaceRef.current;
   if(!surface){setWiki(null);return true;}
   const coords=e.view.coordsAtPos(from),box=surface.getBoundingClientRect();
@@ -138,22 +140,21 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   ScrollCodeBlock.configure({defaultTheme:'github-light-high-contrast',themes:{light:'github-light-high-contrast',dark:'github-dark-high-contrast'}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
-  Markdown,
-   RawMarkdown,RawInline,
+  RawMarkdown,RawInline,RmdAttrsDecorations,
   WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),CrossReferenceNode,
   RichImage.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:CaptionedScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
-  UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
+  UnderlineWithMarkdown,RmdMark,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
   RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
-  InlineMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
-  BlockMathWithHighlight.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true,equationId:String(node.attrs.equationId??'')})}),
+  InlineMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),
+  RmdBlockMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'block',latex:String(node.attrs.latex??''),position:pos,existing:true,equationId:String(node.attrs.equationId??'')})}),
   Placeholder.configure({placeholder:({editor:e,node})=>node.type.name==='heading'?'标题 '+String(node.attrs.level??''):e.isEmpty?'输入“/”插入内容，或直接开始写作…':'输入“/”插入块'}),
  ],[recordId]);
  const editor=useEditor({
-  extensions,content:'',contentType:'markdown',immediatelyRender:false,
-  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(editor.getMarkdown());}if(!detectWiki(editor))detectSlash(editor);},
+  extensions,content:{type:'doc',content:[{type:'paragraph'}]},immediatelyRender:false,
+  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(serializeRmdVisual(editor.getJSON()));}if(!detectWiki(editor))detectSlash(editor);},
   onSelectionUpdate:({editor})=>{if(!detectWiki(editor))detectSlash(editor);followTableSelection(editor);},
   // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
   onFocus:({editor})=>followTableSelection(editor),
@@ -204,7 +205,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   codeBlock:e?.isActive('codeBlock')??false,
   underline:e?.isActive('underline')??false,
   strike:e?.isActive('strike')??false,
-  highlight:e?.isActive('highlight')??false,
+  highlight:e?.isActive('rmdMark')??false,
   superscript:e?.isActive('superscript')??false,
   subscript:e?.isActive('subscript')??false,
   link:e?.isActive('link')??false,
@@ -223,8 +224,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   checked.current=true;
   applying.current=true;
   try{
-   const manager=(editor as typeof editor&{markdown:{parse:(md:string)=>JSONContent;serialize:(doc:JSONContent)=>string}}).markdown;
-   const richDocument=buildVisualMarkdown(value,manager);
+   const richDocument=parseRmdVisual(value);
    editor.commands.setContent(richDocument,{emitUpdate:false});
   }catch{
    // Even when an extension fails, the user must never be trapped in a
@@ -241,7 +241,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
   view.domObserver?.flush();
-  return edited.current?editor.getMarkdown():null;
+  return edited.current?serializeRmdVisual(editor.getJSON()):null;
  }}),[editor]);
 
  chooseWikiRef.current=hit=>{
@@ -349,7 +349,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
-  {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleHighlight().run(),<span className="toolbar-highlight">H</span>)}
+  {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleMark('rmdMark').run(),<span className="toolbar-highlight">H</span>)}
  </>;
  return <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
@@ -388,7 +388,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    <div className="wysiwyg-tools">
     {action('插入或编辑链接',openLink,<Link2 size={17}/>)}
     {action('引用 Wiki 文档',()=>editor.chain().focus().insertContent('[[').run(),'[[]]')}
-    {action('嵌入 Wiki 文档',()=>editor.chain().focus().insertContent('{{embed:').run(),'{{}}')}
+    {action('嵌入 Wiki 文档',()=>editor.chain().focus().insertContent({type:'paragraph',content:[{type:'text',text:'::: embed '}]}).run(),':::')}
     {action('插入或编辑图片',openImage,<ImagePlus size={17}/>)}
     {action('插入行内公式',()=>openMath('inline'),<Sigma size={17}/>)}
     {action('插入块级公式',()=>openMath('block'),<>$$</>)}

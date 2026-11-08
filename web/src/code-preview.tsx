@@ -3,9 +3,11 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {Copy,WrapText,ChevronDown,ChevronUp,FileCode2} from 'lucide-react';
 import type {CodeMeta} from './code-meta';
 import MermaidDiagram from './mermaid-diagram';
+import {isRmdId} from './rmd-schema';
+import {headingAnchor} from './wiki-slug';
 
-export default function ShikiCodePreview({code,language,filename,wrap:defaultWrap,expand:alwaysExpand}:{
- code:string;language:string|null;filename?:string;wrap?:boolean;expand?:boolean;
+export default function ShikiCodePreview({code,language,id,filename,wrap:defaultWrap,expand:alwaysExpand}:{
+ code:string;language:string|null;id?:string;filename?:string;wrap?:boolean;expand?:boolean;
 }){
  const [html,setHtml]=useState<string|null>(null);
  const [wrap,setWrap]=useState(!!defaultWrap);
@@ -25,7 +27,7 @@ export default function ShikiCodePreview({code,language,filename,wrap:defaultWra
   })();
   return()=>{alive=false;};
  },[code,language]);
- return <div className={'rk-code-block rk-code-preview'+(wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')}>
+ return <div id={id&&isRmdId(id)?headingAnchor(id):undefined} className={'rk-code-block rk-code-preview'+(wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')}>
   <div className="rk-code-header">
    <div className="rk-code-title"><FileCode2 size={15} aria-hidden="true"/><span>{filename||language||'Text'}</span></div>
    <div className="rk-code-actions">
@@ -51,6 +53,9 @@ export function codePropsFromElement(child:unknown):CodeMeta&{code:string}{
  const cls=String(props.className??'');
  return {
   language:/language-([a-z0-9_+.#-]+)/i.exec(cls)?.[1]??null,
+  // rehype-sanitize already prefixes id to prevent DOM clobbering; the
+  // Shiki wrapper applies exactly one canonical prefix of its own.
+  id:String(props.id??'').replace(/^user-content-/,''),
   filename:String(props['data-file']??''),
   wrap:String(props['data-wrap']??'')==='true',
   expand:String(props['data-expand']??'')==='true',

@@ -16,7 +16,15 @@ Recalloom 是一个可自部署的版本化个人知识库，同时提供 Web �
 - **备份与恢复**：提供知识库快照导出和恢复前检查，便于迁移与备份。
 - **安全连接**：使用 OAuth 授权 MCP 客户端，可分别授予读取与写入权限。
 
-**Web 管理控制台**：可通过浏览器登录、浏览目录、编辑 Markdown 与结构化任务、查看版本历史和活动、搜索知识库及管理会话。提供亮色/暗色模式、移动端布局，以及 Tiptap 可视化编辑与 Markdown 源码编辑。与 MCP 客户端共享相同的内容和版本历史。前端以 Astryx Neutral 为设计系统，基础控件优先使用 Astryx；Markdown 编辑器与知识库业务视图按需组合实现。关系网画布使用独立按需加载的 Cytoscape.js，不会加入普通首页的图形渲染负担。
+**Web 管理控制台**：可通过浏览器登录、浏览目录、编辑 Markdown 与结构化任务、查看版本历史和活动、搜索知识库及管理会话。提供亮色/暗色模式、移动端布局，以及 RMD 1.0 的 Tiptap 可视化编辑、Markdown 源码编辑和独立的只读预览。与 MCP 客户端共享相同的内容和版本历史。前端以 Astryx Neutral 为设计系统，基础控件优先使用 Astryx；Markdown 编辑器与知识库业务视图按需组合实现。关系网画布使用独立按需加载的 Cytoscape.js，不会加入普通首页的图形渲染负担。
+
+## RMD 1.0：新一代 Markdown 语法
+
+Recalloom 使用统一的 RMD 1.0 词法与渲染管线，在标准 CommonMark/GFM/KaTeX 基础上提供：**行内/块级 Mark、九色 Highlight、八种 Callout、Badge、Tooltip、Abbr、Kbd、Cloze、Details、Tabs、Flashcard、Glossary、Chat、CriticMarkup 多 Agent 审阅、单行/多行注释、块属性、同文档引用与只读 Wiki 嵌入、链接卡片**。语法统一采用对称的 `::` 行内、`:::` 块级和 `@ attrs` 修饰符。只有完整有效的扩展被解释为组件；格式错误原样显示为文本。
+
+- [**完整可复制语法展示与交互示例**](docs/rmd-1.0-syntax-showcase.md)：逐类展示全部 RMD 1.0 语法，涵盖正例、非法写法和三种视图区别。
+- [渲染管线、属性规则和安全审计](docs/rich-markdown.md)：架构、测试和安全边界。
+- Web 中也可使用 MCP `get_help({"topic":"markdown"})`、`get_help({"topic":"wiki"})` 阅读相同的权威帮助说明。
 
 ## 知识关系网
 
@@ -102,7 +110,7 @@ Recalloom 不会自动保存每条对话；需要由客户端根据你的要求�
 
 ### MCP 帮助与扩展 Markdown
 
-MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、`<mark>` 高亮（包含行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务、归档生命周期及备份。通过 `get_help({"topic":"lifecycle"})` 可查看安全归档、永久删除及递归目录删除的完整规则。
+MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、RMD 1.0 Mark 与九色 Highlight（支持行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务、归档生命周期及备份。通过 `get_help({"topic":"lifecycle"})` 可查看安全归档、永久删除及递归目录删除的完整规则。
 
 支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
 

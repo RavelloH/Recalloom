@@ -4,8 +4,8 @@ import type {JSONContent} from '@tiptap/core';
 /**
  * Unsupported Markdown stays readable, editable plain text instead of
  * becoming a rich-text representation of syntax we do not understand.
- * The Markdown serializer deliberately emits its text verbatim, without
- * treating brackets, angle brackets or footnote markers as formatting.
+ * Only the shared RMD serializer emits its text verbatim; ProseMirror merely
+ * stores an editable source slice while preserving surrounding rich content.
  */
 export const RawMarkdown=Node.create({
  name:'rawMarkdown',
@@ -15,10 +15,7 @@ export const RawMarkdown=Node.create({
  isolating:true,
  priority:60,
  parseHTML(){return [{tag:'p[data-raw-markdown]'}];},
- renderHTML({HTMLAttributes}){return ['p',mergeAttributes(HTMLAttributes,{'data-raw-markdown':''}),0];},
- renderMarkdown(node:JSONContent){
-  return (node.content??[]).map(child=>child.text??'').join('');
- }
+ renderHTML({HTMLAttributes}){return ['p',mergeAttributes(HTMLAttributes,{'data-raw-markdown':''}),0];}
 });
 
 /** One editable block with a verbatim Markdown source fragment. */
@@ -37,8 +34,5 @@ export const RawInline=Node.create({
  defining:true,
  priority:65,
  parseHTML(){return [{tag:'span[data-raw-inline]'}];},
- renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-raw-inline':''}),0];},
- renderMarkdown(node:JSONContent){
-  return (node.content??[]).map(child=>child.text??'').join('');
- }
+ renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-raw-inline':''}),0];}
 });

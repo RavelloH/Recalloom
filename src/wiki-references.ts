@@ -150,7 +150,7 @@ export async function listWikiReferences(env:Env,id:string){
   " FROM record_references wr JOIN records s ON s.id=wr.source_id"+
   " LEFT JOIN records t ON t.id=wr.target_id"+
   " WHERE wr.source_id=? OR wr.target_id=?"+
-  " ORDER BY wr.kind,wr.source_id,wr.source_offset LIMIT 301"
+  " ORDER BY wr.source_id,wr.source_offset,wr.kind LIMIT 301"
  ).bind(id,id).all()).results as Array<ReferenceRow&{sourceName:string;targetName:string|null}>;
  return {items:rows.slice(0,300),truncated:rows.length>300};
 }
@@ -173,7 +173,7 @@ export async function backfillWikiReferences(env:Env,resolvePath:PathResolver,op
  ).bind(after,limit).all<{id:string;content:string;revision:number}>()).results;
  let matched=0,inserted=0;
  for(const doc of docs){
-  if(!doc.content.includes('[[')&&!doc.content.includes('{{embed:'))continue;
+  if(!doc.content.includes('[[')&&!doc.content.includes('::: embed '))continue;
   const refs=await prepareWikiProjection(env,doc.id,doc.content,doc.revision,resolvePath);
   if(!refs.length)continue;
   matched++;

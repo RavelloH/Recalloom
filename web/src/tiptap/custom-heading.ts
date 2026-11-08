@@ -1,73 +1,29 @@
-/**
- * 自定义 Heading 扩展
- *
- * 支持文本对齐属性，并在 Markdown 序列化时输出对齐的 <h1-h6> 标签
- * Recalloom 使用独立的 Markdown 大纲；不复用 NeutralPress 的标题节点视图
- */
-
-import Heading from "@tiptap/extension-heading";
+import Heading from '@tiptap/extension-heading';
 import {mergeAttributes} from '@tiptap/core';
 import {headingAnchor} from '../wiki-slug';
-import type { JSONContent } from "@tiptap/react";
 
-
-
-export const CustomHeading = Heading.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      textAlign: {
-        default: "left",
-        parseHTML: (element: HTMLElement) => element.style.textAlign || "left",
-        renderHTML: (attributes: { textAlign?: string }) => {
-          if (!attributes.textAlign || attributes.textAlign === "left") {
-            return {};
-          }
-          return {
-            style: `text-align: ${attributes.textAlign}`,
-          };
-        },
-      },
-      id: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.id || null,
-        renderHTML: (attributes: { id?: string }) => {
-          if (!attributes.id) {
-            return {};
-          }
-          return {
-            id: attributes.id,
-          };
-        },
-      },
-    };
-  },
-
-  renderHTML({node,HTMLAttributes}){
-    return ['h'+node.attrs.level,mergeAttributes(this.options.HTMLAttributes,HTMLAttributes,{
-      id:headingAnchor(String(node.attrs.id||node.textContent))
-    }),0];
-  },
-
-  renderMarkdown(
-    node: JSONContent,
-    helpers: {
-      renderChildren: (nodes: JSONContent | JSONContent[]) => string;
-    },
-  ) {
-    const level = node.attrs?.level || 1;
-    const align = node.attrs?.textAlign;
-    const content = helpers.renderChildren(node.content || []);
-    const prefix = "#".repeat(level);
-    const id=typeof node.attrs?.id==='string'&&/^[a-z][a-z0-9-]{0,79}$/i.test(node.attrs.id)?String(node.attrs.id).toLowerCase():'';
-    const suffix=id?' {#'+id+'}':'';
-
-    // 左对齐或无对齐：使用标准 Markdown 标题
-    if (!align || align === "left") {
-      return `${prefix} ${content}${suffix}`;
-    }
-
-    // 其他对齐：使用 HTML 标题标签
-    return `<h${level} style="text-align: ${align};">${content}</h${level}>`;
-  },
+/** Rich heading presentation. Source IDs and serialization belong solely
+ * to RMD's semantic parser and canonical serializer.
+ */
+export const CustomHeading=Heading.extend({
+ addAttributes(){
+  return {...this.parent?.(),
+   textAlign:{
+    default:'left',
+    parseHTML:(element:HTMLElement)=>element.style.textAlign||'left',
+    renderHTML:(attributes:{textAlign?:string})=>
+     !attributes.textAlign||attributes.textAlign==='left'?{}:{style:'text-align: '+attributes.textAlign}
+   },
+   id:{
+    default:null,
+    parseHTML:(element:HTMLElement)=>element.id||null,
+    renderHTML:(attributes:{id?:string})=>attributes.id?{id:attributes.id}:{}
+   }
+  };
+ },
+ renderHTML({node,HTMLAttributes}){
+  return ['h'+node.attrs.level,mergeAttributes(this.options.HTMLAttributes,HTMLAttributes,{
+   id:headingAnchor(String(node.attrs.id||node.textContent))
+  }),0];
+ }
 });

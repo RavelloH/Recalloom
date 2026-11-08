@@ -2,7 +2,8 @@ import React,{useEffect,useState} from 'react';
 import Image from '@tiptap/extension-image';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {serializeFigureSuffix,safeFigureImageSrc} from '../figure-syntax';
+import {safeFigureImageSrc} from '../figure-syntax';
+import {formatRmdBlockAttrs} from '../rmd-serialize';
 import {validCrossRefId} from '../cross-reference';
 import {useReferenceIndex} from './cross-reference';
 import {headingAnchor} from '../wiki-slug';
@@ -45,6 +46,7 @@ function FigureNodeView({node,updateAttributes,selected,editor}:NodeViewProps){
      style={{width:widthValue?widthValue+'px':undefined,height:heightValue?heightValue+'px':undefined,objectFit:'contain'}}/>
    :<div className="rk-rich-figure-invalid">图片地址不可用</div>}
   {(attrs.caption||number)&&<figcaption className="rk-rich-figcaption">{number&&<strong className="rk-cross-caption-number">{number}{attrs.caption?'：':''}</strong>}{cleanText(attrs.caption)}</figcaption>}
+  {formatRmdBlockAttrs({type:'image',attrs})&&<span contentEditable={false} className="rk-rmd-attrs-decoration" aria-label="图片 Markdown 属性">{formatRmdBlockAttrs({type:'image',attrs})}</span>}
   {selected&&<div className="rk-rich-figure-controls" contentEditable={false}>
    <TextInput label="图注（可选）" width="100%" value={caption} onChange={setCaption} onBlur={commitCaption}
      placeholder="为这张图片添加说明"/>
@@ -66,19 +68,6 @@ export const RichImage=Image.extend({
  renderHTML({HTMLAttributes}){
   const {caption:_caption,figureId:_figureId,...attrs}=HTMLAttributes;
   return ['img',attrs];
- },
- renderMarkdown(node){
-  const attrs=node.attrs??{};
-  const alt=String(attrs.alt??'').replace(/\\/g,'\\\\').replace(/\]/g,'\\]');
-  const src=String(attrs.src??'').replace(/\s/g,'%20');
-  const title=String(attrs.title??'');
-  const image='!['+alt+']('+src+(title?' "'+title.replace(/"/g,'\\"')+'"':'')+')';
-  const suffix=serializeFigureSuffix({
-   width:sizeAttr(attrs.width),
-   height:sizeAttr(attrs.height),
-   caption:cleanText(attrs.caption),id:validCrossRefId(attrs.figureId,'fig')?attrs.figureId:undefined
-  });
-  return image+suffix;
  },
  addNodeView(){return ReactNodeViewRenderer(FigureNodeView);}
 });

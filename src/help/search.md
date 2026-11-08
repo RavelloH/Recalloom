@@ -19,7 +19,7 @@ semantic 使用 Vectorize，异步分块索引可能滞后；不可把“未检�
 ## 关系的不同类型
 
 - 手动显式关系：由 manage_link 创建、移除，list_links 可读取。
-- Wiki 自动引用：来自 Markdown [[id:UUID]]、[[/路径.md]] 与 {{embed:...}}，不会由 manage_link 自动等价创建；其目标身份与索引见 wiki 帮助。
+- Wiki 自动引用：来自 Markdown [[id:UUID]]、[[/路径.md]] 与 RMD 1.0 的 ::: embed 目标 :::，不会由 manage_link 自动等价创建；其目标身份与索引见 wiki 帮助。
 - 语义候选：Vectorize 根据文本相似度推荐，**不是已确认关系，不会自动保存为手动链接**。
 - 同目录关系：关系图可展示同目录近邻，不能当作内容相互引用的证据。
 

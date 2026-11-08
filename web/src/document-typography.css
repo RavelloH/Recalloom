@@ -478,3 +478,80 @@
 .rk-callout-heading[data-callout-kind="question"] svg {color:var(--color-primary);}
 .rk-callout-heading[data-callout-kind="example"] svg {color:var(--color-primary);}
 .rk-callout-heading[data-callout-kind="tip"] svg {color:var(--color-success, #16835a);}
+
+
+/* RMD 1.0 block Mark keeps the existing #f5d870 visual baseline.
+ * Colored Highlight uses EXACTLY the existing inline color tokens.
+ * Full display math is one centered, continuous background surface. */
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark {
+ --rk-rmd-block-background:#f5d870;
+ display:flow-root;
+ width:100%;
+ max-width:min(100%,var(--rk-wide-measure));
+ box-sizing:border-box;
+ margin:24px auto;
+ padding:.3em .5em;
+ color:#251e0e;
+ background:var(--rk-rmd-block-background);
+ border-radius:4px;
+ overflow-x:auto;
+}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color] {color:inherit;}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="red"] {--rk-rmd-block-background:var(--color-background-red,#fddede);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="orange"] {--rk-rmd-block-background:var(--color-background-orange,#ffe8d5);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="yellow"] {--rk-rmd-block-background:var(--color-background-yellow,#fff0ba);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="green"] {--rk-rmd-block-background:var(--color-background-green,#d7f3df);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="blue"] {--rk-rmd-block-background:var(--color-background-blue,#dceaff);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="purple"] {--rk-rmd-block-background:var(--color-background-purple,#ecdfff);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="pink"] {--rk-rmd-block-background:var(--color-background-pink,#ffe0ed);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="cyan"] {--rk-rmd-block-background:var(--color-background-cyan,#d4f5fb);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="teal"] {--rk-rmd-block-background:var(--color-background-teal,#d6efef);}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :first-child {margin-top:0;}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :last-child {margin-bottom:0;}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark:has(> .katex-display:only-child) {
+ width:max-content;
+ max-width:100%;
+}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display {
+ background:transparent!important;
+ color:inherit;
+ width:max-content;
+ min-width:0;
+ max-width:none;
+ margin-inline:auto;
+ padding:0;
+}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display > .katex {
+ display:inline-block;
+ width:max-content;
+ max-width:none;
+}
+
+
+/* RMD editor-specific DOM: ProseMirror's editable wrapper is inside
+ * the semantic block. Do not let math create a second yellow background. */
+.record-main .tiptap .rk-rmd-block-mark .rk-directive-body {
+ min-width:0;
+ overflow-wrap:anywhere;
+}
+.record-main .tiptap .rk-rmd-block-mark .tiptap-mathematics-render[data-type="block-math"] {
+ display:flex;
+ justify-content:safe center;
+ max-width:100%;
+ overflow-x:auto;
+}
+.record-main .tiptap .rk-rmd-block-mark .block-math-inner {
+ background:transparent!important;
+ color:inherit;
+ margin-inline:auto;
+}
+.record-main .tiptap .rk-rmd-comment-block {
+ color:var(--color-text-tertiary,var(--rk-ink-faint));
+ font-size:.89em;
+ line-height:1.58;
+ font-style:italic;
+ opacity:.8;
+ border-inline-start:2px solid var(--rk-document-border);
+ padding-inline-start:.8rem;
+ margin-block:.7rem;
+}

@@ -29,7 +29,7 @@ export function normalizeKnownMarkdown(source:string):string{
      const kind=types[match[1]!.toUpperCase()];
      const lines=original.slice(match[0].length).split('\n');
      const inner=lines.map(line=>line.replace(/^ {0,3}>[ \t]?/,'')).join('\n').trim();
-     blocks.push({start,end,text:':::'+kind+'\n\n'+(inner||' ')+'\n\n:::'});
+     blocks.push({start,end,text:'::: '+kind+'\n\n'+(inner||' ')+'\n\n:::'});
      return;
     }
    }
@@ -37,8 +37,8 @@ export function normalizeKnownMarkdown(source:string):string{
     const raw=source.slice(start,end);
     const found=/^<details(?:\s+open(?:=["']?open["']?)?)?\s*>\s*<summary>\s*([^<>\r\n]{1,180})\s*<\/summary>\s*([\s\S]*?)\s*<\/details>$/i.exec(raw.trim());
     if(found&&found[2]?.trim()){
-     const title=found[1]!.trim().replace(/\\/g,'\\\\').replace(/\[/g,'\\[').replace(/\]/g,'\\]');
-     blocks.push({start,end,text:':::details['+title+']\n\n'+found[2]!.trim()+'\n\n:::'});
+     const title=found[1]!.trim();
+     blocks.push({start,end,text:'::: details '+title+'\n\n'+found[2]!.trim()+'\n\n:::'});
      return;
     }
    }
@@ -57,8 +57,8 @@ export function normalizeKnownMarkdown(source:string):string{
      (end<source.length&&source[end]!=='\n')||
      protectedRanges.some(range=>start<range.end&&end>range.start)||
      blocks.some(block=>start<block.end&&end>block.start))continue;
-  const title=match[1]!.trim().replace(/\\/g,'\\\\').replace(/\[/g,'\\[').replace(/\]/g,'\\]');
-  blocks.push({start,end,text:':::details['+title+']\n\n'+body+'\n\n:::'});
+  const title=match[1]!.trim();
+  blocks.push({start,end,text:'::: details '+title+'\n\n'+body+'\n\n:::'});
  }
  // Inline HTML kbd tags are commonly split into three MDAST siblings.
  // Use AST ranges to ensure only actual prose, never code, is transformed.
@@ -70,7 +70,7 @@ export function normalizeKnownMarkdown(source:string):string{
      blocks.some(block=>start<block.end&&end>block.start))continue;
   const body=m[1]!;
   if(body.includes(']')||body.includes('[')||body.includes('\\'))continue;
-  inline.push({start,end,text:':kbd['+body+']'});
+  inline.push({start,end,text:':: kbd '+body+' ::'});
  }
  let next=source;
  const patches=[...blocks,...inline].sort((a,b)=>b.start-a.start);

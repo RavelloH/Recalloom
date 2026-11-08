@@ -1,68 +1,64 @@
-# 文档编辑与并发安全
+# 文档编辑、审阅与多 Agent 并发安全
 
-Recalloom 把最新正文与 text-version 历史版本分开管理。所有正文修改必须在已授权的情况下执行，并避免覆盖并行 Agent 的工作。
+Recalloom 将 Markdown **正文**、记录**元信息**以及 text-version 历史版本分别管理。编辑正文应走 `edit_record`，标题、路径、标签、归档等独立属性应走对应的元数据操作。**不要在 Markdown 中编造 YAML Front Matter 或假定数据库会从正文提取文件元信息。**
 
 ## 选择编辑方式
 
-| 需求 | 工具或模式 |
+| 操作目标 | 建议工具 |
 | --- | --- |
-| 新建文档 | create_record（kind=document） |
-| 完整替换正文 | edit_record mode=rewrite |
-| 末尾追加 | edit_record mode=append |
-| 单段精确替换 | edit_record mode=replace |
-| 多段精确替换 | edit_record mode=replace_many |
-| Unified Diff | edit_record mode=patch |
-| 插入/替换/删除指定行 | edit_record mode=lines |
-| 重命名、移动或归档 | manage_record |
-| 任务列表条目 | mutate_task，不用 edit_record |
+| 新建文档 | `create_record`（`kind=document`） |
+| 读取权威正文及 Revision | `read_record` |
+| 完整替换（影响最大） | `edit_record mode=rewrite` |
+| 追加新的章节 | `edit_record mode=append` |
+| 单处精确替换 | `edit_record mode=replace` |
+| 多处精确替换 | `edit_record mode=replace_many` |
+| 按 Unified Diff 修改 | `edit_record mode=patch` |
+| 按行插入、替换、删除 | `edit_record mode=lines` |
+| 记录重命名、移动、归档 | `manage_record` |
+| 结构化任务条目 | `mutate_task`，不能伪装成普通 `edit_record` |
 
-## Web 编辑器的两种模式
+**写入流程**：先定位 UUID → `read_record` 读取正文及当前 Revision → 准备最小差异 → 以 `expectedRevision` 写入 → 检查返回内容及 Revision → 必要时重新读取确认。若 Revision 冲突，必须读取最新正文并重新合并，不能用旧内容强行覆盖另一个 Agent 的工作。精确替换要检查预期命中次数；重大修改建议先 `dryRun`。无修改意图时只读，不产生版本。
 
-- **可视化（默认）**：统一阅读、编辑已支持的 Markdown；未知语法显示为普通可编辑文本，编辑其余内容时保留未知片段原文。
-- **源码**：直接修改 Markdown 全文，适合不被可视化解析的语法与精确格式修改。
-- 两种模式操作同一份 Markdown 正文，不再有独立的文档预览模式；只读嵌入不等于第三种编辑模式。
-- 仅切换模式、查看文档不应自动保存。用户真正编辑可视化内容后，支持的语法允许合理规范化，而不能丢失未知语法和未触及的内容。
+## Web 的可视化、源码与预览
 
-## 正确的读改写流程
+- **可视化**：直接编辑已支持的 CommonMark/GFM 和 RMD 1.0 组件；使用共享 AST 转换为 Tiptap 文档，编辑时经规范序列化重新生成 Markdown。未知语法保留为可编辑的字面原文。
+- **源码**：精确编辑全部 Markdown，尤其是未知语法、局部转义和原文保真检查。
+- **预览**：只读投影最新草稿，隐藏有效内部注释和未接受的审阅新增内容，**不能自行接受变更或调用写入 API**。
+- 三个界面读取**同一份 Markdown 草稿**；仅切换视图、查看内容或重载展示组件不会触发修订。可视化修改要经用户保存及 CAS 校验才能写入 D1。
 
-1. 通过 resolve_path、browse 或 search 找到已有记录，不要凭名称猜 UUID。
-2. 使用 read_record 获取**当前正文与 revision**；大文档可用 get_outline 和分段读取。
-3. 构造最小必要修改，保留无关内容及特殊 Markdown/LaTeX 字符。
-4. 如需试算，先用 edit_record 的 dryRun 验证。
-5. 真实提交时提供 expectedRevision（来自刚读取的当前版本）；发生 VERSION_CONFLICT 时，重读正文、人工协调差异，不能盲目重试或覆盖。
-6. 使用 MCP 的 manage_record 或 manage_folder 修改元数据时，**必须**提供读取到的 expectedMetadataRevision；注意它与正文 revision 不同。旧版本会收到 METADATA_CONFLICT，不能省略预期版本来绕过冲突。Web API 的参数约束可能与 MCP 不同。
+新内容的唯一规范扩展语法是 **RMD 1.0**：`:: 名称 正文 | 参数 ::`、`::: 容器`、`@ attrs`、`[[...]]` 和 `::: embed 目标 :::`。旧的 `:badge[...]{...}`、`{#fig-id}`、`{{embed:...}}`、`@fig-id` 等不再是新管线的推荐或兼容入口。查看完整例子请用 `get_help({topic:"markdown"})`；数学使用 `get_help({topic:"math"})`。
 
-## 精确替换与行操作
+## 内容与视觉状态的隔离
 
-- replace 的 oldText 必须为原文精确子串；可以用 expectedReplacements 指定出现次数。
-- replace_many 支持多个 oldText/newText 项，别把多步替换当作任意不受约束的正则操作。
-- patch 使用 Unified Diff，依据当前正文校验。
-- lines 的 start 是从 1 开始的行号，支持 insert/replace/delete 操作；读取分段内容时需核对行号和版本。
-- rewrite 风险最高；只需局部编辑时优先使用更窄的修改方式。
+Markdown 正文是唯一事实来源。CSS、Shiki 高亮缓存、Mermaid 图片、站点图标、KaTeX HTML、Wiki 嵌入预览、Tabs 当前标签、Cloze 答案可见性和 Details 展开状态都**不是独立的内容修订**。
 
-## Markdown 注意事项
+- Mark 默认黄色背景维持 `#f5d870`，行内/块公式整体高亮包裹应基于数学盒子的实际尺寸。彩色 Highlight 沿用现有九色，不将 Mark 转为黄色 Highlight。
+- Banner、Tabs、Chat、Flashcard、Details、Badge、Tooltip、Abbr、Kbd、Cloze 的展开、收起或悬停只改变表现状态，不能使打开中的文档自动进入“未保存”状态。
+- 有效 `@ attrs` 在可视化内可以作为弱化、斜体的非持久装饰显示；无效修饰必须保留为红色斜体的真实文字。装饰不进入 ProseMirror 正文，不参与 Markdown 序列化。
+- 可视化 `%%单行注释%%` 与独立 `%%` 多行块注释可以编辑；预览和 Wiki 投影隐藏有效注释，代码/公式里的字面符号不受影响。
+- **严禁**向 Tiptap 的 NodeViewContent 注入动态 Tooltip DOM 或让异步资源加载直接修改 ProseMirror 管理的节点内容。
+- 深色/浅色主题切换、双主题 Shiki、Mermaid 重新渲染、链接图标异步加载、移动端滚动调整都不应触发编辑事务。
 
-edit_record 保存的是 Markdown 源码，不是渲染后的 HTML。行内 KaTeX 使用 $...$，块公式使用独立 $$ 行；使用 <mark> 包裹公式时须遵守 math 的换行规则。Wiki 引用的 UUID 与路径应依据已确认的记录解析，详见 wiki。
+## 交叉引用与复用
 
-结构化 task_list 的具体状态、优先级和条目管理详见 tasks。归档会从活动路径移除记录，删除文件夹将归档其所有后代，永久删除只允许已归档记录；详细安全和并发规则参见 lifecycle。
+标题、段落、图、块公式和 GFM 表格可用 `@ attrs stable-id @` 指定 Markdown 内的局部 ID。`fig-`、`eq-`、`tbl-` 编号从当前文档 AST 按需派生，使用 `[[#fig-id]]` 等同文档引用；目标文档章节引用使用 `[[id:UUID#heading-id]]`。不在数据库维护独立块编号表。
 
-## Rich Markdown 的编辑与保存
+Wiki 文档嵌入 `::: embed id:UUID :::` 是只读投影：它不会把目标正文复制进本篇，也不能修改被引用文档。服务端自动反向链接索引与前端预览使用相同目标身份语法，路径首先固定 UUID；目标移动或旧路径被占用后不得随意重绑定。
 
-Banner、Collapsible、Badge、显式缩略词和提示、始终可见的注释、彩色高亮和增强代码块的具体语法见 markdown 帮助主题。缩略词/提示在可视化编辑器内使用无 DOM 副作用的 CSS 主题化提示层，Wiki 嵌入则可复用 Astryx Tooltip。**严禁在 Tiptap NodeViewContent 内挂载动态 Tooltip 触发器**：此行为会使包含 :abbr 或 :tooltip 的文档首次打开就错误进入“未保存”状态；提示展示绝不能触发内容编辑。**打开文档、等待 Shiki 高亮、异步获取链接图标都不得触发未保存状态。** 外链图标是运行时表现，不应写入内容版本。浏览器直接向 Meta API 发送完整网站链接，完整路径会被解析服务看到，但查询参数与锚点会预先移除；原站 HTTP/HTTPS 图片则通过有会话鉴权的同源图片代理 `/api/link-image` 下载。此代理不能公开、不能被滥用为访问内网的通用代理，也不得返回可执行的同源 SVG/HTML。
+图片 ID、尺寸、图注可在图片工具栏显式编辑；公式 ID 可在数学弹窗编辑；表格 ID/图注可在表格工具栏修改。只有属性真正变化才应该引起草稿更新。有效修饰符和代码 `file` / `wrap` / `expand` 的显示应保持无损往返；未知属性不得被误识别为已支持参数。
 
-文档元信息不由 Markdown Front Matter 提供。Recalloom 的标题、标签、路径、状态等独立记录属性只通过数据库/API 修改。已有 `---`/`+++` 风格的文档头部只作为普通可编辑文本保留，不能识别为属性卡片、解析 YAML 标签或覆盖数据库元信息；不要建议 Agent 在文档中添加 YAML 元数据头。
+## CriticMarkup 与审阅权限
 
-Astryx Tabs 在可视化编辑模式直接切换当前可见面板，未选中面板只是 CSS 隐藏而非卸载；点击标签不能触发文档编辑或丢失未选中的内容。标题 {#id} 和段落末尾 ^block-id 在可视化中变成稳定 DOM 锚点，源码导出时重新附上原标记。相同 ID 需人工避免重复；图片、块数学公式与整张 GFM 表格已经支持显式 fig-/eq-/tbl- ID 和 @id 引用，但列表项与表格单元格的固定 ID 暂未实现。
+五种审阅标记 `{++新增++}`、`{--删除--}`、`{~~旧~>新~~}`、`{==重点==}`、`{>>批注<<}` 仅表达建议。可视化中的**接受 / 拒绝 / 解决**操作产生可撤销的草稿变更，仍需用户明确点击保存；预览显示未审批情况下的**已确认正文**，绝不能擅自采用新版本。Agent 不应把 CriticMarkup 建议或批注文字当成授权操作。
 
-移动端 CriticMarkup 的替换箭头、批注图标和接受/拒绝按钮必须与相邻文字保持行内布局，不能被全局 SVG 块级样式强制换行；图标与正文只允许表现层变化，不可触发 Tiptap 未保存状态。
+移动端的替换箭头、批注图标和接受/拒绝按钮必须保持行内布局。节点卸载、滚动、提示浮层开合或屏幕尺寸变化不应重排正文、丢失隐藏内容或触发虚假保存。
 
-CriticMarkup 五种审阅标记 `{++新增++}`、`{--删除--}`、`{~~旧~>新~~}`、`{==重点==}`、`{>>批注<<}` 都只表达建议；可视化中显示弱化但不隐藏的批注和建议，编辑/保存仍以原 Markdown 为权威。可视化编辑器现在提供**显式接受/拒绝**（纯批注为“解决”）按钮，操作只更改本地草稿，可以撤销，仍需用户点击保存并接受 Revision/CAS 检查。Agent 不能把标记本身视为用户审批，也没有独立的 MCP 审阅审批工具。
-长文档的站点图标使用外部 CSSOM 样式，不可直接修改 ProseMirror 管理的链接 DOM，避免编辑器无限布局和内存泄漏。
+## 外部网络与安全边界
 
-深浅主题切换不能改变文档内容或触发保存。代码区使用跟随 data-effective-theme 的 Shiki high-contrast 双主题，Mermaid 重新渲染为安全独立图像，图标必须经鉴权图片代理并在中性边框底板上显示；任何这些表现层变化都不得通过直接修改 ProseMirror 内的 DOM 属性实现。
+Markdown 用户内容不能作为信任的 MDX/JSX 执行。只支持白名单 HTML/组件，过滤不安全脚本、iframe、事件属性及危险 URL。外部站点图标可按需请求并通过中性底板显示，但不可直接改写 ProseMirror 链接节点 DOM。
 
-学习闪卡 `::::flashcard` 包含 `:::front`（问题）和 `:::back`（答案）。**可视化编辑器默认显示问题、折叠答案；点击 Astryx“显示答案”即可展开并直接编辑，之后可收起。** Cloze `:cloze[答案]{hint="提示"}` 也在可视化编辑器中点击揭示并直接编辑答案，文本节点始终挂载；Tabs 在可视化编辑器中切换真正可见的面板。展开、收起、切换不是文档修订，不能自动调用 edit_record 或解释为授权删除。Kbd `:kbd[...]` 只展示而不执行。Wiki 的只读嵌入只是投影，不是 Recalloom 的第三种模式。复习调度、评分与统计仍未实现。
+浏览器请求站点 Meta API 时可能将网站完整路径提供给外部服务，查询参数和锚点应预先移除；外站图片通过有用户鉴权的同源 `/api/link-image` 代理获取。代理不得允许内网 SSRF 或返回可执行的同源 SVG/HTML。外链的可视效果不是 Markdown 内容的一部分。
 
-图片尺寸与图注属于 **内容呈现**，不是记录元数据。独立图片可在 Markdown 后写 `{width=480 caption="说明"}`，点击图片在可视化编辑器内直接修改，普通图片不受影响，未知属性保留为普通文本。`::::glossary` 与 `:::definition[术语]` 使用显式容器边界；术语名和定义正文可以直接编辑，不能把它们当成标题、标签、路径等独立文件属性。图注、图片尺寸及词条编辑才产生内容修订，纯渲染和预览不能导致未保存状态。
+## 保存后的验证
 
-图、公式和表格的显式 ID 分别为 `fig-`、`eq-`、`tbl-` 开头的受限标识，跟随 Markdown 正文保存，引用使用 ` @fig-name`、` @eq-name`、` @tbl-name`。图片的 ID/图注在图片选中状态的 Astryx 输入框编辑；公式 ID 在块公式数学编辑对话框编辑；表格的 ID/图注在表格操作工具栏的“表注”面板显式保存。编辑器只在真正变更后更新文档内容；自动编号不应写入 Markdown 或数据库独立字段。当前仅支持同一篇文档内部的 ` @id` 引用；跨文档使用稳定 UUID WikiLink。
+对长文档、嵌套提示、公式与表格、Wiki 关系、注释/审阅和未识别扩展，优先验证：解析—编辑—序列化—重新解析的语义稳定；未触及的原文不被吞掉；预览不写数据库；保存后刷新仍可见；移动端没有横向页面溢出。执行批量替换前先保留来源 Revision 和可复验样本，禁止用代码构建成功代替真实浏览器验收。

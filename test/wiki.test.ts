@@ -9,6 +9,22 @@ describe('stable Wiki references',()=>{
   for(const bad of ['Note.md','folder/note.md','../note.md','/../note.md','/','id:invalid','/folder//note.md','#heading','/folder/a.md|'])
    assert.equal(parseWikiTarget(bad),null,bad);
  });
+ it('preserves actual source offsets in CRLF documents',()=>{
+  const src=['# 标题','段落 [[id:'+ID+']]。','另一段 [[id:'+ID+'|别名]]。'].join('\r\n');
+  const refs=extractWikiReferences(src);
+  assert.equal(refs.length,2,JSON.stringify(refs));
+  const first=src.indexOf('[['),second=src.indexOf('[[',first+2);
+  assert.deepEqual(refs.map(x=>x.offset),[first,second]);
+ });
+ it('indexes an unescaped Wiki alias within one GFM table cell, consistent with the visual parser',()=>{
+  const input=['| 文档 | 引用 |','| --- | --- |','| 示例 | [[id:'+ID+'|可见别名]] |'].join('\n');
+  const refs=extractWikiReferences(input);
+  assert.equal(refs.length,1,JSON.stringify(refs));
+  assert.equal(refs[0]?.alias,'可见别名');
+  assert.equal(refs[0]?.offset,input.indexOf('[['));
+  const quoted=input.replace('|可见别名',String.fromCharCode(92)+'|可见别名');
+  assert.equal(extractWikiReferences(quoted)[0]?.alias,'可见别名');
+ });
  it('extracts links and standalone embeds, but not code, math, markdown links or escapes',()=>{
   const tick=String.fromCharCode(96);
   const doc=[
@@ -22,16 +38,16 @@ describe('stable Wiki references',()=>{
    '',
    tick.repeat(3)+'md',
    '[[id:'+ID+']]',
-   '{{embed:id:'+ID+'}}',
+   '::: embed id:'+ID+' :::',
    tick.repeat(3),
    '',
    '$[[id:'+ID+']]$',
    '',
    '[Regular [[id:'+ID+']]](https://example.org)',
    '',
-   '{{embed:/Folder/A.md#Chapter}}',
+   '::: embed /Folder/A.md#Chapter :::',
    '',
-   'Paragraph {{embed:id:'+ID+'}} should not auto-embed.'
+   'Paragraph ::: embed id:'+ID+' ::: should not auto-embed.'
   ].join('\n');
   const refs=extractWikiReferences(doc);
   assert.equal(refs.length,3,JSON.stringify(refs));

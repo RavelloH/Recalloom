@@ -1,16 +1,12 @@
 import React,{useEffect,useState} from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
-import type {JSONContent} from '@tiptap/core';
 import {Card} from '@astryxdesign/core/Card';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {ExternalLink,Link2,Pencil} from 'lucide-react';
 import {normalizedLinkUrl,resolveLinkMetadata,proxyImageUrl,type LinkPreviewMetadata} from '../link-metadata-client';
 
-function safeDirectiveValue(value:string):string{
- return value.replace(/[\r\n"{}]/g,' ').trim().slice(0,2048);
-}
 export function LinkCardView({url,title}:{url:string;title?:string}){
  const [data,setData]=useState<LinkPreviewMetadata|null>(null);
  const [loaded,setLoaded]=useState(false);
@@ -60,10 +56,5 @@ export const RichLinkCard=Node.create({
  addAttributes(){return {url:{default:''},title:{default:''}};},
  parseHTML(){return [{tag:'div[data-rk-link-card]'}];},
  renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-link-card':''})];},
- addNodeView(){return ReactNodeViewRenderer(LinkCardEditorView);},
- renderMarkdown(node:JSONContent){
-  const url=safeDirectiveValue(String(node.attrs?.url??''));
-  const title=safeDirectiveValue(String(node.attrs?.title??''));
-  return '::link-card'+(title?'['+title.replace(/[\[\]]/g,'')+']':'')+'{url="'+url+'"}';
- }
+ addNodeView(){return ReactNodeViewRenderer(LinkCardEditorView);}
 });

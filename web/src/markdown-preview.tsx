@@ -2,11 +2,14 @@ import React,{useMemo} from 'react';
 import ReactMarkdown,{type Components} from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import {richRemarkDirective,remarkRichTransforms} from './rich-remark';
+
 import {normalizeKnownMarkdown} from './markdown-normalize';
+import {projectRmdPreview} from './rmd-preview';
+import {remarkRmdSyntax} from './rmd-remark';
+import {shieldRmdTablePipes} from './rmd-lexer';
 import {richTitle} from './tiptap/rich-schema';
 import {calloutTitle} from './callout-title';
-import {badgeVariants} from './tiptap/rich-directives';
+import {asAstryBadgeVariant} from './rmd-badge';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Card} from '@astryxdesign/core/Card';
@@ -16,26 +19,26 @@ import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {SmartLink} from './link-icons';
 import {LinkCardView} from './tiptap/rich-link-card';
 import {TabsPreview} from './rich-tabs';
-import {remarkCodeMetadata} from './code-remark';
+
 import ShikiCodePreview,{codePropsFromElement} from './code-preview';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize,{defaultSchema} from 'rehype-sanitize';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import {OverlayScroll} from './scrollbars';
-import {remarkMarkedDisplayMath} from './tiptap/marked-display-math';
-import {prepareWikiMarkdown} from './wiki-remark';
-import {prepareCriticMarkdown,type CriticKind} from './critic-syntax';
+
+
+import type {CriticKind} from './critic-syntax';
 import {CriticDisplay} from './tiptap/rich-critic';
 import ClozeReveal from './cloze-reveal';
-import {remarkFigureAttributes} from './remark-figure';
-import {remarkTableCaptions} from './remark-table-caption';
-import {safeTableId,cleanTableCaption} from './table-caption';
-import {collectPreviewRefs,remarkCrossRefDisplay} from './markdown-cross-reference';
-import {shieldEquationIdClosers,validCrossRefId} from './cross-reference';
+
+
+import {collectRmdPreviewRefs} from './rmd-cross-reference';
+import {validCrossRefId} from './cross-reference';
+import {isRmdId} from './rmd-schema';
 import {safeFigureImageSrc} from './figure-syntax';
 import {WikiInline,WikiEmbed,wikiDecode} from './wiki-components';
-import {slugHeading,headingAnchor,explicitHeadingAnchor,explicitBlockAnchor} from './wiki-slug';
+import {slugHeading,headingAnchor} from './wiki-slug';
 
 type HastNode={type:string;tagName?:string;properties?:Record<string,unknown>;children?:HastNode[]};
 /** The visual editor writes alignment as `style="text-align: …"`. Styles are
@@ -58,20 +61,10 @@ function rehypeHeadingIds(){
  const collect=(node:HastNode):string=>node.type==='text'?(node as HastNode&{value?:string}).value??'':(node.children??[]).map(collect).join('');
  const walk=(node:HastNode)=>{
   if(/^h[1-6]$/.test(node.tagName??'')){
-   const last=node.children?.at(-1) as (HastNode&{value?:string})|undefined;
-   const explicit=last?.type==='text'&&typeof last.value==='string'?explicitHeadingAnchor(last.value):null;
-   if(explicit&&((explicit.body.length>0)||(node.children?.length??0)>1))last!.value=explicit.body;
-   const explicitId=explicit&&((explicit.body.length>0)||(node.children?.length??0)>1)?explicit.id:null;
-   const slug=explicitId??slugHeading(collect(node));
+   const supplied=node.properties?.id;
+   const slug=typeof supplied==='string'&&/^[a-z][a-z0-9-]{0,79}$/i.test(supplied)
+    ?supplied.toLowerCase():slugHeading(collect(node));
    if(slug){const count=labels.get(slug)??0;labels.set(slug,count+1);node.properties??={};node.properties.id=slug+(count?'-'+count:'');}
-  }
-  if(node.tagName==='p'){
-   const last=node.children?.at(-1) as (HastNode&{value?:string})|undefined;
-   const match=last?.type==='text'&&typeof last.value==='string'?explicitBlockAnchor(last.value):null;
-   if(match&&(match.body||(node.children?.length??0)>1)){
-    last!.value=match.body;
-    node.properties??={};node.properties.id=match.id;
-   }
   }
   node.children?.forEach(walk);
  };
@@ -80,12 +73,12 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tooltip','rk-kbd','rk-cloze','rk-comment','rk-figure','rk-table-caption','rk-cross-ref','rk-numbered-math'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tooltip','rk-kbd','rk-cloze','rk-comment','rk-rmd-block-mark','rk-figure','rk-cross-ref','rk-numbered-math'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
-  div:[...(defaultSchema.attributes?.div??[]),'dataHighlightedMath'],
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
   'wiki-embed':['dataTarget','dataAnchor'],
-  'rk-callout':['dataKind','dataTitle','dataSender'],
+  'rk-callout':['dataKind','dataTitle','dataSender','dataId'],
+  'rk-rmd-block-mark':['dataRkColor','dataId'],
   'rk-link-card':['dataUrl','dataTitle'],
   'rk-critic':['dataKind','dataValue','dataBefore'],
   'rk-badge':['dataVariant'],
@@ -93,29 +86,37 @@ const schema={
   'rk-tooltip':['dataContent'],
   'rk-cloze':['dataHint'],
   'rk-figure':['dataPayload'],
-  'rk-table-caption':['dataId','dataCaption'],
   'rk-cross-ref':['dataId'],
   'rk-numbered-math':['dataId'],
-  code:[...(defaultSchema.attributes?.code??[]),'dataFile','dataWrap','dataExpand'],
+  code:[...(defaultSchema.attributes?.code??[]),'id','dataFile','dataWrap','dataExpand'],
+  table:[...(defaultSchema.attributes?.table??[]),'id','dataRmdCaption'],
   mark:[...(defaultSchema.attributes?.mark??[]),'dataRkColor']}
 };
 // Wide blocks scroll inside the column with the same overlay scrollbar as the editor.
 const components:Components={
  a:({node:_node,...props})=><SmartLink {...props}/>,
- table:({node:_node,...props})=><OverlayScroll axis="x" edges className="tableWrapper rk-hscroll"><table {...props}/></OverlayScroll>,
+ table:({node:_node,...props})=>{
+  const values=props as Record<string,unknown>;
+  const caption=String(values['data-rmd-caption']??values.dataRmdCaption??'');
+  return <div className="rk-rmd-table-projection">
+   <OverlayScroll axis="x" edges className="tableWrapper rk-hscroll"><table {...props}/></OverlayScroll>
+   {caption&&<div className="rk-table-caption-read">{caption}</div>}
+  </div>;
+ },
  pre:({node:_node,children})=><ShikiCodePreview {...codePropsFromElement(React.Children.toArray(children)[0])}/>
 };
 
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
 export default function MarkdownPreview({content,sourceId,trail,depth=0}:{content:string;sourceId?:string;trail?:string[];depth?:number}){
- const source=normalizeKnownMarkdown(content.replace(/\r\n/g,'\n'));
+ const source=normalizeKnownMarkdown(projectRmdPreview(content).replace(/\r\n/g,'\n'));
  // A YAML-looking header is ordinary document text, not Recalloom metadata.
  // Isolate it from the CommonMark parser so --- is not reinterpreted as rules.
  const frontmatter=/^\uFEFF?(?:---|\+\+\+)[ \t]*\n[\s\S]*?\n(?:---|\+\+\+|\.\.\.)[ \t]*(?=\n|$)/.exec(source);
  const body=frontmatter?source.slice(frontmatter[0].length).replace(/^\n+/, ''):source;
- const prepared=prepareCriticMarkdown(prepareWikiMarkdown(body));
- const refIndex=useMemo(()=>collectPreviewRefs(prepared),[prepared]);
- const parseSource=useMemo(()=>shieldEquationIdClosers(prepared),[prepared]);
+ const prepared=body;
+ const refIndex=useMemo(()=>collectRmdPreviewRefs(prepared),[prepared]);
+ const syntaxSource=prepared;
+ const parseSource=useMemo(()=>shieldRmdTablePipes(syntaxSource),[syntaxSource]);
  const chain=trail??(sourceId?[sourceId]:[]);
  const custom={
   'wiki-ref':({node:_node,...props}:Record<string,unknown>)=>
@@ -147,7 +148,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
   },
     'rk-cross-ref':({node:_node,...props}:Record<string,unknown>)=>{
    const id=String(props['data-id']??props.dataId??'');
-   if(!validCrossRefId(id))return null;
+   if(!isRmdId(id))return null;
    const item=refIndex.get(id);
    return item?<a href={'#'+headingAnchor(id)} className="rk-cross-reference-read">{item.label}</a>
     :<span className="rk-cross-reference-read rk-cross-reference-missing" title={'缺少目标块 '+id}>{'引用不存在：'+id}</span>;
@@ -158,17 +159,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    const item=refIndex.get(id);
    return <div className="rk-numbered-math-projection" id={headingAnchor(id)} data-rk-equation-id={id}>
     <div className="rk-numbered-math-content">{props.children as React.ReactNode}</div>
-    {item&&<span className="rk-numbered-math-label">({item.number})</span>}
+    {item?.kind==='eq'&&item.number!==undefined&&<span className="rk-numbered-math-label">({item.number})</span>}
    </div>;
-  },
-'rk-table-caption':({node:_node,...props}:Record<string,unknown>)=>{
-   let id='',caption='';
-   try{
-    id=decodeURIComponent(String(props['data-id']??props.dataId??''));
-    caption=cleanTableCaption(decodeURIComponent(String(props['data-caption']??props.dataCaption??'')));
-   }catch{return null;}
-   if(!safeTableId(id)||!caption)return null;
-   return <div className="rk-table-caption-read" data-rk-table-id={id} id={headingAnchor(id)}>{caption}</div>;
   },
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
@@ -204,10 +196,10 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
    return <Banner status={status} title={calloutTitle(kind,richTitle(kind,title))} collapsible={false}>{props.children as React.ReactNode}</Banner>;
   },
+  'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className="rk-rmd-block-mark" data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{
    const raw=String(props['data-variant']??props.dataVariant??'neutral');
-   const valid=badgeVariants.has(raw)?raw:'neutral';
-   return <Badge variant={valid as 'neutral'|'success'} label={props.children as React.ReactNode}/>;
+   return <Badge variant={asAstryBadgeVariant(raw)} label={props.children as React.ReactNode}/>;
   },
   'rk-abbr':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-title']??props.dataTitle??'')}><span className="rk-inline-abbr" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
   'rk-tooltip':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-content']??props.dataContent??'')}><span className="rk-inline-tooltip" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
@@ -222,7 +214,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  };
  return <article className="markdown-preview">
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
-  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,richRemarkDirective,remarkFigureAttributes,remarkTableCaptions,()=>remarkCrossRefDisplay(prepared),()=>remarkRichTransforms(prepared),remarkCodeMetadata,remarkMarkedDisplayMath]}
+  <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource)]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}
    components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
  </article>;

@@ -3,7 +3,7 @@ import type {Editor} from '@tiptap/core';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {headingAnchor} from '../wiki-slug';
-import {collectCrossRefs,crossRefToken,crossRefTokenStart,resolveCrossRef,validCrossRefId,type CrossRefIndex} from '../cross-reference';
+import {collectCrossRefs,resolveCrossRef,type CrossRefIndex} from '../cross-reference';
 
 type Store={subscribe:(listener:()=>void)=>()=>void;getSnapshot:()=>CrossRefIndex};
 const registries=new WeakMap<Editor,Store>();
@@ -36,7 +36,7 @@ export function useReferenceIndex(editor:Editor):CrossRefIndex{
  return useSyncExternalStore(store.subscribe,store.getSnapshot,store.getSnapshot);
 }
 function CrossReferenceView({node,editor}:NodeViewProps){
- const id=String(node.attrs.target??'');
+ const id=String(node.attrs.id??'');
  const index=useReferenceIndex(editor);
  const resolved=resolveCrossRef(index,id);
  const text=resolved?.label??'引用不存在：'+id;
@@ -51,11 +51,8 @@ function CrossReferenceView({node,editor}:NodeViewProps){
 }
 export const CrossReferenceNode=Node.create({
  name:'crossReference',group:'inline',inline:true,atom:true,selectable:true,priority:1800,
- addAttributes(){return {target:{default:''}};},
+ addAttributes(){return {id:{default:''}};},
  parseHTML(){return [{tag:'span[data-rk-cross-ref]'}];},
- renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-rk-cross-ref':HTMLAttributes.target})];},
- addNodeView(){return ReactNodeViewRenderer(CrossReferenceView);},
- parseMarkdown(token){return {type:'crossReference',attrs:{target:String((token as typeof token&{target?:string}).target??'')}};},
- renderMarkdown(node){const id=String(node.attrs?.target??'');return validCrossRefId(id)?'@'+id:'';},
- markdownTokenizer:{name:'crossReference',level:'inline' as const,start:crossRefTokenStart,tokenize:crossRefToken}
+ renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-rk-cross-ref':HTMLAttributes.id})];},
+ addNodeView(){return ReactNodeViewRenderer(CrossReferenceView);}
 });

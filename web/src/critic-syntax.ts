@@ -1,5 +1,6 @@
 import {unified} from 'unified';
 import remarkParse from 'remark-parse';
+import remarkMath from 'remark-math';
 
 export type CriticKind='addition'|'deletion'|'substitution'|'comment'|'highlight';
 export type CriticMatch={kind:CriticKind;raw:string;text:string;before:string};
@@ -45,19 +46,24 @@ export function parseCriticAt(source:string):CriticMatch|null{
  return null;
 }
 const heads=['{++','{--','{~~','{==','{>>'];
+// A void HTML tag does not open an HTML region. Otherwise <img> or <br>
+// suppresses review syntax in unrelated later Markdown paragraphs.
+const voidHtml=new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
 export function criticStartIndex(source:string){
  const hits=heads.map(prefix=>source.indexOf(prefix)).filter(pos=>pos>=0);
  return hits.length?Math.min(...hits):-1;
 }
 
 type Mdast={type:string;children?:Mdast[];position?:{start?:{offset?:number};end?:{offset?:number}}};
-const parser=unified().use(remarkParse);
+// CriticMarkup substitution delimiters contain ~~; do not tokenize them as
+// GFM strikethrough before the Critic scanner. Math must still be protected.
+const parser=unified().use(remarkParse).use(remarkMath);
 const closers:Record<string,string>={'{++':'++}','{--':'--}','{~~':'~~}','{==':'==}','{>>':'<<}'};
 type CriticOccurrence={start:number;end:number;match:CriticMatch};
 export function findCriticMarkup(source:string):CriticOccurrence[]{
  const ast=parser.parse(source) as Mdast;
  const results:CriticOccurrence[]=[];
- const skip=new Set(['code','inlineCode','html','link','linkReference','image','imageReference','definition']);
+ const skip=new Set(['code','inlineCode','math','inlineMath','html','link','linkReference','image','imageReference','definition']);
  const walk=(node:Mdast)=>{
   if(skip.has(node.type))return;
   if(node.type==='text'){
@@ -93,7 +99,8 @@ export function findCriticMarkup(source:string):CriticOccurrence[]{
    if(child.type==='html'){
     const raw=source.slice(child.position?.start?.offset??0,child.position?.end?.offset??0).trim();
     if(/^<\/[a-z][\w:-]*\s*>$/i.test(raw))htmlDepth=Math.max(0,htmlDepth-1);
-    else if(/^<[a-z][\w:-]*(?:\s[^<>]*)?>$/i.test(raw)&&!raw.endsWith('/>'))htmlDepth++;
+    else {const open=/^<([a-z][\w:-]*)(?:\s[^<>]*)?>$/i.exec(raw);
+     if(open&&!raw.endsWith('/>')&&!voidHtml.has(open[1]!.toLowerCase()))htmlDepth++;}
     continue;
    }
    if(htmlDepth===0)walk(child);

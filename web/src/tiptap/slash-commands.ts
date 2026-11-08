@@ -1,4 +1,13 @@
 import type {Editor} from '@tiptap/core';
+// Import command augmentations explicitly; the retired Markdown plugin no longer
+// supplies them transitively to the editor's TypeScript compilation.
+import type {} from '@tiptap/extension-task-list';
+import type {} from '@tiptap/extension-code-block';
+import type {} from '@tiptap/extension-heading';
+import type {} from '@tiptap/extension-paragraph';
+import type {} from '@tiptap/extension-highlight';
+import type {} from '@tiptap/extension-table';
+import type {} from '@tiptap/extension-text-align';
 import {Pilcrow,Heading1,Heading2,Heading3,List,ListOrdered,ListChecks,Quote,SquareCode,SeparatorHorizontal,Table2,Link2,ImagePlus,Sigma,SquareSigma,AlignLeft,AlignCenter,AlignRight,MessageSquareWarning,ChevronsDown,Tag,Highlighter,MessageCircle,MessagesSquare,Footprints,Network,PanelsTopLeft,BookOpenCheck,Keyboard,type LucideIcon} from 'lucide-react';
 
 export type SlashHelpers={openLink:()=>void;openImage:()=>void;openMath:(type:'inline'|'block')=>void};
@@ -17,7 +26,7 @@ export const slashCommands:SlashCommand[]=[
  {id:'bullet',title:'项目列表',description:'无序的要点列表',keywords:['ul','bullet','list','lb'],icon:List,run:e=>chain(e).toggleBulletList().run()},
  {id:'ordered',title:'编号列表',description:'带序号的步骤列表',keywords:['ol','number','ordered','list','bh'],icon:ListOrdered,run:e=>chain(e).toggleOrderedList().run()},
  {id:'todo',title:'待办清单',description:'可勾选的任务项',keywords:['todo','task','check','checkbox','db'],icon:ListChecks,run:e=>chain(e).toggleTaskList().run()},
- {id:'quote',title:'引用',description:'引用或强调一段话',keywords:['quote','blockquote','yy'],icon:Quote,run:e=>chain(e).toggleBlockquote().run()},
+ {id:'quote',title:'引用',description:'引用或强调一段话',keywords:['quote','blockquote','yy'],icon:Quote,run:e=>chain(e).toggleWrap('blockquote').run()},
  {id:'code',title:'代码块',description:'等宽字体的代码片段',keywords:['code','pre','snippet','dm'],icon:SquareCode,run:e=>chain(e).toggleCodeBlock().run()},
  {id:'callout',title:'提示横幅',description:'插入 Astryx 风格提示容器',keywords:['callout','warning','banner','tip','alert','ts'],icon:MessageSquareWarning,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'warning',title:'注意'},content:[{type:'paragraph',content:[{type:'text',text:'请在此输入提示内容'}]}]}).run()},
  {id:'details',title:'折叠内容',description:'插入可以折叠的内容区域',keywords:['details','fold','collapse','zd'],icon:ChevronsDown,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'details',title:'详细内容'},content:[{type:'paragraph',content:[{type:'text',text:'补充说明'}]}]}).run()},
@@ -46,7 +55,7 @@ export const slashCommands:SlashCommand[]=[
  {id:'link-card',title:'链接卡片',description:'从原文 URL 获取站点预览内容',keywords:['linkcard','card','link','url','kapian'],icon:Link2,run:e=>chain(e).insertContent({type:'richLinkCard',attrs:{url:'https://example.com/'}}).run()},
  {id:'footnote',title:'脚注引用',description:'插入 GFM 脚注引用，随后添加同名定义',keywords:['footnote','reference','cite','jiaozhu'],icon:Footprints,run:e=>chain(e).insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run()},
  {id:'mermaid',title:'Mermaid 图表',description:'插入可编辑的流程图代码及安全预览',keywords:['mermaid','diagram','flowchart','graph','tu'],icon:Network,run:e=>chain(e).insertContent({type:'codeBlock',attrs:{language:'mermaid'},content:[{type:'text',text:'flowchart LR\n  A[开始] --> B[完成]'}]}).run()},
- {id:'divider',title:'分割线',description:'在内容之间插入分隔',keywords:['hr','divider','line','separator','fgx'],icon:SeparatorHorizontal,run:e=>chain(e).setHorizontalRule().run()},
+ {id:'divider',title:'分割线',description:'在内容之间插入分隔',keywords:['hr','divider','line','separator','fgx'],icon:SeparatorHorizontal,run:e=>chain(e).insertContent({type:'horizontalRule'}).run()},
  {id:'table',title:'表格',description:'插入 3×3 表格',keywords:['table','grid','bg'],icon:Table2,run:e=>chain(e).insertTable({rows:3,cols:3,withHeaderRow:true}).run(),isAvailable:e=>!e.isActive('table')},
  {id:'link',title:'链接',description:'插入网页或内部链接',keywords:['link','url','href','lj'],icon:Link2,run:(_e,h)=>h.openLink()},
  {id:'image',title:'图片',description:'通过地址插入外部图片',keywords:['image','img','picture','photo','tp'],icon:ImagePlus,run:(_e,h)=>h.openImage()},

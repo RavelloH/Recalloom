@@ -1,7 +1,6 @@
 import React from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
-import type {JSONContent} from '@tiptap/core';
 import {Card} from '@astryxdesign/core/Card';
 import {Footprints} from 'lucide-react';
 
@@ -17,18 +16,7 @@ export const RichFootnoteRef=Node.create({
  addAttributes(){return {id:{default:''}};},
  parseHTML(){return [{tag:'span[data-rk-footnote-ref]'}];},
  renderHTML({HTMLAttributes}){return ['span',mergeAttributes(HTMLAttributes,{'data-rk-footnote-ref':HTMLAttributes.id})];},
- addNodeView(){return ReactNodeViewRenderer(FootnoteRefView);},
- parseMarkdown(token:any){return {type:'richFootnoteRef',attrs:{id:token.id??''}};},
- renderMarkdown(node:JSONContent){return '[^'+safeFootnoteId(String(node.attrs?.id??''))+']';},
- markdownTokenizer:{
-  name:'richFootnoteRef',level:'inline' as const,
-  start:(source:string)=>source.indexOf('[^'),
-  tokenize:(source:string)=>{
-   const match=/^\[\^([^\]\r\n]{1,128})\](?!:)/.exec(source);
-   if(!match)return undefined;
-   return {type:'richFootnoteRef',raw:match[0],id:match[1]};
-  }
- }
+ addNodeView(){return ReactNodeViewRenderer(FootnoteRefView);}
 });
 function FootnoteDefView({node}:NodeViewProps){
  const id=safeFootnoteId(String(node.attrs.id??''));
@@ -44,11 +32,5 @@ export const RichFootnoteDefinition=Node.create({
  addAttributes(){return {id:{default:''}};},
  parseHTML(){return [{tag:'div[data-rk-footnote-definition]'}];},
  renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-footnote-definition':HTMLAttributes.id}),0];},
- addNodeView(){return ReactNodeViewRenderer(FootnoteDefView);},
- renderMarkdown(node:JSONContent,helpers:{renderChildren:(nodes:JSONContent[])=>string}){
-  const id=safeFootnoteId(String(node.attrs?.id??''));
-  const text=(node.content??[]).map(item=>helpers.renderChildren([item]).trimEnd()).join('\n\n');
-  const body=text.split('\n').map((line,index)=>index?'    '+line:line).join('\n');
-  return '[^'+id+']: '+body;
- }
+ addNodeView(){return ReactNodeViewRenderer(FootnoteDefView);}
 });

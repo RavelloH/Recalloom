@@ -8,11 +8,10 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Copy,WrapText,FileCode2,Pencil,ChevronDown,ChevronUp} from 'lucide-react';
 import {attachScrollbars} from '../scrollbars';
-import {parseCodeFenceMeta} from '../code-meta';
 import {safeTableId,cleanTableCaption} from '../table-caption';
 import {headingAnchor} from '../wiki-slug';
+import {isRmdId} from '../rmd-schema';
 import MermaidDiagram from '../mermaid-diagram';
-export {parseCodeFenceMeta} from '../code-meta';
 
 function scrollFrame(host:HTMLElement,child:HTMLElement){
  host.classList.add('rk-hscroll');
@@ -80,7 +79,7 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
   return attachScrollbars(wrapper,viewport,'x',{edges:true});
  },[]);
  const saveTitle=()=>{updateAttributes({filename:filename.replace(/[\r\n\]]/g,' ').slice(0,240)});setEditing(false);};
- return <NodeViewWrapper ref={host} className={'code-block rk-code-block'+(node.attrs.wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')} data-rk-code="true">
+ return <NodeViewWrapper ref={host} id={typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined} className={'code-block rk-code-block'+(node.attrs.wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')} data-rk-code="true">
   <div className="rk-code-header" contentEditable={false}>
    <div className="rk-code-title">
     <FileCode2 size={15} aria-hidden="true"/>
@@ -109,19 +108,6 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  </NodeViewWrapper>;
 };
 export const ScrollCodeBlock=CodeBlockShiki.extend({
- addAttributes(){return {...this.parent?.(),filename:{default:''},wrap:{default:false},expand:{default:false}};},
- addNodeView(){return ReactNodeViewRenderer(CodeView);},
- parseMarkdown(token:any,helpers:any){
-  const info=parseCodeFenceMeta(token.lang??'');
-  return helpers.createNode('codeBlock',info,token.text?[helpers.createTextNode(token.text)]:[]);
- },
- renderMarkdown(node:{attrs?:Record<string,unknown>;content?:unknown[]},helpers:{renderChildren:(children:unknown[])=>string}){
-  const text=helpers.renderChildren(node.content??[]).replace(/\n$/,'');
-  const info=[String(node.attrs?.language??''),node.attrs?.filename?'['+String(node.attrs.filename)+']':'',
-   node.attrs?.wrap?'wrap':'',node.attrs?.expand?'expand':''].filter(Boolean).join(' ');
-  const tick=String.fromCharCode(96);
-  const runs=text.match(new RegExp(tick+'+','g'))??[];
-  const ticks=tick.repeat(Math.max(3,...runs.map(x=>x.length+1)));
-  return ticks+info+'\n'+text+'\n'+ticks;
- }
+ addAttributes(){return {...this.parent?.(),id:{default:null},filename:{default:''},wrap:{default:false},expand:{default:false}};},
+ addNodeView(){return ReactNodeViewRenderer(CodeView);}
 });

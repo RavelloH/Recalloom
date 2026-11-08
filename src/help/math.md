@@ -1,68 +1,85 @@
-# LaTeX 数学公式与高亮
+# RMD 1.0：KaTeX 数学与 Mark / Highlight
 
-Recalloom 使用 remark-math 解析 Markdown 数学语法，并通过 KaTeX 渲染。它支持 KaTeX 可解析的数学命令和环境（例如 \frac、\sqrt、\sum、aligned、matrix），**不是完整 LaTeX 编译器**，也不支持任意 LaTeX 文档、宏包或 \begin{document}。
+Recalloom 的数学输入是 Markdown 中的 `remark-math`，输出由 KaTeX 排版；**不是完整的 LaTeX 文档编译器**。数学公式只存储于正文，不建立额外数据库索引或渲染缓存作为事实来源。
 
-## 行内公式
+## 行内与块级公式
 
-使用单个美元符号围住表达式：
+~~~~markdown
+欧姆定律：$U=IR$。
 
-~~~markdown
-欧姆定律为 $U=IR$，电压比为 $\frac{U_1}{U_2}$。
-~~~
+分式：$\frac{U_1}{U_2}$。
 
-## 块级公式
-
-双美元符号各占**单独一行**，公式整体作为块级节点并居中显示：
-
-~~~markdown
 $$
 \begin{aligned}
 U &= IR\\
 P &= UI
 \end{aligned}
 $$
-~~~
+~~~~
 
-含分式、矩阵或多行结构时，KaTeX 盒子可能高于普通文本行；可视化按照公式实际高度布局，长公式可以在受限宽度下滚动。
+行内仅使用一对 `$`；块级 `$$` 开头和结尾均必须独占一行。KaTeX 支持 `\frac`、`\sqrt`、`\sum`、`aligned`、`matrix` 等语法；不支持引入任意宏包、执行脚本或 `\begin{document}`。复杂分式和多行公式的盒子可能高于正文行高，布局要以 KaTeX 的实际高度计算。
 
-## 高亮文字与行内公式
+## Mark：保持现有黄色视觉
 
-外层 <mark> 不只用于文字，也能包住**完整的行内公式**，并让背景覆盖公式宽度与高度，而不是普通文本行高：
+Mark 是**没有颜色参数**的默认标记，它与彩色 Highlight 是两种独立的 RMD 语义。用户确认现有黄色 `#f5d870`、文字的圆角/内边距、内联公式的完整高度包裹，以及块级公式的一整块连续背景已足够好，重构时**必须保留这些观感**。
 
-~~~markdown
-<mark>重点：电压计算</mark>
+~~~~markdown
+文字：:: mark 变压器短路阻抗 ::。
 
-<mark>$\frac{\Delta P_s U_N^2}{S_N^2}$</mark>
-~~~
+行内公式：:: mark $\frac{\Delta P_s U_N^2}{S_N^2}$ ::。
 
-行内公式必须包含在同一个 <mark>...</mark> 中；不能仅高亮未闭合的公式片段。编辑器保存时会把公式和高亮一起序列化。
+::: mark
 
-## 高亮块级公式：必须使用以下结构
-
-~~~markdown
-<mark>
 $$
 \begin{aligned}
 R_T &= \frac{\Delta P_s U_N^2}{S_N^2}\times1000\\
 X_T &\approx \frac{U_s\%}{100}\frac{U_N^2}{S_N}\times1000
 \end{aligned}
 $$
-</mark>
-~~~
 
-关键规则：
+:::
+~~~~
 
-1. 开头 <mark> 单独占行，结尾 </mark> 单独占行。
-2. 两行 $$ 必须独立成行，且包住完整的 LaTeX 内容。
-3. <mark> 与 $$ 之间可以有空行；不要在同一行插入其他正文或 HTML。
-4. 一个高亮块级公式对应一个 <mark> 包裹块；不要假设任意混合段落的 HTML mark 都会被识别为公式高亮。
-5. 在可视化编辑器中，它是带 highlighted 属性的块公式节点，整个公式只有一块高亮背景，按照公式实际尺寸扩展。
+行内 `:: mark 正文 ::` 可包住完整数学节点；块级 `::: mark` 必须以独占一行的 `:::` 正确闭合。块数学在标记区域内仍居中、可滚动，背景不应被拆分成普通行高加公式扩展部分。
 
-## 反例
+## Highlight：显式颜色
 
-- <mark>$$x^2$$</mark>（同一行的块公式包裹法并非受支持的块级模式）。
-- 只写 <mark> 不写 </mark>，或只写一端的 $$。
-- 在代码围栏内写数学表达式并期待它被当作公式：代码围栏只是代码。
-- 将复杂 LaTeX 排版命令、外部宏包或完整 LaTeX 文档当作可执行渲染内容。
+~~~~markdown
+:: highlight 关键变量 | red ::
 
-需要查看标准和额外 Markdown 语法时读取 markdown 帮助。
+:: highlight $\frac{U_1}{U_2}$ | color=green ::
+
+::: highlight | blue
+
+$$
+P=UI
+$$
+
+:::
+~~~~
+
+可选颜色是 `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal`。Highlight 必须有合法颜色，否则整个语法保持原文；不能把 `:: mark` 自动改写成黄色 Highlight。对九种颜色沿用当前浅色/深色视觉值，不因解析重构修改配色。
+
+## 公式 ID 与本地引用
+
+~~~~markdown
+$$
+E=mc^2
+$$
+@ attrs eq-energy @
+
+如 [[#eq-energy]] 所示。
+~~~~
+
+公式的 `@ attrs` 是紧贴完整块公式的独立一行，不能写在 `$$` 闭合行内。合法 `eq-` 前缀供同文档按需编号和链接。ID 以 ASCII 字母开始，只能含字母、数字、连字符，长度不超过 80，并统一小写。
+
+## 常见错误
+
+- **不支持** `<mark>$...$</mark>`、`<mark>` 单独行包裹 `$$` 等旧开发版高亮语法作为新的规范输出；使用 `:: mark`、`::: mark`。
+- **不支持** 裸 `==公式==`、`:highlight[公式]{color=red}`。
+- 将 `$$x^2$$` 写在段落内不是约定的块级公式。
+- 注释 `%%...%%`、RMD 组件、Wiki 引用不能在公式源字符串中被当成另一层可执行 Markdown。
+- 代码围栏中的 `$...$` 和 `::: mark` 只是代码，不应触发数学或标记渲染。
+- 即使 MathML/KaTeX 生成 HTML，内容仍是只读排版，不能执行任意用户 HTML 或 JS。
+
+更多语法请读取 `get_help({topic:"markdown"})`，Wiki 章节定位及交叉引用参见 `get_help({topic:"wiki"})`。

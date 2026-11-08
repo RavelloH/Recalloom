@@ -1,10 +1,9 @@
 import React from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
-import type {JSONContent} from '@tiptap/core';
 import {NodeViewContent,ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {MessageSquareText,ArrowRight,Check,X} from 'lucide-react';
 import {resolveCriticSuggestion} from '../critic-review';
-import {criticStartIndex,parseCriticAt,type CriticKind} from '../critic-syntax';
+import type {CriticKind} from '../critic-syntax';
 
 const titles:Record<CriticKind,string>={
  addition:'建议新增',deletion:'建议删除',substitution:'建议替换',
@@ -58,7 +57,6 @@ function CriticEditorView({node,editor,getPos}:NodeViewProps){
   </span>
  </NodeViewWrapper>;
 }
-type CriticToken={kind?:CriticKind;before?:string;text?:string;tokens?:unknown[]};
 export const RichCritic=Node.create({
  name:'richCritic',group:'inline',inline:true,content:'text*',
  priority:2100,defining:true,
@@ -68,30 +66,5 @@ export const RichCritic=Node.create({
   const kind=isCriticKind(HTMLAttributes.kind)?HTMLAttributes.kind:'comment';
   return ['span',mergeAttributes(HTMLAttributes,{'data-rk-critic':kind}),0];
  },
- addNodeView(){return ReactNodeViewRenderer(CriticEditorView);},
- parseMarkdown(token:CriticToken){
-  const kind=isCriticKind(token.kind)?token.kind:'comment';
-  return {type:'richCritic',attrs:{kind,before:String(token.before??'')},
-   content:token.text?[{type:'text',text:token.text}]:[]};
- },
- renderMarkdown(node:JSONContent,helpers:{renderChildren:(nodes:JSONContent[])=>string}){
-  const kind=isCriticKind(node.attrs?.kind)?node.attrs!.kind as CriticKind:'comment';
-  const body=helpers.renderChildren(node.content??[]);
-  switch(kind){
-   case 'addition':return '{++'+body+'++}';
-   case 'deletion':return '{--'+body+'--}';
-   case 'substitution':return '{~~'+String(node.attrs?.before??'')+'~>'+body+'~~}';
-   case 'comment':return '{>>'+body+'<<}';
-   case 'highlight':return '{=='+body+'==}';
-  }
- },
- markdownTokenizer:{
-  name:'richCritic',level:'inline' as const,
-  start:criticStartIndex,
-  tokenize:(source:string):{type:string;raw:string;text:string;kind:CriticKind;before:string}|undefined=>{
-   const match=parseCriticAt(source);
-   if(!match)return;
-   return {type:'richCritic',...match};
-  }
- }
+ addNodeView(){return ReactNodeViewRenderer(CriticEditorView);}
 });

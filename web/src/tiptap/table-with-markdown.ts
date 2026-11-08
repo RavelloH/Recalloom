@@ -1,117 +1,40 @@
-import type { JSONContent } from "@tiptap/core";
-import { Table } from "@tiptap/extension-table";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
-import TableRow from "@tiptap/extension-table-row";
-import {safeTableId,serializeTableCaption} from "../table-caption";
+import {Table} from '@tiptap/extension-table';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import TableRow from '@tiptap/extension-table-row';
+import {safeTableId} from '../table-caption';
 
-/**
- * 自定义表格扩展，支持 Markdown 导出时的列对齐
+/** Native ProseMirror GFM table model and content editing. The shared RMD
+ * serializer owns the only table Markdown output and @ attrs caption syntax.
  */
-export const TableWithMarkdown = Table.extend({  addAttributes(){return {...this.parent?.(),
-   tableId:{default:null,parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-id')||null,
-    renderHTML:(attrs:Record<string,unknown>)=>safeTableId(attrs.tableId)?{'data-rk-table-id':attrs.tableId}:{}},
-   caption:{default:'',parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-caption')||'',
-    renderHTML:()=>({})}
-  };},
-  renderMarkdown(node, helpers) {
-    if (!node.content || node.content.length === 0) {
-      return "";
-    }
-
-    // 收集所有列的对齐方式（从第一行获取）
-    const columnAlignments: Array<"left" | "center" | "right" | null> = [];
-
-    const firstRow = node.content[0];
-    if (firstRow && firstRow.content) {
-      firstRow.content.forEach((cell: JSONContent) => {
-        columnAlignments.push(
-          (cell.attrs?.textAlign as "left" | "center" | "right") || null,
-        );
-      });
-    }
-
-    // 渲染所有行
-    const rows: string[] = [];
-    node.content.forEach((row: JSONContent, rowIndex: number) => {
-      if (!row.content) return;
-
-      const cells: string[] = [];
-      row.content.forEach((cell: JSONContent) => {
-        // 渲染单元格内的行内内容
-        const cellContent = helpers.renderChildren(cell.content || []);
-        cells.push(cellContent || " ");
-      });
-      rows.push(`| ${cells.join(" | ")} |`);
-
-      // 在第一行（表头）后添加分隔行，包含对齐标记
-      if (rowIndex === 0) {
-        const separators = columnAlignments.map((align) => {
-          if (align === "center") {
-            return ":------:";
-          } else if (align === "right") {
-            return "-------:";
-          } else {
-            // left 或 null 都使用左对齐（无标记）
-            return "--------";
-          }
-        });
-        rows.push(`| ${separators.join(" | ")} |`);
-      }
-    });
-
-    const suffix=serializeTableCaption({caption:node.attrs?.caption,tableId:node.attrs?.tableId});
-    return rows.join('\n')+(suffix?'\n\n'+suffix:'');
-  },
+export const TableWithMarkdown=Table.extend({
+ addAttributes(){
+  return {...this.parent?.(),
+   tableId:{
+    default:null,
+    parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-id')||null,
+    renderHTML:(attrs:Record<string,unknown>)=>safeTableId(attrs.tableId)
+     ?{'data-rk-table-id':attrs.tableId}:{}
+   },
+   caption:{
+    default:'',
+    parseHTML:(el:HTMLElement)=>el.getAttribute('data-rk-table-caption')||'',
+    renderHTML:()=>({})
+   }
+  };
+ }
 });
-
-/**
- * 自定义 TableCell 扩展，添加对齐属性
- */
-export const TableCellWithMarkdown = TableCell.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      textAlign: {
-        default: null,
-        parseHTML: (element) => element.style.textAlign || null,
-        renderHTML: (attributes) => {
-          if (!attributes.textAlign) {
-            return {};
-          }
-          return {
-            style: `text-align: ${attributes.textAlign}`,
-          };
-        },
-      },
-    };
-  },
+const cellAlignment={
+ default:null,
+ parseHTML:(element:HTMLElement)=>element.style.textAlign||null,
+ renderHTML:(attributes:{textAlign?:string|null})=>attributes.textAlign
+  ?{style:'text-align: '+attributes.textAlign}:{}
+};
+/** Alignment must remain attached to cells, not to the generated text. */
+export const TableCellWithMarkdown=TableCell.extend({
+ addAttributes(){return {...this.parent?.(),textAlign:cellAlignment};}
 });
-
-/**
- * 自定义 TableHeader 扩展，添加对齐属性
- */
-export const TableHeaderWithMarkdown = TableHeader.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      textAlign: {
-        default: null,
-        parseHTML: (element) => element.style.textAlign || null,
-        renderHTML: (attributes) => {
-          if (!attributes.textAlign) {
-            return {};
-          }
-          return {
-            style: `text-align: ${attributes.textAlign}`,
-          };
-        },
-      },
-    };
-  },
+export const TableHeaderWithMarkdown=TableHeader.extend({
+ addAttributes(){return {...this.parent?.(),textAlign:cellAlignment};}
 });
-
-/**
- * 自定义 TableRow 扩展
- */
-export const TableRowWithMarkdown = TableRow;
+export const TableRowWithMarkdown=TableRow;
