@@ -58,6 +58,9 @@ try{
  await page.goto(base+'/records/'+host.id+'?mode=preview',{waitUntil:'domcontentloaded'});
  const preview=page.locator('.markdown-preview').first();await preview.waitFor();
  await preview.locator('.wiki-embed').first().waitFor({state:'visible'});
+ const previewWikiLink=preview.locator('a.wiki-link').first();
+ await previewWikiLink.waitFor({state:'visible'});
+ const previewWikiBackground=await previewWikiLink.evaluate(el=>getComputedStyle(el).backgroundColor);
  await preview.getByText('此段必须出现在章节嵌入中。').first().waitFor({state:'visible'});
  await preview.getByText('一个独立的段落。',{exact:false}).first().waitFor({state:'visible'});
  assert.equal(await preview.locator('.wiki-embed').count(),2);
@@ -65,6 +68,25 @@ try{
  assert.ok(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),'rendering must not dirty the document');
  await page.getByRole('button',{name:'可视化',exact:true}).click();
  const visual=page.locator('.tiptap');await visual.waitFor();
+ const wikiChip=visual.locator('.wiki-editor-chip:has(a.wiki-link)').first();
+ await wikiChip.waitFor({state:'visible'});
+ const wikiAppearance=await wikiChip.evaluate(el=>{
+  const wrapper=getComputedStyle(el),link=el.querySelector('.wiki-link');
+  if(!link)throw new Error('Wiki editor wrapper lost its link');
+  const inner=getComputedStyle(link);
+  el.classList.add('ProseMirror-selectednode');
+  const selected=getComputedStyle(link);
+  const outline=selected.outlineWidth;
+  el.classList.remove('ProseMirror-selectednode');
+  return {outerBackground:wrapper.backgroundColor,outerPadding:wrapper.padding,outerGap:wrapper.gap,
+   innerBackground:inner.backgroundColor,selectionOutline:outline,href:link.getAttribute('href')};
+ });
+ assert.equal(wikiAppearance.outerBackground,'rgba(0, 0, 0, 0)','editor NodeView must not add a second background');
+ assert.equal(wikiAppearance.outerPadding,'0px','editor NodeView must not add second padding');
+ assert.equal(wikiAppearance.outerGap,'0px','editor NodeView must not add a second spacing gap');
+ assert.equal(wikiAppearance.innerBackground,previewWikiBackground,'preview and editor use the same Wiki link background');
+ assert.equal(wikiAppearance.selectionOutline,'2px','selected Wiki link gets an outline rather than another background');
+ assert.equal(wikiAppearance.href,'/records/'+target.id,'Wiki link destination remains intact');
  await visual.locator('.wiki-editor-embed').first().waitFor({state:'visible'});
  assert.equal(await visual.locator('.wiki-editor-embed').count(),2);
  assert.ok(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),'read-only embed must not write');
