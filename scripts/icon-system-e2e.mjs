@@ -70,7 +70,7 @@ try{
     assert.equal(row.color,row.titleColor,row.kind+' icon/title mismatch');
     assert.equal(row.border,'0px',row.kind+' still has left stripe');
     assert.ok(Math.abs(row.centerDelta)<2,row.kind+' vertically misaligned');
-    assert.ok(Math.abs(parseFloat(row.size)-parseFloat(row.font))<2,row.kind+' icon does not follow text size');
+    assert.ok(Math.abs(parseFloat(row.size)-16)<0.5&&Math.abs(parseFloat(row.font)-14)<0.5,row.kind+' uses 16px semantic icon aligned with 14px title');
    }
    all[theme+'-'+mode]=rows;
    if(mode==='preview'){

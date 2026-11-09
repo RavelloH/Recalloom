@@ -73,7 +73,7 @@
   min-width: 0;
   line-height: 1.45;
 }
-.search-result-heading > svg { flex: none; margin-top: 2px; }
+.search-result-heading > .rk-icon-frame { flex: none; }
 .search-result-heading > strong {
   flex: 1 1 230px;
   min-width: 0;

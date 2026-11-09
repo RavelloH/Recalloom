@@ -98,9 +98,9 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
   finally{setBusy(false);}
  };
  const createItems=(parentId:string|null):DropdownMenuOption[]=>[
-  {label:'新建文档',icon:<IconFileText size="1.125em"/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
-  {label:'新建任务列表',icon:<IconChecklist size="1.125em"/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
-  {label:'新建文件夹',icon:<IconFolder size="1.125em"/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
+  {label:'新建文档',icon:<IconFileText size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
+  {label:'新建任务列表',icon:<IconChecklist size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
+  {label:'新建文件夹',icon:<IconFolder size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
  ];
  return <TreeContext.Provider value={{createItems,onNavigate}}>
   <div className="nav-label nav-label-row tree-heading">

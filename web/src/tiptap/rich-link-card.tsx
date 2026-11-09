@@ -28,7 +28,7 @@ export function LinkCardView({url,title}:{url:string;title?:string}){
 
    <div className="rk-link-card-text">
     <div className="rk-link-card-head">
-     {icon&&!iconError?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setIconError(true)}/>:<IconLink size="1.125em" aria-hidden="true"/>}
+     {icon&&!iconError?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setIconError(true)}/>:<IconLink size="var(--rk-icon-sm)" aria-hidden="true"/>}
      <span>{data?.siteName||domain||'外部链接'}</span>
     </div>
     <div className="rk-link-card-title">{displayTitle}</div>
@@ -50,7 +50,7 @@ function LinkCardEditorView({node,updateAttributes}:NodeViewProps){
   <LinkCardView url={url} title={title}/>
   <div className="rk-link-card-edit-actions">{edit?<TextInput label="链接卡片 URL" value={draft} onChange={setDraft} onBlur={save}
     onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();save();}else if(event.key==='Escape'){setDraft(url);setEdit(false);}}}/>
-   :<IconButton label="编辑链接地址" variant="ghost" size="sm" icon={<IconPencil size="1.125em"/>} onClick={()=>{setDraft(url);setEdit(true);}}/>}</div>
+   :<IconButton label="编辑链接地址" variant="ghost" size="sm" icon={<IconPencil size="var(--rk-icon-sm)"/>} onClick={()=>{setDraft(url);setEdit(true);}}/>}</div>
  </NodeViewWrapper>;
 }
 export const RichLinkCard=Node.create({

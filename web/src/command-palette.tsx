@@ -25,7 +25,7 @@ function PaletteFooter({onOpenSearch}:{onOpenSearch:(q:string)=>void}){
  const term=(useCommandPaletteContext()?.search??'').trim();
  return <CommandPaletteFooter className="palette-footer">
   <span className="palette-hints"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>↵</kbd> 打开 <kbd>Esc</kbd> 关闭</span>
-  <button type="button" className="palette-open-search" onClick={()=>onOpenSearch(term)}>{term?'在搜索页查看全部结果':'打开搜索页'}<IconArrowUpRight size="1em"/></button>
+  <button type="button" className="palette-open-search" onClick={()=>onOpenSearch(term)}>{term?'在搜索页查看全部结果':'打开搜索页'}<IconArrowUpRight size="var(--rk-icon-sm)"/></button>
  </CommandPaletteFooter>;
 }
 
@@ -71,5 +71,5 @@ export function QuickSwitcher({isOpen,onOpenChange}:{isOpen:boolean;onOpenChange
  return <CommandPalette<PaletteItem> isOpen={isOpen} onOpenChange={onOpenChange} label="快速导航" width={600} maxHeight="min(72vh,560px)"
   searchSource={source} onValueChange={select} footer={<PaletteFooter onOpenSearch={openSearch}/>}
   emptySearchText="没有匹配的页面" emptyBootstrapText="搜索标题与正文，或跳转到页面"
-  renderItem={item=>{const Icon=item.auxiliaryData.icon;return <span className="palette-item"><Icon size="1.125em" className="palette-icon"/><span className="palette-copy"><span className="palette-label truncate">{item.label}</span>{item.auxiliaryData.detail&&<span className="palette-detail truncate">{item.auxiliaryData.detail}</span>}</span></span>;}}/>;
+  renderItem={item=>{const Icon=item.auxiliaryData.icon;return <span className="palette-item"><Icon size="var(--rk-icon-sm)" className="palette-icon"/><span className="palette-copy"><span className="palette-label truncate">{item.label}</span>{item.auxiliaryData.detail&&<span className="palette-detail truncate">{item.auxiliaryData.detail}</span>}</span></span>;}}/>;
 }

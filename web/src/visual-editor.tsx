@@ -418,9 +418,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    }}>
    <div className="bubble-menu-inner" role="toolbar" aria-label="文本格式" onMouseDown={event=>event.preventDefault()}>
     {active?.imageSelected
-     ?action('插入或编辑图片',openImage,<><IconPhotoPlus size="1.125em"/><span>编辑图片</span></>)
+     ?action('插入或编辑图片',openImage,<><IconPhotoPlus size="var(--rk-icon-sm)"/><span>编辑图片</span></>)
      :!active?.textSelection
-      ?<>{active?.linkHref&&<span className="bubble-link truncate" title={active.linkHref}>{active.linkHref}</span>}{action('插入或编辑链接',openLink,<><IconLink size="1.125em"/><span>编辑链接</span></>)}</>
+      ?<>{active?.linkHref&&<span className="bubble-link truncate" title={active.linkHref}>{active.linkHref}</span>}{action('插入或编辑链接',openLink,<><IconLink size="var(--rk-icon-sm)"/><span>编辑链接</span></>)}</>
       :<>
        <div className="bubble-group">
         {toggle('一级标题',active?.heading1??false,()=>editor.chain().focus().toggleHeading({level:1}).run(),'H1')}
@@ -429,32 +429,32 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
        </div>
        <div className="bubble-group">
         {inlineMarks}
-        {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="1.125em"/>)}
+        {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
        </div>
        <div className="bubble-group">
         {toggle('上标',active?.superscript??false,()=>editor.chain().focus().toggleSuperscript().run(),<>x<sup>2</sup></>)}
         {toggle('下标',active?.subscript??false,()=>editor.chain().focus().toggleSubscript().run(),<>x<sub>2</sub></>)}
        </div>
-       <div className="bubble-group">{action('插入或编辑链接',openLink,<IconLink size="1.125em"/>)}</div>
+       <div className="bubble-group">{action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)}</div>
       </>}
    </div>
   </BubbleMenu>}
   <div hidden={!((active?.table&&active.focused)||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
    <span className="muted small table-actions-label">表格</span>
-   {action('在上方插入行',()=>tableCommand('addRowBefore'),<><IconTableRow size="1.125em"/><IconPlus size="1em"/></>,!tableTarget&&!editor.can().addRowBefore())}
-   {action('在下方插入行',()=>tableCommand('addRowAfter'),<><IconTableRow size="1.125em"/><IconPlus size="1em"/></>,!tableTarget&&!editor.can().addRowAfter())}
-   {action('删除当前行',()=>tableCommand('deleteRow'),<><IconTableRow size="1.125em"/><IconMinus size="1em"/></>,!tableTarget&&!editor.can().deleteRow())}
+   {action('在上方插入行',()=>tableCommand('addRowBefore'),<><IconTableRow size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addRowBefore())}
+   {action('在下方插入行',()=>tableCommand('addRowAfter'),<><IconTableRow size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addRowAfter())}
+   {action('删除当前行',()=>tableCommand('deleteRow'),<><IconTableRow size="var(--rk-icon-sm)"/><IconMinus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().deleteRow())}
    <span className="editor-table-sep"/>
-   {action('在前方插入列',()=>tableCommand('addColumnBefore'),<><IconColumns3 size="1.125em"/><IconPlus size="1em"/></>,!tableTarget&&!editor.can().addColumnBefore())}
-   {action('在后方插入列',()=>tableCommand('addColumnAfter'),<><IconColumns3 size="1.125em"/><IconPlus size="1em"/></>,!tableTarget&&!editor.can().addColumnAfter())}
-   {action('删除当前列',()=>tableCommand('deleteColumn'),<><IconColumns3 size="1.125em"/><IconMinus size="1em"/></>,!tableTarget&&!editor.can().deleteColumn())}
+   {action('在前方插入列',()=>tableCommand('addColumnBefore'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addColumnBefore())}
+   {action('在后方插入列',()=>tableCommand('addColumnAfter'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addColumnAfter())}
+   {action('删除当前列',()=>tableCommand('deleteColumn'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconMinus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().deleteColumn())}
    <span className="editor-table-sep"/>
-   {action('当前列左对齐',()=>alignTableColumn(editor,'left',lastColumn.current??undefined),<IconAlignLeft size="1.125em"/>)}
-   {action('当前列居中对齐',()=>alignTableColumn(editor,'center',lastColumn.current??undefined),<IconAlignCenter size="1.125em"/>)}
-   {action('当前列右对齐',()=>alignTableColumn(editor,'right',lastColumn.current??undefined),<IconAlignRight size="1.125em"/>)}
+   {action('当前列左对齐',()=>alignTableColumn(editor,'left',lastColumn.current??undefined),<IconAlignLeft size="var(--rk-icon-sm)"/>)}
+   {action('当前列居中对齐',()=>alignTableColumn(editor,'center',lastColumn.current??undefined),<IconAlignCenter size="var(--rk-icon-sm)"/>)}
+   {action('当前列右对齐',()=>alignTableColumn(editor,'right',lastColumn.current??undefined),<IconAlignRight size="var(--rk-icon-sm)"/>)}
    <span className="editor-table-sep"/>
-   {action('编辑表格图注与 ID',editTableCaption,<><IconPencil size="1.125em"/><span>表注</span></>)}
-   {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<IconTrash size="1.125em"/>,!tableTarget&&!editor.can().deleteTable())}
+   {action('编辑表格图注与 ID',editTableCaption,<><IconPencil size="var(--rk-icon-sm)"/><span>表注</span></>)}
+   {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<IconTrash size="var(--rk-icon-sm)"/>,!tableTarget&&!editor.can().deleteTable())}
   </div>
   {tableCaptionOpen&&<div className="rk-table-caption-editor" role="group" aria-label="编辑表格图注与 ID" style={{top:tableToolbarTop+55}}>
    <TextInput label="表格 ID（tbl-...）" value={tableIdDraft} onChange={setTableIdDraft} placeholder="tbl-parameters"/>
@@ -470,7 +470,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>
    {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
     onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
-    <span className="slash-icon"><Icon size="1.25em"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+    <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
   </div>}
   {wiki&&<div className="slash-menu wiki-completion" role="listbox" aria-label="引用文档"
    style={{...(wiki.placement==='above'?{bottom:wiki.offset}:{top:wiki.offset}),left:wiki.left,width:SLASH_MENU_WIDTH}}
