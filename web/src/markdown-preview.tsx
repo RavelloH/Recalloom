@@ -18,7 +18,7 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Card} from '@astryxdesign/core/Card';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
-import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
+import {RmdChatMessage,RmdChatTranscript} from './rmd-chat';
 import {SmartLink} from './link-icons';
 import {LinkCardView} from './tiptap/rich-link-card';
 import {TabsPreview} from './rich-tabs';
@@ -189,11 +189,11 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    </dl>;
    if(kind==='tabs')return <TabsPreview title={title}>{props.children as React.ReactNode}</TabsPreview>;
    if(kind==='tab')return <div className="rk-tab-pane">{props.children as React.ReactNode}</div>;
-   if(kind==='chat')return <ChatMessageList density="compact" align="top">{props.children as React.ReactNode}</ChatMessageList>;
+   if(kind==='chat')return <RmdChatTranscript title={title}>{props.children as React.ReactNode}</RmdChatTranscript>;
    if(kind==='message'){
     const rawSender=String(props['data-sender']??props.dataSender??'assistant');
     const sender=rawSender==='user'?'user':rawSender==='system'?'system':'assistant';
-    return <ChatMessage sender={sender}><ChatMessageBubble name={richTitle(kind,title)}>{props.children as React.ReactNode}</ChatMessageBubble></ChatMessage>;
+    return <RmdChatMessage sender={sender} name={richTitle(kind,title)} avatarName={title||sender}>{props.children as React.ReactNode}</RmdChatMessage>;
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';

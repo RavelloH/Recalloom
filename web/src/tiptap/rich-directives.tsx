@@ -7,7 +7,7 @@ import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Card} from '@astryxdesign/core/Card';
 import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
-import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
+import {RmdChatMessage,RmdChatTranscript} from '../rmd-chat';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconPencil,IconEye,IconEyeOff} from '@tabler/icons-react';
@@ -84,9 +84,9 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <NodeViewContent className="rk-directive-body rk-definition-body"/>
      </div>
    :kind==='chat'
-   ?<ChatMessageList density="compact" align="top"><NodeViewContent className="rk-directive-body rk-chat-list"/></ChatMessageList>
+   ?<RmdChatTranscript title={title} titleNode={editTitle}><NodeViewContent className="rk-directive-body rk-chat-list"/></RmdChatTranscript>
    :kind==='message'
-   ?<ChatMessage sender={sender}><ChatMessageBubble name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></ChatMessageBubble></ChatMessage>
+   ?<RmdChatMessage sender={sender} name={editTitle} avatarName={title||sender}><NodeViewContent className="rk-directive-body rk-chat-message"/></RmdChatMessage>
    :kind==='details'
    ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
    :kind==='mark'||kind==='highlight'

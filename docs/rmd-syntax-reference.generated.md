@@ -619,11 +619,17 @@ Markdown 正文
 **完整示例**：
 
 ~~~~rmd-example
-:::: chat
+:::: chat 示例会话
 
 ::: message 用户 | sender=user
 
-你好。
+可以介绍一下这个组件吗？
+
+:::
+
+::: message Assistant | sender=assistant
+
+可以。这是 **Astryx Chat** 消息布局。
 
 :::
 
