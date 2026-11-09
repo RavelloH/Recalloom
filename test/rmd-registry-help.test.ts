@@ -17,9 +17,9 @@ test('RMD component runtime schema and docs share the same registry with no miss
  assert.deepEqual(Object.keys(attrsByBlock),registry.nodes.map(n=>n.node));
  const reference=readFileSync('docs/rmd-syntax-reference.generated.md','utf8');
  assert.match(reference,/29 种语法形式/);
- assert.equal((reference.match(/~~~~rmd-example\n/g)??[]).length,registry.components.length+registry.nodes.length,
+ assert.equal((reference.match(/~~~~rmd-example\r?\n/g)??[]).length,registry.components.length+registry.nodes.length,
   'every complete component and attrs example must be marked for the real Web preview');
- assert.equal((reference.match(/~~~~text\n/g)??[]).length,registry.components.length,
+ assert.equal((reference.match(/~~~~text\r?\n/g)??[]).length,registry.components.length,
   'non-executable syntax templates must stay plain text');
  for(const component of registry.components){
   const type=component.type as 'inline'|'block'|'leaf';
