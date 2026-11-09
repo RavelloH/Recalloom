@@ -42,7 +42,7 @@ export function sketchSeed(s:string):number{
 export type SketchPath={d:string;fill?:boolean;dash?:string};
 const round=(n:number)=>Number(n.toFixed(2));
 /** Pure paths in local CSS pixel SVG coordinates; dimensions include padding. */
-export function sketchPaths(kind:SketchKind,width:number,height:number,seed=1,roughness=1):SketchPath[]{
+export function sketchPaths(kind:SketchKind,width:number,height:number,seed=1,roughness=1,hasMath=false):SketchPath[]{
  const w=Math.max(4,width),h=Math.max(4,height),r=Math.max(0,Math.min(3,roughness));
  let state=seed>>>0;
  const noise=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296-.5;};
@@ -54,8 +54,12 @@ export function sketchPaths(kind:SketchKind,width:number,height:number,seed=1,ro
   return parts.join(' ');
  };
  if(kind==='highlight'){
-  const top=h*.29,bottom=h*.86;
-  return [{d:'M '+jig(x0,2)+' '+jig(top,3)+' L '+jig(x1,2)+' '+jig(top-1,3)+' L '+jig(x1,2)+' '+jig(bottom,3)+' L '+jig(x0,2)+' '+jig(bottom+1,3)+' Z',fill:true}];
+  // Ordinary text keeps a lighter highlighter stripe. Fractions, roots and
+  // integrals can exceed KaTeX's outer line box; cover the whole measured
+  // glyph height instead of painting only a narrow middle strip.
+  const top=hasMath?2:h*.29,bottom=hasMath?h-2:h*.86;
+  const variation=hasMath?1:3;
+  return [{d:'M '+jig(x0,hasMath?1:2)+' '+jig(top,variation)+' L '+jig(x1,hasMath?1:2)+' '+jig(top-1,variation)+' L '+jig(x1,hasMath?1:2)+' '+jig(bottom,variation)+' L '+jig(x0,hasMath?1:2)+' '+jig(bottom+1,variation)+' Z',fill:true}];
  }
  if(kind==='circle'){
   const cx=w/2,cy=h/2,rx=Math.max(1,w/2-2),ry=Math.max(1,h/2-2);

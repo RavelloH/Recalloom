@@ -1,5 +1,6 @@
 import {useEffect,type RefObject} from 'react';
 import {SKETCH_DEFAULT_COLORS,SKETCH_PALETTE,isSketchKind,parseSketchNumber,sketchPaths,sketchSeed} from './sketch-geometry';
+import {measureBlockSketchLine,measureInlineSketchLines} from './sketch-measure';
 import './sketch-annotations.css';
 
 const SVG_NS='http://www.w3.org/2000/svg';
@@ -20,7 +21,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
  // paint would continuously fire initial ResizeObserver entries and redraw.
  const observed=new Set<HTMLElement>();
  resize.observe(root);
- const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number)=>{
+ const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean)=>{
   if(!isSketchKind(kind)||rect.width<1||rect.height<1)return;
   const stroke=parseSketchNumber(element.dataset.rkSketchStroke,'stroke')??2;
   const padding=parseSketchNumber(element.dataset.rkSketchPadding,'padding')??(kind==='circle'||kind==='box'||kind==='bracket'?5:3);
@@ -32,7 +33,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    :SKETCH_PALETTE[SKETCH_DEFAULT_COLORS[kind]];
   const width=rect.width+padding*2,height=rect.height+padding*2;
   const seed=sketchSeed(kind+':'+(element.textContent??'')+':'+index);
-  const paths=sketchPaths(kind,width,height,seed,roughness);
+  const paths=sketchPaths(kind,width,height,seed,roughness,hasMath);
   const svg=document.createElementNS(SVG_NS,'svg');
   svg.setAttribute('class','rk-sketch-svg');
   svg.setAttribute('data-sketch-drawing',kind);
@@ -69,18 +70,14 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    if(!observed.has(element)){resize.observe(element);observed.add(element);}
    if(element.getClientRects().length===0)continue;
    const kind=element.dataset.rkSketchKind??'';
-   let rectangles:DOMRect[];
-   if(element.classList.contains('rk-sketch-block')){
-    // KaTeX's outer display container may occupy the entire paragraph.
-    // Measure its actual rendered glyphs to avoid drawing a full-width box.
-    const math=element.dataset.rkSketchMathOnly==='true'
-     ?element.querySelector<HTMLElement>('.katex-html,.block-math-inner'):null;
-    const target=math??element.querySelector<HTMLElement>('.rk-sketch-content')??element;
-    rectangles=[target.getBoundingClientRect()];
-   }else{
-    rectangles=[...element.getClientRects()].filter(r=>r.width>1&&r.height>1);
-   }
-   rectangles.forEach((rect,index)=>make(kind,rect,base,element,index));
+   // Browser inline client rects are *fragments*, not visual lines. Group
+   // adjacent text + KaTeX on the same line into one drawing, while preserving
+   // separate drawings on actual wrapped lines. Measure visible KaTeX glyphs
+   // rather than the smaller outer math line box.
+   const lines=element.classList.contains('rk-sketch-block')
+    ?[measureBlockSketchLine(element)]
+    :measureInlineSketchLines(element);
+   lines.forEach(({rect,hasMath},index)=>make(kind,rect,base,element,index,hasMath));
   }
   for(const old of observed)if(!currentlyVisible.has(old)){
    resize.unobserve(old);observed.delete(old);

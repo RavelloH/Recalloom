@@ -35,7 +35,9 @@
   max-width: 100%;
   min-width: 0;
   margin-block: .8rem;
-  margin-inline: auto;
+  /* Prose and lists follow the document's left text baseline; only pure
+   * display-math sketch blocks are centered (see math-only rule below). */
+  margin-inline: 0;
   padding: .15rem .35rem;
 }
 .record-main .rk-sketch-block .rk-sketch-content {
