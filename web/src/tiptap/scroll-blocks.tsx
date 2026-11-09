@@ -9,6 +9,7 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Copy,WrapText,FileCode2,Pencil,ChevronDown,ChevronUp} from 'lucide-react';
 import {attachScrollbars} from '../scrollbars';
+import {attachLazyCodeScrollbars} from '../code-scrollbars';
 import {safeTableId,cleanTableCaption} from '../table-caption';
 import {headingAnchor} from '../wiki-slug';
 import {isRmdId} from '../rmd-schema';
@@ -69,16 +70,24 @@ export class CaptionedScrollTableView extends ScrollTableView{
 }
 const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  const host=useRef<HTMLDivElement>(null);
+ const codeScroll=useRef<ReturnType<typeof attachLazyCodeScrollbars>|null>(null);
  const [expanded,setExpanded]=useState(false);
  const [editing,setEditing]=useState(false);
  const [filename,setFilename]=useState(String(node.attrs.filename??''));
- const lines=node.textContent.split('\n').length;
+ const codeText=node.textContent;
+ const lines=codeText.split('\n').length;
  const fold=lines>20&&!node.attrs.expand&&!expanded;
  useEffect(()=>{
   const wrapper=host.current,viewport=wrapper?.querySelector<HTMLElement>('.rk-code-viewport');
   if(!wrapper||!viewport)return;
-  return attachScrollbars(wrapper,viewport,'x',{edges:true});
+  const controller=attachLazyCodeScrollbars(wrapper,viewport);
+  codeScroll.current=controller;
+  return()=>{codeScroll.current=null;controller.dispose();};
  },[]);
+ // ProseMirror can change an inline text node's scrollWidth without changing
+ // the pre element's border box (and thus without a ResizeObserver event).
+ // Recheck after text or wrapping changes while the block is near the viewport.
+ useEffect(()=>{codeScroll.current?.check();},[codeText,node.attrs.wrap,expanded]);
  const saveTitle=()=>{updateAttributes({filename:filename.replace(/[\r\n\]]/g,' ').slice(0,240)});setEditing(false);};
  return <NodeViewWrapper ref={host} id={typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined} className={'code-block rk-code-block'+(node.attrs.wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')} data-rk-code="true">
   <div className="rk-code-header" contentEditable={false}>
