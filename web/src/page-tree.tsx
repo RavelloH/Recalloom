@@ -3,7 +3,7 @@ import {Link,useLocation,useNavigate} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
-import {ChevronRight,FileText,Folder,FolderOpen,ListTodo,Plus} from 'lucide-react';
+import {IconChevronRight,IconFileText,IconFolder,IconFolderOpen,IconChecklist,IconPlus} from '@tabler/icons-react';
 import {browse} from './api';
 import type {Entry} from './types';
 import {createUntitled,type NewPageKind} from './create-page';
@@ -49,17 +49,17 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
  const pathname=useLocation({select:state=>state.pathname});
  const folder=entry.entityType==='folder';
  const active=pathname===(folder?'/library/':'/records/')+entry.id;
- const Icon=folder?(open?FolderOpen:Folder):entry.kind==='task_list'?ListTodo:FileText;
- const label=<><Icon size={15} className="tree-icon"/><span className="truncate">{entry.name}</span></>;
+ const Icon=folder?(open?IconFolderOpen:IconFolder):entry.kind==='task_list'?IconChecklist:IconFileText;
+ const label=<><Icon size="1.125em" className="tree-icon"/><span className="truncate">{entry.name}</span></>;
  return <li>
   <div className={'tree-row'+(active?' is-active':'')} style={{'--tree-depth':depth} as React.CSSProperties}>
    {folder
-    ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><ChevronRight size={14}/></button>
+    ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><IconChevronRight size="1.125em"/></button>
     :<span className="tree-toggle is-leaf" aria-hidden="true"/>}
    {folder
     ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>
     :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>}
-   {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<Plus size={14}/>} items={createItems(entry.id)}/></div>}
+   {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<IconPlus size="1.125em"/>} items={createItems(entry.id)}/></div>}
   </div>
   {folder&&<AutoResizer duration={0.2}>{open&&<TreeChildren folderId={entry.id} depth={depth+1}/>}</AutoResizer>}
  </li>;
@@ -98,14 +98,14 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
   finally{setBusy(false);}
  };
  const createItems=(parentId:string|null):DropdownMenuOption[]=>[
-  {label:'新建文档',icon:<FileText size={15}/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
-  {label:'新建任务列表',icon:<ListTodo size={15}/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
-  {label:'新建文件夹',icon:<Folder size={15}/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
+  {label:'新建文档',icon:<IconFileText size="1.125em"/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
+  {label:'新建任务列表',icon:<IconChecklist size="1.125em"/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
+  {label:'新建文件夹',icon:<IconFolder size="1.125em"/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
  ];
  return <TreeContext.Provider value={{createItems,onNavigate}}>
   <div className="nav-label nav-label-row tree-heading">
    <Link to="/library" onClick={onNavigate} className="tree-heading-link">知识库</Link>
-   <MoreMenu size="sm" variant="ghost" label="在知识库根目录新建" icon={<Plus size={14}/>} items={createItems(null)}/>
+   <MoreMenu size="sm" variant="ghost" label="在知识库根目录新建" icon={<IconPlus size="1.125em"/>} items={createItems(null)}/>
   </div>
   <AutoResizer>{error&&<p className="tree-error" role="alert">{error}</p>}</AutoResizer>
   <nav aria-label="页面树" className="page-tree"><TreeChildren folderId={null} depth={0}/></nav>

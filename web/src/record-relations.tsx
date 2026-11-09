@@ -5,7 +5,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
-import {ArrowDownLeft,ArrowUpRight,Link2,Network,Sparkles,Unlink} from 'lucide-react';
+import {IconArrowDownLeft,IconArrowUpRight,IconLink,IconTopologyStar3,IconSparkles,IconUnlink} from '@tabler/icons-react';
 import {mutate} from './api';
 import {relationsQuery,searchQuery} from './queries';
 import {relationLabel,semanticMessage} from './graph-types';
@@ -47,27 +47,27 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
  const data=related.data;
  return <section className="relation-panel" aria-label="文档关联">
   <div className="relation-panel-heading">
-   <h3><Network size={16}/>关联文档</h3>
+   <h3><IconTopologyStar3 size="1.125em"/>关联文档</h3>
    <Link to="/graph" search={{focus:recordId}} onClick={onNavigate} className="relation-graph-link">查看关系网</Link>
   </div>
   {error&&<Banner status="error" container="section" title="关联操作失败" description={error}/>}
   {related.isPending?<p className="muted small" role="status">正在加载关联…</p>:
    related.isError?<Banner status="error" container="section" title="关联加载失败" description={related.error.message}/>:
    <>
-    <div className="relation-group-heading"><Link2 size={14}/>已确认关系 <span>{data?.links.length??0}</span></div>
+    <div className="relation-group-heading"><IconLink size="1.125em"/>已确认关系 <span>{data?.links.length??0}</span></div>
     {data?.links.length?<div className="relation-items">{data.links.map(link=><div className="relation-row" key={link.id}>
-     {link.direction==='outgoing'?<ArrowUpRight size={15}/>:<ArrowDownLeft size={15}/>}
+     {link.direction==='outgoing'?<IconArrowUpRight size="1.125em"/>:<IconArrowDownLeft size="1.125em"/>}
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:link.other.id}} onClick={onNavigate} className="relation-name">{link.other.name}</Link>
       <small className="muted">{link.direction==='outgoing'?'指向':'来自'} · {relationLabel(link.relation)}{link.type==='reference'||link.type==='embed'?' · 正文自动生成':''}{link.other.status==='archived'?' · 已归档':''}</small>
      </div>
-     {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<Unlink size={13}/>}
+     {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<IconUnlink size="1em"/>}
       isDisabled={Boolean(busy)} onClick={()=>void apply(link.sourceId,link.targetId,link.relation,'remove')}/>:<span className="muted small" title="请修改源文档中的 Wiki 语法以解除关系">自动</span>}
     </div>)}</div>:<p className="relation-placeholder">尚未建立显式关系。可以在下方搜索文档并关联。</p>}
-    <div className="relation-group-heading"><Sparkles size={14}/>语义相似 <span>{data?.suggestions.length??0}</span></div>
+    <div className="relation-group-heading"><IconSparkles size="1.125em"/>语义相似 <span>{data?.suggestions.length??0}</span></div>
     <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>
     {Boolean(data?.suggestions.length)&&<div className="relation-items">{data?.suggestions.map(s=><div className="relation-row relation-suggestion" key={s.id}>
-     <Sparkles size={15}/>
+     <IconSparkles size="1.125em"/>
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:s.other.id}} onClick={onNavigate} className="relation-name">{s.other.name}</Link>
       <small className="muted">{Math.round((s.score??0)*100)}% 相似度{(s.support??0)>1?' · 多段匹配':''}</small>

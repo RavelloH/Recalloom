@@ -1,7 +1,7 @@
 import React,{useMemo,useState} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {BookOpen,Search,X,Code2,Tags} from 'lucide-react';
+import {IconBook2,IconSearch,IconX,IconCode,IconTags} from '@tabler/icons-react';
 import {HELP_META,HELP_PAGES,HELP_RMD_COMPONENTS,HELP_RMD_NODES} from '../../src/help/catalog.generated';
 import {RMD_REGISTRY} from './rmd-schema';
 import {RmdHelpPre} from './rmd-help-example';
@@ -53,21 +53,21 @@ export default function RmdHelpPage(){
  const isSelected=(type:Topic,name?:string)=>selected.type===type&&selected.name===name;
  return <div className="page rk-help-page">
   <header className="rk-help-header">
-   <span className="rk-help-eyebrow"><BookOpen size={15} aria-hidden="true"/> Recalloom Markdown</span>
+   <span className="rk-help-eyebrow"><IconBook2 size="1.125em" aria-hidden="true"/> Recalloom Markdown</span>
    <h1>RMD 语法参考</h1>
    <p>全部组件、属性、嵌套约束与可复制示例。来源于实际渲染器的权威 Schema。</p>
   </header>
   <div className="rk-help-layout">
    <nav className="rk-help-navigation" aria-label="RMD 组件导航">
     <div className="rk-help-search">
-     <Search size={16} aria-hidden="true"/>
+     <IconSearch size="1.125em" aria-hidden="true"/>
      <input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label="搜索 RMD 语法"
        placeholder="搜索组件或属性…" spellCheck={false}/>
-     {query&&<button type="button" onClick={()=>setQuery('')} aria-label="清空搜索"><X size={15}/></button>}
+     {query&&<button type="button" onClick={()=>setQuery('')} aria-label="清空搜索"><IconX size="1.125em"/></button>}
     </div>
     <div className="rk-help-links">
-     <button type="button" className={isSelected('intro')?'active':''} aria-current={isSelected('intro')?'page':undefined} onClick={()=>choose('intro')}><BookOpen size={15}/> 使用说明</button>
-     <button type="button" className={isSelected('all')?'active':''} aria-current={isSelected('all')?'page':undefined} onClick={()=>choose('all')}><Code2 size={15}/> 完整参考手册</button>
+     <button type="button" className={isSelected('intro')?'active':''} aria-current={isSelected('intro')?'page':undefined} onClick={()=>choose('intro')}><IconBook2 size="1.125em"/> 使用说明</button>
+     <button type="button" className={isSelected('all')?'active':''} aria-current={isSelected('all')?'page':undefined} onClick={()=>choose('all')}><IconCode size="1.125em"/> 完整参考手册</button>
     </div>
     {groups.map(group=>group.items.length>0&&<section key={group.type} aria-label={group.label}>
      <h2>{group.label}</h2>
@@ -78,7 +78,7 @@ export default function RmdHelpPage(){
        {item.name}<span>{Object.keys(item.attributes).length?'参数 '+Object.keys(item.attributes).length:''}</span>
       </button>)}
     </section>)}
-    {visibleNodes.length>0&&<section aria-label="Markdown 块属性"><h2><Tags size={13} aria-hidden="true"/> @ attrs</h2>
+    {visibleNodes.length>0&&<section aria-label="Markdown 块属性"><h2><IconTags size="1em" aria-hidden="true"/> @ attrs</h2>
      {visibleNodes.map(item=><button key={item.node} type="button" className={isSelected('node',item.node)?'active':''}
        aria-current={isSelected('node',item.node)?'page':undefined} onClick={()=>choose('node',item.node)}>
        {item.label}<span>{item.node}</span>

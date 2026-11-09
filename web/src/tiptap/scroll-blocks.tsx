@@ -7,7 +7,7 @@ import type {EditorView} from '@tiptap/pm/view';
 import {ReactNodeViewRenderer,NodeViewWrapper,NodeViewContent,type NodeViewProps} from '@tiptap/react';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {Copy,WrapText,FileCode2,Pencil,ChevronDown,ChevronUp} from 'lucide-react';
+import {IconCopy,IconTextWrap,IconFileCode2,IconPencil,IconChevronDown,IconChevronUp} from '@tabler/icons-react';
 import {attachScrollbars} from '../scrollbars';
 import {attachLazyCodeScrollbars} from '../code-scrollbars';
 import {safeTableId,cleanTableCaption} from '../table-caption';
@@ -92,18 +92,18 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  return <NodeViewWrapper ref={host} id={typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined} className={'code-block rk-code-block'+(node.attrs.wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')} data-rk-code="true">
   <div className="rk-code-header" contentEditable={false}>
    <div className="rk-code-title">
-    <FileCode2 size={15} aria-hidden="true"/>
+    <IconFileCode2 size="1.125em" aria-hidden="true"/>
     {editing?<TextInput label="代码文件名" value={filename} onChange={setFilename} hasAutoFocus
       onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveTitle();}else if(e.key==='Escape')setEditing(false);}}
       onBlur={saveTitle}/>
      :<><span>{String(node.attrs.filename||node.attrs.language||'Text')}</span>
-       <IconButton label="修改代码文件名" variant="ghost" size="sm" icon={<Pencil size={13}/>}
+       <IconButton label="修改代码文件名" variant="ghost" size="sm" icon={<IconPencil size="1em"/>}
          onClick={()=>{setFilename(String(node.attrs.filename??''));setEditing(true);}}/></>}
    </div>
    <div className="rk-code-actions">
     <IconButton label={node.attrs.wrap?'关闭自动换行':'开启自动换行'} variant="ghost" size="sm"
-      icon={<WrapText size={16}/>} onClick={()=>updateAttributes({wrap:!node.attrs.wrap})}/>
-    <IconButton label="复制代码" variant="ghost" size="sm" icon={<Copy size={16}/>}
+      icon={<IconTextWrap size="1.125em"/>} onClick={()=>updateAttributes({wrap:!node.attrs.wrap})}/>
+    <IconButton label="复制代码" variant="ghost" size="sm" icon={<IconCopy size="1.125em"/>}
       onClick={()=>{if(typeof navigator!=='undefined'&&navigator.clipboard)void navigator.clipboard.writeText(node.textContent);}}/>
    </div>
   </div>
@@ -113,7 +113,7 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
   {String(node.attrs.language).toLowerCase()==='mermaid'&&<MermaidDiagram code={node.textContent}/>}
   {lines>20&&!node.attrs.expand&&<div className="rk-code-fold-button" contentEditable={false}>
     <IconButton label={fold?'展开全部代码':'收起长代码'} variant="ghost" size="sm"
-      icon={fold?<ChevronDown size={16}/>:<ChevronUp size={16}/>} onClick={()=>setExpanded(!expanded)}/>
+      icon={fold?<IconChevronDown size="1.125em"/>:<IconChevronUp size="1.125em"/>} onClick={()=>setExpanded(!expanded)}/>
    </div>}
  </NodeViewWrapper>;
 };

@@ -4,7 +4,7 @@ import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/
 import {Card} from '@astryxdesign/core/Card';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconButton} from '@astryxdesign/core/IconButton';
-import {ExternalLink,Link2,Pencil} from 'lucide-react';
+import {IconExternalLink,IconLink,IconPencil} from '@tabler/icons-react';
 import {normalizedLinkUrl,resolveLinkMetadata,proxyImageUrl,type LinkPreviewMetadata} from '../link-metadata-client';
 
 export function LinkCardView({url,title}:{url:string;title?:string}){
@@ -28,13 +28,13 @@ export function LinkCardView({url,title}:{url:string;title?:string}){
 
    <div className="rk-link-card-text">
     <div className="rk-link-card-head">
-     {icon&&!iconError?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setIconError(true)}/>:<Link2 size={16} aria-hidden="true"/>}
+     {icon&&!iconError?<img className="rk-site-favicon" src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setIconError(true)}/>:<IconLink size="1.125em" aria-hidden="true"/>}
      <span>{data?.siteName||domain||'外部链接'}</span>
     </div>
     <div className="rk-link-card-title">{displayTitle}</div>
     {data?.description&&<p className="rk-link-card-desc">{data.description}</p>}
     {!loaded&&<div className="rk-link-card-loading">正在获取链接信息…</div>}
-    {valid?<a href={url} target="_blank" rel="noopener noreferrer" className="rk-link-card-open">{domain||'打开链接'} <ExternalLink size={13} aria-hidden="true"/></a>
+    {valid?<a href={url} target="_blank" rel="noopener noreferrer" className="rk-link-card-open">{domain||'打开链接'} <IconExternalLink size="1em" aria-hidden="true"/></a>
      :<span className="rk-link-card-loading">请添加有效的 HTTP(S) 地址</span>}
    </div>
    {preview&&!imageError&&<img src={preview} className="rk-link-card-image" alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setImageError(true)}/>}
@@ -50,7 +50,7 @@ function LinkCardEditorView({node,updateAttributes}:NodeViewProps){
   <LinkCardView url={url} title={title}/>
   <div className="rk-link-card-edit-actions">{edit?<TextInput label="链接卡片 URL" value={draft} onChange={setDraft} onBlur={save}
     onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();save();}else if(event.key==='Escape'){setDraft(url);setEdit(false);}}}/>
-   :<IconButton label="编辑链接地址" variant="ghost" size="sm" icon={<Pencil size={15}/>} onClick={()=>{setDraft(url);setEdit(true);}}/>}</div>
+   :<IconButton label="编辑链接地址" variant="ghost" size="sm" icon={<IconPencil size="1.125em"/>} onClick={()=>{setDraft(url);setEdit(true);}}/>}</div>
  </NodeViewWrapper>;
 }
 export const RichLinkCard=Node.create({
