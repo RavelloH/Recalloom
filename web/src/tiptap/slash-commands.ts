@@ -1,5 +1,6 @@
 import type {Editor} from '@tiptap/core';
 import {runInlineRmdCommand} from './editor-inline-commands';
+import {extraBlockCommands} from './editor-block-commands';
 // Import command augmentations explicitly; the retired Markdown plugin no longer
 // supplies them transitively to the editor's TypeScript compilation.
 import type {} from '@tiptap/extension-task-list';
@@ -11,7 +12,7 @@ import type {} from '@tiptap/extension-table';
 import type {} from '@tiptap/extension-text-align';
 import {IconPilcrow,IconH1,IconH2,IconH3,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconSeparatorHorizontal,IconTable,IconLink,IconPhotoPlus,IconMathFunction,IconSum,IconAlignLeft,IconAlignCenter,IconAlignRight,IconMessageExclamation,IconChevronsDown,IconTag,IconHighlight,IconMessageCircle,IconMessages,IconNotes,IconLayoutNavbar,IconVocabulary,IconCards,IconSchema,IconBrowser,IconEyeQuestion,IconKeyboard,type TablerIcon} from '@tabler/icons-react';
 
-export type SlashHelpers={openLink:()=>void;openImage:()=>void;openMath:(type:'inline'|'block')=>void};
+export type SlashHelpers={openLink:()=>void;openImage:()=>void;openMath:(type:'inline'|'block')=>void;openWikiEmbed?:()=>void};
 export type SlashCommand={
  id:string;title:string;description:string;keywords:string[];icon:TablerIcon;
  run:(editor:Editor,helpers:SlashHelpers)=>void;
@@ -30,6 +31,8 @@ export const slashCommands:SlashCommand[]=[
  {id:'quote',title:'引用',description:'引用或强调一段话',keywords:['quote','blockquote','yy'],icon:IconQuote,run:e=>chain(e).toggleWrap('blockquote').run()},
  {id:'code',title:'代码块',description:'等宽字体的代码片段',keywords:['code','pre','snippet','dm'],icon:IconCodeDots,run:e=>chain(e).toggleCodeBlock().run()},
  {id:'callout',title:'提示横幅',description:'插入 Astryx 风格提示容器',keywords:['callout','warning','banner','tip','alert','ts'],icon:IconMessageExclamation,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'warning',title:'注意'},content:[{type:'paragraph',content:[{type:'text',text:'请在此输入提示内容'}]}]}).run()},
+ ...extraBlockCommands.map(item=>({id:'rmd-block:'+item.syntax,title:item.title,description:item.category==='child'?'在合法父容器中添加子块':'插入 RMD '+item.syntax+' 块',keywords:[...item.keywords],icon:item.category==='annotation'?IconHighlight:IconMessageExclamation,run:(e:Editor)=>{item.run(e);},isAvailable:item.isAvailable})),
+ {id:'wiki-embed',title:'嵌入 Wiki 文档',description:'搜索并嵌入只读文档投影',keywords:['embed','wiki','嵌入','文档'],icon:IconBrowser,run:(_e,h)=>h.openWikiEmbed?.()},
  {id:'details',title:'折叠内容',description:'插入可以折叠的内容区域',keywords:['details','fold','collapse','zd'],icon:IconChevronsDown,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'details',title:'详细内容'},content:[{type:'paragraph',content:[{type:'text',text:'补充说明'}]}]}).run()},
  {id:'badge',title:'行内徽标',description:'插入状态或版本标签',keywords:['badge','tag','label','bz'],icon:IconTag,run:e=>chain(e).insertContent({type:'richBadge',attrs:{variant:'info'},content:[{type:'text',text:'状态'}]}).run()},
  {id:'comment',title:'弱化注释',description:'在所选文字上添加可见注释',keywords:['comment','note','annotation','zs'],icon:IconMessageCircle,run:e=>chain(e).setMark('visibleComment').run()},

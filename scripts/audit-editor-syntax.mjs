@@ -45,6 +45,22 @@ if(fs.existsSync(catalogPath)){
  }
 }
 function RMDInlineSourceCheck(source){return source.includes('inlineRmdCommands')&&source.includes('runInlineRmdCommand');}
+// Every generated block command must be in the actual slash actions and the
+// insertion code must check registered schema and parent constraints.
+const blockCommandsPath='web/src/tiptap/editor-block-commands.ts';
+if(fs.existsSync(blockCommandsPath)&&slash.includes('...extraBlockCommands.map')){
+ const blockCatalog=fs.readFileSync(blockCommandsPath,'utf8');
+ if(blockCatalog.includes('extraBlockCommands:readonly RmdBlockInsertion[]')&&
+    blockCatalog.includes("getRmdSchema('block',entry.syntax)")){
+  for(const c of r.components.filter(c=>c.type==='block')){
+   if(['details','tabs','chat','flashcard','glossary'].includes(c.name))continue;
+   entries['block:'+c.name]={surface:'slash',id:'rmd-block:'+c.name,
+    proof:()=>blockCatalog.includes('category:')&&slash.includes("id:'rmd-block:'+item.syntax")};
+  }
+ }
+}
+if(slash.includes("id:'wiki-embed'")&&toolbar.includes('openWikiEmbed'))
+ entries['leaf:embed']={surface:'slash',id:'wiki-embed'};
 for(const [name,data] of Object.entries(entries)){
  assert.ok(r.components.some(c=>c.type+':'+c.name===name),'stale registry name '+name);
  assert.ok((data.proof?data.proof():ids.has(data.id)),'stale UI anchor '+name+':'+data.id);
@@ -62,7 +78,7 @@ const attrRows=r.nodes.map(n=>({node:n.node,current:attrs.includes((typeForAttr[
 if(process.argv.includes('--json'))console.log(JSON.stringify({head:'current',registryTotal:rows.length,summary,rows,attributes:attrRows},null,2));
 else {
  console.log('# RMD 可视化命令入口覆盖审计（当前工作树）\n');
- console.log('基线统计：'+rows.length+' 种组件；直接工具栏 '+summary.toolbar+'，直接斜杠 '+summary.slash+'，仅父容器默认内含 '+summary['parent-default']+'，缺少入口 '+summary.missing+'。\n');
+ console.log('当前统计：'+rows.length+' 种组件；直接工具栏 '+summary.toolbar+'，斜杠（含合法子块） '+summary.slash+'，仅父容器默认内含 '+summary['parent-default']+'，缺少入口 '+summary.missing+'。\n');
  console.log('注意：parent-default 只能在创建父容器时生成预设子块，不代表可随时添加合法子块；slash 中的 inline 项也不代表在格式工具栏可找到。\n');
  console.log('| RMD | 当前入口 | 证据 | 目标入口 |');console.log('|---|---|---|---|');
  for(const x of rows)console.log('| '+x.key+' | '+x.current+' | '+(x.evidence||'—')+' | '+x.target+' |');

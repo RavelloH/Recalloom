@@ -283,6 +283,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   setDialog({kind:'image',src:existing?String(attrs.src??''):'',alt:existing?String(attrs.alt??''):'',title:existing?String(attrs.title??''):'',existing});
  };
  const openMath=(type:'inline'|'block')=>setDialog({kind:'math',type,latex:'',existing:false});
+ const openWikiEmbed=()=>{
+  // Reuse the existing UUID-pinned Wiki document selector.
+  editor?.chain().focus().insertContent('::: embed ').run();
+ };
  const applyDialog=(item:InsertDialogState)=>{
   if(!editor)return;
   if(item.kind==='link'){
@@ -355,7 +359,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!editor||!state)return;
   setSlash(null);slashDismissedAt.current=null;
   editor.chain().focus().deleteRange({from:state.from,to:state.to}).run();
-  command.run(editor,{openLink,openImage,openMath});
+  command.run(editor,{openLink,openImage,openMath,openWikiEmbed});
  };
  if(!editor||!ready)return <div className="content-loading">正在准备可视化编辑器…</div>;
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
