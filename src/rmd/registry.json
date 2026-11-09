@@ -1,6 +1,6 @@
 {
   "formatVersion": 1,
-  "description": "RMD 1.0 组件和块属性的权威注册表。Web 解析器、MCP 语法帮助和源码补全从此派生。",
+  "description": "RMD 1.0 组件和块属性的权威注册表。手绘风格的标记采用静态 SVG，无动画。Web 解析器、MCP 帮助和源码补全从此派生。",
   "colors": [
     "red",
     "orange",
@@ -46,13 +46,142 @@
         "color"
       ],
       "attributes": {
-        "color": "color"
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "opacity": "sketch-opacity"
       },
-      "requiredAttributes": [
+      "summary": "手绘荧光笔（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: highlight 重要结论 ::"
+    },
+    {
+      "type": "inline",
+      "name": "circle",
+      "main": "required",
+      "positions": [
         "color"
       ],
-      "summary": "九色强调，必须显式提供 color，不存在默认颜色。",
-      "example": ":: highlight 高风险 | red ::"
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘圈选（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: circle 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "box",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘方框（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: box 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "bracket",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘括号（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: bracket 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "underline",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: underline 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "double-underline",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "双下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: double-underline 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "dotted-underline",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "点状下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: dotted-underline 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "wavy",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘波浪线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: wavy 重要结论 | color=blue ::"
+    },
+    {
+      "type": "inline",
+      "name": "arrow",
+      "main": "required",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness"
+      },
+      "summary": "手绘箭头（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。",
+      "example": ":: arrow 重要结论 | color=blue ::"
     },
     {
       "type": "inline",
@@ -225,14 +354,100 @@
         "color"
       ],
       "attributes": {
-        "id": "id",
-        "color": "color"
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "opacity": "sketch-opacity",
+        "id": "id"
       },
-      "requiredAttributes": [
+      "summary": "手绘荧光笔（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: highlight\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "circle",
+      "main": "forbidden",
+      "positions": [
         "color"
       ],
-      "summary": "块级九色 Highlight，必须传 color。",
-      "example": "::: highlight | color=blue\n\n彩色强调正文。\n\n:::"
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "id": "id"
+      },
+      "summary": "手绘圈选（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: circle\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "box",
+      "main": "forbidden",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "id": "id"
+      },
+      "summary": "手绘方框（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: box | color=orange\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "bracket",
+      "main": "forbidden",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "id": "id"
+      },
+      "summary": "手绘括号（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: bracket\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "underline",
+      "main": "forbidden",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "id": "id"
+      },
+      "summary": "手绘下划线（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: underline\n\n$$\nE=mc^2\n$$\n\n:::"
+    },
+    {
+      "type": "block",
+      "name": "double-underline",
+      "main": "forbidden",
+      "positions": [
+        "color"
+      ],
+      "attributes": {
+        "color": "color",
+        "stroke": "sketch-stroke",
+        "padding": "sketch-padding",
+        "roughness": "sketch-roughness",
+        "id": "id"
+      },
+      "summary": "双下划线（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。",
+      "example": "::: double-underline\n\n$$\nE=mc^2\n$$\n\n:::"
     },
     {
       "type": "block",

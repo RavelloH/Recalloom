@@ -72,7 +72,7 @@ try{
  await visual.waitFor({timeout:25000});
  await visual.locator('.rk-inline-badge').first().waitFor();
  assert.equal(await visual.locator('mark:not([data-rk-color])').count(),1,'default Mark one inline');
- assert.equal(await visual.locator('mark[data-rk-color="yellow"]').count(),1);
+ assert.equal(await visual.locator('.rk-sketch-inline[data-rk-sketch-kind="highlight"][data-rk-sketch-color="yellow"]').count(),1);
  assert.equal(await visual.locator('.rk-rmd-block-mark').count(),1,'block Mark node');
  assert.equal(await visual.locator('table tbody tr').count(),2,'Tiptap includes the header row in tbody');
  assert.equal(await visual.locator('table tbody tr').last().locator('td').count(),2,'GFM two columns');
@@ -121,6 +121,15 @@ try{
  await page.waitForFunction(async id=>{
   const r=await fetch('/api/records/'+id);
   return r.ok&&(await r.json()).content.includes('USER_EDIT_RMD');
+ },id,{timeout:20000});
+ // Local Worker reads can briefly disagree after a write; require three
+ // independent no-store reads to observe the same committed revision.
+ await page.waitForFunction(async recordId=>{
+  const samples=await Promise.all([1,2,3].map(async()=>{
+   const response=await fetch('/api/records/'+recordId,{cache:'no-store'});
+   return response.ok?String((await response.json()).content??''):'';
+  }));
+  return samples.every(value=>value.includes('USER_EDIT_RMD'));
  },id,{timeout:20000});
  const saved=(await json('/records/'+id)).body.content;
  for(const marker of ['文中','状态','标准',':: mark',':: highlight','@ attrs tbl-test','%%','USER_EDIT_RMD','[站点](https://example.com "链接标题")','![实验装置](device.png "图片标题")','[[#code-visual]]'])

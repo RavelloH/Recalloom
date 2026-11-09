@@ -4,6 +4,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import {remarkRmdSyntax} from './rmd-remark';
+import {isSketchKind,sketchAttrs} from './sketch-geometry';
 import {analyzeRmd,shieldRmdTablePipes,type RmdAnalysis} from './rmd-lexer';
 import {rawMarkdownBlock} from './tiptap/raw-markdown';
 import {normalizeKnownMarkdown} from './markdown-normalize';
@@ -76,9 +77,10 @@ function inlineNode(node:AstNode,source:string):JSONContent[]{
   case 'rmdInline':{
    const name=node.name??'',attributes=props(node);
    if(name==='mark')return addMark(children(node,source),'rmdMark');
-   if(name==='highlight'){
-    const color=attributes.dataRkColor;
-    return color?addMark(children(node,source),'highlight',{color}):mkText(at(node,source));
+   if(isSketchKind(name)){
+    const props:Record<string,string>={};
+    for(const key of ['Color','Stroke','Padding','Roughness','Opacity'])if(attributes['dataRkSketch'+key])props[key.toLowerCase()]=attributes['dataRkSketch'+key]!;
+    return addMark(children(node,source),'rmdSketch',sketchAttrs(name,props));
    }
    if(name==='comment')return addMark(children(node,source),'visibleComment');
    if(name==='wikiLink')return [{type:'wikiLink',attrs:{
@@ -115,6 +117,12 @@ function blockNode(node:AstNode,source:string):JSONContent[]{
   if(node.data?.hName==='rk-rmd-block-mark')return [{type:'richContainer',
    attrs:{kind:node.name??'mark',title:'',color:p.dataRkColor??null},
    content:nonemptyChildren(body)}];
+  if(node.data?.hName==='rk-sketch-block'){
+   const kind=node.name??'',attrs:Record<string,string>={};
+   for(const key of ['Color','Stroke','Padding','Roughness','Opacity'])if(p['dataRkSketch'+key])attrs[key.toLowerCase()]=p['dataRkSketch'+key]!;
+   if(!isSketchKind(kind))return [protect(node,source)];
+   return [{type:'richContainer',attrs:{...sketchAttrs(kind,attrs),title:'',mathOnly:p.dataRkSketchMathOnly==='true'},content:nonemptyChildren(body)}];
+  }
   if(node.data?.hName==='rk-rmd-comment-block')return [{type:'richContainer',
    attrs:{kind:'comment',title:''},content:nonemptyChildren(body)}];
   if(node.data?.hName==='rk-callout')return [{type:'richContainer',

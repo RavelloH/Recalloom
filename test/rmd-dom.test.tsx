@@ -23,14 +23,16 @@ describe('RMD semantic HTML integration',()=>{
  it('renders default Mark identically to native mark and distinguishes yellow Highlight',()=>{
   const html=render('普通 :: mark $E=mc^2$ ::，彩色 :: highlight 重要 | yellow ::。');
   assert.ok(html.includes('<mark>'),html.slice(0,1500));
-  assert.ok(html.includes('data-rk-color="yellow"'),html.slice(0,1500));
+  assert.ok(html.includes('data-rk-sketch-kind="highlight"'),html.slice(0,1500));
+  assert.ok(html.includes('data-rk-sketch-color="yellow"'),html.slice(0,1500));
   assert.ok(html.includes('katex'),html.slice(0,1000));
  });
  it('preserves full display math inside block Mark independently from colored Highlight',()=>{
   const src=['::: mark','','$$','E=mc^2','$$','',':::','','::: highlight | yellow','','重点','',':::'].join('\n');
   const html=render(src);
-  assert.equal((html.match(/<rk-rmd-block-mark/g)??[]).length,2,html.slice(0,4000));
-  assert.ok(html.includes('data-rk-color="yellow"'),html.slice(0,4000));
+  assert.equal((html.match(/<rk-rmd-block-mark/g)??[]).length,1,html.slice(0,4000));
+  assert.equal((html.match(/<rk-sketch-block/g)??[]).length,1,html.slice(0,4000));
+  assert.ok(html.includes('data-rk-sketch-color="yellow"'),html.slice(0,4000));
   assert.ok(html.includes('katex-display'));
  });
  it('protects component pipes from GFM and still recognizes a two-column table',()=>{

@@ -1,5 +1,6 @@
 import type {JSONContent} from '@tiptap/core';
 import {isRmdId,isValidRmdValue} from './rmd-schema';
+import {isSketchKind,parseSketchNumber} from './sketch-geometry';
 
 const string=(value:unknown)=>String(value??'');
 const asId=(v:unknown)=>{const x=string(v).trim();return isRmdId(x)?x.toLowerCase():'';};
@@ -28,6 +29,17 @@ function renderMarked(content:string,mark:{type:string;attrs?:Record<string,unkn
  if(mark.type==='subscript')return '<sub>'+content+'</sub>';
  if(mark.type==='link')return '['+content+']('+string(value.href).replace(/\s/g,'%20')+markdownTitle(value.title)+')';
  if(mark.type==='rmdMark')return inlineToken('mark',content);
+ if(mark.type==='rmdSketch'){
+  const kind=string(value.kind),color=string(value.color);
+  if(!isSketchKind(kind))return content;
+  const args:Array<[string,unknown]>=[];
+  if(isValidRmdValue('color',color))args.push(['color',color]);
+  for(const key of ['stroke','padding','roughness','opacity'] as const){
+   const v=parseSketchNumber(value[key],key);
+   if(v!==undefined&&!(key==='opacity'&&kind!=='highlight'))args.push([key,v]);
+  }
+  return inlineToken(kind,content,args);
+ }
  if(mark.type==='highlight'){
   const color=string(value.color);
   return isValidRmdValue('color',color)?inlineToken('highlight',content,[['color',color]]):content;
@@ -39,8 +51,8 @@ function renderMarked(content:string,mark:{type:string;attrs?:Record<string,unkn
  * emphasis, irrespective of the order ProseMirror stored the same mark set.
  * Prevents :: mark **x** :: becoming **:: mark x ::** on save. */
 const wrapMarks=(text:string,marks:readonly {type:string;attrs?:Record<string,unknown>}[])=>
- [...marks].sort((a,b)=>Number(!['rmdMark','highlight','visibleComment'].includes(a.type))-
- Number(!['rmdMark','highlight','visibleComment'].includes(b.type)))
+ [...marks].sort((a,b)=>Number(!['rmdMark','rmdSketch','highlight','visibleComment'].includes(a.type))-
+ Number(!['rmdMark','rmdSketch','highlight','visibleComment'].includes(b.type)))
  .reduceRight((value,mark)=>renderMarked(value,mark),text);
 export function serializeRmdInline(content:readonly JSONContent[]):string{
  const fragments=content.map(node=>{
@@ -157,7 +169,7 @@ export function serializeRmdBlock(node:JSONContent):string{
    const kind=string(a.kind),title=string(a.title);
    const body=paragraphs(node.content??[]);
    if(kind==='comment')return '%%\n'+body+'\n%%';
-   const meta=kind==='highlight'?params([['color',a.color]]):kind==='message'?params([['sender',a.sender]]):'';
+   const meta=isSketchKind(kind)?params([['color',a.color],['stroke',a.stroke],['padding',a.padding],['roughness',a.roughness],['opacity',kind==='highlight'?a.opacity:null]]):kind==='message'?params([['sender',a.sender]]):'';
    const head=kind+(title?' '+title:'')+meta;
    const childFence=body.match(/^(:{3,})/gm)??[];
    const size=Math.max(3,...childFence.map(v=>v.length+1));

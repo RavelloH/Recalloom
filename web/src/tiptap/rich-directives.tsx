@@ -8,6 +8,7 @@ import {Card} from '@astryxdesign/core/Card';
 import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {RmdChatMessage,RmdChatTranscript} from '../rmd-chat';
+import {isSketchKind} from '../sketch-geometry';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconPencil,IconEye,IconEyeOff} from '@tabler/icons-react';
@@ -24,6 +25,7 @@ const calloutKinds=new Set(['note','info','tip','success','warning','danger','ex
 function ContainerView({node,updateAttributes}:NodeViewProps){
  const kind=String(node.attrs.kind??'note'),title=String(node.attrs.title??'');
  const color=String(node.attrs.color??'');
+ const sketchKind=isSketchKind(kind);
  const mathOnly=node.childCount===1&&node.firstChild?.type.name==='blockMath';
  const sender=node.attrs.sender==='user'?'user':node.attrs.sender==='system'?'system':'assistant';
  const tabs=node.content?.content.filter(child=>child.type.name==='richContainer'&&child.attrs.kind==='tab')??[];
@@ -39,7 +41,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
   :<span>{richTitle(kind,title)}</span>}
   {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<IconPencil size="var(--rk-icon-sm)"/>}/>}
  </span>;
- return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')} data-rk-kind={kind}>
+ return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>
   {kind==='tabs'
    ?<Card variant="default" padding={3} className="rk-tabs-edit" data-rk-active-tab={tabs.length<=32?String(activeTab):undefined}>
       <div className="rk-tabs-heading" contentEditable={false}>{editTitle}</div>
@@ -89,8 +91,18 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
    ?<RmdChatMessage sender={sender} name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></RmdChatMessage>
    :kind==='details'
    ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
-   :kind==='mark'||kind==='highlight'
-   ?<section className={'rk-rmd-block-mark'+(mathOnly?' rk-rmd-mark-math-only':'')} data-rk-color={kind==='highlight'?color||undefined:undefined}>
+   :sketchKind
+   ?<section className="rk-sketch-block" data-rk-sketch-kind={kind}
+     data-rk-sketch-color={color||undefined}
+     data-rk-sketch-stroke={node.attrs.stroke??undefined}
+     data-rk-sketch-padding={node.attrs.padding??undefined}
+     data-rk-sketch-roughness={node.attrs.roughness??undefined}
+     data-rk-sketch-opacity={node.attrs.opacity??undefined}
+     data-rk-sketch-math-only={mathOnly?'true':undefined}>
+     <NodeViewContent className="rk-directive-body rk-sketch-content"/>
+    </section>
+   :kind==='mark'
+   ?<section className={'rk-rmd-block-mark'+(mathOnly?' rk-rmd-mark-math-only':'')}>
      <NodeViewContent className="rk-directive-body"/>
     </section>
    :kind==='comment'
@@ -102,7 +114,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
 }
 export const RichContainer=Node.create({
  name:'richContainer',group:'block',content:'block+',defining:true,isolating:true,priority:67,
- addAttributes(){return {kind:{default:'note'},title:{default:''},sender:{default:null},color:{default:null}};},
+ addAttributes(){return {kind:{default:'note'},title:{default:''},sender:{default:null},color:{default:null},stroke:{default:null},padding:{default:null},roughness:{default:null},opacity:{default:null}};},
  parseHTML(){return [{tag:'div[data-rk-kind]'}];},
  renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-kind':HTMLAttributes.kind}),0];},
  addNodeView(){return ReactNodeViewRenderer(ContainerView);}

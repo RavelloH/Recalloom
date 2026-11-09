@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import {readFileSync,writeFileSync} from 'node:fs';
-const base='http://127.0.0.1:8805';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8805';
+assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
 const registry=JSON.parse(readFileSync('src/rmd/registry.json','utf8'));
 const secret=readFileSync('.dev.vars','utf8').match(/MCP_AUTH_SECRET=([^\r\n]+)/)[1];
 const colors=registry.colors;
@@ -33,13 +34,16 @@ try{
   await page.goto(base+'/records/'+result.body.id+'?mode='+mode);
   await page.locator('.editor-view '+(mode==='visual'?'.tiptap':'.markdown-preview')).waitFor();
   assert.equal(await page.locator('html').getAttribute('data-effective-theme'),'dark');
+  await page.waitForFunction(()=>document.querySelectorAll('.editor-view svg[data-sketch-drawing="highlight"]').length>=18);
   output[mode]=await page.evaluate(()=>{
-   const root=document.querySelector('.editor-view .tiptap,.editor-view .markdown-preview');
+   const root=document.querySelector('.editor-view .wysiwyg,.editor-view .markdown-preview');
    const colors=nodes=>[...root.querySelectorAll(nodes)].map(e=>{
     const s=getComputedStyle(e),rect=e.getBoundingClientRect();
-    return {name:e.getAttribute('data-rk-color')||e.getAttribute('data-rk-kind'),bg:s.backgroundColor,color:s.color,w:rect.width,h:rect.height,icon:(e.querySelector('.astryx-banner-icon')?getComputedStyle(e.querySelector('.astryx-banner-icon')).color:null)};
+    return {name:e.getAttribute('data-rk-sketch-color')||e.getAttribute('data-rk-kind'),bg:s.backgroundColor,color:s.color,w:rect.width,h:rect.height,icon:(e.querySelector('.astryx-banner-icon')?getComputedStyle(e.querySelector('.astryx-banner-icon')).color:null)};
    });
-   return {inline:colors('mark[data-rk-color]'),blocks:colors('.rk-rmd-block-mark[data-rk-color]'),callouts:colors('.rk-rmd-callout'),overflow:document.documentElement.scrollWidth-innerWidth};
+   return {inline:colors('.rk-sketch-inline[data-rk-sketch-color]'),blocks:colors('.rk-sketch-block[data-rk-sketch-color]'),callouts:colors('.rk-rmd-callout'),
+    strokes:[...root.querySelectorAll('svg[data-sketch-drawing="highlight"]')].map(svg=>svg.querySelector('path')?.getAttribute('fill')),
+    overflow:document.documentElement.scrollWidth-innerWidth};
   });
   await page.screenshot({path:'tmp/parity-screens/mobile-dark-'+mode+'.png',fullPage:true});
   assert.equal(output[mode].inline.length,colors.length,'must have 9 highlights '+mode);
@@ -54,8 +58,10 @@ try{
    assert.equal(b[i].name,colors[i]);
    assert.equal(a[i].bg,b[i].bg,'Color '+colors[i]+' mismatch '+group);
   }
-  assert.equal(new Set(a.map(x=>x.bg)).size,colors.length,'all nine colors should be distinct '+group);
+  assert.ok(a.every(x=>x.bg==='rgba(0, 0, 0, 0)'),'hand drawn spans/blocks have no old color background '+group);
  }
+ assert.deepEqual(output.visual.strokes,output.preview.strokes,'SVG pigment is identical between visual and preview');
+ assert.equal(new Set(output.visual.strokes).size,colors.length,'all nine hand drawn pigment colors are distinct');
  for(let i=0;i<kinds.length;i++){
   assert.equal(output.visual.callouts[i].name,kinds[i]);
   assert.equal(output.preview.callouts[i].name,kinds[i]);
@@ -66,5 +72,5 @@ try{
  assert.equal(saved,source);
  writeFileSync('tmp/rmd-parity-dark-colors.json',JSON.stringify(output,null,2));
  console.log('PASS DARK PHONE nine inline highlights, nine block highlights, eight Callouts, no overflow, preview parity');
- console.log(JSON.stringify({colors:output.preview.inline.map(x=>x.name+'='+x.bg),callouts:output.preview.callouts.map(x=>x.name+'='+x.icon)},null,2));
+ console.log(JSON.stringify({colors:output.preview.inline.map((x,i)=>x.name+'='+output.preview.strokes[i]),callouts:output.preview.callouts.map(x=>x.name+'='+x.icon)},null,2));
 }finally{await browser.close();}

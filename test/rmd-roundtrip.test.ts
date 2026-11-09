@@ -16,7 +16,7 @@ const semantic=(source:string)=>{
   tables:walk(doc,'table').map(n=>[n.attrs?.tableId,n.attrs?.caption]),
   containers:walk(doc,'richContainer').map(n=>[n.attrs?.kind,n.attrs?.title,n.attrs?.color]),
   badges:walk(doc,'richBadge').map(n=>n.attrs?.variant),
-  marks:walk(doc,'text').flatMap(n=>(n.marks??[]).filter(m=>['rmdMark','highlight','visibleComment'].includes(m.type)).map(m=>[m.type,m.attrs?.color??null])),
+  marks:walk(doc,'text').flatMap(n=>(n.marks??[]).filter(m=>['rmdMark','rmdSketch','highlight','visibleComment'].includes(m.type)).map(m=>[m.type,m.attrs?.color??null])),
  };
 };
 const check=(source:string)=>{

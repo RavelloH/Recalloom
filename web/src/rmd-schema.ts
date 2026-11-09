@@ -5,7 +5,7 @@
 import registry from '../../src/rmd/registry.json';
 
 export type RmdNodeType='inline'|'block'|'leaf';
-export type RmdValueType='string'|'boolean'|'integer'|'color'|'variant'|'id';
+export type RmdValueType='string'|'boolean'|'integer'|'color'|'variant'|'id'|'sketch-stroke'|'sketch-padding'|'sketch-roughness'|'sketch-opacity';
 export type RmdSchema={
  name:string;type:RmdNodeType;main:'required'|'optional'|'forbidden';
  positions:readonly string[];attributes:Readonly<Record<string,RmdValueType>>;
@@ -44,6 +44,11 @@ export function isValidRmdValue(kind:string,value:string):boolean{
  if(!value.trim())return false;
  if(kind==='integer')return /^\d+$/.test(value)&&Number(value)>=registry.constraints.integerMinimum&&Number(value)<=registry.constraints.integerMaximum;
  if(kind==='boolean')return value==='true'||value==='false';
+ if(kind.startsWith('sketch-')){
+  const limits:Record<string,[number,number]>={'sketch-stroke':[.5,6],'sketch-padding':[0,24],'sketch-roughness':[0,3],'sketch-opacity':[.1,.85]};
+  const range=limits[kind];const num=Number(value);
+  return !!range&&/^\d+(?:\.\d{1,2})?$/.test(value)&&Number.isFinite(num)&&num>=range[0]&&num<=range[1];
+ }
  if(kind==='color')return RMD_COLORS.includes(value);
  if(kind==='variant')return RMD_VARIANTS.includes(value);
  if(kind==='id')return isRmdId(value);

@@ -17,9 +17,10 @@ describe('RMD shared MDAST renderer',()=>{
  it('renders Inline Mark and explicit Highlight with distinct data and preserved formula',()=>{
   const doc=parse('这是 :: mark $E=mc^2$ :: 和 :: highlight 重点 | yellow ::。');
   const marks=all(doc,'mark');
-  assert.equal(marks.length,2,JSON.stringify(doc));
+  assert.equal(marks.length,1,JSON.stringify(doc));
+  assert.equal(all(doc,'rk-sketch').length,1,JSON.stringify(doc));
   assert.equal(marks[0]?.data?.hProperties?.dataRkColor,undefined);
-  assert.equal(marks[1]?.data?.hProperties?.dataRkColor,'yellow');
+  assert.equal(all(doc,'rk-sketch')[0]?.data?.hProperties?.dataRkSketchColor,'yellow');
   assert.ok(marks[0]?.children?.some(c=>c.type==='inlineMath'),JSON.stringify(doc));
  });
  it('renders badge and tooltip with schema-derived exact properties',()=>{
@@ -30,6 +31,7 @@ describe('RMD shared MDAST renderer',()=>{
  it('preserves invalid unknown text rather than interpreting nodes',()=>{
   const doc=parse(':: highlight 未提供颜色 :: 和 :: badge a | nonsense ::。');
   assert.equal(all(doc,'mark').length,0);
+  assert.equal(all(doc,'rk-sketch').length,1);
   assert.equal(all(doc,'rk-badge').length,0);
   assert.ok(JSON.stringify(doc).includes('未提供颜色'));
  });
@@ -42,9 +44,10 @@ describe('RMD shared MDAST renderer',()=>{
  });
  it('keeps block Mark and Highlight distinct for full math blocks',()=>{
   const doc=parse(['::: mark','','$$','E=mc^2','$$','',':::','','::: highlight | yellow','','$$','P=UI','$$','',':::'].join('\n\n').replace(/\n\n\n/g,'\n\n'));
-  assert.equal(all(doc,'rk-rmd-block-mark').length,2,JSON.stringify(doc));
+  assert.equal(all(doc,'rk-rmd-block-mark').length,1,JSON.stringify(doc));
+  assert.equal(all(doc,'rk-sketch-block').length,1,JSON.stringify(doc));
   assert.equal(all(doc,'rk-rmd-block-mark')[0]?.data?.hProperties?.dataRkColor,undefined);
-  assert.equal(all(doc,'rk-rmd-block-mark')[1]?.data?.hProperties?.dataRkColor,'yellow');
+  assert.equal(all(doc,'rk-sketch-block')[0]?.data?.hProperties?.dataRkSketchColor,'yellow');
   assert.ok(all(doc,'rk-rmd-block-mark')[0]?.children?.some(c=>c.type==='math'));
  });
  it('attaches heading attr and removes its source modifier in projection',()=>{

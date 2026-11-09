@@ -68,9 +68,10 @@ try{
 
  await nav.getByRole('button',{name:'完整参考手册'}).click();
  await expectHelpContent('RMD 1.0 完整语法参考（自动生成）');
- await expectHelpContent('29 种语法形式');
+ const registry=JSON.parse(readFileSync('src/rmd/registry.json','utf8'));
+ await expectHelpContent(registry.components.length+' 种语法形式');
  await expectHelpContent('flashcard');
- assert.equal(await page.locator('.rk-help-live-example').count(),35,'every registered syntax form and @ attrs node shows a live example');
+ assert.equal(await page.locator('.rk-help-live-example').count(),registry.components.length+registry.nodes.length,'every registered syntax form and @ attrs node shows a live example');
  assert.equal(await page.locator('.rk-help-prose script').count(),0,'help may not execute script tags');
 
  const search=nav.getByRole('searchbox',{name:'搜索 RMD 语法'});

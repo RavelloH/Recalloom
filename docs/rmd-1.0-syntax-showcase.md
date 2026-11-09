@@ -27,9 +27,9 @@
 
 普通正文可以带稳定 ID。 @ attrs important-paragraph @
 
-## 02 · Mark 与九色 Highlight @ attrs section-colors @
+## 02 · Mark 与九色手绘荧光笔 @ attrs section-colors @
 
-Mark 是独立语义标记，保持原有黄色视觉效果：:: mark 重要结论 ::。它并不等于“黄色 Highlight”。
+Mark 是独立的规整语义标记，保持原有黄色视觉效果：:: mark 重要结论 ::。Highlight 则改为静态手绘荧光笔，默认黄色，也可指定九种颜色。
 
 - :: highlight 红色 | red ::
 - :: highlight 橙色 | orange ::
@@ -332,3 +332,69 @@ GFM 表格中可使用带别名的 WikiLink，而不会额外拆列：
 比较表达式 `a == b` 不是 Highlight。没有正确闭合或不符合 Schema 的扩展**回退纯文本**，不会部分提升成可执行组件。
 
 可视化显示编辑态组件与弱化注释，源码显示原始字符，预览隐藏合法注释和合法属性装饰。三者共享草稿；只有明确保存才会持久化。HTML 被限制在安全子集，不能执行脚本；外部输入的 GitHub Alert、`<details>`、`<kbd>`、`<br/>` 可在安全条件下导入，但新写文档应使用 RMD 1.0。
+
+
+## 手绘风格的标记（静态 SVG，无动画）
+
+九种行内语法均不要求指定颜色；以下示例同时覆盖纯文本、公式与笔触参数。
+
+:: highlight 重要的结论 ::
+
+:: circle 核心概念 | color=cyan ::
+
+:: box $E=mc^2$ | color=orange ::
+
+:: bracket 一组相关的概念 | roughness=1.5 ::
+
+:: underline 关键条件 | stroke=2 ::
+
+:: double-underline 最终结论 | color=teal ::
+
+:: dotted-underline 参考术语 ::
+
+:: wavy 注意符号方向 | color=purple ::
+
+:: arrow 继续推导 ::
+
+::: highlight
+
+手绘荧光笔也可以强调整段正文。
+
+:::
+
+::: circle
+
+$$
+\int_0^1 x^2\,dx=\frac{1}{3}
+$$
+
+:::
+
+::: box | padding=6
+
+$$
+E=mc^2
+$$
+
+:::
+
+::: bracket
+
+- 相关条件一
+- 相关条件二
+
+:::
+
+::: underline
+
+需要特别留意的结论。
+
+:::
+
+::: double-underline | color=teal
+
+$$
+P=UI
+$$
+
+:::

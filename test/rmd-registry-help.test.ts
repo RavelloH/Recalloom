@@ -7,7 +7,7 @@ import {getHelp,RMD_COMPONENT_NAMES,RMD_NODE_NAMES} from '../src/help/index';
 import {readFileSync} from 'node:fs';
 
 test('RMD component runtime schema and docs share the same registry with no missing forms',()=>{
- assert.equal(registry.components.length,29);
+ assert.equal(registry.components.length,42);
  assert.equal(registry.nodes.length,6);
  assert.equal(RMD_SCHEMA.size,registry.components.length);
  assert.deepEqual([...RMD_COLORS],registry.colors);
@@ -16,7 +16,7 @@ test('RMD component runtime schema and docs share the same registry with no miss
  assert.deepEqual(new Set(RMD_NODE_NAMES),new Set(registry.nodes.map(n=>n.node)));
  assert.deepEqual(Object.keys(attrsByBlock),registry.nodes.map(n=>n.node));
  const reference=readFileSync('docs/rmd-syntax-reference.generated.md','utf8');
- assert.match(reference,/29 种语法形式/);
+ assert.match(reference,/42 种语法形式/);
  assert.equal((reference.match(/~~~~rmd-example\r?\n/g)??[]).length,registry.components.length+registry.nodes.length,
   'every complete component and attrs example must be marked for the real Web preview');
  assert.equal((reference.match(/~~~~text\r?\n/g)??[]).length,registry.components.length,

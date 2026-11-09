@@ -3,7 +3,7 @@ import {resolve} from 'node:path';
 
 export const REGISTRY_PATH=resolve(import.meta.dirname,'../src/rmd/registry.json');
 const names=new Set(['inline','block','leaf']);
-const values=new Set(['string','boolean','integer','color','variant','id']);
+const values=new Set(['string','boolean','integer','color','variant','id','sketch-stroke','sketch-padding','sketch-roughness','sketch-opacity']);
 const mains=new Set(['required','optional','forbidden']);
 const key=/^[a-z][a-z0-9-]*$/;
 
@@ -45,6 +45,10 @@ function valueHint(t,r){
  case 'integer':return r.constraints.integerMinimum+'–'+r.constraints.integerMaximum+' 整数';
  case 'boolean':return 'true / false';
  case 'color':return r.colors.map(v=>'`'+v+'`').join('、');
+ case 'sketch-stroke':return '0.5–6，最多两位小数';
+ case 'sketch-padding':return '0–24 CSS px，最多两位小数';
+ case 'sketch-roughness':return '0–3，最多两位小数';
+ case 'sketch-opacity':return '0.1–0.85，最多两位小数';
  case 'variant':return r.variants.map(v=>'`'+v+'`').join('、');
  default:return '非空字符串；特殊字符可用 JSON 双引号和转义';
  }
@@ -78,7 +82,7 @@ export function renderComponent(c,r){
  if(c.children)out.push('**合法子容器**：'+c.children.map(x=>'`'+x+'`').join('、')+'。','');
  if(c.orderedChildren)out.push('**子容器顺序与数量**：'+c.orderedChildren.map(x=>'`'+x+'`').join(' → ')+'；必须恰好一次。','');
  if(c.note)out.push('**额外约束**：'+c.note,'');
- if(c.name==='highlight')out.push('**必须显式提供颜色**；不提供时回退为纯文本，不等于默认 Mark。','');
+ if(c.name==='highlight')out.push('**默认黄色手绘荧光笔**；颜色可以省略。它与规整的语义 `mark` 是不同组件，历史的 `highlight` 文档仍可解析。','');
  if(c.name==='embed')out.push('**目标**：`id:UUID` 或绝对虚拟路径；标题和段落统一使用 `#anchor-id`。','');
  if(c.name==='link-card')out.push('**目标**：HTTP(S) URL，不允许 javascript: 等脚本协议。','');
  out.push('**完整示例**：','',code(c.example,true),'');

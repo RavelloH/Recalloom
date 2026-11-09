@@ -18,7 +18,7 @@ describe('Shared RMD AST to Tiptap adapter',()=>{
   const math=walk(doc,'inlineMath');
   assert.equal(math.length,1,JSON.stringify(doc));
   assert.ok(math[0]?.marks?.some(m=>m.type==='rmdMark'),JSON.stringify(doc));
-  assert.ok(walk(doc,'text').some(n=>n.marks?.some(m=>m.type==='highlight'&&m.attrs?.color==='yellow')));
+  assert.ok(walk(doc,'text').some(n=>n.marks?.some(m=>m.type==='rmdSketch'&&m.attrs?.kind==='highlight'&&m.attrs?.color==='yellow')));
  });
  it('converts valid inline components and leaves invalid ones as original prose',()=>{
   const src='这里有 :: badge 已完成 | success ::，以及 :: badge 无效 | unknown ::。';

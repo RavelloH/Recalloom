@@ -110,7 +110,7 @@ describe('Only RMD 1.0 is the authoritative Markdown component pipeline',()=>{
   const src=[':: mark $E=mc^2$ ::',...colors.map(c=>':: highlight '+c+' | '+c+' ::')].join('\n\n');
   const {doc}=save(src);
   assert.equal(marks(doc).filter(m=>m.type==='rmdMark').length,1);
-  assert.equal(marks(doc).filter(m=>m.type==='highlight').length,9);
+  assert.equal(marks(doc).filter(m=>m.type==='rmdSketch'&&m.attrs?.kind==='highlight').length,9);
   assert.equal(nodes(doc,'inlineMath')[0]?.marks?.[0]?.type,'rmdMark');
  });
  it('keeps block Mark and colored Highlight around a whole KaTeX block',()=>{

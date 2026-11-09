@@ -27,6 +27,8 @@ import {ScrollCodeBlock,CaptionedScrollTableView} from './tiptap/scroll-blocks';
 import {parseRmdVisual} from './rmd-visual';
 import {serializeRmdVisual} from './rmd-serialize';
 import {RmdMark} from './tiptap/rmd-mark';
+import {RmdSketchMark} from './tiptap/rmd-sketch';
+import {useSketchAnnotations} from './sketch-annotations';
 import {RmdAttrsDecorations} from './tiptap/rmd-attrs-decoration';
 import RmdAttrsEditor,{isRmdAttrsEditable} from './tiptap/rmd-attrs-editor';
 import {RawMarkdown,RawInline,rawMarkdownBlock} from './tiptap/raw-markdown';
@@ -77,6 +79,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const compactRef=useRef(compact);
  compactRef.current=compact;
  const surfaceRef=useRef<HTMLDivElement>(null);
+ useSketchAnnotations(surfaceRef,ready);
  const slashListRef=useRef<HTMLDivElement>(null);
  const [slash,setSlash]=useState<SlashState|null>(null);
  const slashRef=useRef<SlashState|null>(null);
@@ -147,7 +150,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   RichImage.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:CaptionedScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,
   TaskList,TaskItem.configure({nested:true}),
-  UnderlineWithMarkdown,RmdMark,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
+  UnderlineWithMarkdown,RmdMark,RmdSketchMark,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,
   RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze,RichCritic,RichLinkCard,RichFootnoteRef,RichFootnoteDefinition,VisibleComment,
   TextAlignWithMarkdown.configure({types:['heading','paragraph'],alignments:['left','center','right']}),
   InlineMath.configure({katexOptions:{throwOnError:false,strict:false},onClick:(node,pos)=>setDialog({kind:'math',type:'inline',latex:String(node.attrs.latex??''),position:pos,existing:true})}),

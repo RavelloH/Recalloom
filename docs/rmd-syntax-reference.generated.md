@@ -2,7 +2,7 @@
 
 > 来源：`src/rmd/registry.json`。请勿直接手改生成文件。
 
-已定义 29 种语法形式、27 个不同组件名称及 6 类块属性目标。
+已定义 42 种语法形式、35 个不同组件名称及 6 类块属性目标。
 行内使用 `:: 名称 正文 | 参数 ::`；多行块级使用独立的 `::: 名称` 和 `:::`；独立块级使用 `::: 名称 目标 :::`。
 允许最多 10 层嵌套；围栏冒号不超过 64 个；超限、未知或非法语法全部保留原文。
 
@@ -10,8 +10,8 @@
 
 | 类别 | 组件 |
 | --- | --- |
-| 行内 | `mark`、`highlight`、`badge`、`tooltip`、`abbr`、`kbd`、`cloze` |
-| 多行块级 | `note`、`info`、`tip`、`success`、`warning`、`danger`、`example`、`question`、`mark`、`highlight`、`details`、`tabs`、`tab`、`chat`、`message`、`flashcard`、`front`、`back`、`glossary`、`definition` |
+| 行内 | `mark`、`highlight`、`circle`、`box`、`bracket`、`underline`、`double-underline`、`dotted-underline`、`wavy`、`arrow`、`badge`、`tooltip`、`abbr`、`kbd`、`cloze` |
+| 多行块级 | `note`、`info`、`tip`、`success`、`warning`、`danger`、`example`、`question`、`mark`、`highlight`、`circle`、`box`、`bracket`、`underline`、`double-underline`、`details`、`tabs`、`tab`、`chat`、`message`、`flashcard`、`front`、`back`、`glossary`、`definition` |
 | 独立单行块级 | `embed`、`link-card` |
 
 ## 组件与参数详解
@@ -39,7 +39,7 @@
 
 ## `highlight` · 行内
 
-九色强调，必须显式提供 color，不存在默认颜色。
+手绘荧光笔（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
 
 - **类型**：行内。
 - **主文本／标题**：必填。
@@ -52,14 +52,226 @@
 
 | 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
 | --- | --- | --- | --- | --- | --- |
-| `color` | `color` | 第 1 个 | 是 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `opacity` | `sketch-opacity` | 无 | 否 | 未声明 | 0.1–0.85，最多两位小数 |
 
-**必须显式提供颜色**；不提供时回退为纯文本，不等于默认 Mark。
+**默认黄色手绘荧光笔**；颜色可以省略。它与规整的语义 `mark` 是不同组件，历史的 `highlight` 文档仍可解析。
 
 **完整示例**：
 
 ~~~~rmd-example
-:: highlight 高风险 | red ::
+:: highlight 重要结论 ::
+~~~~
+
+## `circle` · 行内
+
+手绘圈选（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: circle 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: circle 重要结论 | color=blue ::
+~~~~
+
+## `box` · 行内
+
+手绘方框（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: box 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: box 重要结论 | color=blue ::
+~~~~
+
+## `bracket` · 行内
+
+手绘括号（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: bracket 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: bracket 重要结论 | color=blue ::
+~~~~
+
+## `underline` · 行内
+
+手绘下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: underline 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: underline 重要结论 | color=blue ::
+~~~~
+
+## `double-underline` · 行内
+
+双下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: double-underline 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: double-underline 重要结论 | color=blue ::
+~~~~
+
+## `dotted-underline` · 行内
+
+点状下划线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: dotted-underline 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: dotted-underline 重要结论 | color=blue ::
+~~~~
+
+## `wavy` · 行内
+
+手绘波浪线（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: wavy 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: wavy 重要结论 | color=blue ::
+~~~~
+
+## `arrow` · 行内
+
+手绘箭头（静态 SVG），支持文字和行内公式；颜色与笔触参数均可选。
+
+- **类型**：行内。
+- **主文本／标题**：必填。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+:: arrow 正文 [| 参数] ::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+
+**完整示例**：
+
+~~~~rmd-example
+:: arrow 重要结论 | color=blue ::
 ~~~~
 
 ## `badge` · 行内
@@ -458,7 +670,7 @@ $$
 
 ## `highlight` · 多行块级
 
-块级九色 Highlight，必须传 color。
+手绘荧光笔（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
 
 - **类型**：多行块级。
 - **主文本／标题**：禁止。
@@ -475,17 +687,208 @@ Markdown 正文
 
 | 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
 | --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `opacity` | `sketch-opacity` | 无 | 否 | 未声明 | 0.1–0.85，最多两位小数 |
 | `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
-| `color` | `color` | 第 1 个 | 是 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
 
-**必须显式提供颜色**；不提供时回退为纯文本，不等于默认 Mark。
+**默认黄色手绘荧光笔**；颜色可以省略。它与规整的语义 `mark` 是不同组件，历史的 `highlight` 文档仍可解析。
 
 **完整示例**：
 
 ~~~~rmd-example
-::: highlight | color=blue
+::: highlight
 
-彩色强调正文。
+$$
+E=mc^2
+$$
+
+:::
+~~~~
+
+## `circle` · 多行块级
+
+手绘圈选（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
+
+- **类型**：多行块级。
+- **主文本／标题**：禁止。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+::: circle [| 参数]
+
+Markdown 正文
+
+:::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
+
+**完整示例**：
+
+~~~~rmd-example
+::: circle
+
+$$
+E=mc^2
+$$
+
+:::
+~~~~
+
+## `box` · 多行块级
+
+手绘方框（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
+
+- **类型**：多行块级。
+- **主文本／标题**：禁止。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+::: box [| 参数]
+
+Markdown 正文
+
+:::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
+
+**完整示例**：
+
+~~~~rmd-example
+::: box | color=orange
+
+$$
+E=mc^2
+$$
+
+:::
+~~~~
+
+## `bracket` · 多行块级
+
+手绘括号（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
+
+- **类型**：多行块级。
+- **主文本／标题**：禁止。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+::: bracket [| 参数]
+
+Markdown 正文
+
+:::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
+
+**完整示例**：
+
+~~~~rmd-example
+::: bracket
+
+$$
+E=mc^2
+$$
+
+:::
+~~~~
+
+## `underline` · 多行块级
+
+手绘下划线（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
+
+- **类型**：多行块级。
+- **主文本／标题**：禁止。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+::: underline [| 参数]
+
+Markdown 正文
+
+:::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
+
+**完整示例**：
+
+~~~~rmd-example
+::: underline
+
+$$
+E=mc^2
+$$
+
+:::
+~~~~
+
+## `double-underline` · 多行块级
+
+双下划线（静态 SVG），支持正文、公式和其他块级内容；颜色与笔触参数均可选。
+
+- **类型**：多行块级。
+- **主文本／标题**：禁止。
+- **位置参数**：1. `color`；位置参数必须位于具名参数前。
+- **语法模板（占位符，不能直接作为正文）**：
+
+~~~~text
+::: double-underline [| 参数]
+
+Markdown 正文
+
+:::
+~~~~
+
+| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |
+| --- | --- | --- | --- | --- | --- |
+| `color` | `color` | 第 1 个 | 否 | 未声明 | `red`、`orange`、`yellow`、`green`、`blue`、`purple`、`pink`、`cyan`、`teal` |
+| `stroke` | `sketch-stroke` | 无 | 否 | 未声明 | 0.5–6，最多两位小数 |
+| `padding` | `sketch-padding` | 无 | 否 | 未声明 | 0–24 CSS px，最多两位小数 |
+| `roughness` | `sketch-roughness` | 无 | 否 | 未声明 | 0–3，最多两位小数 |
+| `id` | `id` | 无 | 否 | 未声明 | 字母开头、字母数字连字符、最长 80 字符（统一小写） |
+
+**完整示例**：
+
+~~~~rmd-example
+::: double-underline
+
+$$
+E=mc^2
+$$
 
 :::
 ~~~~

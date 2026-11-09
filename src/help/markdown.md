@@ -11,7 +11,7 @@ Recalloom 的**文档正文只存 Markdown**，不把渲染树、Tiptap JSON、�
 
 所有未知组件、未知节点、无效查询组合均会被拒绝，禁止 Agent 猜测不存在的属性。CodeMirror 源码编辑器从同一注册表提供 `::`、`:::`、参数名、枚举值与 `@ attrs` 候选补全，不会擅自插入不支持的组件。
 
-完整覆盖八种 Callout、九色 Highlight、五类行内组件、Details/Tabs/Flashcard/Glossary/Chat、注释与 CriticMarkup、图片/表格/公式/代码修饰、WikiLink/Embed 的可复制示例见仓库 `docs/rmd-1.0-syntax-showcase.md`，其内容会通过自动化测试实际解析并验证规范化保存不漂移。
+完整覆盖八种 Callout、九种静态手绘标记（含九色荧光笔）、行内组件、Details/Tabs/Flashcard/Glossary/Chat、注释与 CriticMarkup、图片/表格/公式/代码修饰、WikiLink/Embed 的可复制示例见仓库 `docs/rmd-1.0-syntax-showcase.md`，其内容会通过自动化测试实际解析并验证规范化保存不漂移。
 
 可视化模式中，合法的 `@ attrs … @` 显示为**可点击、可键盘聚焦的灰色斜体属性按钮**，支持直接编辑标题、段落、公式、表格、代码和图片的节点属性。点击后修改 ID、图注、尺寸、代码文件名或开关，点击「保存属性」只更新本地草稿，再点击整篇文档的「保存」才会落库；取消或非法 ID 不写入。没有必要切换到源码模式才能修改已有属性。纯公式的块级 Mark 仅包裹公式宽度并居中，含正文的 Mark 仍是普通块；表格及公式属性在两种视图中均居中。
 
@@ -55,16 +55,18 @@ flowchart LR
 
 数学使用 remark-math 和 KaTeX，不是完整的 LaTeX 编译器。块公式的两个 `$$` 必须独占一行。详细用法参见 `get_help({topic:"math"})`。
 
-## 两种独立的标记：Mark 和 Highlight
+## Mark 与手绘风格的标记
 
-**Mark** 是不带颜色参数的语义标记。其现有黄色观感（默认 `#f5d870`）、公式高度自适应与块公式整体背景已确定为视觉基线，不能因为解析管线重构而改变。**Highlight** 则必须明确指定颜色，不等于 Mark 的“黄色变体”。
+**Mark** 是规整的语义标记，原有黄色（默认 `#f5d870`）及公式自适应背景不变。**Highlight** 已改为静态手绘荧光笔，默认黄色，允许可选九色。手绘类还包括 `circle`、`box`、`bracket`、`underline`、`double-underline`、`dotted-underline`、`wavy` 和 `arrow`，每种拥有独立简短语法。它们全部使用无动画、确定性 SVG 笔迹。`<u>` 是普通 HTML 下划线，不等于手绘的 `:: underline`。
+
+行内九种风格全部支持文本、行内公式；块级支持 `highlight`、`circle`、`box`、`bracket`、`underline`、`double-underline`。参数 `color`（九色）、`stroke`（0.5–6）、`padding`（0–24）、`roughness`（0–3）可选，`highlight` 还支持 `opacity`（0.1–0.85）。多个参数必须分别使用 ` | ` 分隔。
 
 ~~~~markdown
 这是 :: mark 重点结论 ::。
 
 公式也可以 :: mark $\frac{U_1}{U_2}$ ::。
 
-这是 :: highlight 高风险 | red ::。
+这是 :: highlight 默认荧光笔 ::；也能用 :: highlight 高风险 | red ::。
 这是 :: highlight 已验证 | green ::。
 这是 :: highlight 普通强调 | color=yellow ::。
 

@@ -29,7 +29,7 @@ describe('RMD standard Markdown and modifier fidelity',()=>{
   assert.equal(walk(b,'table').length,1,output);
   assert.equal(walk(walk(b,'table')[0]!,'tableRow')[1]?.content?.length,2,output);
   assert.equal(walk(b,'wikiLink').length,1,output);
-  assert.ok(walk(b,'text').some(n=>n.marks?.some(m=>m.type==='highlight'&&m.attrs?.color==='green')),output);
+  assert.ok(walk(b,'text').some(n=>n.marks?.some(m=>m.type==='rmdSketch'&&m.attrs?.kind==='highlight'&&m.attrs?.color==='green')),output);
  });
  it('code fence with embedded backticks is never truncated and attrs do not become code',()=>{
   const fence=String.fromCharCode(96).repeat(3);
