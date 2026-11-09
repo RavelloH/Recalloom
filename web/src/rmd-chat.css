@@ -1,0 +1,105 @@
+/* A static RMD transcript uses Astryx's chat primitives. This stylesheet
+ * adapts their layout to document prose and Tiptap NodeView boundaries;
+ * it does not restyle the underlying Astryx bubbles or sender alignment. */
+.record-main .rk-chat-embed {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, 720px);
+  min-width: 0;
+  margin: 1rem auto;
+  font-size: .875rem;
+  line-height: 1.55;
+}
+.record-main .rk-chat-embed-title {
+  padding: .55rem .9rem;
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1.45;
+  color: var(--rk-document-muted, var(--color-text-secondary));
+  border: 1px solid var(--rk-document-border, var(--color-border));
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--rk-document-wash, var(--color-background-muted));
+}
+.record-main .rk-chat-transcript {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--rk-document-border, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rk-document-wash, transparent) 45%, transparent);
+  overflow: visible;
+}
+.record-main .rk-chat-embed:has(> .rk-chat-embed-title) .rk-chat-transcript {
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+.record-main .rk-chat-row {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}
+.record-main .rk-chat-bubble {
+  box-sizing: border-box;
+  max-width: min(100%, 34rem);
+  min-width: 0;
+  width: fit-content;
+}
+.record-main .rk-chat-bubble :is(p, ul, ol, blockquote) {
+  margin-block: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+.record-main .rk-chat-bubble :is(p, ul, ol, blockquote) + :is(p, ul, ol, blockquote) {
+  margin-block-start: .55em;
+}
+.record-main .rk-chat-bubble :is(ul, ol) {
+  padding-inline-start: 1.4em;
+}
+.record-main .rk-chat-bubble :is(pre, table, .katex-display) {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* Tiptap renders each message as a separate React NodeView. Its React roots
+ * do not inherit ChatMessageList context, and their wrappers must not add a
+ * second round of vertical margins / gap. Message density is passed directly
+ * to the Astryx ChatMessage in rmd-chat.tsx. */
+.record-main .rk-directive-chat {
+  width: 100%;
+  max-width: min(100%, 720px);
+  margin: 1rem auto;
+  min-width: 0;
+}
+.record-main .rk-directive-chat > .rk-chat-embed { margin: 0; }
+.record-main .rk-directive-chat .rk-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-width: 0;
+  width: 100%;
+}
+.record-main .rk-directive-chat .rk-directive-message {
+  margin-block: 0;
+  min-width: 0;
+}
+.record-main .rk-directive-chat .react-renderer {
+  min-width: 0;
+}
+.record-main .rk-chat-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.record-main .rk-chat-message > :first-child { margin-block-start: 0; }
+.record-main .rk-chat-message > :last-child { margin-block-end: 0; }
+.record-main .rk-directive-message .rk-directive-title {
+  position: relative;
+  min-height: 20px;
+}
+@media (max-width: 480px) {
+  .record-main .rk-chat-embed {
+    margin-block: .75rem;
+  }
+}

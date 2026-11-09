@@ -283,7 +283,7 @@
         "message"
       ],
       "summary": "聊天会话容器，只允许 message 子容器。",
-      "example": ":::: chat\n\n::: message 用户 | sender=user\n\n你好。\n\n:::\n\n::::"
+      "example": ":::: chat 示例会话\n\n::: message 用户 | sender=user\n\n可以介绍一下这个组件吗？\n\n:::\n\n::: message Assistant | sender=assistant\n\n可以。这是 **Astryx Chat** 消息布局。\n\n:::\n\n::::"
     },
     {
       "type": "block",
