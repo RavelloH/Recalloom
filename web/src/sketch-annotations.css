@@ -1,0 +1,63 @@
+/* Static, pointer-transparent hand-drawn overlays. All styles are generated
+ * by the same pure path engine in visual mode and the Markdown projection. */
+.record-main :is(.markdown-preview,.wysiwyg) {
+  position: relative;
+  isolation: isolate;
+}
+.record-main .rk-sketch-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+  contain: layout style;
+}
+.record-main .rk-sketch-overlay .rk-sketch-svg {
+  position: absolute;
+  display: block;
+  max-width: none;
+  overflow: visible;
+  pointer-events: none;
+}
+.record-main .rk-sketch-inline {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  box-decoration-break: clone;
+}
+.record-main .rk-sketch-block {
+  box-sizing: border-box;
+  display: block;
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  margin-block: .8rem;
+  margin-inline: auto;
+  padding: .15rem .35rem;
+}
+.record-main .rk-sketch-block .rk-sketch-content {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.record-main .rk-sketch-block .rk-sketch-content > :first-child { margin-block-start: 0; }
+.record-main .rk-sketch-block .rk-sketch-content > :last-child { margin-block-end: 0; }
+/* Mathematical glyphs determine the outline, not the full-width display host.
+ * Rely on the existing code/math scroll policy for genuinely oversized math. */
+.record-main .rk-sketch-block[data-rk-sketch-math-only="true"] {
+  display: table;
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.record-main .rk-sketch-block[data-rk-sketch-math-only="true"] .katex-display {
+  margin-block: .1em;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.record-main .tiptap .rk-directive-sketch .rk-sketch-block {margin-block:0;}
+.record-main .tiptap .rk-directive-sketch {margin-block:.8rem;}

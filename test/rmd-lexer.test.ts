@@ -16,7 +16,7 @@ describe('RMD 1.0 shared lexer and schema',()=>{
   assert.deepEqual(nodes.map(x=>x.name),['mark','highlight']);
   assert.equal(nodes[0]?.main,'$E=mc^2$');
   assert.equal(nodes[1]?.attributes.color,'yellow');
-  assert.deepEqual(lexRmd(':: highlight 没有颜色 ::'),[]);
+  assert.equal(lexRmd(':: highlight 没有颜色 ::')[0]?.name,'highlight');
   assert.deepEqual(lexRmd(':: mark 内容 | yellow ::'),[]);
  });
  it('rejects missing main value, duplicate values and invalid enum without swallowing source',()=>{

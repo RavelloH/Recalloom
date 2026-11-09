@@ -1,4 +1,4 @@
-import React,{useMemo} from 'react';
+import React,{useMemo,useRef} from 'react';
 // Preview is a lazily loaded route. The shared RMD component stylesheet must
 // also be loaded here; importing it only from VisualEditor loses highlight
 // colors, interactive rich component styling and layout on direct preview.
@@ -10,6 +10,8 @@ import remarkMath from 'remark-math';
 import {normalizeKnownMarkdown} from './markdown-normalize';
 import {projectRmdPreview} from './rmd-preview';
 import {remarkRmdSyntax} from './rmd-remark';
+import {useSketchAnnotations} from './sketch-annotations';
+import {isSketchKind} from './sketch-geometry';
 import {analyzeRmd,shieldRmdTablePipes} from './rmd-lexer';
 import {richTitle} from './tiptap/rich-schema';
 import {calloutIcon} from './callout-icon';
@@ -77,12 +79,14 @@ function rehypeHeadingIds(){
 const aligned=['p','h1','h2','h3','h4','h5','h6','th','td'];
 const schema={
  ...defaultSchema,
- tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tooltip','rk-kbd','rk-cloze','rk-comment','rk-rmd-block-mark','rk-figure','rk-cross-ref','rk-numbered-math'],
+ tagNames:[...(defaultSchema.tagNames??[]),'mark','u','wiki-ref','wiki-embed','rk-callout','rk-link-card','rk-critic','rk-badge','rk-abbr','rk-tooltip','rk-kbd','rk-cloze','rk-comment','rk-rmd-block-mark','rk-sketch','rk-sketch-block','rk-figure','rk-cross-ref','rk-numbered-math'],
  attributes:{...defaultSchema.attributes,...Object.fromEntries(aligned.map(tag=>[tag,[...(defaultSchema.attributes?.[tag]??[]),'dataAlign',...(tag.startsWith('h')||tag==='p'?['id']:[])]])),
   'wiki-ref':['dataTarget','dataAlias','dataAnchor'],
   'wiki-embed':['dataTarget','dataAnchor'],
   'rk-callout':['dataKind','dataTitle','dataSender','dataId'],
   'rk-rmd-block-mark':['dataRkColor','dataRkMathOnly','dataId'],
+  'rk-sketch':['dataRkSketchKind','dataRkSketchColor','dataRkSketchStroke','dataRkSketchPadding','dataRkSketchRoughness','dataRkSketchOpacity'],
+  'rk-sketch-block':['dataRkSketchKind','dataRkSketchColor','dataRkSketchStroke','dataRkSketchPadding','dataRkSketchRoughness','dataRkSketchOpacity','dataRkSketchMathOnly','dataId'],
   'rk-link-card':['dataUrl','dataTitle'],
   'rk-critic':['dataKind','dataValue','dataBefore'],
   'rk-badge':['dataVariant'],
@@ -112,6 +116,8 @@ const components:Components={
 
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
 export default function MarkdownPreview({content,sourceId,trail,depth=0}:{content:string;sourceId?:string;trail?:string[];depth?:number}){
+ const sketchRef=useRef<HTMLElement>(null);
+ useSketchAnnotations(sketchRef,true,content);
  const source=normalizeKnownMarkdown(projectRmdPreview(content).replace(/\r\n/g,'\n'));
  // A YAML-looking header is ordinary document text, not Recalloom metadata.
  // Isolate it from the CommonMark parser so --- is not reinterpreted as rules.
@@ -124,6 +130,29 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
  const parseSource=useMemo(()=>shieldRmdTablePipes(syntaxSource,analysis),[syntaxSource,analysis]);
  const chain=trail??(sourceId?[sourceId]:[]);
  const custom={
+  'rk-sketch':({node:_node,...props}:Record<string,unknown>)=>{
+   const get=(key:string)=>props['data-rk-sketch-'+key.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase())]??props['dataRkSketch'+key[0]!.toUpperCase()+key.slice(1)];
+   const kind=String(get('kind')??'');if(!isSketchKind(kind))return <>{props.children as React.ReactNode}</>;
+   return <span className="rk-sketch-inline" data-rk-sketch-kind={kind}
+    data-rk-sketch-color={String(get('color')??'')||undefined}
+    data-rk-sketch-stroke={get('stroke')??undefined}
+    data-rk-sketch-padding={get('padding')??undefined}
+    data-rk-sketch-roughness={get('roughness')??undefined}
+    data-rk-sketch-opacity={get('opacity')??undefined}>{props.children as React.ReactNode}</span>;
+  },
+  'rk-sketch-block':({node:_node,...props}:Record<string,unknown>)=>{
+   const get=(key:string)=>props['data-rk-sketch-'+key.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase())]??props['dataRkSketch'+key[0]!.toUpperCase()+key.slice(1)];
+   const kind=String(get('kind')??'');if(!isSketchKind(kind))return <>{props.children as React.ReactNode}</>;
+   return <section className="rk-sketch-block" data-rk-sketch-kind={kind}
+    data-rk-sketch-color={String(get('color')??'')||undefined}
+    data-rk-sketch-stroke={get('stroke')??undefined}
+    data-rk-sketch-padding={get('padding')??undefined}
+    data-rk-sketch-roughness={get('roughness')??undefined}
+    data-rk-sketch-opacity={get('opacity')??undefined}
+    data-rk-sketch-math-only={String(get('mathOnly')??'')==='true'?'true':undefined}>
+     <div className="rk-sketch-content">{props.children as React.ReactNode}</div>
+    </section>;
+  },
   'wiki-ref':({node:_node,...props}:Record<string,unknown>)=>
    <WikiInline target={wikiDecode(String(props['data-target']??''))}
     alias={wikiDecode(String(props['data-alias']??''))||null}
@@ -223,7 +252,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
     sourceId={sourceId} trail={chain} depth={depth}
     render={(body,id,next,nextDepth)=><MarkdownPreview content={body} sourceId={id} trail={next} depth={nextDepth}/>}/>
  };
- return <article className="markdown-preview">
+ return <article className="markdown-preview" ref={sketchRef}>
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter[0]}</p>}
   <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource,analysis)]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,schema],rehypeKatex]}

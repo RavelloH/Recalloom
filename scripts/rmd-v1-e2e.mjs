@@ -76,9 +76,10 @@ try{
  assert.equal(await page.getByRole('button',{name:'预览',exact:true}).count(),1);
  const preview=page.locator('.markdown-preview').first();
  const html=await preview.innerHTML();
- assert.ok(html.includes('data-rk-color="yellow"'),'colored highlight actual DOM: '+html.slice(0,850));
+ assert.ok(html.includes('data-rk-sketch-kind="highlight"')&&html.includes('data-rk-sketch-color="yellow"'),'static sketch highlight actual DOM: '+html.slice(0,850));
  assert.ok(await preview.locator('mark:not([data-rk-color])').count()>=2,'default mark present');
- assert.ok(await preview.locator('.rk-rmd-block-mark').count()>=2,'block mark and highlight rendered');
+ assert.ok(await preview.locator('.rk-rmd-block-mark').count()>=1,'semantic block mark rendered');
+ assert.ok(await preview.locator('.rk-sketch-block[data-rk-sketch-kind="highlight"]').count()>=1,'hand-drawn block highlight rendered');
  assert.ok(await preview.locator('table tbody tr').count()===1,'valid GFM row');
  assert.equal(await preview.locator('table tbody tr td').count(),2,'component | is not GFM separator');
  assert.equal(await preview.locator('.rk-inline-badge').count(),0,'preview badge uses Astryx component, not edit NodeView');

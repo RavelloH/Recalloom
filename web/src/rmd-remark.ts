@@ -5,6 +5,7 @@ import remarkMath from 'remark-math';
 import {analyzeRmd,RMD_PIPE_SENTINEL,type RmdAnalysis,type RmdSyntaxNode,type RmdSpan} from './rmd-lexer';
 import {findCriticMarkup} from './critic-syntax';
 import {isRmdId} from './rmd-schema';
+import {isSketchKind} from './sketch-geometry';
 
 /** Common RMD renderer adapter, with one lexer for all presentation surfaces.
  * Source offsets are authoritative, and invalid RMD stays ordinary Markdown.
@@ -41,9 +42,11 @@ const makeInline=(token:RmdSyntaxNode):RmdMdast=>{
   dataKind:token.attributes.kind??'',dataBefore:encodeURIComponent(token.attributes.before??''),
   dataValue:encodeURIComponent(token.main)
  }},children:[{type:'text',value:token.main}],position:{start:{offset:token.start},end:{offset:token.end}}};
- if(token.name==='mark'||token.name==='highlight'){
-  name='mark';
-  if(token.name==='highlight')props.dataRkColor=token.attributes.color!;
+ if(token.name==='mark')name='mark';
+ else if(isSketchKind(token.name)){
+  name='rk-sketch';
+  props.dataRkSketchKind=token.name;
+  for(const key of ['color','stroke','padding','roughness','opacity'])if(token.attributes[key])props['dataRkSketch'+key[0]!.toUpperCase()+key.slice(1)]=token.attributes[key]!;
  }else if(token.name==='badge')props.dataVariant=token.attributes.variant??'neutral';
  else if(token.name==='tooltip')props.dataContent=token.attributes.description??'';
  else if(token.name==='abbr')props.dataTitle=token.attributes.description??'';
@@ -81,10 +84,14 @@ const makeBlock=(token:RmdSyntaxNode):RmdMdast=>{
  applyRmdTree(inner,body,token.name);
  const props:Record<string,string>={};
  let hName='rk-callout';
- if(token.name==='mark'||token.name==='highlight'){
+ if(token.name==='mark'){
   hName='rk-rmd-block-mark';
   if(inner.children?.length===1&&inner.children[0]?.type==='math')props.dataRkMathOnly='true';
-  if(token.name==='highlight')props.dataRkColor=token.attributes.color!;
+ }else if(isSketchKind(token.name)){
+  hName='rk-sketch-block';
+  props.dataRkSketchKind=token.name;
+  if(inner.children?.length===1&&inner.children[0]?.type==='math')props.dataRkSketchMathOnly='true';
+  for(const key of ['color','stroke','padding','roughness','opacity'])if(token.attributes[key])props['dataRkSketch'+key[0]!.toUpperCase()+key.slice(1)]=token.attributes[key]!;
  }else{
   props.dataKind=token.name;
   props.dataTitle=token.main;
