@@ -26,8 +26,9 @@
 .rk-help-prose h3{font-size:15px;margin:20px 0 8px}
 .rk-help-prose p,.rk-help-prose ul,.rk-help-prose ol{margin:9px 0 14px}
 .rk-help-prose li{margin-bottom:5px}
-.rk-help-prose table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto;font-size:12px;margin:16px 0}
-.rk-help-prose th,.rk-help-prose td{border:1px solid var(--rk-document-border,var(--color-border));padding:8px 11px;text-align:left}
+.rk-help-prose table{border-collapse:collapse;display:block;width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;font-size:12px;margin:16px 0}
+.rk-help-prose th,.rk-help-prose td{border:1px solid var(--rk-document-border,var(--color-border));padding:8px 11px;text-align:left;min-width:115px;white-space:normal;word-break:normal;overflow-wrap:normal;vertical-align:top}
+.rk-help-prose td:first-child,.rk-help-prose th:first-child{min-width:75px}
 .rk-help-prose th{background:var(--rk-document-wash,rgba(128,128,128,.06));white-space:nowrap}
 .rk-help-prose pre{max-width:100%;overflow:auto;padding:13px 15px;background:var(--rk-document-wash,rgba(128,128,128,.075));border-radius:8px;line-height:1.5}
 .rk-help-prose :not(pre)>code{background:var(--rk-document-wash,rgba(128,128,128,.075));padding:.16em .38em;border-radius:4px;overflow-wrap:anywhere}

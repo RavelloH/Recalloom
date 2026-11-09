@@ -1,4 +1,8 @@
 import React,{useMemo} from 'react';
+// Preview is a lazily loaded route. The shared RMD component stylesheet must
+// also be loaded here; importing it only from VisualEditor loses highlight
+// colors, interactive rich component styling and layout on direct preview.
+import './tiptap/editor.css';
 import ReactMarkdown,{type Components} from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -15,10 +19,10 @@ import {Badge} from '@astryxdesign/core/Badge';
 import {Card} from '@astryxdesign/core/Card';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
-import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {SmartLink} from './link-icons';
 import {LinkCardView} from './tiptap/rich-link-card';
 import {TabsPreview} from './rich-tabs';
+import FlashcardPreview from './flashcard-preview';
 
 import ShikiCodePreview,{codePropsFromElement} from './code-preview';
 import rehypeRaw from 'rehype-raw';
@@ -163,20 +167,18 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
     {item?.kind==='eq'&&item.number!==undefined&&<span className="rk-numbered-math-label">({item.number})</span>}
    </div>;
   },
-  'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/>,
+  'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><div className="rk-rich-link-card"><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/></div>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
    const kind=String(props['data-kind']??props.dataKind??'info'),title=String(props['data-title']??props.dataTitle??'');
-   if(kind==='flashcard')return <Card variant="default" padding={3} className="rk-flashcard rk-flashcard-read">
-    <div className="rk-flashcard-heading">{richTitle(kind,title)}</div>
-    <div className="rk-flashcard-body">{props.children as React.ReactNode}</div>
-   </Card>;
-   if(kind==='front')return <section className="rk-flashcard-front">
+   if(kind==='flashcard')return <FlashcardPreview title={title}>{props.children as React.ReactNode}</FlashcardPreview>;
+   if(kind==='front')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-front">
     <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
     <div className="rk-flashcard-content">{props.children as React.ReactNode}</div>
-   </section>;
-   if(kind==='back')return <Collapsible trigger="显示答案" defaultIsOpen={false}>
-     <div className="rk-flashcard-content rk-flashcard-answer">{props.children as React.ReactNode}</div>
-    </Collapsible>;
+   </Card>;
+   if(kind==='back')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-back">
+    <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
+    <div className="rk-flashcard-content">{props.children as React.ReactNode}</div>
+   </Card>;
    if(kind==='glossary')return <Card variant="muted" padding={3} className="rk-glossary-read">
     <div className="rk-glossary-title">{richTitle(kind,title)}</div>
     <div className="rk-glossary-entries">{props.children as React.ReactNode}</div>
@@ -185,7 +187,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
     <dt className="rk-definition-term">{richTitle(kind,title)}</dt>
     <dd className="rk-definition-body">{props.children as React.ReactNode}</dd>
    </dl>;
-   if(kind==='tabs')return <TabsPreview>{props.children as React.ReactNode}</TabsPreview>;
+   if(kind==='tabs')return <TabsPreview title={title}>{props.children as React.ReactNode}</TabsPreview>;
    if(kind==='tab')return <div className="rk-tab-pane">{props.children as React.ReactNode}</div>;
    if(kind==='chat')return <ChatMessageList density="compact" align="top">{props.children as React.ReactNode}</ChatMessageList>;
    if(kind==='message'){
@@ -195,15 +197,23 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
-   return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false}>{props.children as React.ReactNode}</Banner></div>;
+   return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false} container="card">{props.children as React.ReactNode}</Banner></div>;
   },
   'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className={'rk-rmd-block-mark'+((props['data-rk-math-only']??props.dataRkMathOnly)==='true'?' rk-rmd-mark-math-only':'')} data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{
    const raw=String(props['data-variant']??props.dataVariant??'neutral');
    return <Badge variant={asAstryBadgeVariant(raw)} label={props.children as React.ReactNode}/>;
   },
-  'rk-abbr':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-title']??props.dataTitle??'')}><span className="rk-inline-abbr" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
-  'rk-tooltip':({node:_node,...props}:Record<string,unknown>)=><Tooltip content={String(props['data-content']??props.dataContent??'')}><span className="rk-inline-tooltip" tabIndex={0}>{props.children as React.ReactNode}</span></Tooltip>,
+  'rk-abbr':({node:_node,...props}:Record<string,unknown>)=>{
+   const description=String(props['data-title']??props.dataTitle??'');
+   return <span className="rk-tooltip-inline rk-inline-abbr" tabIndex={0}
+    data-rk-tooltip={description||undefined} aria-label={description?'查看解释：'+description:undefined}>{props.children as React.ReactNode}</span>;
+  },
+  'rk-tooltip':({node:_node,...props}:Record<string,unknown>)=>{
+   const description=String(props['data-content']??props.dataContent??'');
+   return <span className="rk-tooltip-inline rk-inline-tooltip" tabIndex={0}
+    data-rk-tooltip={description||undefined} aria-label={description?'查看解释：'+description:undefined}>{props.children as React.ReactNode}</span>;
+  },
   'rk-kbd':({node:_node,...props}:Record<string,unknown>)=><kbd className="rk-keycap">{props.children as React.ReactNode}</kbd>,
   'rk-cloze':({node:_node,...props}:Record<string,unknown>)=><ClozeReveal hint={String(props['data-hint']??props.dataHint??'')}>{props.children as React.ReactNode}</ClozeReveal>,
   'rk-comment':({node:_node,...props}:Record<string,unknown>)=><span className="rk-comment" data-rk-comment="">{props.children as React.ReactNode}</span>,

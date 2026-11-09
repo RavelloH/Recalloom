@@ -260,6 +260,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 /* Structured terms have explicit Markdown fence boundaries: no ambiguous
  * [DO]: ... continuation or implicit document metadata fields. */
 .record-main :is(.tiptap,.markdown-preview) :is(.rk-glossary-edit,.rk-glossary-read) {margin-block:1.15rem;}
+.record-main .markdown-preview .rk-glossary-read .rk-definition-read {margin-block:1rem;}
 .record-main .rk-glossary-title {font-weight:650;margin-bottom:.8rem;color:var(--rk-document-ink);}
 .record-main .rk-glossary-entries {display:flex;flex-direction:column;gap:.8rem;}
 .record-main :is(.rk-definition-edit,.rk-definition-read) {border-inline-start:2px solid var(--rk-document-border);padding-inline-start:.8rem;margin:0;}
@@ -280,9 +281,11 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-flashcard-content > :last-child {margin-block-end:0;}
 /* The Notion-style visual editor is also the reader: flashcard answer
  * disclosure works here, while its ProseMirror content stays mounted. */
-.record-main .rk-flashcard-edit .rk-flashcard-heading {display:flex;align-items:center;gap:.7rem;justify-content:space-between;flex-wrap:wrap;}
+.record-main :is(.rk-flashcard-edit,.rk-flashcard-read) .rk-flashcard-heading {display:flex;align-items:center;gap:.7rem;justify-content:space-between;flex-wrap:wrap;}
+.record-main .rk-flashcard-read[data-rk-answer-open="false"] .rk-flashcard-back {display:none!important;}
+.record-main .markdown-preview .rk-flashcard-read :is(.rk-flashcard-front,.rk-flashcard-back) {padding-block:12px;}
 .record-main .rk-flashcard-edit[data-rk-answer-open="false"] .rk-directive-back {display:none!important;}
-.record-main .rk-flashcard-front {padding-block:.25rem .55rem;}
+.record-main .tiptap .rk-flashcard-front {padding-block:.25rem .55rem;}
 .record-main .rk-flashcard-answer {padding-top:.5rem;}
 /* Static tooltip inside ProseMirror: pure CSS pseudo element, no DOM
  * mutations or dynamic overlays. Match Astryx token colors and geometry. */
@@ -341,6 +344,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 /* Astryx Tabs: interactive even in the canonical Notion-style visual editor.
  * Inactive panels are CSS-hidden but remain mounted editable ProseMirror nodes. */
 .record-main .rk-tabs-edit,.record-main .rk-tabs-preview {max-width:100%;min-width:0;}
+.record-main .markdown-preview .rk-tabs-preview {margin-block:1rem;}
 .record-main .rk-tabs-editor-body {display:flex;flex-direction:column;gap:.8rem;padding-top:.8rem;}
 /* Editor panels are real ProseMirror nodes: tab switching only changes
  * visibility. Never unmount or replace NodeViewContent on tab click. */
@@ -381,7 +385,9 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-tab-edit {margin:0!important;min-width:0;}
 .record-main .rk-tab-title {font-weight:600;margin-bottom:.5rem;}
 .record-main .rk-tabs-heading {font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.5rem;}
-.record-main .rk-tabs-read-panel {min-height:2rem;padding-top:.9rem;}
+.record-main .rk-tabs-read-panel {min-height:2rem;padding-top:.8rem;}
+.record-main .rk-tabs-read-panel .rk-tab-edit {margin:0;}
+.record-main .rk-tabs-read-panel .rk-tab-title {margin-bottom:.5rem;}
 .record-main .rk-tabs-read-panel[hidden] {display:none;}
 .record-main .rk-tabs-unscoped {border-top:1px solid var(--rk-document-border);padding-top:.5rem;}
 .record-main .rk-tabs-read-panel .rk-tab-pane > :first-child {margin-top:0;}

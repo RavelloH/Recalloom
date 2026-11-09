@@ -563,6 +563,8 @@
 /* Identical status-icon geometry and semantic color in visual and preview.
  * Banner retains Astryx layout and accessible icon slot. */
 .record-main .rk-rmd-callout {--rk-callout-accent:#5687bd;min-width:0;}
+/* Only the authoring view has a ProseMirror directive wrapper. */
+.record-main .markdown-preview .rk-rmd-callout {margin-block:1rem;}
 .record-main .rk-rmd-callout[data-rk-kind="note"]{--rk-callout-accent:#7e94ac;}
 .record-main .rk-rmd-callout[data-rk-kind="info"]{--rk-callout-accent:#438bc8;}
 .record-main .rk-rmd-callout[data-rk-kind="tip"]{--rk-callout-accent:#3ba578;}
