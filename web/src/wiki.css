@@ -32,8 +32,12 @@
 }
 .wiki-embed-body .markdown-preview>.wiki-embed{margin-block:8px;}
 .wiki-embed-note{font-size:11px;color:var(--color-text-secondary,light-dark(#555,#bbc));}
-.wiki-editor-chip{display:inline-flex;gap:5px;align-items:center;border-radius:4px;
- background:color-mix(in srgb,var(--color-text-link,#527cb7) 11%,transparent);
- color:var(--color-text-link,#527cb7);padding:0 4px;cursor:pointer;}
+/* A Tiptap NodeView is a structural wrapper, not a second Wiki chip.
+ * Keep the same single link surface in preview and visual modes. */
+.wiki-editor-chip{display:inline-flex;gap:0;align-items:center;border-radius:4px;
+ background:transparent;color:inherit;padding:0;cursor:pointer;}
+/* Selection belongs to the editor and must not add another background. */
+.wiki-editor-chip.ProseMirror-selectednode > .wiki-link{
+ outline:2px solid var(--color-text-link,#527cb7);outline-offset:2px;}
 .wiki-editor-chip.is-embed{display:flex;padding:10px;margin:10px 0;
  border:1px dashed var(--color-border,light-dark(#ccc,#555));}
