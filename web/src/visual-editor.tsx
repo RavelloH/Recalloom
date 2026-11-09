@@ -5,6 +5,7 @@ import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
+import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -42,6 +43,7 @@ import {decorateEditorLinks} from './link-metadata-client';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {inlineCommandsByGroup,runInlineRmdCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
 import {safeTableId,cleanTableCaption} from './table-caption';
 
@@ -210,7 +212,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   codeBlock:e?.isActive('codeBlock')??false,
   underline:e?.isActive('underline')??false,
   strike:e?.isActive('strike')??false,
-  highlight:e?.isActive('rmdMark')??false,
+  mark:e?.isActive('rmdMark')??false,
   superscript:e?.isActive('superscript')??false,
   subscript:e?.isActive('subscript')??false,
   link:e?.isActive('link')??false,
@@ -366,7 +368,17 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
-  {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleMark('rmdMark').run(),<span className="toolbar-highlight">H</span>)}
+  {toggle('语义 Mark',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">M</span>)}
+  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',icon:<IconPencil size="var(--rk-icon-sm)"/>}}
+   presentation="adaptive" items={inlineCommandsByGroup('hand-drawn').map(command=>({
+    id:command.id,label:command.title,description:command.description,
+    isDisabled:!command.isAvailable(editor),onClick:()=>{command.run(editor);}
+   }))}/>
+  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',icon:<IconPlus size="var(--rk-icon-sm)"/>}}
+   presentation="adaptive" items={inlineCommandsByGroup('inline-component').map(command=>({
+    id:command.id,label:command.title,description:command.description,
+    isDisabled:!command.isAvailable(editor),onClick:()=>{command.run(editor);}
+   }))}/>
  </>;
  return <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
