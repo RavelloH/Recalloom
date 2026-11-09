@@ -10,7 +10,7 @@ import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {Pencil,Eye,EyeOff} from 'lucide-react';
+import {IconPencil,IconEye,IconEyeOff} from '@tabler/icons-react';
 import {richTitle} from './rich-schema';
 import {calloutIcon} from '../callout-icon';
 import {asAstryBadgeVariant} from '../rmd-badge';
@@ -37,7 +37,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
     onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();updateAttributes({title:safeTitle(draft)});setEditing(false);}if(event.key==='Escape')setEditing(false);}}
     onBlur={()=>{updateAttributes({title:safeTitle(draft)});setEditing(false);}}/>
   :<span>{richTitle(kind,title)}</span>}
-  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<Pencil size={13}/>}/>}
+  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<IconPencil size="1em"/>}/>}
  </span>;
  return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')} data-rk-kind={kind}>
   {kind==='tabs'
@@ -60,7 +60,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <div contentEditable={false} className="rk-flashcard-heading">
        {editTitle}
        <Button variant="ghost" label={flashcardOpen?"收起答案":"显示答案"}
-        icon={flashcardOpen?<EyeOff size={16} aria-hidden="true"/>:<Eye size={16} aria-hidden="true"/>}
+        icon={flashcardOpen?<IconEyeOff size="1.125em" aria-hidden="true"/>:<IconEye size="1.125em" aria-hidden="true"/>}
         aria-expanded={flashcardOpen}
         onMouseDown={event=>event.preventDefault()}
         onClick={()=>setFlashcardOpen(open=>!open)}/>

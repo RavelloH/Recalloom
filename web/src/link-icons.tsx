@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState,type AnchorHTMLAttributes,type ReactNode} from 'react';
-import {Link2} from 'lucide-react';
+import {IconLink} from '@tabler/icons-react';
 import {normalizedLinkOrigin,resolveRemoteIcon} from './link-metadata-client';
 
 /** Displays the source website's favicon without storing its image in Recalloom. */
@@ -24,7 +24,7 @@ export function SmartLink({href,children,...props}:AnchorHTMLAttributes<HTMLAnch
  return <a {...props} href={href} ref={anchor} className={['rk-smart-link',props.className??''].join(' ')}>
   {external&&!hasImage&&(icon&&!failed
    ?<img src={icon} alt="" className="rk-site-favicon" aria-hidden="true" decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>
-   :<Link2 size={14} aria-hidden="true" className="rk-link-fallback"/>)}
+   :<IconLink size="1.125em" aria-hidden="true" className="rk-link-fallback"/>)}
   {children}
  </a>;
 }

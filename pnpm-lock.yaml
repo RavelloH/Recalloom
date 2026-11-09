@@ -44,6 +44,9 @@ importers:
       '@stylexjs/stylex':
         specifier: ^0.19.1
         version: 0.19.1
+      '@tabler/icons-react':
+        specifier: ^3.50.0
+        version: 3.50.0(react@19.3.1)
       '@tanstack/react-query':
         specifier: ^5.105.0
         version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
@@ -143,9 +146,6 @@ importers:
       katex:
         specifier: ^0.16.47
         version: 0.16.47
-      lucide-react:
-        specifier: ^1.62.0
-        version: 1.62.0(@types/react@19.3.0)(react@19.3.1)
       mermaid:
         specifier: ^11.17.2
         version: 11.17.2
@@ -1055,6 +1055,14 @@ packages:
 
   '@stylexjs/stylex@0.19.1':
     resolution: {integrity: sha512-JwNFm0MOYPqi+M4Ax5Un4ZxfZp4HEAX2sAWetZ88KALFcv1eEiHNJs75oO3V3U7RVWnzfkiM8i9eBowC3hqgUw==}
+
+  '@tabler/icons-react@3.50.0':
+    resolution: {integrity: sha512-X9XhFbxAmSNimQ71VAd7opfd4z84x1pLrEbBT33VCIEsFs8zWVqdhh5r/Jyi/3iJjQ861kE5Wm9ixiJfS2nwBA==}
+    peerDependencies:
+      react: '>= 16'
+
+  '@tabler/icons@3.50.0':
+    resolution: {integrity: sha512-HflLxyrH1cqC7s7jzQGSjpsTAVIoaf7+/yHjbdM59rJQBMjliibp+LYhDPFxOMcwa1M8DNpOk6ENzQiWn9a1Dg==}
 
   '@tanstack/history@1.162.5':
     resolution: {integrity: sha512-w1+YvwmTkwt5n8yUqEH3IWZ9DsmorCZW/EQ3KYHnqEgIkOZpH54NvW6/Epq3Dzb8H0ifIeYX8PExvrNLIH5FIA==}
@@ -3744,6 +3752,13 @@ snapshots:
       css-mediaquery: 0.1.2
       invariant: 2.2.4
       styleq: 0.2.1
+
+  '@tabler/icons-react@3.50.0(react@19.3.1)':
+    dependencies:
+      '@tabler/icons': 3.50.0
+      react: 19.3.1
+
+  '@tabler/icons@3.50.0': {}
 
   '@tanstack/history@1.162.5': {}
 

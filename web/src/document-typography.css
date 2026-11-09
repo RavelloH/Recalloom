@@ -625,6 +625,7 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="dan
 html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="example"]{--rk-callout-accent:#c0a7ef;}
 html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="question"]{--rk-callout-accent:#94bfee;}
 .record-main .rk-rmd-callout .astryx-banner {
+ --rk-callout-label-size:.875rem;
  align-items:center;
  border-inline-start:0!important;
  border-left:0!important;
@@ -632,6 +633,7 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
  color:var(--rk-callout-accent)!important;
 }
 .record-main .rk-rmd-callout .astryx-banner-icon {
+ font-size:var(--rk-callout-label-size)!important;
  width:1em!important;min-width:1em!important;height:1em!important;
  display:flex!important;align-items:center!important;justify-content:center!important;
  color:inherit!important;flex:none;
@@ -643,6 +645,7 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
 .record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon),
 .record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) > :first-child {
  color:inherit!important;
+ font-size:var(--rk-callout-label-size)!important;
 }
 
 /* Center the actual table rather than centering its full-width scroll host. */

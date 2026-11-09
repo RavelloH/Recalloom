@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Card} from '@astryxdesign/core/Card';
 import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
-import {Database,RefreshCw,Square} from 'lucide-react';
+import {IconDatabase,IconRefresh,IconSquare} from '@tabler/icons-react';
 import {api} from './api';
 import {useQueryClient} from '@tanstack/react-query';
 
@@ -58,15 +58,15 @@ export function WikiIndexPanel(){
   }
  };
  return <Card className="settings-panel" padding={5}>
-  <h2><Database size={17} style={{verticalAlign:'text-bottom',marginRight:8}}/>Wiki 引用索引</h2>
+  <h2><IconDatabase size="1.25em" style={{verticalAlign:'text-bottom',marginRight:8}}/>Wiki 引用索引</h2>
   <p className="muted small">新建或编辑文档时，正文中的 <code>[[id:UUID]]</code>、<code>[[/路径]]</code> 与 <code>::: embed 目标 :::</code> 会自动建立双向引用。
    对于升级前就存在的 Markdown，可以执行一次补建，识别已有语法。</p>
   <p className="muted small">仅补建自动引用关系，不会修改正文、版本历史、手动关系或向量索引；遇到其他 Agent 正在修改的文档会跳过过期结果。支持中途停止并继续。</p>
   <div className="row gap">
    <Button label={state.finished?'补建完成':state.cursor?'继续补建':'扫描旧文档'}
-    variant="secondary" icon={<RefreshCw size={15}/>} isDisabled={running||state.finished}
+    variant="secondary" icon={<IconRefresh size="1.125em"/>} isDisabled={running||state.finished}
     isLoading={running} onClick={()=>void run()}/>
-   {running&&<Button label="停止" variant="ghost" icon={<Square size={14}/>} onClick={stop}/>}
+   {running&&<Button label="停止" variant="ghost" icon={<IconSquare size="1.125em"/>} onClick={stop}/>}
    {state.finished&&<Button label="重新扫描" variant="ghost" size="sm"
     onClick={()=>{progress.current=initial;setState(initial);setError('');}}/>}
   </div>

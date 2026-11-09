@@ -5,7 +5,7 @@ import {RouterProvider} from '@tanstack/react-router';
 import {Theme} from '@astryxdesign/core/theme';
 import {InternationalizationProvider} from '@astryxdesign/core/i18n';
 import zhCN from '@astryxdesign/core/locales/zh-CN.json';
-import {neutralTheme} from '@astryxdesign/theme-neutral/built';
+import {recalloomTheme} from './icon-theme';
 import {router} from './router';
 import {queryClient} from './queries';
 import {ThemeProvider,useAppearance} from './theme';
@@ -27,5 +27,5 @@ applyScrollbarPolicy();
 // Keep Cap.js proof-of-work self-hosted: no third-party runtime download.
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';
 window.CAP_CUSTOM_HASHWX_URL='/cap-wasm/hashwx.wasm';
-function App(){const {mode}=useAppearance();return <InternationalizationProvider locale="zh-CN" messages={{'zh-CN':zhCN}}><Theme theme={neutralTheme} mode={mode}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></Theme></InternationalizationProvider>;}
+function App(){const {mode}=useAppearance();return <InternationalizationProvider locale="zh-CN" messages={{'zh-CN':zhCN}}><Theme theme={recalloomTheme} mode={mode}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></Theme></InternationalizationProvider>;}
 createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);

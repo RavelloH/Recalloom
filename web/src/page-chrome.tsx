@@ -3,7 +3,7 @@ import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {Token} from '@astryxdesign/core/Token';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {ChevronRight,Plus} from 'lucide-react';
+import {IconChevronRight,IconPlus} from '@tabler/icons-react';
 import {ApiError,api} from './api';
 import {TopbarPortal} from './topbar-slot';
 import {useCompactLayout} from './use-media';
@@ -49,9 +49,9 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
  const folders=trail.data??[];
  return <nav className="crumbs" aria-label="页面路径">
   <Link to="/library" className="crumb">知识库</Link>
-  {folders.map(folder=><React.Fragment key={folder.id}><ChevronRight size={13} className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate">{folder.name}</Link></React.Fragment>)}
-  {folderId&&trail.isPending&&<><ChevronRight size={13} className="crumb-sep" aria-hidden="true"/><span className="crumb muted">…</span></>}
-  {current&&<><ChevronRight size={13} className="crumb-sep" aria-hidden="true"/><span className="crumb crumb-current truncate" aria-current="page">{current}</span></>}
+  {folders.map(folder=><React.Fragment key={folder.id}><IconChevronRight size="1em" className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate">{folder.name}</Link></React.Fragment>)}
+  {folderId&&trail.isPending&&<><IconChevronRight size="1em" className="crumb-sep" aria-hidden="true"/><span className="crumb muted">…</span></>}
+  {current&&<><IconChevronRight size="1em" className="crumb-sep" aria-hidden="true"/><span className="crumb crumb-current truncate" aria-current="page">{current}</span></>}
  </nav>;
 }
 
@@ -120,7 +120,7 @@ export function TagEditor({tags,onChange}:{tags:string[];onChange:(tag:string,ac
    ?<div className="tag-input" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))void submit();}}>
      <TextInput label="新标签" isLabelHidden size="sm" width={160} hasAutoFocus placeholder="输入后回车" value={draft} onChange={setDraft} onEnter={()=>void submit()} onKeyDown={event=>{if(event.key==='Escape'){setDraft('');setAdding(false);}}}/>
     </div>
-   :<button type="button" className="property-add" aria-label="添加标签" disabled={busy} onClick={()=>setAdding(true)}><Plus size={13}/>{tags.length?null:'添加标签'}</button>}
+   :<button type="button" className="property-add" aria-label="添加标签" disabled={busy} onClick={()=>setAdding(true)}><IconPlus size="1em"/>{tags.length?null:'添加标签'}</button>}
   {error&&<span className="property-error" role="alert">{error}</span>}
  </div>;
 }
