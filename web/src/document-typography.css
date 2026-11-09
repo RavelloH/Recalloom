@@ -363,6 +363,49 @@
   max-width: none;
   text-align: initial;
 }
+/* A block formula is only a horizontal scroll container when its rendered
+ * content is actually wider than its column. Otherwise some touch/trackpad
+ * engines can swallow vertical gesture chaining on an empty scroll box.
+ * RecordEditor toggles this class after checking intrinsic scroll width.
+ * Never suppress ordinary vertical document scrolling or editor selection. */
+.record-main .tiptap [data-type="block-math"],
+.record-main .markdown-preview .katex-display,
+.record-main .markdown-preview [data-highlighted-math],
+.record-main .markdown-preview .rk-numbered-math-content {
+  overflow-x: clip;
+  overflow-y: visible;
+  overscroll-behavior-y: auto;
+}
+.record-main .tiptap [data-type="block-math"].rk-math-scroll-active,
+.record-main .markdown-preview .katex-display.rk-math-scroll-active,
+.record-main .markdown-preview [data-highlighted-math].rk-math-scroll-active,
+.record-main .markdown-preview .rk-numbered-math-content.rk-math-scroll-active {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-y: auto;
+}
+/* Math-only Mark has its own outer card. Use that card as the sole
+ * horizontal viewport, rather than creating nested formula scrollers. */
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only {
+  overflow-x: clip;
+  overflow-y: visible;
+  overscroll-behavior-y: auto;
+}
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only.rk-math-scroll-active {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-y: auto;
+}
+.record-main .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only .tiptap-mathematics-render[data-type="block-math"] {
+  overflow: visible;
+  width: max-content;
+  max-width: none;
+}
+/* Numbered and highlighted formulas have an outer horizontal viewport.
+ * The inner KaTeX display must not introduce a second scroll container. */
+.record-main .markdown-preview :is(.rk-numbered-math-content,[data-highlighted-math]) .katex-display {
+  overflow: visible;
+}
 /* Inline math stays inline; scroll containers here intercept its edit clicks. */
 .record-main .tiptap .tiptap-mathematics-render--editable:not([data-type="block-math"]) {
   overflow: visible;
@@ -607,5 +650,11 @@
  max-width:100%!important;margin-inline:auto!important;
 }
 .record-main .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only > .rk-directive-body {
- display:table;width:max-content;max-width:100%;
+ display:block;width:max-content;max-width:none;
+}
+/* A table formatting context can ignore max-width when the formula has an
+ * enormous intrinsic minimum. fit-content keeps small highlighted equations
+ * compact while limiting very wide ones to the reading column. */
+.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only {
+ display:block!important;width:fit-content!important;max-width:100%!important;
 }

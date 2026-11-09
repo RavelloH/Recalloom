@@ -16,11 +16,17 @@ import {useConfirmDialog} from './confirm-dialog';
 import type {RecordDetail} from './types';
 import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor,PreviewEditorChunk as PreviewEditor,type EditorMode} from './editor-chunks';
 import {AutoResizer,AutoTransition} from './motion-primitives';
+import {observeMathHorizontalOverflow} from './math-scroll';
 
 
 export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordDetail;onSaved:()=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode}){
  const initialMode=new URLSearchParams(location.search).get('mode');
  const visualRef=useRef<VisualEditorHandle>(null);
+ const editorSectionRef=useRef<HTMLDivElement>(null);
+ useEffect(()=>{
+  const root=editorSectionRef.current;
+  return root?observeMathHorizontalOverflow(root):undefined;
+ },[]);
  const qc=useQueryClient();
  const sessionId=qc.getQueryData<{session?:{id:string}}>(['auth-session'])?.session?.id??'';
  const [stored]=useState(()=>readSessionDraft(sessionId,item.id));
@@ -114,7 +120,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
  const discardRecovered=()=>{
   clearSessionDraft(sessionId,item.id);latestDraft.current=item.content;setDraft(item.content);setEditorKey(key=>key+1);setRecoveryNotice(false);
  };
- return <div className="editor-section">{confirmation}
+ return <div ref={editorSectionRef} className="editor-section">{confirmation}
   <PageActions className="editor-topline" pinned={<>
    <AutoResizer animateWidth animateHeight={false} className="save-status-box"><AutoTransition as="span" transitionKey={busy?'busy':changed?'dirty':'clean'} duration={.14}><span className={'save-status'+(changed?' is-dirty':'')} title={changed?'按 Ctrl/⌘ + S 保存':'所有更改已保存'}>{busy?'保存中…':changed?'未保存':'已保存'}<span className="save-revision"> · R{item.revision}</span></span></AutoTransition></AutoResizer>
    <Button label="保存" icon={<Save size={14}/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
