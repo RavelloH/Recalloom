@@ -29,7 +29,7 @@ const metrics=async()=>page.evaluate(()=>{
   mark:{container:rect(box),bg:box?getComputedStyle(box).backgroundColor:null,paragraph:rect(paragraph),paragraphColor:paragraph?getComputedStyle(paragraph).color:null},
   caption:{host:rect(table),table:rect(tbl),caption:rect(caption),direction:table?getComputedStyle(table).flexDirection:null},
   card:{host:rect(linkCard),image:rect(linkImage),cssWidth:linkImage?getComputedStyle(linkImage).width:null,margin:linkImage?getComputedStyle(linkImage).margin:null},
-  note:{icons:note?.querySelectorAll('.astryx-banner-icon svg').length,editOpacity:note?.querySelector('.rk-directive-title button')?getComputedStyle(note.querySelector('.rk-directive-title button')).opacity:null},
+  note:{icons:note?.querySelectorAll('.astryx-banner-icon svg').length,titleTriggers:note?.querySelectorAll('.rk-directive-title-hit').length,pencilButtons:note?.querySelectorAll('.rk-directive-title button').length},
   page:{viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth}
  };
 });
@@ -52,7 +52,8 @@ try{
  assert.equal(out.mark.bg,'rgb(245, 216, 112)','Mark background unchanged');
  assert.equal(out.mark.paragraphColor,'rgb(37, 30, 14)','Mark text contrast in dark mode');
  assert.equal(out.note.icons,1,'only one Banner semantic icon');
- assert.equal(out.note.editOpacity,'0','pencil action hidden until focus or hover');
+ assert.equal(out.note.titleTriggers,1,'structural title is directly editable on click');
+ assert.equal(out.note.pencilButtons,0,'no separate pencil icon or hover-only edit control');
  assert.equal(out.caption.direction,'column','captioned table must stack rows');
  assert.ok(out.caption.caption&&out.caption.table&&out.caption.caption.y>=out.caption.table.y+out.caption.table.h-2,'table caption must follow the table, never be to the left');
  assert.ok(out.caption.caption.w>0&&out.caption.caption.w<=out.caption.host.w+1,'caption must stay inside table wrapper');

@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useRef,useState} from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -9,9 +9,8 @@ import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {RmdChatMessage,RmdChatTranscript} from '../rmd-chat';
 import {isSketchKind} from '../sketch-geometry';
-import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {IconPencil,IconEye,IconEyeOff} from '@tabler/icons-react';
+import {IconEye,IconEyeOff} from '@tabler/icons-react';
 import {richTitle} from './rich-schema';
 import {calloutIcon} from '../callout-icon';
 import {asAstryBadgeVariant} from '../rmd-badge';
@@ -34,12 +33,29 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
  const activeTab=Math.min(Math.max(0,Number(selected)||0),Math.max(0,tabs.length-1));
  const [editing,setEditing]=useState(false);
  const [draft,setDraft]=useState(title);
+ const titleFinished=useRef(false);
+ const startTitleEdit=()=>{titleFinished.current=false;setDraft(title);setEditing(true);};
+ const finishTitleEdit=()=>{
+  if(titleFinished.current)return;
+  titleFinished.current=true;
+  const next=safeTitle(draft);
+  if(next!==title)updateAttributes({title:next});
+  setEditing(false);
+ };
+ const cancelTitleEdit=()=>{titleFinished.current=true;setEditing(false);};
  const editTitle=<span className="rk-directive-title" contentEditable={false}>
   {editing?<TextInput label="容器标题" value={draft} onChange={setDraft} aria-label="容器标题"
-    onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();updateAttributes({title:safeTitle(draft)});setEditing(false);}if(event.key==='Escape')setEditing(false);}}
-    onBlur={()=>{updateAttributes({title:safeTitle(draft)});setEditing(false);}}/>
-  :<span>{richTitle(kind,title)}</span>}
-  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<IconPencil size="var(--rk-icon-sm)"/>}/>}
+    onKeyDown={event=>{
+     if(event.key==='Enter'){event.preventDefault();event.stopPropagation();finishTitleEdit();}
+     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();cancelTitleEdit();}
+    }} onBlur={finishTitleEdit}/>
+   :<span className="rk-directive-title-hit" role="button" tabIndex={0}
+     aria-label={'编辑'+kind+'标题'} title="点击直接编辑标题"
+     onMouseDown={event=>event.stopPropagation()}
+     onClick={event=>{event.stopPropagation();startTitleEdit();}}
+     onKeyDown={event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();startTitleEdit();}
+     }}>{richTitle(kind,title)}</span>}
  </span>;
  return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>
   {kind==='tabs'

@@ -52,22 +52,9 @@
   font-weight: 600;
   color: var(--rk-document-muted, var(--color-text-secondary));
 }
-/* Tiptap name edit controls must not consume the speaker label's width.
- * Keep the name aligned with the bubble in both visual and preview modes. */
-.record-main .rk-directive-message .rk-directive-title {
-  position: relative;
-  min-height: 1.25rem;
-}
-.record-main .rk-directive-message .rk-directive-title button {
-  position: absolute;
-  inset-inline-start: calc(100% + .25rem);
-  top: 50%;
-  transform: translateY(-50%);
-}
-.record-main .rk-directive-message .rk-chat-row[data-sender="user"] .rk-directive-title button {
-  inset-inline-start: auto;
-  inset-inline-end: calc(100% + .25rem);
-}
+/* The speaker label itself edits on click; no adjacent pencil participates in
+ * the Chat name geometry in either visual or preview mode. */
+.record-main .rk-directive-message .rk-directive-title {position:relative;min-height:1.25rem;}
 .record-main .rk-chat-bubble {
   box-sizing: border-box;
   max-width: min(100%, 34rem);

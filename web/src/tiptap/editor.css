@@ -105,10 +105,11 @@
 .record-main .rk-directive-body > :last-child {margin-bottom:0;}
 .record-main .rk-directive-title {display:inline-flex;gap:.45rem;align-items:center;min-width:0;}
 .record-main .rk-directive-title input {max-width:min(28ch,60vw);}
-.record-main .rk-directive-title button {opacity:0;transition:opacity .14s ease;}
-.record-main .rk-directive-title:focus-within button,
-.record-main .rk-directive-title:hover button {opacity:1;}
-@media(hover:none){.record-main .rk-directive-title button {opacity:.65;}}
+/* Structural titles are edited at the text itself, not via an adjacent pencil.
+ * The action stays accessible to keyboard users without changing the layout. */
+.record-main .rk-directive-title-hit{cursor:text;display:inline;min-width:0;border-radius:3px;text-underline-offset:.18em;}
+@media(hover:hover){.record-main .rk-directive-title-hit:hover{text-decoration:underline dotted;}}
+.record-main .rk-directive-title-hit:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
 .record-main .rk-rich-inline {display:inline;}
 .record-main .rk-inline-editable {display:inline;}
 .record-main .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
