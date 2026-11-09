@@ -27,13 +27,13 @@ await page.addInitScript(()=>{
  document.addEventListener('keydown',event=>{if(event.key!=='x'||!event.target?.closest?.('.tiptap'))return;const start=performance.now();requestAnimationFrame(()=>baseline.frames.push(Math.round((performance.now()-start)*100)/100));},true);
 });
 const json=async(endpoint,options)=>page.evaluate(async({endpoint,options})=>{const r=await fetch('/api'+endpoint,options);return {status:r.status,body:await r.json().catch(()=>({}))};},{endpoint,options});
-const result={createdAt:new Date().toISOString(),commit:process.env.RMD_BASELINE_COMMIT??'',browser:await browser.version(),browserPath,origin,method:{environment:'127.0.0.1 local Wrangler isolated D1, cached JS assets',input:'12 keydown x events, 40ms delay; time to next animation frame is input responsiveness proxy, not pure handler CPU',measurements:'navigation to visible, mode switch to visible, long tasks >=50ms, DOM editor key-to-RAF',repetitions:1},cases:[]};
+const result={createdAt:new Date().toISOString(),commit:process.env.RMD_BASELINE_COMMIT??'',browser:await browser.version(),browserPath,origin,method:{environment:'127.0.0.1 local Wrangler isolated D1, cached JS assets',input:'12 keydown x events, 40ms delay; time to next animation frame is input responsiveness proxy, not pure handler CPU',measurements:'navigation to editor container and all fixture code blocks mounted (separate milestones), mode switch to visible, long tasks >=50ms, DOM editor key-to-RAF',repetitions:1},cases:[]};
 try{
  await page.goto(origin+'/login',{waitUntil:'domcontentloaded'});
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(origin+'/',{timeout:35000});
- for(const size of [10,50]){
+ for(const size of [10,50,100]){
   const f=createFixture(size*1024);
   const response=await json('/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'RMD-Baseline-'+size+'KB-'+Date.now()+'.md',kind:'document',content:f.content})});
   assert.equal(response.status,201,'local record creation failed '+JSON.stringify(response.body).slice(0,500));
@@ -43,6 +43,10 @@ try{
   await page.goto(link,{waitUntil:'domcontentloaded'});
   await page.locator('.tiptap').waitFor();
   const visualReadyMs=Math.round((performance.now()-start)*100)/100;
+  // The ProseMirror root can exist before setContent has installed the whole
+  // parsed document. Confirm every fixture code block is mounted separately.
+  await page.waitForFunction(expected=>document.querySelectorAll('.tiptap .rk-code-block').length>=expected,f.sections,{timeout:120000});
+  const visualFullReadyMs=Math.round((performance.now()-start)*100)/100;
   const initial=await page.evaluate(()=>({heap:performance.memory?.usedJSHeapSize??null,longtasks:window.__rmdBaseline?.longTasks??[]}));
   await page.locator('.tiptap p').first().click();
   await page.keyboard.press('End');
@@ -53,15 +57,19 @@ try{
   const typedMs=Math.round((performance.now()-typingStart)*100)/100;
   const input=await page.evaluate(()=>({frames:window.__rmdBaseline.frames,longTasks:window.__rmdBaseline.longTasks,heap:performance.memory?.usedJSHeapSize??null}));
   assert.ok(input.frames.length>=10,'keydown timings missing '+JSON.stringify(input.frames));
-  const modes={};for(const [mode,selector]of [['source','.cm-content'],['preview','.markdown-preview'],['visual','.tiptap']]){
+  const modes={};const fullModes={};for(const [mode,selector]of [['source','.cm-content'],['preview','.markdown-preview'],['visual','.tiptap']]){
    const start=performance.now();
    await page.getByRole('button',{name:mode==='source'?'源码':mode==='preview'?'预览':'可视化',exact:true}).click();
    await page.locator(selector).first().waitFor();
    modes[mode]=Math.round((performance.now()-start)*100)/100;
+   if(mode==='visual'){
+    await page.waitForFunction(expected=>document.querySelectorAll('.tiptap .rk-code-block').length>=expected,f.sections,{timeout:120000});
+    fullModes.visual=Math.round((performance.now()-start)*100)/100;
+   }
   }
-  const data={sizeKb:size,bytes:f.bytes,sections:f.sections,visualReadyMs,initialLongTasks:initial.longtasks.length,input:{totalTypingMs:typedMs,frameLatency:calc(input.frames),frameSamples:input.frames,longTaskCount:input.longTasks.length,longTaskMaxMs:Math.max(0,...input.longTasks.map(x=>x.duration)),longTaskTotalMs:Math.round(input.longTasks.reduce((sum,x)=>sum+x.duration,0)*100)/100,heapBeforeBytes:initial.heap,heapAfterBytes:input.heap},modeSwitchMs:modes};
+  const data={sizeKb:size,bytes:f.bytes,sections:f.sections,visualReadyMs,visualFullReadyMs,renderedCodeBlocks:f.sections,initialLongTasks:initial.longtasks.length,input:{totalTypingMs:typedMs,frameLatency:calc(input.frames),frameSamples:input.frames,longTaskCount:input.longTasks.length,longTaskMaxMs:Math.max(0,...input.longTasks.map(x=>x.duration)),longTaskTotalMs:Math.round(input.longTasks.reduce((sum,x)=>sum+x.duration,0)*100)/100,heapBeforeBytes:initial.heap,heapAfterBytes:input.heap},modeSwitchMs:modes,modeSwitchFullReadyMs:fullModes};
   result.cases.push(data);
-  console.log(JSON.stringify({sizeKb:size,bytes:f.bytes,sections:f.sections,visualReadyMs,input:data.input.frameLatency,longTasks:data.input.longTaskCount,modeSwitchMs:modes}));
+  console.log(JSON.stringify({sizeKb:size,bytes:f.bytes,sections:f.sections,visualReadyMs,visualFullReadyMs,input:data.input.frameLatency,longTasks:data.input.longTaskCount,modeSwitchMs:modes}));
  }
 }finally{await browser.close().catch(()=>{});}
 mkdirSync('tmp',{recursive:true});
