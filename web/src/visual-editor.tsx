@@ -392,19 +392,19 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     {toggle('任务清单',active?.taskList??false,()=>editor.chain().focus().toggleTaskList().run(),'☑')}
     {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),'❝')}
     {toggle('代码块',active?.codeBlock??false,()=>editor.chain().focus().toggleCodeBlock().run(),'</>')}
-    {action('插入表格',()=>editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run(),<IconTable size="1.25em"/>)}
+    {action('插入表格',()=>editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run(),<IconTable size="1.5em"/>)}
    </div>
    <div className="wysiwyg-tools">
-    {toggle('居中对齐',active?.alignCenter??false,()=>editor.chain().focus().setTextAlign('center').run(),<IconAlignCenter size="1.25em"/>)}
-    {toggle('右对齐',active?.alignRight??false,()=>editor.chain().focus().setTextAlign('right').run(),<IconAlignRight size="1.25em"/>)}
-    {action('左对齐',()=>editor.chain().focus().setTextAlign('left').run(),<IconAlignLeft size="1.25em"/>)}
+    {toggle('居中对齐',active?.alignCenter??false,()=>editor.chain().focus().setTextAlign('center').run(),<IconAlignCenter size="1.5em"/>)}
+    {toggle('右对齐',active?.alignRight??false,()=>editor.chain().focus().setTextAlign('right').run(),<IconAlignRight size="1.5em"/>)}
+    {action('左对齐',()=>editor.chain().focus().setTextAlign('left').run(),<IconAlignLeft size="1.5em"/>)}
    </div>
    <div className="wysiwyg-tools">
-    {action('插入或编辑链接',openLink,<IconLink size="1.25em"/>)}
+    {action('插入或编辑链接',openLink,<IconLink size="1.5em"/>)}
     {action('引用 Wiki 文档',()=>editor.chain().focus().insertContent('[[').run(),'[[]]')}
     {action('嵌入 Wiki 文档',()=>editor.chain().focus().insertContent({type:'paragraph',content:[{type:'text',text:'::: embed '}]}).run(),':::')}
-    {action('插入或编辑图片',openImage,<IconPhotoPlus size="1.25em"/>)}
-    {action('插入行内公式',()=>openMath('inline'),<IconMathFunction size="1.25em"/>)}
+    {action('插入或编辑图片',openImage,<IconPhotoPlus size="1.5em"/>)}
+    {action('插入行内公式',()=>openMath('inline'),<IconMathFunction size="1.5em"/>)}
     {action('插入块级公式',()=>openMath('block'),<>$$</>)}
    </div>
   </div>}
