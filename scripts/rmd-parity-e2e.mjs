@@ -127,7 +127,7 @@ try{
  assert.ok(visual.tables[0].rect.w<visual.tables[0].parent.w);
  assert.ok(Math.abs((visual.tables[0].rect.x+visual.tables[0].rect.w/2)-(visual.tables[0].parent.x+visual.tables[0].parent.w/2))<2,'table centered in visual');
  assert.equal(visual.callouts.length,8,'all eight Callout variants render in visual mode');
- assert.ok(visual.callouts.every(x=>Math.abs(x.size.w-x.titleFontSize)<1&&Math.abs(x.size.h-x.titleFontSize)<1&&Math.abs(x.iconSvg.w-x.titleFontSize)<1&&Math.abs(x.iconSvg.h-x.titleFontSize)<1),'callout icon must follow title font size');
+ assert.ok(visual.callouts.every(x=>x.size.w===16&&x.size.h===16&&x.iconSvg.w===16&&x.iconSvg.h===16&&x.titleFontSize===14),'callout icon is a centered 16px control glyph beside 14px title');
  assert.ok(visual.callouts.every(x=>x.color===x.titleColor&&x.borderLeft==='0px'),'callout icon/title use one semantic color with no left stripe');
  assert.ok(visual.callouts.every(x=>Math.abs(x.size.y+x.size.h/2-x.titleRect.y-x.titleRect.h/2)<2),'callout icon vertically aligns with title');
  assert.ok(visual.callouts.every(x=>x.headerBg&&x.headerBg!=='rgb(185, 215, 255)'),'callout header must use semantic tint, not shared blue');
@@ -191,7 +191,7 @@ try{
  assert.ok(Math.abs(preview.marks[0].rect.w-visual.marks[0].rect.w)<8,'formula Mark width should agree between modes');
  assert.ok(Math.abs(preview.tables[0].rect.w-visual.tables[0].rect.w)<5,'tables are consistent between modes');
  assert.equal(preview.callouts.length,8,'all eight Callout variants render in preview mode');
- assert.ok(preview.callouts.every(x=>Math.abs(x.size.w-x.titleFontSize)<1&&Math.abs(x.size.h-x.titleFontSize)<1&&Math.abs(x.iconSvg.w-x.titleFontSize)<1),'preview icon follows title font size');
+ assert.ok(preview.callouts.every(x=>x.size.w===16&&x.size.h===16&&x.iconSvg.w===16&&x.iconSvg.h===16&&x.titleFontSize===14),'preview has the same 16px icon slot and 14px title');
  assert.ok(preview.callouts.every(x=>x.color===x.titleColor&&x.borderLeft==='0px'),'preview icon/title match with no left stripe');
  assert.ok(preview.callouts.every(x=>Math.abs(x.size.y+x.size.h/2-x.titleRect.y-x.titleRect.h/2)<2),'preview icon vertically aligns with title');
  assert.deepEqual(preview.callouts.map(x=>x.headerBg),visual.callouts.map(x=>x.headerBg),'visual and preview semantic header backgrounds match');

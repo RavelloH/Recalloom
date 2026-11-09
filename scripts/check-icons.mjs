@@ -7,7 +7,7 @@ import ts from 'typescript';
 
 const root='web/src';
 const failures=[];
-let files=0,uses=0,relativeSizes=0;
+let files=0,uses=0,tokenSizes=0,inlineSizes=0;
 const findFiles=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
  const file=join(dir,entry.name);
  return entry.isDirectory()?findFiles(file):/\.(ts|tsx)$/.test(entry.name)?[file]:[];
@@ -34,10 +34,22 @@ for(const file of srcFiles){
    if(locals.has(node.tagName.getText(sf))){
     uses++;
     const size=node.attributes.properties.find(attr=>ts.isJsxAttribute(attr)&&attr.name.text==='size');
-    if(size){
+    if(!size){
+     // These components supply dimensions through their own centered icon
+     // container, or (for the Astryx registry) the shared glyph object.
+     const ownedFiles=['icon-theme.tsx','shell.tsx','page-tree.tsx','record-editor.tsx','visual-editor.tsx'];
+     if(!ownedFiles.some(name=>file.endsWith(name)))
+      failures.push(file+': icon missing a shared size token near line '+(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1));
+    }else{
      const literal=size.initializer;
-     if(literal&&ts.isStringLiteral(literal)&&/^(?:\d+(?:\.\d+)?)em$/.test(literal.text))relativeSizes++;
-     else failures.push(file+': icon uses non-em size near line '+(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1));
+     if(literal&&ts.isStringLiteral(literal)){
+      if(/^var\(--rk-icon-(?:xs|sm|md|lg|nav|bottom)\)$/.test(literal.text))tokenSizes++;
+      else if(literal.text==='1em') {
+       const inlineFiles=['page-chrome.tsx','pages.tsx','knowledge-graph.tsx','rich-critic.tsx','rich-link-card.tsx','wiki-components.tsx','link-icons.tsx'];
+       if(inlineFiles.some(s=>file.endsWith(s)))inlineSizes++;
+       else failures.push(file+': 1em allowed only for genuine inline or title glyphs near line '+(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1));
+      } else failures.push(file+': icon must use an --rk-icon-* token or inline 1em near line '+(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1));
+     }else failures.push(file+': icon size must use a shared static token near line '+(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1));
     }
     for(const attr of node.attributes.properties)if(ts.isJsxAttribute(attr)&&attr.name.text==='strokeWidth')
      failures.push(file+': Tabler icon uses Lucide strokeWidth prop');
@@ -47,8 +59,11 @@ for(const file of srcFiles){
  }
  inspect(sf);
 }
+const sharedCss=readFileSync('web/src/icon-layout.css','utf8');
+for(const token of ['xs','sm','md','lg','nav','bottom'])
+ if(!sharedCss.includes('--rk-icon-'+token+':'))failures.push('icon-layout.css: missing shared token '+token);
 const pkg=JSON.parse(readFileSync('package.json','utf8'));
 assert.ok(pkg.dependencies['@tabler/icons-react'],'Tabler must be a direct dependency');
 if(pkg.dependencies['lucide-react'])failures.push('package.json: legacy Lucide dependency');
 if(failures.length)throw Error('Icon system checks failed:\n'+failures.join('\n'));
-console.log('Icon system verified: '+files+' files, '+uses+' direct Tabler JSX icons, '+relativeSizes+' relative em sizes; no Lucide imports');
+console.log('Icon system verified: '+files+' files, '+uses+' direct Tabler JSX icons, '+tokenSizes+' shared-token icons, '+inlineSizes+' intentional inline icons; no Lucide imports');

@@ -632,16 +632,6 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
  background:color-mix(in srgb,var(--rk-callout-accent) 12%,transparent)!important;
  color:var(--rk-callout-accent)!important;
 }
-.record-main .rk-rmd-callout .astryx-banner-icon {
- font-size:var(--rk-callout-label-size)!important;
- width:1em!important;min-width:1em!important;height:1em!important;
- display:flex!important;align-items:center!important;justify-content:center!important;
- color:inherit!important;flex:none;
-}
-.record-main .rk-rmd-callout .astryx-banner-icon svg {
- width:1em!important;height:1em!important;stroke-width:1.9!important;
- stroke:currentColor;display:block;flex:none;
-}
 .record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon),
 .record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) > :first-child {
  color:inherit!important;

@@ -22,7 +22,7 @@ function FootnoteDefView({node}:NodeViewProps){
  const id=safeFootnoteId(String(node.attrs.id??''));
  return <NodeViewWrapper className="rk-footnote-definition" data-rk-footnote-definition={id}>
   <Card variant="muted" padding={3}>
-   <div className="rk-footnote-definition-title" contentEditable={false}><IconNotes size="1.125em" aria-hidden="true"/> 脚注 [{id}]</div>
+   <div className="rk-footnote-definition-title" contentEditable={false}><IconNotes size="var(--rk-icon-sm)" aria-hidden="true"/> 脚注 [{id}]</div>
    <NodeViewContent className="rk-footnote-definition-content"/>
   </Card>
  </NodeViewWrapper>;

@@ -11,7 +11,7 @@ import {
 
 // Astryx still owns behavior, accessibility and layout. Override only its
 // semantic icon registry, preserving the precompiled neutral theme/CSS.
-const glyph={size:'1em',stroke:2,'aria-hidden':true} as const;
+const glyph={size:'var(--rk-icon-sm)',stroke:2,'aria-hidden':true} as const;
 
 const icons:IconRegistry={
  close:<IconX {...glyph}/>,

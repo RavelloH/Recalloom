@@ -20,8 +20,8 @@ describe('Recalloom Astryx icon registry',()=>{
    const rendered=renderToStaticMarkup(React.createElement(React.Fragment,null,getIcon(key,recalloomTheme)));
    assert.match(rendered,/\btabler-icon\b/,'expected Tabler for '+key);
    assert.doesNotMatch(rendered,/\blucide\b/,'legacy Lucide rendered for '+key);
-   assert.match(rendered,/width="1em"/,'relative width needed for '+key);
-   assert.match(rendered,/height="1em"/,'relative height needed for '+key);
+   assert.match(rendered,/width="var\(--rk-icon-sm\)"/,'shared component icon width needed for '+key);
+   assert.match(rendered,/height="var\(--rk-icon-sm\)"/,'shared component icon height needed for '+key);
    assert.match(rendered,/stroke-width="2"/,'consistent outline needed for '+key);
   }
  });

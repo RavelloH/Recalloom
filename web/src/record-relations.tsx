@@ -47,27 +47,27 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
  const data=related.data;
  return <section className="relation-panel" aria-label="文档关联">
   <div className="relation-panel-heading">
-   <h3><IconTopologyStar3 size="1.125em"/>关联文档</h3>
+   <h3><IconTopologyStar3 size="var(--rk-icon-sm)"/>关联文档</h3>
    <Link to="/graph" search={{focus:recordId}} onClick={onNavigate} className="relation-graph-link">查看关系网</Link>
   </div>
   {error&&<Banner status="error" container="section" title="关联操作失败" description={error}/>}
   {related.isPending?<p className="muted small" role="status">正在加载关联…</p>:
    related.isError?<Banner status="error" container="section" title="关联加载失败" description={related.error.message}/>:
    <>
-    <div className="relation-group-heading"><IconLink size="1.125em"/>已确认关系 <span>{data?.links.length??0}</span></div>
+    <div className="relation-group-heading"><IconLink size="var(--rk-icon-sm)"/>已确认关系 <span>{data?.links.length??0}</span></div>
     {data?.links.length?<div className="relation-items">{data.links.map(link=><div className="relation-row" key={link.id}>
-     {link.direction==='outgoing'?<IconArrowUpRight size="1.125em"/>:<IconArrowDownLeft size="1.125em"/>}
+     <span className="rk-icon-frame rk-icon-frame--first-line rk-icon-frame--first-line-sm">{link.direction==='outgoing'?<IconArrowUpRight size="var(--rk-icon-sm)"/>:<IconArrowDownLeft size="var(--rk-icon-sm)"/>}</span>
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:link.other.id}} onClick={onNavigate} className="relation-name">{link.other.name}</Link>
       <small className="muted">{link.direction==='outgoing'?'指向':'来自'} · {relationLabel(link.relation)}{link.type==='reference'||link.type==='embed'?' · 正文自动生成':''}{link.other.status==='archived'?' · 已归档':''}</small>
      </div>
-     {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<IconUnlink size="1em"/>}
+     {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<IconUnlink size="var(--rk-icon-sm)"/>}
       isDisabled={Boolean(busy)} onClick={()=>void apply(link.sourceId,link.targetId,link.relation,'remove')}/>:<span className="muted small" title="请修改源文档中的 Wiki 语法以解除关系">自动</span>}
     </div>)}</div>:<p className="relation-placeholder">尚未建立显式关系。可以在下方搜索文档并关联。</p>}
-    <div className="relation-group-heading"><IconSparkles size="1.125em"/>语义相似 <span>{data?.suggestions.length??0}</span></div>
+    <div className="relation-group-heading"><IconSparkles size="var(--rk-icon-sm)"/>语义相似 <span>{data?.suggestions.length??0}</span></div>
     <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>
     {Boolean(data?.suggestions.length)&&<div className="relation-items">{data?.suggestions.map(s=><div className="relation-row relation-suggestion" key={s.id}>
-     <IconSparkles size="1.125em"/>
+     <span className="rk-icon-frame rk-icon-frame--first-line rk-icon-frame--first-line-sm"><IconSparkles size="var(--rk-icon-sm)"/></span>
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:s.other.id}} onClick={onNavigate} className="relation-name">{s.other.name}</Link>
       <small className="muted">{Math.round((s.score??0)*100)}% 相似度{(s.support??0)>1?' · 多段匹配':''}</small>

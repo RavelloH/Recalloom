@@ -56,7 +56,7 @@ export function WikiEmbed({target,anchor,sourceId,trail=[],depth=0,render}:{
  if(truncated)body=body.slice(0,50000)+'\n\n> 嵌入内容过长，剩余部分请打开源文档查看。';
  return <section className="wiki-embed" aria-label="嵌入文档">
   <header className="wiki-embed-heading">
-   <IconFileImport size="1.125em"/>
+   <IconFileImport size="var(--rk-icon-sm)"/>
    {id?<Link to="/records/$recordId" params={{recordId:id}} className="wiki-embed-title">
     {q.data?.name??target}{anchor?' #'+anchor:''}<IconExternalLink size="1em"/>
    </Link>:<span className="wiki-embed-title">{target}</span>}

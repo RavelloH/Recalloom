@@ -37,7 +37,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
     onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();updateAttributes({title:safeTitle(draft)});setEditing(false);}if(event.key==='Escape')setEditing(false);}}
     onBlur={()=>{updateAttributes({title:safeTitle(draft)});setEditing(false);}}/>
   :<span>{richTitle(kind,title)}</span>}
-  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<IconPencil size="1em"/>}/>}
+  {!editing&&<IconButton label="编辑标题" variant="ghost" size="sm" onClick={()=>{setDraft(title);setEditing(true);}} icon={<IconPencil size="var(--rk-icon-sm)"/>}/>}
  </span>;
  return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')} data-rk-kind={kind}>
   {kind==='tabs'
@@ -60,7 +60,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <div contentEditable={false} className="rk-flashcard-heading">
        {editTitle}
        <Button variant="ghost" label={flashcardOpen?"收起答案":"显示答案"}
-        icon={flashcardOpen?<IconEyeOff size="1.125em" aria-hidden="true"/>:<IconEye size="1.125em" aria-hidden="true"/>}
+        icon={flashcardOpen?<IconEyeOff size="var(--rk-icon-sm)" aria-hidden="true"/>:<IconEye size="var(--rk-icon-sm)" aria-hidden="true"/>}
         aria-expanded={flashcardOpen}
         onMouseDown={event=>event.preventDefault()}
         onClick={()=>setFlashcardOpen(open=>!open)}/>

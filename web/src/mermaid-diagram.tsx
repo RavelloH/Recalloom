@@ -106,7 +106,7 @@ export default function MermaidDiagram({code}:{code:string}){
  },[code,theme]);
  return <div className="rk-mermaid" data-rk-mermaid="" data-rk-diagram-theme={theme} contentEditable={false}>
   {svg?<div className="rk-mermaid-svg"><img src={"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg)} alt="Mermaid 图表" draggable={false}/></div>
-   :error?<div className="rk-mermaid-error"><IconAlertTriangle size="1.125em" aria-hidden="true"/>{error}</div>
-   :<div className="rk-mermaid-loading"><IconTopologyStar3 size="1.125em" aria-hidden="true"/> 正在绘制图表…</div>}
+   :error?<div className="rk-mermaid-error"><IconAlertTriangle size="var(--rk-icon-sm)" aria-hidden="true"/>{error}</div>
+   :<div className="rk-mermaid-loading"><IconTopologyStar3 size="var(--rk-icon-sm)" aria-hidden="true"/> 正在绘制图表…</div>}
  </div>;
 }

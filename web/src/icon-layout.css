@@ -4,6 +4,7 @@
   --rk-icon-xs: .75rem;
   --rk-icon-sm: 1rem;
   --rk-icon-md: 1.125rem;
+  --rk-icon-lg: 1.5rem;
   --rk-icon-nav: 1.25rem;
   --rk-icon-bottom: 1.375rem;
 }
@@ -27,6 +28,18 @@
 .rk-icon-frame--nav { --rk-icon-size: var(--rk-icon-nav); }
 .rk-icon-frame--tree { --rk-icon-size: var(--rk-icon-md); }
 .rk-icon-frame--bottom { --rk-icon-size: var(--rk-icon-bottom); }
+/* Multi-line result and relation rows align the glyph to the first text line.
+ * A taller cell provides centering without an arbitrary per-icon margin-top. */
+.rk-icon-frame--first-line {
+  --rk-icon-size: var(--rk-icon-md);
+  height: 1.5rem;
+  align-self: flex-start;
+}
+.rk-icon-frame--first-line-sm { --rk-icon-size: var(--rk-icon-sm); }
+.rk-icon-frame--first-line > svg.tabler-icon {
+  width: var(--rk-icon-size);
+  height: var(--rk-icon-size);
+}
 
 /* Astryx Button already supplies a centered iconWrapper; override only the
  * SVG dimensions in each control family rather than injecting extra markup. */
@@ -86,6 +99,39 @@
 .record-main .editor-table-actions button svg.tabler-icon + svg.tabler-icon {
   width: var(--rk-icon-xs);
   height: var(--rk-icon-xs);
+}
+
+/* RMD Callout is a compact semantic header, not 14px inline text.
+ * Astryx Banner owns the icon slot: align a 16px Tabler glyph and its
+ * 14px title inside the same flex row. Keep stroke and color inherited. */
+.record-main .rk-rmd-callout .astryx-banner-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 var(--rk-icon-sm);
+  width: var(--rk-icon-sm) !important;
+  min-width: var(--rk-icon-sm) !important;
+  height: var(--rk-icon-sm) !important;
+  line-height: 0;
+  color: inherit !important;
+}
+.record-main .rk-rmd-callout .astryx-banner-icon > svg.tabler-icon {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  stroke-width: 2;
+  flex: none;
+}
+.record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) {
+  min-width: 0;
+}
+
+/* Avoid SVG baseline offset inside status, graph and action controls. */
+.record-main :is(.rk-code-header, .rk-link-card, .rk-flashcard) button svg.tabler-icon,
+.graph-inspector button svg.tabler-icon,
+.graph-controls button svg.tabler-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* Bottom navigation is vertical: center the icon cell independently from its

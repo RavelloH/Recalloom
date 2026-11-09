@@ -13,7 +13,7 @@ export default function FlashcardPreview({children,title}:{children:React.ReactN
   <div className="rk-flashcard-heading rk-flashcard-read-heading">
    <span>{richTitle('flashcard',title)}</span>
    <Button variant="ghost" label={open?'收起答案':'显示答案'}
-    icon={open?<IconEyeOff size="1.125em" aria-hidden="true"/>:<IconEye size="1.125em" aria-hidden="true"/>}
+    icon={open?<IconEyeOff size="var(--rk-icon-sm)" aria-hidden="true"/>:<IconEye size="var(--rk-icon-sm)" aria-hidden="true"/>}
     aria-expanded={open} onClick={()=>setOpen(value=>!value)}/>
   </div>
   <div className="rk-flashcard-body">{children}</div>
