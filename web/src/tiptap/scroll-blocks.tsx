@@ -7,7 +7,7 @@ import type {EditorView} from '@tiptap/pm/view';
 import {ReactNodeViewRenderer,NodeViewWrapper,NodeViewContent,type NodeViewProps} from '@tiptap/react';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {IconCopy,IconTextWrap,IconFileCode2,IconPencil,IconChevronDown,IconChevronUp} from '@tabler/icons-react';
+import {IconCopy,IconTextWrap,IconFileCode2,IconChevronDown,IconChevronUp} from '@tabler/icons-react';
 import {attachScrollbars} from '../scrollbars';
 import {attachLazyCodeScrollbars} from '../code-scrollbars';
 import {safeTableId,cleanTableCaption} from '../table-caption';
@@ -74,6 +74,7 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  const [expanded,setExpanded]=useState(false);
  const [editing,setEditing]=useState(false);
  const [filename,setFilename]=useState(String(node.attrs.filename??''));
+ const titleFinished=useRef(false);
  const codeText=node.textContent;
  const lines=codeText.split('\n').length;
  const fold=lines>20&&!node.attrs.expand&&!expanded;
@@ -88,17 +89,31 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  // the pre element's border box (and thus without a ResizeObserver event).
  // Recheck after text or wrapping changes while the block is near the viewport.
  useEffect(()=>{codeScroll.current?.check();},[codeText,node.attrs.wrap,expanded]);
- const saveTitle=()=>{updateAttributes({filename:filename.replace(/[\r\n\]]/g,' ').slice(0,240)});setEditing(false);};
+ const startTitle=()=>{titleFinished.current=false;setFilename(String(node.attrs.filename??''));setEditing(true);};
+ const finishTitle=()=>{
+  if(titleFinished.current)return;
+  titleFinished.current=true;
+  const next=filename.replace(/[\r\n\]]/g,' ').slice(0,240);
+  if(next!==String(node.attrs.filename??''))updateAttributes({filename:next});
+  setEditing(false);
+ };
+ const cancelTitle=()=>{titleFinished.current=true;setEditing(false);};
  return <NodeViewWrapper ref={host} id={typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined} className={'code-block rk-code-block'+(node.attrs.wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')} data-rk-code="true">
   <div className="rk-code-header" contentEditable={false}>
    <div className="rk-code-title">
     <IconFileCode2 size="var(--rk-icon-sm)" aria-hidden="true"/>
     {editing?<TextInput label="代码文件名" value={filename} onChange={setFilename} hasAutoFocus
-      onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveTitle();}else if(e.key==='Escape')setEditing(false);}}
-      onBlur={saveTitle}/>
-     :<><span>{String(node.attrs.filename||node.attrs.language||'Text')}</span>
-       <IconButton label="修改代码文件名" variant="ghost" size="sm" icon={<IconPencil size="var(--rk-icon-sm)"/>}
-         onClick={()=>{setFilename(String(node.attrs.filename??''));setEditing(true);}}/></>}
+      onKeyDown={e=>{
+       if(e.nativeEvent.isComposing)return;
+       if(e.key==='Enter'){e.preventDefault();e.stopPropagation();finishTitle();}
+       else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelTitle();}
+      }} onBlur={finishTitle}/>
+     :<span className="rk-code-title-hit" role="button" tabIndex={0}
+       aria-label="编辑代码文件名" title="点击直接编辑代码文件名"
+       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();startTitle();}}
+       onKeyDown={e=>{
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();startTitle();}
+       }}>{String(node.attrs.filename||node.attrs.language||'Text')}</span>}
    </div>
    <div className="rk-code-actions">
     <IconButton label={node.attrs.wrap?'关闭自动换行':'开启自动换行'} variant="ghost" size="sm"

@@ -95,7 +95,25 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     };
     assert.match(tool('get_help').description,/KaTeX/);
     assert.ok(tool('get_help').inputSchema.properties?.component,'component selector must be discoverable');
+    assert.ok(tool('get_help').inputSchema.properties?.kind,'inline/block/leaf selector must be discoverable');
     assert.ok(tool('get_help').inputSchema.properties?.node,'node selector must be discoverable');
+    assert.match(tool('get_help').description,/hand-drawn Highlight\/Circle/);
+    for(const name of ['highlight','circle','box','bracket','underline','double-underline','dotted-underline','wavy','arrow']){
+     const response=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:name,kind:'inline'}});
+     assert.equal(response.isError,undefined,'inline sketch MCP help '+name);
+     const text=JSON.parse(response.content[0].text).content as string;
+     assert.match(text,/静态 SVG/);
+     assert.match(text,/`color`/);
+     assert.match(text,/`stroke`/);
+     assert.match(text,/~~~~rmd-example/);
+    }
+    for(const name of ['highlight','circle','box','bracket','underline','double-underline']){
+     const response=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:name,kind:'block'}});
+     assert.equal(response.isError,undefined,'block sketch MCP help '+name);
+     assert.match(JSON.parse(response.content[0].text).content,/多行块级/);
+    }
+    const denied=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'wavy',kind:'block'}});
+    assert.equal(denied.isError,true,'unsupported block sketch must be rejected');
     for(const name of ['list_archived','delete_archived_record','delete_folder'])assert.ok(tool(name));
     assert.equal(tool('list_archived').annotations?.readOnlyHint,true);
     assert.equal(tool('delete_archived_record').annotations?.destructiveHint,true);
