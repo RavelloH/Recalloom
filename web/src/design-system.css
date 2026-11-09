@@ -7,15 +7,8 @@
   --rk-radius: 12px;
   --rk-space: 16px;
 }
-/* Tabler sizes follow the local text: 1em inline, 1.125em in navigation/
-   controls, 1.25em for emphasis, and 1.5–2em for decorative glyphs.
-   Keep icon geometry independent of the button's touch target. */
-svg.tabler-icon {
-  display:inline-block;
-  flex-shrink:0;
-  /* Align actual inline glyphs to the text center; flex/grid controls center their own icons. */
-  vertical-align:middle;
-}
+/* UI icons are controlled by their container in icon-layout.css.
+   Inline Markdown icons retain the natural text baseline. */
 body { font-size: 14px; line-height: 1.5; }
 .shell { --aside: 244px; }
 .workspace { min-width: 0; }

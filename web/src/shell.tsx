@@ -48,17 +48,17 @@ export function Shell({children}:{children:React.ReactNode}){
  return <div className={'shell'+(collapsed?' sidebar-collapsed':'')} data-scrolled={scrolled||undefined} data-width={fullWidth?'full':undefined}>
  <SideNav className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏"
   header={<div className="brand"><div className="brand-mark">R</div><span className="brand-name">Recalloom</span>
-   <IconButton className="sidebar-collapse" variant="ghost" size="sm" label="折叠侧边栏" icon={<IconChevronsLeft size="1.375em"/>} onClick={()=>setCollapsed(true)}/>
-   <IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<IconX size="1.5em"/>} onClick={closeMobile}/></div>}
+   <IconButton className="sidebar-collapse" variant="ghost" size="sm" label="折叠侧边栏" icon={<IconChevronsLeft/>} onClick={()=>setCollapsed(true)}/>
+   <IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<IconX/>} onClick={closeMobile}/></div>}
   footer={<div className="sidebar-footer">
-   <Link to="/settings" onClick={closeMobile} className="nav-link" activeProps={{className:'nav-link active'}}><IconSettings size="1.375em"/>设置</Link>
-   <Button className="nav-link" width="100%" variant="ghost" label={'主题：'+themeName} tooltip="切换主题：跟随系统 → 浅色 → 深色" icon={<IconSunMoon size="1.375em"/>} onClick={cycleTheme}/>
-   <Button className="nav-link is-danger" width="100%" variant="ghost" label="退出登录" icon={<IconLogout size="1.375em"/>} onClick={logout}/>
+   <Link to="/settings" onClick={closeMobile} className="nav-link" activeProps={{className:'nav-link active'}}><IconSettings/>设置</Link>
+   <Button className="nav-link" width="100%" variant="ghost" label={'主题：'+themeName} tooltip="切换主题：跟随系统 → 浅色 → 深色" icon={<IconSunMoon/>} onClick={cycleTheme}/>
+   <Button className="nav-link is-danger" width="100%" variant="ghost" label="退出登录" icon={<IconLogout/>} onClick={logout}/>
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
-    <Button className="nav-link nav-search" width="100%" variant="ghost" label="搜索" icon={<IconSearch size="1.375em"/>} endContent={<kbd className="nav-kbd">{shortcut}</kbd>} onClick={()=>{closeMobile();setCommands(true);}}/>
-    <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon:Icon})=><Link key={to} to={to} onClick={closeMobile} activeOptions={{exact:to==='/'}} className="nav-link" activeProps={{className:'nav-link active'}}><Icon size="1.375em"/>{name}</Link>)}</nav>
+    <Button className="nav-link nav-search" width="100%" variant="ghost" label="搜索" icon={<IconSearch/>} endContent={<kbd className="nav-kbd">{shortcut}</kbd>} onClick={()=>{closeMobile();setCommands(true);}}/>
+    <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon:Icon})=><Link key={to} to={to} onClick={closeMobile} activeOptions={{exact:to==='/'}} className="nav-link" activeProps={{className:'nav-link active'}}><span className="rk-icon-frame rk-icon-frame--nav"><Icon aria-hidden="true"/></span>{name}</Link>)}</nav>
    </div>
    <PageTree onNavigate={closeMobile}/>
   </OverlayScroll>
@@ -66,8 +66,8 @@ export function Shell({children}:{children:React.ReactNode}){
  <button className={'mobile-scrim'+(mobileOpen?' is-visible':'')} aria-label="关闭导航" aria-hidden={!mobileOpen} tabIndex={mobileOpen?0:-1} onClick={closeMobile}/>
  <div className="workspace"><header className="topbar">
   <div className="topbar-left">
-   <IconButton className="mobile-menu" variant="ghost" label="打开导航" icon={<IconMenu2 size="1.5em"/>} onClick={()=>setMobileOpen(true)}/>
-   {collapsed&&<IconButton className="desktop-toggle" variant="ghost" size="sm" label="展开侧边栏" icon={<IconLayoutSidebarLeftExpand size="1.25em"/>} onClick={()=>setCollapsed(false)}/>}
+   <IconButton className="mobile-menu" variant="ghost" label="打开导航" icon={<IconMenu2/>} onClick={()=>setMobileOpen(true)}/>
+   {collapsed&&<IconButton className="desktop-toggle" variant="ghost" size="sm" label="展开侧边栏" icon={<IconLayoutSidebarLeftExpand/>} onClick={()=>setCollapsed(false)}/>}
    <span className="topbar-title">Recalloom</span>
    <div className="topbar-slot topbar-slot-start" ref={setSlotStart}/>
   </div>
@@ -79,7 +79,7 @@ export function Shell({children}:{children:React.ReactNode}){
    </TopbarSlotProvider>
   </OverlayScroll>
  </main></div>
- <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon:Icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon size="2em"/><span>{name}</span></Link>)}</div>
+ <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon:Icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><span className="rk-icon-frame rk-icon-frame--bottom"><Icon aria-hidden="true"/></span><span>{name}</span></Link>)}</div>
  <QuickSwitcher isOpen={commands} onOpenChange={setCommands}/>
  {confirmation}
  </div>;
