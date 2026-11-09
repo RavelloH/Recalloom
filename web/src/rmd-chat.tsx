@@ -1,6 +1,5 @@
 import React,{type ReactNode} from 'react';
 import './rmd-chat.css';
-import {Avatar} from '@astryxdesign/core/Avatar';
 import {ChatMessage,ChatMessageBubble,ChatMessageList} from '@astryxdesign/core/Chat';
 
 export type RmdChatSender='user'|'assistant'|'system';
@@ -21,22 +20,20 @@ export function RmdChatTranscript({children,title,titleNode}:{children:ReactNode
 }
 
 export function RmdChatMessage({
- sender,name,avatarName,children,
+ sender,name,children,
 }:{
  sender:RmdChatSender;
  name:ReactNode;
- avatarName:string;
  children:ReactNode;
 }){
  return <ChatMessage
   sender={sender}
   density="compact"
-  className="rk-chat-row"
-  avatar={sender==='system'?undefined:<Avatar name={avatarName} size="sm" tooltip={false}/>}>
+  className="rk-chat-row">
   <ChatMessageBubble
    className="rk-chat-bubble"
    name={name}
-   variant={sender==='user'?'filled':'ghost'}>
+   variant={sender==='system'?'ghost':'filled'}>
    {children}
   </ChatMessageBubble>
  </ChatMessage>;

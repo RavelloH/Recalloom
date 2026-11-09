@@ -86,7 +86,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
    :kind==='chat'
    ?<RmdChatTranscript title={title} titleNode={editTitle}><NodeViewContent className="rk-directive-body rk-chat-list"/></RmdChatTranscript>
    :kind==='message'
-   ?<RmdChatMessage sender={sender} name={editTitle} avatarName={title||sender}><NodeViewContent className="rk-directive-body rk-chat-message"/></RmdChatMessage>
+   ?<RmdChatMessage sender={sender} name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></RmdChatMessage>
    :kind==='details'
    ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
    :kind==='mark'||kind==='highlight'

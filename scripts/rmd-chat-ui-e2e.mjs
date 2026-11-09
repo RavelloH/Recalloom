@@ -100,9 +100,11 @@ try{
     assert.equal(values.rows.length,4,theme+' '+size.name+' '+mode+' message count');
     assert.deepEqual(values.rows.map(v=>v.sender),['user','assistant','system','user']);
     assert.deepEqual(values.rows.map(v=>v.density),['compact','compact','compact','compact'],'explicit compact density');
-    assert.deepEqual(values.rows.map(v=>v.variant),['filled','ghost','ghost','filled'],'native Bubble variants');
-    assert.equal(values.rows.filter(v=>v.avatar).length,3,'Avatar for non-system roles');
-    assert.ok(values.rows.filter(v=>v.avatar).every(v=>Math.abs(v.avatar.w-24)<.5),'native 24px avatar');
+    assert.deepEqual(values.rows.map(v=>v.variant),['filled','filled','ghost','filled'],'users and agents use filled bubbles; system stays unobtrusive');
+    assert.ok(values.rows.every(v=>!v.avatar),'static RMD chat has no avatars');
+    assert.ok(values.rows.every(v=>v.head&&v.head.font==='12px'),'speaker names use a consistent 12px label');
+    assert.ok(values.rows.every(v=>v.bubble.y-v.head.y-v.head.h>=2),'speaker name has a visible gap above its bubble: '+JSON.stringify(values.rows.map(v=>({sender:v.sender,gap:v.bubble.y-v.head.y-v.head.h}))));
+    assert.ok(values.rows.every(v=>v.sender==='user' ? Math.abs(v.head.x+v.head.w-v.bubble.x-v.bubble.w)<1.5 : v.sender==='assistant'?Math.abs(v.head.x-v.bubble.x)<1.5:true),'speaker names align with bubble edges');
     assert.ok(values.rows.every(v=>v.bubble?.w<=v.rect.w+1),'no bubble larger than message column');
     assert.ok(values.rows.every(v=>v.bubble?.font==='14px'),'native 14px body font');
     assert.ok(values.section.w<=721,'chat transcript must respect the document prose width: '+JSON.stringify(values.section));
@@ -124,6 +126,7 @@ try{
     assert.equal(a.bubble.line,b.bubble.line,'bubble line height parity');
     assert.equal(a.bubble.padding,b.bubble.padding,'bubble padding parity');
     assert.ok(Math.abs(a.bubble.w-b.bubble.w)<=5,'bubble width parity: '+JSON.stringify({i,a:a.bubble.w,b:b.bubble.w}));
+     assert.ok(Math.abs(a.head.w-b.head.w)<2,'speaker labels must not shift when a hidden Tiptap edit button is mounted');
    }
   }
  }
@@ -138,9 +141,17 @@ try{
  await titleInput.press('Enter');
  await page.locator('.rk-chat-embed-title').getByText('项目讨论（已编辑）').waitFor();
  assert.equal(await page.locator('.rk-chat-transcript article').count(),4,'editing chat title does not remount or drop messages');
+ const assistant=page.locator('.rk-directive-message').filter({has:page.locator('article[data-sender="assistant"]')}).first();
+ await assistant.locator('.rk-directive-title button').click();
+ const speakerInput=assistant.getByRole('textbox',{name:'容器标题'});
+ await speakerInput.waitFor();
+ await speakerInput.fill('Agent A');
+ await speakerInput.press('Enter');
+ await assistant.locator('[data-chat-name]').getByText('Agent A').waitFor();
+ assert.match(await assistant.locator('.rk-chat-bubble').innerText(),/助手回复|回复/,'editing speaker name retains message body');
  assert.deepEqual(errors,[],'no browser JS errors');
  console.log('PASS RMD CHAT UI',JSON.stringify({
-  senderRoles:'4 messages, 3 avatars, native compact density',
+  senderRoles:'4 messages, no avatars, native compact density, agent bubbles filled, names aligned',
   modes:'preview and Tiptap visual matched',
   themes:'light/dark',
   widths:'1280/390/320 without overflow',
