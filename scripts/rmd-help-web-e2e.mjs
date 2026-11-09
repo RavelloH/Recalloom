@@ -50,7 +50,9 @@ try{
  await expectHelpContent('40–1800');
  await expectHelpContent('width');
  await expectHelpContent('caption');
- const figurePreview=page.locator('.rk-help-live-example .markdown-preview');
+ const figureExample=page.locator('.rk-help-live-example').first();
+ await figureExample.scrollIntoViewIfNeeded();
+ const figurePreview=figureExample.locator('.markdown-preview');
  await figurePreview.waitFor();
  assert.ok(await figurePreview.locator('figure.rk-rich-figure').count(),'image attributes render a real figure');
  assert.ok(await figurePreview.locator('figcaption').count(),'figure caption is visible');
@@ -58,7 +60,9 @@ try{
  await nav.getByRole('button',{name:/mark/}).first().click();
  assert.equal(await page.locator('.rk-help-live-example').count(),2,'Mark shows both inline and block forms');
  await nav.getByRole('button',{name:/tabs/}).click();
- const tabExample=page.locator('.rk-help-live-example .markdown-preview');
+ const tabsExample=page.locator('.rk-help-live-example').first();
+ await tabsExample.scrollIntoViewIfNeeded();
+ const tabExample=tabsExample.locator('.markdown-preview');
  await tabExample.waitFor();
  assert.ok(await tabExample.getByText('第一项。').count(),'nested child component renders inside tabs');
 
