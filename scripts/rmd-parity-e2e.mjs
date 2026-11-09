@@ -54,6 +54,7 @@ const source=[
 '',
 ':::',
 '',
+...['info','tip','warning','danger','example','question'].flatMap(kind=>['::: '+kind+' '+kind,'','语义色标题测试。','',':::','']),
 '::: link-card https://github.com/RavelloH/Recalloom?tab=readme#section | title=Recalloom :::',
 '',
 '~~~typescript',
@@ -91,7 +92,18 @@ const measure=()=>page.evaluate(()=>{
   tables:tables.map(el=>({rect:rect(el),parent:rect(el.parentElement),display:getComputedStyle(el).display,margin:getComputedStyle(el).marginInlineStart})),
   maths:Array.from(root?.querySelectorAll('.katex-display')??[]).map(el=>rect(el)),
   attrs:Array.from(root?.querySelectorAll('.rk-rmd-attrs-decoration')??[]).map(el=>({name:el.getAttribute('aria-label'),kind:el.getAttribute('data-rk-attrs-kind'),rect:rect(el)})),
-  callouts:calls.map(el=>({kind:el.getAttribute('data-rk-kind'),size:rect(el.querySelector('.astryx-banner-icon')),color:el.querySelector('.astryx-banner-icon')?getComputedStyle(el.querySelector('.astryx-banner-icon')).color:null,rect:rect(el)})),
+  callouts:calls.map(el=>{
+   const banner=el.querySelector('.astryx-banner');
+   const icon=el.querySelector('.astryx-banner-icon');
+   const title=banner?.querySelector(':scope > div:nth-child(2) > div');
+   const bannerStyle=banner?getComputedStyle(banner):null;
+   return {
+    kind:el.getAttribute('data-rk-kind'),size:rect(icon),iconSvg:rect(icon?.querySelector('svg')),
+    color:icon?getComputedStyle(icon).color:null,titleColor:title?getComputedStyle(title).color:null,
+    titleRect:rect(title),headerBg:bannerStyle?.backgroundColor,borderLeft:bannerStyle?.borderLeftWidth,
+    rect:rect(el)
+   };
+  }),
   link:(()=>{const card=root?.querySelector('.rk-link-card');return {box:rect(card),image:rect(card?.querySelector('.rk-link-card-image')),text:rect(card?.querySelector('.rk-link-card-text'))};})(),
   scrollWidth:document.documentElement.scrollWidth
  };
@@ -113,7 +125,11 @@ try{
  assert.ok(visual.marks[1].rect.w>visual.marks[0].rect.w*3,'mixed Mark retains full measure');
  assert.ok(visual.tables[0].rect.w<visual.tables[0].parent.w);
  assert.ok(Math.abs((visual.tables[0].rect.x+visual.tables[0].rect.w/2)-(visual.tables[0].parent.x+visual.tables[0].parent.w/2))<2,'table centered in visual');
- assert.ok(visual.callouts.every(x=>x.size.w===22&&x.size.h===22),'callout icons share fixed geometry');
+ assert.equal(visual.callouts.length,8,'all eight Callout variants render in visual mode');
+ assert.ok(visual.callouts.every(x=>x.size.w===16&&x.size.h===16&&x.iconSvg.w===16&&x.iconSvg.h===16),'callout icon matches 16px title text');
+ assert.ok(visual.callouts.every(x=>x.color===x.titleColor&&x.borderLeft==='0px'),'callout icon/title use one semantic color with no left stripe');
+ assert.ok(visual.callouts.every(x=>Math.abs(x.size.y+x.size.h/2-x.titleRect.y-x.titleRect.h/2)<2),'callout icon vertically aligns with title');
+ assert.ok(visual.callouts.every(x=>x.headerBg&&x.headerBg!=='rgb(185, 215, 255)'),'callout header must use semantic tint, not shared blue');
  assert.notEqual(visual.callouts[0].color,visual.callouts[1].color,'callout kinds have distinct colors');
  assert.ok(visual.link.box&&visual.link.text,'link-card must render in visual mode');
  const bookmark=page.locator('.tiptap .rk-link-card-open').first();
@@ -173,7 +189,11 @@ try{
  assert.ok(preview.marks[0].rect.w<200,'preview formula Mark must be content width');
  assert.ok(Math.abs(preview.marks[0].rect.w-visual.marks[0].rect.w)<8,'formula Mark width should agree between modes');
  assert.ok(Math.abs(preview.tables[0].rect.w-visual.tables[0].rect.w)<5,'tables are consistent between modes');
- assert.ok(preview.callouts.every(x=>x.size.w===22),'preview callout icon geometry matches visual');
+ assert.equal(preview.callouts.length,8,'all eight Callout variants render in preview mode');
+ assert.ok(preview.callouts.every(x=>x.size.w===16&&x.size.h===16&&x.iconSvg.w===16),'preview icon geometry matches visual');
+ assert.ok(preview.callouts.every(x=>x.color===x.titleColor&&x.borderLeft==='0px'),'preview icon/title match with no left stripe');
+ assert.ok(preview.callouts.every(x=>Math.abs(x.size.y+x.size.h/2-x.titleRect.y-x.titleRect.h/2)<2),'preview icon vertically aligns with title');
+ assert.deepEqual(preview.callouts.map(x=>x.headerBg),visual.callouts.map(x=>x.headerBg),'visual and preview semantic header backgrounds match');
  assert.deepEqual(preview.callouts.map(x=>x.color),visual.callouts.map(x=>x.color));
  assert.ok(preview.link.box&&preview.link.text,'link-card must render in preview');
  assert.ok((await page.locator('.markdown-preview .rk-link-card-open').first().getAttribute('href'))?.includes('?tab=readme#section'),'preview link retains query/anchor');

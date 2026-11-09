@@ -603,32 +603,47 @@
  margin-block:.7rem;
 }
 
-/* Identical status-icon geometry and semantic color in visual and preview.
- * Banner retains Astryx layout and accessible icon slot. */
-.record-main .rk-rmd-callout {--rk-callout-accent:#5687bd;min-width:0;}
+/* RMD Callouts use one semantic hue for icon, title and a subtle header tint.
+ * Keep Astryx Banner structure/semantics, but not its status-dependent blue fill. */
+.record-main .rk-rmd-callout {--rk-callout-accent:#53687d;min-width:0;}
 /* Only the authoring view has a ProseMirror directive wrapper. */
 .record-main .markdown-preview .rk-rmd-callout {margin-block:1rem;}
-.record-main .rk-rmd-callout[data-rk-kind="note"]{--rk-callout-accent:#7e94ac;}
-.record-main .rk-rmd-callout[data-rk-kind="info"]{--rk-callout-accent:#438bc8;}
-.record-main .rk-rmd-callout[data-rk-kind="tip"]{--rk-callout-accent:#3ba578;}
-.record-main .rk-rmd-callout[data-rk-kind="success"]{--rk-callout-accent:#2e9b62;}
-.record-main .rk-rmd-callout[data-rk-kind="warning"]{--rk-callout-accent:#da9a29;}
-.record-main .rk-rmd-callout[data-rk-kind="danger"]{--rk-callout-accent:#d15b60;}
-.record-main .rk-rmd-callout[data-rk-kind="example"]{--rk-callout-accent:#9980cc;}
-.record-main .rk-rmd-callout[data-rk-kind="question"]{--rk-callout-accent:#5789bb;}
+.record-main .rk-rmd-callout[data-rk-kind="note"]{--rk-callout-accent:#53687d;}
+.record-main .rk-rmd-callout[data-rk-kind="info"]{--rk-callout-accent:#216ca5;}
+.record-main .rk-rmd-callout[data-rk-kind="tip"]{--rk-callout-accent:#267852;}
+.record-main .rk-rmd-callout[data-rk-kind="success"]{--rk-callout-accent:#1b7548;}
+.record-main .rk-rmd-callout[data-rk-kind="warning"]{--rk-callout-accent:#916013;}
+.record-main .rk-rmd-callout[data-rk-kind="danger"]{--rk-callout-accent:#ad414a;}
+.record-main .rk-rmd-callout[data-rk-kind="example"]{--rk-callout-accent:#7354a7;}
+.record-main .rk-rmd-callout[data-rk-kind="question"]{--rk-callout-accent:#346fa7;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="note"]{--rk-callout-accent:#aabed4;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="info"]{--rk-callout-accent:#81b9ed;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="tip"]{--rk-callout-accent:#80d3ac;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="success"]{--rk-callout-accent:#78d5a1;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="warning"]{--rk-callout-accent:#f0c278;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="danger"]{--rk-callout-accent:#f099a0;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="example"]{--rk-callout-accent:#c0a7ef;}
+html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="question"]{--rk-callout-accent:#94bfee;}
+.record-main .rk-rmd-callout .astryx-banner {
+ align-items:center;
+ border-inline-start:0!important;
+ border-left:0!important;
+ background:color-mix(in srgb,var(--rk-callout-accent) 12%,transparent)!important;
+ color:var(--rk-callout-accent)!important;
+}
 .record-main .rk-rmd-callout .astryx-banner-icon {
- width:22px!important;min-width:22px!important;height:22px!important;
+ width:1em!important;min-width:1em!important;height:1em!important;
  display:flex!important;align-items:center!important;justify-content:center!important;
- color:var(--rk-callout-accent)!important;flex:none;
+ color:inherit!important;flex:none;
 }
 .record-main .rk-rmd-callout .astryx-banner-icon svg {
- width:18px!important;height:18px!important;stroke-width:1.85!important;
+ width:1em!important;height:1em!important;stroke-width:1.9!important;
  stroke:currentColor;display:block;flex:none;
 }
-.record-main .rk-rmd-callout .astryx-banner {
- border-left:3px solid var(--rk-callout-accent);
+.record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon),
+.record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) > :first-child {
+ color:inherit!important;
 }
-.record-main .rk-rmd-callout .astryx-banner > div:first-child {align-items:center;}
 
 /* Center the actual table rather than centering its full-width scroll host. */
 .record-main .tiptap .tableWrapper.rk-hscroll .rk-scroll-viewport > table {
