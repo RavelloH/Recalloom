@@ -193,7 +193,7 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    if(kind==='message'){
     const rawSender=String(props['data-sender']??props.dataSender??'assistant');
     const sender=rawSender==='user'?'user':rawSender==='system'?'system':'assistant';
-    return <RmdChatMessage sender={sender} name={richTitle(kind,title)} avatarName={title||sender}>{props.children as React.ReactNode}</RmdChatMessage>;
+    return <RmdChatMessage sender={sender} name={richTitle(kind,title)}>{props.children as React.ReactNode}</RmdChatMessage>;
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';

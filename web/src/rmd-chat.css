@@ -40,6 +40,34 @@
   width: 100%;
   margin: 0;
 }
+/* Astryx positions the name with the bubble's inline padding, but its
+ * default compact name row has a negative bottom margin. A static document
+ * transcript reads more clearly with a separate, comfortably spaced line. */
+.record-main .rk-chat-embed .rk-chat-row [data-chat-name] {
+  height: auto;
+  min-height: 1.25rem;
+  margin-block-end: .25rem;
+  font-size: .75rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--rk-document-muted, var(--color-text-secondary));
+}
+/* Tiptap name edit controls must not consume the speaker label's width.
+ * Keep the name aligned with the bubble in both visual and preview modes. */
+.record-main .rk-directive-message .rk-directive-title {
+  position: relative;
+  min-height: 1.25rem;
+}
+.record-main .rk-directive-message .rk-directive-title button {
+  position: absolute;
+  inset-inline-start: calc(100% + .25rem);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.record-main .rk-directive-message .rk-chat-row[data-sender="user"] .rk-directive-title button {
+  inset-inline-start: auto;
+  inset-inline-end: calc(100% + .25rem);
+}
 .record-main .rk-chat-bubble {
   box-sizing: border-box;
   max-width: min(100%, 34rem);
