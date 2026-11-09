@@ -495,16 +495,4 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="table"] {
  display:table;margin:.35rem auto .65rem;max-width:100%;text-align:center;
 }
-.record-main .rk-rmd-attrs-editor{
- position:fixed;z-index:80;bottom:max(16px,env(safe-area-inset-bottom));
- right:max(20px,env(safe-area-inset-right));
- width:min(370px,calc(100vw - 32px));max-height:min(72vh,540px);overflow:auto;
- background:var(--color-background-body,#fff);color:var(--color-text-primary);
- border:1px solid var(--rk-document-border);box-shadow:0 14px 45px rgba(0,0,0,.24);
- border-radius:13px;padding:18px;display:flex;flex-direction:column;gap:12px;
-}
-.record-main .rk-rmd-attrs-editor-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.record-main .rk-rmd-attrs-editor-heading span{color:var(--rk-document-muted);font-size:12px;}
-.record-main .rk-rmd-attrs-editor-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
-.record-main .rk-rmd-attrs-toggle{display:flex;align-items:center;gap:.65rem;font-size:14px;cursor:pointer;}
-.record-main .rk-rmd-attrs-error{color:var(--color-danger,#d6585b);font-size:13px;margin:0;}
+/* Markdown @ attrs markers now open the shared responsive BlockEditorPanel. */

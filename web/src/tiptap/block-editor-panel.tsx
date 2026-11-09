@@ -7,12 +7,14 @@ import {IconX,IconCode,IconEye} from '@tabler/icons-react';
 import {parseRmdVisual} from '../rmd-visual';
 import {serializeRmdBlock} from '../rmd-serialize';
 import {topLevelBlockAt} from './editor-block-actions';
+import {RmdSchemaAttributeFields} from './rmd-schema-attrs-fields';
+import {isRmdAttrsEditable} from './rmd-schema-attrs-model';
 import './block-editor-panel.css';
 
 const Preview=React.lazy(()=>import('../markdown-preview'));
 const safeTitle=(s:string)=>s.replace(/[\r\n]/g,' ').slice(0,180);
-export function BlockEditorPanel({editor,pos,onClose,recordId,mobile=false}:{
- editor:Editor;pos:number;onClose:()=>void;recordId?:string;mobile?:boolean;
+export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobile=false}:{
+ editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;mobile?:boolean;
 }){
  const [version,setVersion]=useState(0);
  const [draft,setDraft]=useState(()=>serializeRmdBlock(topLevelBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'}));
@@ -107,6 +109,8 @@ export function BlockEditorPanel({editor,pos,onClose,recordId,mobile=false}:{
     <TextInput label="消息身份" width="100%" value={String(current.attrs.sender??'assistant')}
      onChange={v=>{if(['user','assistant','system'].includes(v))attr('sender',v);}}
      placeholder="user / assistant / system"/>}
+   {attributePos!==undefined&&attributePos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(attributePos)?.type.name??'')&&
+    <RmdSchemaAttributeFields key={attributePos} editor={editor} pos={attributePos}/>}
    <div className="rk-block-panel-section-heading"><IconCode size="var(--rk-icon-sm)"/><span>当前块 RMD 正文与属性</span></div>
    <TextArea label="块源码" width="100%" rows={10} value={draft} onChange={commitRaw}
     placeholder="编辑当前块的 Markdown / RMD"/>

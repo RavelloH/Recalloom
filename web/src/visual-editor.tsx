@@ -32,7 +32,7 @@ import {RmdMark} from './tiptap/rmd-mark';
 import {RmdSketchMark} from './tiptap/rmd-sketch';
 import {useSketchAnnotations} from './sketch-annotations';
 import {RmdAttrsDecorations} from './tiptap/rmd-attrs-decoration';
-import RmdAttrsEditor,{isRmdAttrsEditable} from './tiptap/rmd-attrs-editor';
+import {isRmdAttrsEditable} from './tiptap/rmd-schema-attrs-model';
 import {RawMarkdown,RawInline,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
@@ -47,7 +47,7 @@ import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/sl
 import {BlockHandleLayer} from './tiptap/block-handle';
 import {BlockEditorPanel} from './tiptap/block-editor-panel';
 import {EditorContextMenu} from './tiptap/editor-context-menu';
-import {topLevelBlockAt} from './tiptap/editor-block-actions';
+import {topLevelBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {inlineCommandsByGroup,runInlineRmdCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
@@ -82,9 +82,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableIdDraft,setTableIdDraft]=useState('');
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
- const [attrsPos,setAttrsPos]=useState<number|null>(null);
  const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
+ const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
  const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
+ const attributeNodeRef=useRef<{pos:number;type:string}|null>(null);
  const compact=useCompactLayout();
  const compactRef=useRef(compact);
  compactRef.current=compact;
@@ -259,7 +260,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    const position=(event as CustomEvent<{pos:number}>).detail?.pos;
    if(!Number.isInteger(position))return;
    const node=editor.state.doc.nodeAt(position);
-   if(node&&isRmdAttrsEditable(node.type.name))setAttrsPos(position);
+   if(node&&isRmdAttrsEditable(node.type.name)){
+    const owner=topLevelAtDocumentPosition(editor,position);
+    if(!owner)return;
+    blockPanelRef.current={pos:owner.pos,node:owner.node};
+    attributeNodeRef.current={pos:position,type:node.type.name};
+    setBlockPanelPos(owner.pos);
+    setAttributeNodePos(position);
+   }
   };
   root.addEventListener('rmd-edit-attrs',open);
   return()=>root.removeEventListener('rmd-edit-attrs',open);
@@ -278,10 +286,21 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    const mapped=transaction.mapping.mapResult(previous.pos,fromPanel?-1:1);
    const current=topLevelBlockAt(editor,mapped.pos);
    if(!current||current.node.type!==previous.node.type||(!fromPanel&&mapped.deleted)){
-    blockPanelRef.current=null;setBlockPanelPos(null);return;
+    blockPanelRef.current=null;attributeNodeRef.current=null;
+    setBlockPanelPos(null);setAttributeNodePos(null);return;
    }
    blockPanelRef.current={pos:current.pos,node:current.node};
    if(current.pos!==previous.pos)setBlockPanelPos(current.pos);
+   const attrs=attributeNodeRef.current;
+   if(attrs){
+    const next=transaction.mapping.mapResult(attrs.pos,fromPanel?-1:1);
+    const nextNode=editor.state.doc.nodeAt(next.pos);
+    if(!nextNode||nextNode.type.name!==attrs.type||(!fromPanel&&next.deleted)){
+     attributeNodeRef.current=null;setAttributeNodePos(null);
+    }else if(next.pos!==attrs.pos){
+     attributeNodeRef.current={pos:next.pos,type:attrs.type};setAttributeNodePos(next.pos);
+    }
+   }
   };
   editor.on('transaction',listener);
   return()=>{editor.off('transaction',listener);};
@@ -520,12 +539,16 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    const target=topLevelBlockAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
    setBlockPanelPos(pos);
   }}><EditorContent editor={editor}/></EditorContextMenu>}
   <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} onEditBlock={pos=>{
    const target=topLevelBlockAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
    setBlockPanelPos(pos);
   }}/>
   {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
@@ -547,15 +570,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    </div>)}
    {Boolean(wiki.query)&&!wikiSearch.isFetching&&!wikiMatches.length&&<p className="muted small wiki-completion-status">没有匹配文档，请更换关键词。</p>}
   </div>}
-  {attrsPos!==null&&<RmdAttrsEditor key={attrsPos} editor={editor} pos={attrsPos} onClose={()=>setAttrsPos(null)}/>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>
  </div>
  {blockPanelPos!==null&&(compact?createPortal(
-  <BlockEditorPanel editor={editor} pos={blockPanelPos} recordId={recordId} mobile
-   onClose={()=>{blockPanelRef.current=null;setBlockPanelPos(null);}}/>,document.body):
-  <BlockEditorPanel editor={editor} pos={blockPanelPos} recordId={recordId}
-   onClose={()=>{blockPanelRef.current=null;setBlockPanelPos(null);}}/>)}
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile
+   onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body):
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId}
+   onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>)}
  </div>;
 });
 export default VisualEditor;

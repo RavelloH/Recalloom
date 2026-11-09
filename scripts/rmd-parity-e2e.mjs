@@ -140,33 +140,32 @@ try{
  assert.ok(eqHint&&Math.abs(eqHint.rect.x+eqHint.rect.w/2-(visual.tables[0].parent.x+visual.tables[0].parent.w/2))<10,'centered formula attr is centered');
  console.log('PASS VISUAL_LAYOUT',JSON.stringify({marks:visual.marks.map(x=>x.rect.w),table:visual.tables[0].rect,icons:visual.callouts.map(x=>[x.kind,x.color,x.size.w]),link:visual.link,eqHint:eqHint.rect}));
  const control=page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="heading"]').first();
+ const panel=page.getByRole('complementary',{name:'块编辑面板'});
+ const close=async()=>{await panel.getByRole('button',{name:'关闭块编辑'}).click();await panel.waitFor({state:'hidden'});};
  await control.waitFor();await control.focus();await control.press('Enter');
- const dialog=page.getByRole('dialog',{name:'编辑标题 Markdown 属性'});
- await dialog.waitFor();
- await dialog.getByRole('button',{name:'取消属性编辑'}).click();
- await dialog.waitFor({state:'hidden'});
- assert.equal((await api('/records/'+id)).body.content,source,'Cancel never persists attrs');
+ await panel.waitFor();
+ assert.equal(await panel.getByRole('region',{name:'标题 Markdown 属性'}).count(),1,'attribute badge uses shared sidebar');
+ await close();
+ assert.equal((await api('/records/'+id)).body.content,source,'closing shared sidebar never writes to D1');
  await control.click();
- await dialog.waitFor();
- console.log('ATTRS_OPEN',await dialog.innerText());
- await dialog.getByRole('textbox',{name:'稳定 ID（可选）'}).fill('9invalid');
- await dialog.getByRole('button',{name:'保存属性'}).click();
- await dialog.getByRole('alert').waitFor();
- assert.ok((await dialog.getByRole('alert').textContent()).includes('ID'));
+ await panel.waitFor();
+ console.log('ATTRS_OPEN',await panel.innerText());
+ await panel.getByRole('textbox',{name:'稳定 ID（可选）'}).fill('9invalid');
+ await panel.getByRole('alert').waitFor();
+ assert.ok((await panel.getByRole('alert').textContent()).includes('ID'));
  assert.equal((await api('/records/'+id)).body.content,source,'invalid changes never touch D1');
- await dialog.getByRole('textbox',{name:'稳定 ID（可选）'}).fill('parity-renamed');
- await dialog.getByRole('button',{name:'保存属性'}).click();
- assert.equal(await page.locator('.tiptap button[data-rk-attrs-kind="heading"]').first().textContent(),'@ attrs parity-renamed @');
+ await panel.getByRole('textbox',{name:'稳定 ID（可选）'}).fill('parity-renamed');
+ await page.locator('.tiptap button[data-rk-attrs-kind="heading"]').first().getByText('@ attrs parity-renamed @').waitFor();
+ await close();
  const edit=async(kind,idValue,fields={})=>{
   await page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="'+kind+'"]').first().click();
-  const panel=page.getByRole('dialog',{name:/Markdown 属性/});await panel.waitFor();
+  await panel.waitFor();
   await panel.getByRole('textbox',{name:'稳定 ID（可选）'}).fill(idValue);
   for(const [name,value] of Object.entries(fields)){
    if(typeof value==='boolean'){const check=panel.getByRole('checkbox',{name});if(await check.isChecked()!==value)await check.click();}
    else await panel.getByRole('textbox',{name}).fill(value);
   }
-  await panel.getByRole('button',{name:'保存属性'}).click();
-  await panel.waitFor({state:'hidden'});
+  await close();
  };
  await edit('paragraph','parity-text');
  await edit('blockMath','eq-edited');
@@ -178,12 +177,10 @@ try{
  await page.keyboard.press('Home');
  await page.keyboard.type('移动前文位置 ');
  await page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="codeBlock"]').first().click();
- const shiftedPanel=page.getByRole('dialog',{name:'编辑代码块 Markdown 属性'});
- await shiftedPanel.waitFor();
- assert.equal(await shiftedPanel.getByRole('textbox',{name:'文件名'}).inputValue(),'edited.ts','the mapped widget must still edit its code block');
- await shiftedPanel.getByRole('button',{name:'取消属性编辑'}).click();
- await shiftedPanel.waitFor({state:'hidden'});
- assert.equal((await api('/records/'+id)).body.content,source,'all attribute panel edits remain unsaved');
+ await panel.waitFor();
+ assert.equal(await panel.getByRole('textbox',{name:'文件名'}).inputValue(),'edited.ts','mapped attrs marker must still edit its own block');
+ await close();
+ assert.equal((await api('/records/'+id)).body.content,source,'all live sidebar edits remain unsaved until explicit save');
  await page.getByRole('button',{name:'预览',exact:true}).click();
  await page.locator('.markdown-preview').waitFor();
  const preview=await measure();
