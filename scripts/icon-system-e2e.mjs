@@ -29,6 +29,7 @@ try{
  const before=await firstSvg.evaluate(el=>el.getBoundingClientRect().width);
  await first.evaluate(el=>el.style.fontSize='20px');
  const after=await firstSvg.evaluate(el=>el.getBoundingClientRect().width);
+ assert.ok(before>=18&&before<=23,'sidebar icon must be legible beside 14px text: '+before);
  assert.ok(after>before*1.25,'navigation icon must scale with nearby text '+before+' -> '+after);
  await first.evaluate(el=>el.style.removeProperty('font-size'));
  await page.goto(base+'/help');
@@ -81,10 +82,36 @@ try{
  await page.setViewportSize({width:320,height:720});
  await page.goto(base+'/records/'+id+'?mode=preview');
  await page.locator('.markdown-preview .rk-rmd-callout').first().waitFor();
- const mobile=await page.evaluate(()=>({viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,icons:[...document.querySelectorAll('.bottom-nav svg')].map(el=>el.classList.contains('tabler-icon'))}));
+ const mobile=await page.evaluate(()=>({
+  viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+  icons:[...document.querySelectorAll('.bottom-link svg')].map(el=>{
+   const icon=el.getBoundingClientRect(),parent=el.closest('.bottom-link').getBoundingClientRect();
+   return {tabler:el.classList.contains('tabler-icon'),width:icon.width,height:icon.height,centerOffset:+(icon.left+icon.width/2-parent.left-parent.width/2).toFixed(2)};
+  })
+ }));
  assert.ok(mobile.scrollWidth<=mobile.viewport+1,'mobile horizontal overflow '+JSON.stringify(mobile));
- assert.ok(mobile.icons.every(Boolean),'mobile bottom navigation must use Tabler');
+ assert.equal(mobile.icons.length,4,'four bottom navigation entries');
+ assert.ok(mobile.icons.every(x=>x.tabler&&x.width>=19&&x.width<=24&&x.height===x.width),'bottom icons should be ~20px: '+JSON.stringify(mobile));
+ assert.ok(mobile.icons.every(x=>Math.abs(x.centerOffset)<1),'bottom icons must be centered');
  await page.screenshot({path:'tmp/icon-audit/screens/mobile.png'});
+ await page.getByRole('button',{name:'打开导航'}).click();
+ const mobileSidebar=await page.locator('.sidebar .nav-list .nav-link svg').first().evaluate(el=>{
+  const icon=el.getBoundingClientRect(),link=el.closest('.nav-link').getBoundingClientRect();
+  return {width:icon.width,height:icon.height,centerOffsetY:+(icon.top+icon.height/2-link.top-link.height/2).toFixed(2)};
+ });
+ assert.ok(mobileSidebar.width>=18&&mobileSidebar.width<=23,'mobile sidebar icons should be ~19px: '+JSON.stringify(mobileSidebar));
+ assert.ok(Math.abs(mobileSidebar.centerOffsetY)<2,'mobile sidebar icon should be vertically centered: '+JSON.stringify(mobileSidebar));
+ await page.screenshot({path:'tmp/icon-audit/screens/mobile-sidebar.png'});
+ await page.getByRole('button',{name:'关闭侧栏'}).click();
+ await page.goto(base+'/records/'+id+'?mode=visual');
+ await page.locator('.wysiwyg-tools button svg.tabler-icon').first().waitFor();
+ const toolbar=await page.locator('.wysiwyg-tools button:has(svg.tabler-icon)').first().evaluate(btn=>{
+  const icon=btn.querySelector('svg.tabler-icon').getBoundingClientRect(),box=btn.getBoundingClientRect();
+  return {width:icon.width,centerOffsetY:+(icon.top+icon.height/2-box.top-box.height/2).toFixed(2)};
+ });
+ assert.ok(toolbar.width>=18&&toolbar.width<=24,'editor toolbar icon should be ~20px: '+JSON.stringify(toolbar));
+ assert.ok(Math.abs(toolbar.centerOffsetY)<2,'editor toolbar icon should be centered: '+JSON.stringify(toolbar));
+ await page.screenshot({path:'tmp/icon-audit/screens/mobile-toolbar.png'});
  assert.deepEqual(errors,[],'browser JS errors');
- console.log('PASS TABLER ICON SYSTEM',JSON.stringify({navigationEm:{before,after},callouts:kinds,previewVisual:'matched in light and dark',mobile}));
+ console.log('PASS TABLER ICON SYSTEM',JSON.stringify({navigationEm:{before,after},callouts:kinds,previewVisual:'matched in light and dark',mobile,mobileSidebar,toolbar}));
 }finally{await browser.close();}

@@ -13,7 +13,8 @@
 svg.tabler-icon {
   display:inline-block;
   flex-shrink:0;
-  vertical-align:-.125em;
+  /* Align actual inline glyphs to the text center; flex/grid controls center their own icons. */
+  vertical-align:middle;
 }
 body { font-size: 14px; line-height: 1.5; }
 .shell { --aside: 244px; }

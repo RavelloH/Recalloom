@@ -123,10 +123,10 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
  return <div ref={editorSectionRef} className="editor-section">{confirmation}
   <PageActions className="editor-topline" pinned={<>
    <AutoResizer animateWidth animateHeight={false} className="save-status-box"><AutoTransition as="span" transitionKey={busy?'busy':changed?'dirty':'clean'} duration={.14}><span className={'save-status'+(changed?' is-dirty':'')} title={changed?'按 Ctrl/⌘ + S 保存':'所有更改已保存'}>{busy?'保存中…':changed?'未保存':'已保存'}<span className="save-revision"> · R{item.revision}</span></span></AutoTransition></AutoResizer>
-   <Button label="保存" icon={<IconDeviceFloppy size="1.125em"/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
+   <Button label="保存" icon={<IconDeviceFloppy size="1.5em"/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
   </>}>
    <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<IconTypography size="1.125em"/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="源码" icon={<IconCode size="1.125em"/>} variant={mode==='source'?'secondary':'ghost'} onClick={()=>switchMode('source')}/><Button label="预览" icon={<IconEye size="1.125em"/>} variant={mode==='preview'?'secondary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup>
-   <IconButton variant="ghost" size="sm" label="历史" icon={<IconHistory size="1.125em"/>} onClick={()=>setHistory(v=>!v)}/>
+   <IconButton variant="ghost" size="sm" label="历史" icon={<IconHistory size="1.5em"/>} onClick={()=>setHistory(v=>!v)}/>
    {pageActions}
   </PageActions>
   <AutoResizer><div className="doc-notice">
