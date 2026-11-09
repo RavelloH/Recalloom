@@ -50,16 +50,16 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
  const folder=entry.entityType==='folder';
  const active=pathname===(folder?'/library/':'/records/')+entry.id;
  const Icon=folder?(open?IconFolderOpen:IconFolder):entry.kind==='task_list'?IconChecklist:IconFileText;
- const label=<><Icon size="1.3em" className="tree-icon"/><span className="truncate">{entry.name}</span></>;
+ const label=<><span className="rk-icon-frame rk-icon-frame--tree"><Icon className="tree-icon" aria-hidden="true"/></span><span className="truncate">{entry.name}</span></>;
  return <li>
   <div className={'tree-row'+(active?' is-active':'')} style={{'--tree-depth':depth} as React.CSSProperties}>
    {folder
-    ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><IconChevronRight size="1.3em"/></button>
+    ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><IconChevronRight/></button>
     :<span className="tree-toggle is-leaf" aria-hidden="true"/>}
    {folder
     ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>
     :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>}
-   {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<IconPlus size="1.3em"/>} items={createItems(entry.id)}/></div>}
+   {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<IconPlus/>} items={createItems(entry.id)}/></div>}
   </div>
   {folder&&<AutoResizer duration={0.2}>{open&&<TreeChildren folderId={entry.id} depth={depth+1}/>}</AutoResizer>}
  </li>;
@@ -105,7 +105,7 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
  return <TreeContext.Provider value={{createItems,onNavigate}}>
   <div className="nav-label nav-label-row tree-heading">
    <Link to="/library" onClick={onNavigate} className="tree-heading-link">知识库</Link>
-   <MoreMenu size="sm" variant="ghost" label="在知识库根目录新建" icon={<IconPlus size="1.3em"/>} items={createItems(null)}/>
+   <MoreMenu size="sm" variant="ghost" label="在知识库根目录新建" icon={<IconPlus/>} items={createItems(null)}/>
   </div>
   <AutoResizer>{error&&<p className="tree-error" role="alert">{error}</p>}</AutoResizer>
   <nav aria-label="页面树" className="page-tree"><TreeChildren folderId={null} depth={0}/></nav>

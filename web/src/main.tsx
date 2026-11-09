@@ -23,6 +23,7 @@ import './graph.css';
 import './wiki.css';
 import './workspace.css';
 import './polish.css';
+import './icon-layout.css';
 applyScrollbarPolicy();
 // Keep Cap.js proof-of-work self-hosted: no third-party runtime download.
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';
