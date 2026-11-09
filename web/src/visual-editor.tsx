@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
+import {createPortal} from 'react-dom';
 import {useQuery} from '@tanstack/react-query';
 import {searchQuery,type SearchHit} from './queries';
 import './tiptap/editor.css';
@@ -43,6 +44,11 @@ import {decorateEditorLinks} from './link-metadata-client';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
 import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {BlockHandleLayer} from './tiptap/block-handle';
+import {BlockEditorPanel} from './tiptap/block-editor-panel';
+import {EditorContextMenu} from './tiptap/editor-context-menu';
+import {topLevelBlockAt} from './tiptap/editor-block-actions';
+import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {inlineCommandsByGroup,runInlineRmdCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
 import {safeTableId,cleanTableCaption} from './table-caption';
@@ -77,6 +83,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const [attrsPos,setAttrsPos]=useState<number|null>(null);
+ const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
+ const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
  const compact=useCompactLayout();
  const compactRef=useRef(compact);
  compactRef.current=compact;
@@ -256,6 +264,28 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   root.addEventListener('rmd-edit-attrs',open);
   return()=>root.removeEventListener('rmd-edit-attrs',open);
  },[editor,ready]);
+ // Keep the inspected top-level block anchored as unrelated edits shift its
+ // position. Close safely if an external transaction replaces/deletes it.
+ useEffect(()=>{
+  if(!editor)return;
+  const listener=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
+   if(!transaction.docChanged||!blockPanelRef.current)return;
+   const previous=blockPanelRef.current;
+   // External edits: association +1 follows the block when content is
+   // inserted at its former start. Our panel explicitly replaces its own
+   // node, which mapping marks deleted; association -1 retains that anchor.
+   const fromPanel=transaction.getMeta('rk-block-panel-edit')===true;
+   const mapped=transaction.mapping.mapResult(previous.pos,fromPanel?-1:1);
+   const current=topLevelBlockAt(editor,mapped.pos);
+   if(!current||current.node.type!==previous.node.type||(!fromPanel&&mapped.deleted)){
+    blockPanelRef.current=null;setBlockPanelPos(null);return;
+   }
+   blockPanelRef.current={pos:current.pos,node:current.node};
+   if(current.pos!==previous.pos)setBlockPanelPos(current.pos);
+  };
+  editor.on('transaction',listener);
+  return()=>{editor.off('transaction',listener);};
+ },[editor]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
@@ -384,7 +414,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     isDisabled:!command.isAvailable(editor),onClick:()=>{command.run(editor);}
    }))}/>
  </>;
- return <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
+ return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
+  <div className="rk-editor-block-canvas">
+  <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
@@ -484,7 +516,18 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       isDisabled={Boolean(tableIdDraft.trim())!==Boolean(tableCaptionDraft.trim())||Boolean(tableIdDraft.trim())&&!safeTableId(tableIdDraft.trim().toLowerCase())}>保存</Button>
    </div>
   </div>}
-  <EditorContent editor={editor}/>
+  {compact?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={pos=>{
+   const target=topLevelBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   setBlockPanelPos(pos);
+  }}><EditorContent editor={editor}/></EditorContextMenu>}
+  <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} onEditBlock={pos=>{
+   const target=topLevelBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   setBlockPanelPos(pos);
+  }}/>
   {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
    <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>
    {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
@@ -506,6 +549,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   </div>}
   {attrsPos!==null&&<RmdAttrsEditor key={attrsPos} editor={editor} pos={attrsPos} onClose={()=>setAttrsPos(null)}/>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
+ </div>
+ </div>
+ {blockPanelPos!==null&&(compact?createPortal(
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} recordId={recordId} mobile
+   onClose={()=>{blockPanelRef.current=null;setBlockPanelPos(null);}}/>,document.body):
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} recordId={recordId}
+   onClose={()=>{blockPanelRef.current=null;setBlockPanelPos(null);}}/>)}
  </div>;
 });
 export default VisualEditor;
