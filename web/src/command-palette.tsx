@@ -2,7 +2,7 @@ import React,{useMemo} from 'react';
 import {useNavigate} from '@tanstack/react-router';
 import {useQueryClient} from '@tanstack/react-query';
 import {CommandPalette,CommandPaletteFooter,useCommandPaletteContext} from '@astryxdesign/core/CommandPalette';
-import {IconArrowUpRight,IconSearch,type TablerIcon} from '@tabler/icons-react';
+import {IconArrowUpRight,IconFileText,IconChecklist,IconSearch,type TablerIcon} from '@tabler/icons-react';
 import {useRecentPages} from './recent-pages';
 import {menu} from './navigation';
 import {glyphs} from './icon';
@@ -14,7 +14,7 @@ const PALETTE_LIMIT=8;
 const navItems=():PaletteItem[]=>menu.map(({to,name,icon})=>({id:'nav:'+to,label:name,auxiliaryData:{group:'跳转',icon:glyphs[icon]}}));
 const pageItem=(group:string,hit:{id:string;name:string;kind?:string;path?:string;snippet?:string}):PaletteItem=>({
  id:'record:'+hit.id,label:hit.name,
- auxiliaryData:{group,detail:hit.snippet?hit.snippet.replace(/\s+/g,' ').trim().slice(0,90):hit.path,icon:hit.kind==='task_list'?glyphs.taskList:glyphs.document}
+ auxiliaryData:{group,detail:hit.snippet?hit.snippet.replace(/\s+/g,' ').trim().slice(0,90):hit.path,icon:hit.kind==='task_list'?IconChecklist:IconFileText}
 });
 const pause=(ms:number,signal:AbortSignal)=>new Promise<void>((resolve,reject)=>{
  const id=setTimeout(resolve,ms);

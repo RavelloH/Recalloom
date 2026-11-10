@@ -3,9 +3,8 @@ import {Link,useLocation,useNavigate} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
-import {IconChevronRight,IconPlus} from '@tabler/icons-react';
+import {IconChevronRight,IconFileText,IconFolder,IconFolderOpen,IconChecklist,IconPlus} from '@tabler/icons-react';
 import {browse} from './api';
-import {Icon} from './icon';
 import type {Entry} from './types';
 import {createUntitled,type NewPageKind} from './create-page';
 import {AutoResizer} from './motion-primitives';
@@ -50,8 +49,8 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
  const pathname=useLocation({select:state=>state.pathname});
  const folder=entry.entityType==='folder';
  const active=pathname===(folder?'/library/':'/records/')+entry.id;
- const iconName=folder?'folder':entry.kind==='task_list'?'taskList':'document';
- const label=<><Icon name={iconName} size="sm" className="tree-icon"/><span className="truncate">{entry.name}</span></>;
+ const Icon=folder?(open?IconFolderOpen:IconFolder):entry.kind==='task_list'?IconChecklist:IconFileText;
+ const label=<><span className="rk-icon-frame rk-icon-frame--tree"><Icon className="tree-icon" aria-hidden="true"/></span><span className="truncate">{entry.name}</span></>;
  return <li>
   <div className={'tree-row'+(active?' is-active':'')} style={{'--tree-depth':depth} as React.CSSProperties}>
    {folder
@@ -99,9 +98,9 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
   finally{setBusy(false);}
  };
  const createItems=(parentId:string|null):DropdownMenuOption[]=>[
-  {label:'新建文档',icon:<Icon name="document" size="sm"/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
-  {label:'新建任务列表',icon:<Icon name="taskList" size="sm"/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
-  {label:'新建文件夹',icon:<Icon name="folder" size="sm"/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
+  {label:'新建文档',icon:<IconFileText size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('document',parentId)},
+  {label:'新建任务列表',icon:<IconChecklist size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('task_list',parentId)},
+  {label:'新建文件夹',icon:<IconFolder size="var(--rk-icon-sm)"/>,isDisabled:busy,onClick:()=>void create('folder',parentId)}
  ];
  return <TreeContext.Provider value={{createItems,onNavigate}}>
   <div className="nav-label nav-label-row tree-heading">
