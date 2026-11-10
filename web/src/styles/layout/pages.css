@@ -32,8 +32,10 @@
   gap: 8px;
 }
 
+/* The graph uses available workspace width instead of the document measure. */
 .page.knowledge-graph-page {
-  --rk-measure: 1400px;
+  max-width: none;
+  width: 100%;
 }
 
 .crumbs {

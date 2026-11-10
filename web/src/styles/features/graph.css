@@ -22,7 +22,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: none;
   padding-block-end: 28px;
   min-width: 0;
 }
@@ -495,7 +494,6 @@
 
 .knowledge-graph-page {
   gap: 12px;
-  padding-inline: 0;
 }
 
 .graph-controls {

@@ -635,8 +635,10 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   color: var(--color-text-secondary,#777);
 }
 
-.main-content {
-  padding-bottom: calc(76px + env(safe-area-inset-bottom,0px));
+/* The scroll viewport continues behind the fixed tab bar. Reserve space
+   inside its scroll content so the final row remains reachable. */
+.route-stage {
+  padding-block-end: calc(64px + env(safe-area-inset-bottom,0px));
 }
 
 .sidebar-collapsed .sidebar {
@@ -737,7 +739,7 @@ html[data-effective-theme="dark"] .topbar {
 
 html[data-effective-theme="dark"] .bottom-nav {
   border-top-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -1px 0 rgba(255,255,255,.08), 0 -8px 18px -14px rgba(0,0,0,.6);
   background: var(--rk-canvas);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -759,7 +761,7 @@ html[data-effective-theme="dark"] .bottom-nav {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border-top: 0;
-  box-shadow: 0 -1px 0 var(--rk-border-soft);
+  box-shadow: 0 -1px 0 var(--rk-border-soft), 0 -8px 18px -14px rgba(15,15,15,.28);
 }
 }
 
@@ -769,8 +771,8 @@ html[data-effective-theme="dark"] .bottom-nav {
   display: none;
 }
 
-.shell:has(.tiptap:focus, .cm-editor.cm-focused, .page-title:focus, textarea:focus) .main-content {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+.shell:has(.tiptap:focus, .cm-editor.cm-focused, .page-title:focus, textarea:focus) .route-stage {
+  padding-block-end: env(safe-area-inset-bottom, 0px);
 }
 }
 

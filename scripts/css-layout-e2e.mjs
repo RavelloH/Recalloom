@@ -12,6 +12,7 @@ const secret=secretLine.split('=').slice(1).join('=').trim().replace(/^["']|["']
 const browser=await chromium.launch({headless:true,executablePath:browserPath,args:['--no-sandbox']});
 const cases=[
  {name:'desktop',width:1440,height:900,hasTouch:false,isMobile:false},
+ {name:'desktop-wide',width:1920,height:1080,hasTouch:false,isMobile:false},
  {name:'touch-pad',width:1024,height:768,hasTouch:true,isMobile:false},
  {name:'touch-phone',width:390,height:844,hasTouch:true,isMobile:true}
 ];
@@ -38,7 +39,10 @@ try{
     fine:matchMedia('(hover: hover) and (pointer: fine)').matches,
     coarse:matchMedia('(pointer: coarse)').matches,
     nav:navigation,sidebar:bounds(q('.sidebar')),add:bounds(q('.file-new')),
-    bottom:bounds(q('.bottom-nav')),topbar:bounds(q('.topbar'))};
+    bottom:bounds(q('.bottom-nav')),topbar:bounds(q('.topbar')),
+    scroll:bounds(q('.main-scroll')),main:bounds(q('.main-content')),
+    scrollContentPadding:parseFloat(getComputedStyle(q('.route-stage')).paddingBottom),
+    bottomShadow:getComputedStyle(q('.bottom-nav')).boxShadow};
   });
   assert.ok(measurements.scrollWidth<=measurements.viewport+1,mode.name+' page horizontal overflow '+JSON.stringify(measurements));
   assert.ok(measurements.add&&measurements.add.h>=30&&measurements.add.w>=100,mode.name+' add button collapsed '+JSON.stringify(measurements.add));
@@ -57,6 +61,9 @@ try{
    await page.locator('.sidebar.mobile-open').waitFor({state:'hidden'});
    await page.waitForFunction(()=>document.querySelector('.sidebar')?.getBoundingClientRect().right<=1,{timeout:5000});
    assert.ok(measurements.bottom&&measurements.bottom.h>=45,mode.name+' missing mobile bottom navigation');
+   assert.ok(measurements.scroll.bottom===undefined&&measurements.scroll.y+measurements.scroll.h>=measurements.bottom.y+measurements.bottom.h-1,mode.name+' scroll viewport stops above tab bar');
+   assert.ok(measurements.scrollContentPadding>=measurements.bottom.h-2,mode.name+' missing scroll-content clearance');
+   assert.notEqual(measurements.bottomShadow,'none',mode.name+' bottom nav has no overlay shadow');
   }
   await page.screenshot({path:'tmp/css-layout-snapshots/'+mode.name+'.png'});
   if(mode.name==='desktop'){
@@ -67,7 +74,21 @@ try{
     await page.getByPlaceholder('输入后回车').waitFor({state:'visible'});
    }
   }
-  console.log('PASS CSS layout '+mode.name,JSON.stringify(measurements));
+  await page.goto(base+'/graph');
+  await page.locator('.knowledge-graph-page').waitFor({state:'visible'});
+  await page.locator('.graph-workspace').waitFor({state:'visible',timeout:20000});
+  const graph=await page.evaluate(()=>{
+   const box=(selector)=>{const el=document.querySelector(selector);if(!el)return null;const r=el.getBoundingClientRect();return {x:r.x,w:r.width,right:r.right}};
+   return {page:box('.knowledge-graph-page'),workspace:box('.workspace'),graph:box('.graph-workspace'),stage:box('.graph-stage'),controls:box('.graph-controls'),scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,paddingInline:getComputedStyle(document.querySelector('.knowledge-graph-page')).paddingLeft};
+  });
+  assert.ok(graph.page&&graph.workspace&&graph.graph&&graph.stage,mode.name+' graph workspace did not render');
+  assert.ok(graph.graph.w>0&&graph.stage.w>0,mode.name+' graph stage collapsed '+JSON.stringify(graph));
+  assert.ok(graph.graph.right<=graph.page.right+1,mode.name+' graph stage exceeds page width '+JSON.stringify(graph));
+  assert.ok(graph.page.w>=graph.workspace.w-2,mode.name+' graph page is incorrectly constrained '+JSON.stringify(graph));
+  assert.ok(graph.scrollWidth<=graph.viewport+1,mode.name+' graph page horizontal overflow '+JSON.stringify(graph));
+  if(mode.width<=720)assert.ok(parseFloat(graph.paddingInline)>=15,mode.name+' graph lost mobile page gutters');
+  await page.screenshot({path:'tmp/css-layout-snapshots/'+mode.name+'-graph.png'});
+  console.log('PASS CSS layout '+mode.name,JSON.stringify({library:measurements,graph}));
   await context.close();
  }
 }finally{await browser.close()}
