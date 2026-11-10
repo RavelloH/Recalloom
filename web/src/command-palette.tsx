@@ -72,5 +72,5 @@ export function QuickSwitcher({isOpen,onOpenChange}:{isOpen:boolean;onOpenChange
  return <CommandPalette<PaletteItem> isOpen={isOpen} onOpenChange={onOpenChange} label="快速导航" width={600} maxHeight="min(72vh,560px)"
   searchSource={source} onValueChange={select} footer={<PaletteFooter onOpenSearch={openSearch}/>}
   emptySearchText="没有匹配的页面" emptyBootstrapText="搜索标题与正文，或跳转到页面"
-  renderItem={item=>{const name=item.auxiliaryData.icon;return <span className="palette-item"><Icon name={name} size="sm" className="palette-icon"/><span className="palette-copy"><span className="palette-label truncate">{item.label}</span>{item.auxiliaryData.detail&&<span className="palette-detail truncate">{item.auxiliaryData.detail}</span>}</span></span>;}}/>;
+  renderItem={item=>{const name=item.auxiliaryData.icon;return <span className="palette-item"><Icon name={name} size="md" className="palette-icon"/><span className="palette-copy"><span className="palette-label truncate">{item.label}</span>{item.auxiliaryData.detail&&<span className="palette-detail truncate">{item.auxiliaryData.detail}</span>}</span></span>;}}/>;
 }

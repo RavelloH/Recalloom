@@ -85,6 +85,18 @@ try{
  await page.setViewportSize({width:320,height:720});
  await page.goto(base+'/records/'+id+'?mode=preview');
  await page.locator('.markdown-preview .rk-rmd-callout').first().waitFor();
+ // Mobile view switcher must keep all icons. A legacy CSS rule hid every
+ // ButtonGroup SVG even though the underlying React icons were present.
+ const viewModes=await page.getByRole('group',{name:'内容视图'}).locator('button').evaluateAll(buttons=>buttons.map(button=>{
+  const svg=button.querySelector('svg.rk-icon');
+  const rect=svg?.getBoundingClientRect();
+  const style=svg?getComputedStyle(svg):null;
+  return {label:button.getAttribute('aria-label')??button.textContent?.trim(),present:!!svg,
+   width:rect?.width,height:rect?.height,display:style?.display,visibility:style?.visibility};
+ }));
+ assert.equal(viewModes.length,3,'all content view mode buttons should exist on phones');
+ assert.ok(viewModes.every(item=>item.present&&item.width>=16&&item.height>=16&&item.display!=='none'&&item.visibility!=='hidden'),
+  'visual/source/preview icons must be visible on phones: '+JSON.stringify(viewModes));
  const mobile=await page.evaluate(()=>({
   viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
   icons:[...document.querySelectorAll('.bottom-link svg')].map(el=>{
@@ -99,7 +111,10 @@ try{
  await page.screenshot({path:'tmp/icon-audit/screens/mobile.png'});
  await page.getByRole('button',{name:'打开导航'}).click();
  await page.locator('.sidebar.mobile-open').waitFor();
- await page.waitForTimeout(500);
+ await page.waitForFunction(()=>{
+  const sidebar=document.querySelector('.sidebar.mobile-open');
+  return sidebar&&sidebar.getBoundingClientRect().left>=-1;
+ },null,{timeout:7000});
  const sidebarBounds=await page.locator('.sidebar.mobile-open').evaluate(el=>{
   const r=el.getBoundingClientRect();return {left:r.left,right:r.right,viewport:innerWidth};
  });

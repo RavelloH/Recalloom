@@ -373,12 +373,10 @@
   display: none;
 }
 
-.record-main .page-actions-bar [role="group"] button svg {
-  display: none;
-}
-
+/* Preserve all three view-mode glyphs on touch screens. Horizontal overflow
+   belongs to the action bar; icons must not disappear to make the row fit. */
 .record-main .page-actions-bar [role="group"] button {
-  padding-inline: 10px;
+  padding-inline: 8px;
 }
 }
 
