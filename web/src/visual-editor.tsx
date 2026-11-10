@@ -179,7 +179,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(cell&&surface)setTableToolbarTop(tableToolbarOffset(cell,surface,compactRef.current));
  };
  const extensions=useMemo(()=>[
-  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:false}),
+  StarterKit.configure({heading:false,paragraph:false,underline:false,codeBlock:false,link:false,
+    // ProseMirror's default drop cursor has no base CSS class and uses a
+    // hardcoded color; identify it explicitly so text and block drags differ.
+    dropcursor:{class:'rk-editor-dropcursor',color:false,width:3}}),
   Link.configure({openOnClick:false}),
   ScrollCodeBlock.configure({defaultTheme:'github-light-high-contrast',themes:{light:'github-light-high-contrast',dark:'github-dark-high-contrast'}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
@@ -554,19 +557,6 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const menuIcon=(icon:React.ReactNode)=><span className="rk-inline-dropdown-icon" aria-hidden="true">
   {icon}<IconChevronDown className="rk-inline-dropdown-chevron" size="var(--rk-icon-xs)"/>
  </span>;
- const inlineMarks=<>
-  {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<IconBold size="var(--rk-icon-sm)"/>)}
-  {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<IconItalic size="var(--rk-icon-sm)"/>)}
-  {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
-  {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
-  {toggle('高亮',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">H</span>)}
-  {categoryButton('荧光笔与手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
-   inlineCommandsByGroup('hand-drawn').map(command=>({
-    id:command.id,label:command.title,description:command.description,
-    active:command.isActive(editor),disabled:!command.isAvailable(editor),
-    run:()=>runInlineFromMenu(command)
-   })))}
- </>;
  const moreInlineItems:InlinePopupItem[]=[
   ...inlineCommandsByGroup('inline-component').map(command=>({
    id:command.id,label:command.title,description:command.description,
@@ -581,7 +571,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    active:editor.isActive('visibleComment'),
    run:()=>runCapturedInline(()=>editor.chain().focus().toggleMark('visibleComment').run())}
  ];
- const formatStateMenus=<>
+ // Shared ordered toolbar: touch and desktop MUST render the very same
+ // controls in DOM/tab order. Put the highest-frequency actions in the first
+ // screenful on narrow touch devices; secondary formatting scrolls to the right.
+ const sharedFormattingToolbar=<>
   {categoryButton('标题',<IconH2 size="var(--rk-icon-sm)"/>,[
    {id:'heading-paragraph',label:'正文',active:!editor.isActive('heading'),
     run:()=>runCapturedInline(()=>editor.chain().focus().setParagraph().run())},
@@ -590,6 +583,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleHeading({level}).run())
    }))
   ])}
+  {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<IconBold size="var(--rk-icon-sm)"/>)}
+  {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<IconItalic size="var(--rk-icon-sm)"/>)}
   {categoryButton('列表',<IconList size="var(--rk-icon-sm)"/>,[
    {id:'list-bullet',label:'项目列表',active:Boolean(active?.bulletList),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleBulletList().run())},
@@ -598,6 +593,11 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    {id:'list-todo',label:'任务清单',active:Boolean(active?.taskList),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleTaskList().run())}
   ])}
+  {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<IconQuote size="var(--rk-icon-sm)"/>)}
+  {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
+  {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
+  {toggle('高亮',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">H</span>)}
+  {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
   {categoryButton('对齐方式',<IconAlignLeft size="var(--rk-icon-sm)"/>,[
    {id:'align-left',label:'左对齐',active:!active?.alignCenter&&!active?.alignRight,
     run:()=>runCapturedInline(()=>editor.chain().focus().unsetTextAlign().run())},
@@ -612,12 +612,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
      if(active?.alignRight)chain.unsetTextAlign().run();else chain.setTextAlign('right').run();
     })}
   ])}
-  {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<IconQuote size="var(--rk-icon-sm)"/>)}
- </>;
- const inlineActions=<>
   {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
   {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
-  {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
+  {categoryButton('荧光笔与手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
+   inlineCommandsByGroup('hand-drawn').map(command=>({
+    id:command.id,label:command.title,description:command.description,
+    active:command.isActive(editor),disabled:!command.isAvailable(editor),
+    run:()=>runInlineFromMenu(command)
+   })))}
   {categoryButton('更多',<IconDots size="var(--rk-icon-sm)"/>,moreInlineItems)}
  </>;
  const editBlock=(pos:number)=>{
@@ -667,18 +669,16 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
   {touchToolbar&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
-   <div className="wysiwyg-tools wysiwyg-tools-primary">
+   <div className="wysiwyg-tools wysiwyg-tools-leading">
     {action('插入内容',()=>openInsertMenu(),<IconPlus size="var(--rk-icon-sm)"/>)}
-    {inlineMarks}
-    {inlineActions}
-    {formatStateMenus}
+    {touchBlockPos!==null&&<span className="wysiwyg-block-leading" role="group" aria-label="当前块操作">
+     {action('编辑当前块',()=>editBlock(touchBlockPos),<IconPencil size="var(--rk-icon-sm)"/>)}
+     <MoreMenu label="更多块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
+      variant="ghost" size="sm" presentation="adaptive"
+      items={blockMenuItems({editor,pos:touchBlockPos,onEditBlock:editBlock})}/>
+    </span>}
    </div>
-   {touchBlockPos!==null&&<div className="wysiwyg-tools wysiwyg-tools-block" role="group" aria-label="当前块操作">
-    {action('编辑当前块',()=>editBlock(touchBlockPos),<IconPencil size="var(--rk-icon-sm)"/>)}
-    <MoreMenu label="更多块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
-     variant="ghost" size="sm" presentation="adaptive"
-     items={blockMenuItems({editor,pos:touchBlockPos,onEditBlock:editBlock})}/>
-   </div>}
+   <div className="wysiwyg-tools wysiwyg-tools-primary">{sharedFormattingToolbar}</div>
   </div>}
   {finePointer&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
    shouldShow={({editor:e,state,from,to})=>{
@@ -694,9 +694,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
      :!active?.textSelection
       ?action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)
       :<div className="bubble-group">
-       {inlineMarks}
-       {formatStateMenus}
-       {inlineActions}
+       {sharedFormattingToolbar}
       </div>}
    </div>
   </BubbleMenu>}

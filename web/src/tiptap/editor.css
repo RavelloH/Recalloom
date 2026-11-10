@@ -8,12 +8,60 @@
  background: var(--color-background-body,inherit);
 }
 .wysiwyg-tools {display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-width:0;}
+.wysiwyg-block-leading{display:inline-flex;align-items:center;gap:3px;}
 .wysiwyg-tools + .wysiwyg-tools {
  padding-left:10px;
  border-left:1px solid var(--color-border,rgba(128,128,128,.22));
 }
 .wysiwyg-tools button {min-width:34px;min-height:34px;}
 .toolbar-highlight {background:#f7dc6f;color:#242424;border-radius:2px;padding:0 2px;}
+
+/* Selected glyphs and the drag insertion caret use the same restrained
+ * theme accent as the source editor. This is intentionally scoped to the
+ * editable document; permanent RMD Mark/highlight colors are unaffected. */
+.record-main .tiptap::selection,
+.record-main .tiptap ::selection{
+ background:var(--rk-selection,rgba(73,133,230,.27));
+ color:inherit;
+ text-shadow:none;
+}
+.record-main .tiptap::-moz-selection,
+.record-main .tiptap ::-moz-selection{
+ background:var(--rk-selection,rgba(73,133,230,.27));
+ color:inherit;
+ text-shadow:none;
+}
+/* ProseMirror renders its drop cursor as an absolutely positioned DIV.
+ * The 'class' option must be explicit: it does NOT apply a shared
+ * .ProseMirror-dropcursor class of its own. */
+.rk-editor-dropcursor{
+ background:var(--color-text-link,#5389d5)!important;
+ border-radius:999px;
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--color-text-link,#5389d5) 16%,transparent),
+            0 0 10px color-mix(in srgb,var(--color-text-link,#5389d5) 24%,transparent);
+}
+/* A fine caret for ordinary inline text, with a small round upper anchor. */
+.rk-editor-dropcursor.prosemirror-dropcursor-inline::before{
+ content:"";position:absolute;left:50%;top:-3px;
+ width:7px;height:7px;border-radius:50%;transform:translateX(-50%);
+ background:inherit;
+}
+/* Crossing block boundaries is shown as a short, rounded horizontal rule
+ * with visible endpoints instead of the default harsh white bar. */
+.rk-editor-dropcursor.prosemirror-dropcursor-block::before,
+.rk-editor-dropcursor.prosemirror-dropcursor-block::after{
+ content:"";position:absolute;top:50%;
+ width:7px;height:7px;border-radius:50%;
+ background:inherit;transform:translateY(-50%);
+}
+.rk-editor-dropcursor.prosemirror-dropcursor-block::before{left:-3px;}
+.rk-editor-dropcursor.prosemirror-dropcursor-block::after{right:-3px;}
+/* The RMD block dragger already animates a complete destination gap.
+ * Never show a second ProseMirror insertion line over its block preview. */
+body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
+@media(prefers-reduced-motion:reduce){
+ .rk-editor-dropcursor{transition:none!important;animation:none!important;}
+}
 .tiptap p.is-editor-empty:first-child::before {
  color:var(--color-text-tertiary,#888);
  content:attr(data-placeholder);
@@ -76,6 +124,13 @@
  }
  .wysiwyg-toolbar::-webkit-scrollbar{display:none;}
  .wysiwyg-tools{flex:0 0 auto;flex-wrap:nowrap;overflow:visible;max-width:none;align-items:center;}
+ /* Keep insertion and context-specific block actions reachable when the
+  * remainder of the single toolbar scrolls on a narrow touch device. */
+ .wysiwyg-tools-leading{
+  position:sticky;left:0;z-index:2;
+  background:var(--color-background-body,#fff);
+  padding-right:6px;
+ }
  .wysiwyg-tools + .wysiwyg-tools{border-left:1px solid var(--color-border,rgba(128,128,128,.2));padding-left:9px;}
  .wysiwyg-tools button{
   box-sizing:border-box!important;flex:0 0 auto;display:inline-flex!important;

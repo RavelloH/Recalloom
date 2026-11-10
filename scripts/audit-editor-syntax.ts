@@ -80,21 +80,24 @@ for(const spec of RMD_REGISTRY.nodes){
 const touch=toolbar.split('{touchToolbar&&<div className="wysiwyg-toolbar"')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
 const desktop=toolbar.split('{finePointer&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
 const standard=['粗体','斜体','下划线','删除线','行内代码','上标','下标'];
-const shared=toolbar.split('const inlineMarks=<>')[1]?.split('</>;')[0]??'';
-const actions=toolbar.split('const inlineActions=<>')[1]?.split('</>;')[0]??'';
-for(const title of ['粗体','斜体','下划线','删除线']){
- assert.ok(shared.includes("toggle('"+title+"'"),'shared formatting toolbar missing '+title);
+const shared=toolbar.split('const sharedFormattingToolbar=<>')[1]?.split('</>;')[0]??'';
+const ordered=['标题','粗体','斜体','列表','引用','插入或编辑链接','下划线',
+ '高亮','删除线','对齐方式','行内代码','插入行内公式','荧光笔与手绘标记','更多'];
+let prior=-1;
+for(const title of ordered){
+ const candidate=shared.matchAll(/(?:toggle|action|categoryButton)\('([^']+)'/g);
+ const positions=[...candidate].filter(match=>match[1]===title).map(match=>match.index);
+ assert.equal(positions.length,1,'shared toolbar must expose '+title+' exactly once');
+ assert.ok(positions[0]>prior,'shared formatting toolbar order regressed at '+title);
+ prior=positions[0];
 }
-assert.ok(actions.includes("toggle('行内代码'"),'inline code must be directly visible');
 for(const title of ['上标','下标'])
  assert.ok(toolbar.includes("label:'"+title+"'"),'more menu missing '+title);
-assert.ok(touch.includes('{inlineMarks}')&&touch.includes('{inlineActions}')&&
- touch.includes('{formatStateMenus}'),'touch toolbar must expose inline and state actions');
-assert.ok(desktop.includes('{inlineMarks}')&&desktop.includes('{inlineActions}')&&
- desktop.includes('{formatStateMenus}'),'desktop selection toolbar must expose inline and state actions');
-for(const action of ['插入或编辑链接','插入行内公式'])
- assert.ok(actions.includes("action('"+action+"'"),'toolbar missing direct action '+action);
+assert.ok(touch.includes('{sharedFormattingToolbar}')&&desktop.includes('{sharedFormattingToolbar}'),
+ 'desktop and touch must render exactly the same ordered formatting toolbar');
 assert.ok(touch.includes("action('插入内容'"),'touch toolbar must open slash insertion picker');
+assert.ok(touch.indexOf('wysiwyg-tools-leading')<touch.indexOf('{sharedFormattingToolbar}'),
+ 'insertion and context block actions should precede scrollable formatting');
 assert.ok(slash.has('footnote'),'GFM footnote reference must retain an insertion entry');
 const summary={
  schema:{inline:inline.length,block:blocks.length,leaf:leaf.length,total:rows.length,nodes:RMD_REGISTRY.nodes.length},

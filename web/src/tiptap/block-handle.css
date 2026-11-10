@@ -74,9 +74,9 @@
 .rk-block-drag-floating-copy strong{font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rk-block-drag-floating-copy > span{color:var(--color-text-secondary,#777);font-size:11px;line-height:1.45;max-height:3em;overflow:hidden;}
 body.rk-block-drag-active,body.rk-block-drag-active *{cursor:grabbing!important;}
-/* Tiptap/ProseMirror may render its own drop cursor during an HTML5 drag.
- * Our ghost and slot are authoritative: do not show both indicators. */
-body.rk-block-drag-active .ProseMirror-dropcursor{display:none!important;}
+/* Native Tiptap drop indication is styled/suppressed via the explicit
+ * .rk-editor-dropcursor class in editor.css. The custom floating ghost and
+ * slot remain the only feedback during RMD block reordering. */
 /* A touch-only tablet/phone never renders a grip, even at desktop width.
  * A mouse-equipped tablet can opt into this affordance via pointer MQ. */
 @media (hover:none), (pointer:coarse){

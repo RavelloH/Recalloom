@@ -99,6 +99,11 @@ try{
  assert.notEqual(await stateLine.evaluate(el=>getComputedStyle(el).textAlign),'center');
  console.log('PASS center alignment state toggles back to the default');
 
+ // Keep the text selection live while hovering a formatting control.
+ // Other state-switch tests can legitimately leave the editor caret collapsed.
+ await page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first().click();
+ await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+ await toolbar.waitFor();
  const markButton=toolbar.getByRole('button',{name:'高亮'});
  await markButton.hover();
  await page.getByRole('tooltip').first().waitFor({state:'visible'});

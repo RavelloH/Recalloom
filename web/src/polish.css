@@ -7,7 +7,7 @@
   --rk-gutter: clamp(24px, 4vw, 56px);
   --rk-font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
   --rk-code-ink: color-mix(in srgb, var(--color-text-primary, #222) 88%, #c2410c);
-  --rk-selection: color-mix(in srgb, #2f80ed 22%, transparent);
+  --rk-selection: color-mix(in srgb, var(--color-text-link, #3978d2) 27%, transparent);
   --rk-scroll-thumb: color-mix(in srgb, var(--color-text-primary, #222) 26%, transparent);
   --rk-scroll-thumb-hover: color-mix(in srgb, var(--color-text-primary, #222) 46%, transparent);
   /* Elevation: 0 = canvas (documents, lists), 1 = resting cards,
@@ -20,7 +20,7 @@
 }
 html[data-effective-theme="dark"] {
   --rk-code-ink: color-mix(in srgb, var(--color-text-primary, #eee) 85%, #fb923c);
-  --rk-selection: color-mix(in srgb, #5b9cff 32%, transparent);
+  --rk-selection: color-mix(in srgb, var(--color-text-link, #74a7f7) 37%, transparent);
   --rk-elev-1: 0 0 0 1px rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.3);
   --rk-elev-1-hover: 0 0 0 1px rgba(255,255,255,.13), 0 6px 18px rgba(0,0,0,.42);
   --rk-elev-3: 0 0 0 1px rgba(255,255,255,.08), 0 16px 40px rgba(0,0,0,.55);
