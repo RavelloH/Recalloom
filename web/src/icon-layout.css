@@ -157,3 +157,4 @@
 .sidebar button.rk-nav-row > .rk-nav-row-label { flex:1;min-width:0; }
 .sidebar-footer button.rk-nav-row > .rk-icon { flex:0 0 20px;overflow:visible; }
 .sidebar-footer button.rk-nav-row > .rk-nav-row-label { flex:1;min-width:0; }
+.relation-row-icon{align-self:flex-start;margin-block-start:.125rem}

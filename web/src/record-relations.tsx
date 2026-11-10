@@ -5,8 +5,9 @@ import {Button} from '@astryxdesign/core/Button';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
-import {IconArrowDownLeft,IconArrowUpRight,IconLink,IconTopologyStar3,IconSparkles,IconUnlink} from '@tabler/icons-react';
+import {IconLink,IconTopologyStar3,IconSparkles,IconUnlink} from '@tabler/icons-react';
 import {mutate} from './api';
+import {Icon} from './icon';
 import {relationsQuery,searchQuery} from './queries';
 import {relationLabel,semanticMessage} from './graph-types';
 
@@ -56,7 +57,7 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
    <>
     <div className="relation-group-heading"><IconLink size="var(--rk-icon-sm)"/>已确认关系 <span>{data?.links.length??0}</span></div>
     {data?.links.length?<div className="relation-items">{data.links.map(link=><div className="relation-row" key={link.id}>
-     <span className="rk-icon-frame rk-icon-frame--first-line rk-icon-frame--first-line-sm">{link.direction==='outgoing'?<IconArrowUpRight size="var(--rk-icon-sm)"/>:<IconArrowDownLeft size="var(--rk-icon-sm)"/>}</span>
+     <Icon name={link.direction==="outgoing"?"outgoing":"incoming"} size="sm" className="relation-row-icon"/>
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:link.other.id}} onClick={onNavigate} className="relation-name">{link.other.name}</Link>
       <small className="muted">{link.direction==='outgoing'?'指向':'来自'} · {relationLabel(link.relation)}{link.type==='reference'||link.type==='embed'?' · 正文自动生成':''}{link.other.status==='archived'?' · 已归档':''}</small>
@@ -67,7 +68,7 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
     <div className="relation-group-heading"><IconSparkles size="var(--rk-icon-sm)"/>语义相似 <span>{data?.suggestions.length??0}</span></div>
     <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>
     {Boolean(data?.suggestions.length)&&<div className="relation-items">{data?.suggestions.map(s=><div className="relation-row relation-suggestion" key={s.id}>
-     <span className="rk-icon-frame rk-icon-frame--first-line rk-icon-frame--first-line-sm"><IconSparkles size="var(--rk-icon-sm)"/></span>
+     <Icon name="semantic" size="sm" className="relation-row-icon"/>
      <div className="relation-copy">
       <Link to="/records/$recordId" params={{recordId:s.other.id}} onClick={onNavigate} className="relation-name">{s.other.name}</Link>
       <small className="muted">{Math.round((s.score??0)*100)}% 相似度{(s.support??0)>1?' · 多段匹配':''}</small>
