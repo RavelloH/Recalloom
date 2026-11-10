@@ -1,0 +1,52 @@
+name: Quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Static checks, unit tests, web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Architecture, generated docs and type checks
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build web assets
+        run: pnpm build:web
+
+# Browser E2E requires a local-only auth fixture and an installed browser.
+# It must not run against the production Worker.
+# Migration replay uses isolated local Wrangler/D1 and remains an explicit
+# local command until its runtime is reliably bounded.

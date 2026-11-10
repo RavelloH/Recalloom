@@ -8,12 +8,25 @@ dist/
 coverage/
 wrangler.deploy.jsonc
 
+# Personal Agent instructions/configuration are local to each developer.
+# They must never replace another developer's Agent setup in Git.
+AGENTS.md
+.agents/
+.agent/
+.claude/
+.codex/
+.cursor/
+
+# Plans, dated acceptance reports, one-off test artifacts and Agent execution
+# notes live locally, not alongside versioned product and technical documentation.
+# Keep only current, reusable technical docs and permanent regression tests in Git.
+# Local history from older tracked docs is preserved under .agents/archive/.
+/docs/_local/
+
 # Local-only research, benchmarks and temporary development notes.
-# Keep persistent technical decisions/checkpoints in Recalloom instead.
 /notes/
 /scratch/
 /bench/
 /tmp/
-/docs/_local/
 /web/.tanstack/
 /web/public/cap-wasm/

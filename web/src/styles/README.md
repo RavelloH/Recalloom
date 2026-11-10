@@ -32,9 +32,9 @@
 
 ## 核心规则
 
-1. 一个选择器只允许有一个全局文件负责。默认、响应式、悬停、选中和禁用状态放在相同的所有权模块内。不要重新添加 polish.css 这样的覆盖层。
+1. 一个选择器只允许有一个全局文件负责。默认、响应式、悬停、选中和禁用状态放在相同的所有权模块内。不要增加以加载顺序覆盖既有组件的全局补丁层。
 2. 视觉语义用设计变量表示；布局尺寸与真实容器有关，不能机械强制统一。
-3. 避免依赖第三方 DOM 内部结构。侧栏尚存在 button.nav-link > span 旧 Astryx Button 兼容规则，未来迁移 NavRow 时必须删除并验证。
+3. 避免依赖第三方 DOM 内部结构。侧栏使用统一 NavRow，调整图标与按钮布局时应同步验证 SVG 图标槽和文字对齐。
 4. 不要依靠 import 顺序解决同一个选择器的分歧，应修改唯一所属模块。不得随意新增 !important。
 5. UI 常用字级使用 --rk-font-caption、--rk-font-small、--rk-font-label、--rk-font-body、--rk-font-control。Markdown 正文、数学、图谱小标签允许独立尺寸。
 6. 标注、搜索匹配与危险边框的固定语义色使用 token，不再跨多个文件复制十六进制值。
@@ -60,7 +60,3 @@ Astryx 样式在全局入口之前导入，保持组件原有交互、可访问�
 - pnpm check：集成样式、图标、帮助、语法与 TypeScript 检查。
 - pnpm build:web：Vite 样式与资源打包。
 - node scripts/run-editor-e2e.mjs editor-responsive-v5-e2e.mjs editor-toolbar-v4-e2e.mjs editor-block-handle-e2e.mjs：验证编辑器、触屏 iPad 与手机交互。导航和按钮改动需继续加对应布局 E2E。
-
-## 迁移记录
-
-2026-11-11，从 11 个跨域全局 CSS 文件中提取为 21 个按所有权组织的模块，合并掉 313 条同一 scoped selector 下失效或重复的声明。保留相同 selector 与 media 下的最终声明值，交互特征查询收紧为 hover+fine。功能组件自有 CSS 不强行全局化。图标语义系统单独重构。

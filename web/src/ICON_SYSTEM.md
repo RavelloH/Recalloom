@@ -23,9 +23,9 @@ import {Icon} from './icon';
 
 - `activity`、`versionHistory`、`clock` 表示活动入口、历史版本和时间信息，不能混用。
 - `archive` 与 `backup` 是不同操作，保留各自的图形。
-- `taskList` 用于任务资源，`list`、`listNumbers` 等用于排版命令（迁移后的注册表按实际使用保留）。
+- `taskList` 用于任务资源，`list` 等用于排版命令；具体名称以 `web/src/icon.ts` 的实际注册表为准。
 - 活动条目使用 `created`、`updated`、`restore`、`trash`、`link`、`unlink` 等动作语义，避免所有条目使用历史图形。
-- 无信息价值的装饰性图标不再重复添加；记录类型/标签/更新时间属性行已改为文字标签。
+- 对没有新增信息价值的属性标签或操作，不应重复添加装饰性图标。
 
 ## 布局与输入能力
 
@@ -37,5 +37,3 @@ import {Icon} from './icon';
 - `pnpm check`：包含前后端类型检查以及 CSS 所有权审计。
 - `node scripts/run-editor-e2e.mjs icon-system-e2e.mjs css-layout-e2e.mjs editor-responsive-v5-e2e.mjs`：检查导航文字/图标对齐、文件树、底栏、编辑器、Callout 等。
 - 新增功能图标时：先判断是否已有等义名称，避免通过减少或增加图标数量来代替语义设计。
-
-2026-11-11：全站完成语义图标迁移，并保留统一的 Tabler 视觉语言。前一次因 `NavRow` 和 CSS wrapper 冲突而回滚的经验已纳入测试。

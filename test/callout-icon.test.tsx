@@ -11,8 +11,8 @@ describe('RMD semantic Callout icon conventions',()=>{
   for(const kind of kinds){
    const html=renderToStaticMarkup(<>{calloutIcon(kind)}</>);
    assert.match(html,/class="[^"]*tabler-icon/,'Tabler icon: '+kind);
-   assert.match(html,/width="var\(--rk-icon-sm\)"/,'16px shared icon token: '+kind);
-   assert.match(html,/height="var\(--rk-icon-sm\)"/,'16px shared icon token: '+kind);
+   assert.match(html,/width="16"/,'16px shared icon width: '+kind);
+   assert.match(html,/height="16"/,'16px shared icon height: '+kind);
    assert.match(html,/stroke-width="2"/,'uniform outline: '+kind);
    glyphs.add(html.match(/tabler-icon-([a-z-]+)/)?.[1]??'');
   }

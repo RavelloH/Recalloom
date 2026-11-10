@@ -1,3 +1,4 @@
+import React from 'react';
 import type {IconRegistry} from '@astryxdesign/core/Icon';
 import {neutralTheme} from '@astryxdesign/theme-neutral/built';
 import {Icon} from './icon';
