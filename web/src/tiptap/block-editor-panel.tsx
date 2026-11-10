@@ -1,6 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
-import {TextInput} from '@astryxdesign/core/TextInput';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {Button} from '@astryxdesign/core/Button';
 import {IconX,IconCode,IconEye} from '@tabler/icons-react';
@@ -8,6 +7,9 @@ import {parseRmdVisual} from '../rmd-visual';
 import {serializeRmdBlock} from '../rmd-serialize';
 import {topLevelBlockAt} from './editor-block-actions';
 import {RmdSchemaAttributeFields} from './rmd-schema-attrs-fields';
+import {RmdContainerAttributeFields} from './rmd-container-fields';
+import {RmdLeafAttributeFields} from './rmd-leaf-fields';
+import type {RichContainerField} from './rmd-container-attributes';
 import {isRmdAttrsEditable} from './rmd-schema-attrs-model';
 import './block-editor-panel.css';
 
@@ -36,7 +38,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
     canonicalRef.current=canonical;
     // An external direct edit of the selected block updates the sidebar.
     // Editing the sidebar itself must not overwrite incomplete text inputs.
-    if(transaction.getMeta('rk-block-panel-edit')!==true)setDraft(canonical);
+    if(transaction.getMeta('rk-block-panel-edit')!==true||transaction.getMeta('rk-block-panel-field-edit')===true)setDraft(canonical);
    }
   };
   editor.on('transaction',update);
@@ -51,21 +53,32 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
  const block=topLevelBlockAt(editor,pos);
  const current=block?.node;
  const kind=current?.type.name??'';
- const title=kind==='richContainer'?String(current?.attrs.title??''):'';
  const presentation=useMemo(()=>current?serializeRmdBlock(current.toJSON()):'', [current,version]);
  if(!current)return null;
- const attr=(name:string,value:string)=>{
+ const attr=(name:RichContainerField,value:string|number|null)=>{
   const node=editor.state.doc.nodeAt(pos);
   if(!node||node.type!==current.type){setError('目标块已变化，请重新打开');return;}
-  if(name==='title')value=safeTitle(value);
-  if(String(node.attrs[name]??'')===value)return;
+  if(name==='title'&&typeof value==='string')value=safeTitle(value);
+  if(node.attrs[name]===value)return;
   try{
    const tr=editor.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,[name]:value});
    tr.doc.check();
-   editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true));
+   editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true).setMeta('rk-block-panel-field-edit',true));
    setDraft(serializeRmdBlock(editor.state.doc.nodeAt(pos)!.toJSON()));
    setError('');
   }catch{setError('当前属性未能写入，请确认内容是否有效');}
+ };
+ const applyLeaf=(attrs:Record<string,string|null>)=>{
+  const node=editor.state.doc.nodeAt(pos);
+  if(!node||node.type!==current.type){setError('目标块已变化，请重新打开');return;}
+  if(Object.entries(attrs).every(([name,value])=>node.attrs[name]===value))return;
+  try{
+   const tr=editor.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,...attrs});
+   tr.doc.check();
+   editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true).setMeta('rk-block-panel-field-edit',true));
+   setDraft(serializeRmdBlock(editor.state.doc.nodeAt(pos)!.toJSON()));
+   setError('');
+  }catch{setError('当前属性未能写入，请确认格式');}
  };
  const commitRaw=(value:string)=>{
   setDraft(value);
@@ -103,12 +116,9 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   </section>
   <section className="rk-block-panel-fields">
    <p className="rk-block-panel-desc">有效修改立即同步文档；保存仍使用页面顶部的「保存」操作。</p>
-   {kind==='richContainer'&&
-    <TextInput label="块标题" width="100%" value={title} onChange={v=>attr('title',v)}/>}
-   {kind==='richContainer'&&current.attrs.kind==='message'&&
-    <TextInput label="消息身份" width="100%" value={String(current.attrs.sender??'assistant')}
-     onChange={v=>{if(['user','assistant','system'].includes(v))attr('sender',v);}}
-     placeholder="user / assistant / system"/>}
+   {kind==='richContainer'&&<RmdContainerAttributeFields key={'container-'+pos+'-'+String(current.attrs.kind)}
+     node={current} onApply={attr}/>}
+   {(kind==='richLinkCard'||kind==='wikiEmbed')&&<RmdLeafAttributeFields key={kind+'-'+pos} node={current} onApply={applyLeaf}/>}
    {attributePos!==undefined&&attributePos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(attributePos)?.type.name??'')&&
     <RmdSchemaAttributeFields key={attributePos} editor={editor} pos={attributePos}/>}
    <div className="rk-block-panel-section-heading"><IconCode size="var(--rk-icon-sm)"/><span>当前块 RMD 正文与属性</span></div>

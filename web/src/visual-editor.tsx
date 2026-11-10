@@ -241,11 +241,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   applying.current=true;
   try{
    const richDocument=parseRmdVisual(value);
-   editor.commands.setContent(richDocument,{emitUpdate:false});
+   // Loading a persisted document is not an undoable user edit. Without
+   // this flag, a fast first drag can group with initialization history and
+   // Ctrl+Z may erase the entire document instead of reverting the drag.
+   editor.chain().setMeta('addToHistory',false).setContent(richDocument,{emitUpdate:false}).run();
   }catch{
    // Even when an extension fails, the user must never be trapped in a
    // source-only island. The fallback stays normal editable paragraph text.
-   editor.commands.setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false});
+   editor.chain().setMeta('addToHistory',false)
+    .setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false}).run();
   }
   finally{applying.current=false;setReady(true);}
  },[editor,value]);
@@ -269,8 +273,22 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     setAttributeNodePos(position);
    }
   };
+  const openDirectBlock=(event:Event)=>{
+   const pos=(event as CustomEvent<{pos:number}>).detail?.pos;
+   if(!Number.isInteger(pos))return;
+   const target=topLevelBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
+   setBlockPanelPos(pos);
+  };
   root.addEventListener('rmd-edit-attrs',open);
-  return()=>root.removeEventListener('rmd-edit-attrs',open);
+  root.addEventListener('rmd-open-block-editor',openDirectBlock);
+  return()=>{
+   root.removeEventListener('rmd-edit-attrs',open);
+   root.removeEventListener('rmd-open-block-editor',openDirectBlock);
+  };
  },[editor,ready]);
  // Keep the inspected top-level block anchored as unrelated edits shift its
  // position. Close safely if an external transaction replaces/deletes it.

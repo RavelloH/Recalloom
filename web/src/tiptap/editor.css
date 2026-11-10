@@ -244,10 +244,10 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-link-card-desc {color:var(--color-text-secondary);font-size:.81rem;line-height:1.5;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
 .record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.78rem;line-height:1.5;text-decoration:none!important;margin-top:.15rem;}
 .record-main .rk-link-card-open:hover{text-decoration:underline!important;}
-.record-main .rk-link-card-edit-actions{display:flex;align-items:center;justify-content:flex-end;margin-top:4px;}
-.record-main .rk-rich-link-card > .rk-link-card-edit-actions{opacity:0;transition:opacity .15s ease;}
-.record-main .rk-rich-link-card:hover > .rk-link-card-edit-actions,.record-main .rk-rich-link-card:focus-within > .rk-link-card-edit-actions{opacity:1;}
-@media(hover:none){.record-main .rk-rich-link-card > .rk-link-card-edit-actions{opacity:.8;}}
+.record-main .rk-rich-link-card .rk-link-card-title[role='button']{cursor:text;border-radius:3px;text-underline-offset:.16em;}
+@media(hover:hover){.record-main .rk-rich-link-card .rk-link-card-title[role='button']:hover{text-decoration:underline dotted;}}
+.record-main .rk-rich-link-card .rk-link-card-title[role='button']:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
+
 .record-main .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
 .record-main .rk-rich-link-card {margin-block:1rem;}
 .record-main .rk-rich-link-card > button {margin-block:.3rem;}

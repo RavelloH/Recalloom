@@ -40,7 +40,7 @@ export function RmdSchemaAttributeFields({editor,pos}:{editor:Editor;pos:number}
    const next={...current.attrs,[attrName]:normalized.value};
    const tr=editor.state.tr.setNodeMarkup(pos,undefined,next);
    tr.doc.check();
-   editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true));
+   editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true).setMeta('rk-block-panel-field-edit',true));
   }catch{
    setErrors(values=>({...values,[field]:'当前属性无法应用，请检查内容与节点类型'}));
   }

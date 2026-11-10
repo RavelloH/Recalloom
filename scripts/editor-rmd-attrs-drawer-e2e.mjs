@@ -55,6 +55,8 @@ try{
   assert.match(await badge('image').innerText(),/width=420/,'invalid dimension did not modify the original');
   await field.fill('480');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-rmd-attrs-decoration')].some(el=>el.textContent.includes('width=480')));
+  await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('width=480')));
+  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/width=480/,'structured node attrs must refresh raw RMD in the same panel');
   await panel.getByRole('textbox',{name:'图注'}).fill('更新后的图注');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-rmd-attrs-decoration')].some(el=>el.textContent.includes('更新后的图注')));
   await close();
@@ -67,6 +69,7 @@ try{
   await page.waitForFunction(()=>!document.querySelector('.tiptap .rk-code-block')?.classList.contains('rk-code-wrap'));
   assert.doesNotMatch(await badge('codeBlock').innerText(),/wrap=/,'false is the schema default and must be omitted from canonical RMD');
   await panel.getByRole('textbox',{name:'文件名'}).fill('after.ts');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('file=after.ts')));
   await close();
   await badge('heading').click();
   await panel.waitFor();
