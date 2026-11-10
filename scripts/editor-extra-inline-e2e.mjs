@@ -20,13 +20,26 @@ async function create(){
  await page.goto(base+'/records/'+result.data.id+'?mode=visual');
  await page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first().waitFor();
 }
-async function select(){
+async function select(width){
  const line=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
- await line.click();
- await page.keyboard.press('End');
- await page.keyboard.press('Shift+Home');
- assert.equal((await page.evaluate(()=>window.getSelection()?.toString().trim())),'alpha beta gamma');
- await page.waitForTimeout(350);
+ for(let attempt=0;attempt<4;attempt++){
+  await line.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Home');
+  const selected=await page.evaluate(()=>window.getSelection()?.toString().trim()??'');
+  if(selected!=='alpha beta gamma'){await page.waitForTimeout(120);continue;}
+  if(width===390){await page.waitForTimeout(250);return;}
+  try{
+   await page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'更多行内功能'}).waitFor({state:'visible',timeout:1400});
+   return;
+  }catch{/* BubbleMenu is debounced and may have missed a focus transition; reselect. */}
+ }
+ throw Error('Selected RMD text cannot open its inline toolbar: '+JSON.stringify(
+  await page.evaluate(()=>({
+   selection:window.getSelection()?.toString(),
+   focus:document.activeElement?.outerHTML.slice(0,200),
+   bubble:document.querySelectorAll('.bubble-menu').length
+  }))));
 }
 async function sourceText(){
  await page.getByRole('button',{name:'源码'}).click();
@@ -44,7 +57,7 @@ try{
   await page.setViewportSize({width,height:width===1280?900:844});
   const toolbar=()=>page.getByRole('toolbar',{name:width===1280?'文本格式':'格式工具栏'}).first();
   await create();
-  await select();
+  await select(width);
   await toolbar().getByRole('button',{name:'更多行内功能'}).click();
   const menu=page.getByRole('menu').last();
   for(const label of ['链接','行内公式','Wiki 引用','脚注引用','弱化注释'])
@@ -53,7 +66,7 @@ try{
   assert.match(await sourceText(),/%%alpha beta gamma%%/);
   console.log('PASS inline comment source via shared menu',width);
 
-  await create();await select();
+  await create();await select(width);
   await toolbar().getByRole('button',{name:'更多行内功能'}).click();
   await page.getByRole('menu').last().getByRole('menuitem',{name:'链接'}).click();
   const dialog=page.getByRole('dialog',{name:/链接/});

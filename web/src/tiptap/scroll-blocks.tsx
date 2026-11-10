@@ -42,24 +42,30 @@ export class CaptionedScrollTableView extends ScrollTableView{
  private readonly captionElement:HTMLDivElement;
  private readonly editorView:EditorView;
  private currentNode:PMNode;
- private captionInput:HTMLInputElement|null=null;
+ private captionEditing=false;
  constructor(node:PMNode,cellMinWidth:number,view:EditorView,attrs:Record<string,unknown>={}){
   super(node,cellMinWidth,view,attrs);
   this.editorView=view;
   this.currentNode=node;
   this.captionElement=document.createElement('div');
   this.captionElement.className='rk-table-caption';
-  this.captionElement.contentEditable='false';
-  this.captionElement.role='button';
+  // The caption itself owns the caret; never swap it for an input or touch
+  // the table's ProseMirror-managed contentDOM while editing.
+  this.captionElement.contentEditable='true';
+  this.captionElement.role='textbox';
   this.captionElement.tabIndex=0;
-  this.captionElement.title='点击直接编辑表格图注';
+  this.captionElement.title='点击文字原位编辑表格图注';
   this.captionElement.setAttribute('aria-label','直接编辑表格图注');
-  this.captionElement.addEventListener('click',()=>this.startCaptionEdit());
+  this.captionElement.setAttribute('aria-multiline','false');
+  this.captionElement.addEventListener('focus',()=>{this.captionEditing=true;});
+  this.captionElement.addEventListener('blur',()=>this.finishCaptionEdit(true));
+  this.captionElement.addEventListener('pointerdown',event=>event.stopPropagation());
+  this.captionElement.addEventListener('click',event=>event.stopPropagation());
   this.captionElement.addEventListener('keydown',event=>{
-   if(this.captionInput)return;
-   if(event.key==='Enter'||event.key===' '){
-    event.preventDefault();event.stopPropagation();this.startCaptionEdit();
-   }
+   event.stopPropagation();
+   if(event.isComposing)return;
+   if(event.key==='Enter'){event.preventDefault();this.finishCaptionEdit(true);this.captionElement.blur();}
+   else if(event.key==='Escape'){event.preventDefault();this.finishCaptionEdit(false);this.captionElement.blur();}
   });
   this.dom.appendChild(this.captionElement);
   this.paint(node);
@@ -76,45 +82,23 @@ export class CaptionedScrollTableView extends ScrollTableView{
   }catch{/* Detached NodeView: do not mutate an unrelated table. */}
   return null;
  }
- private startCaptionEdit(){
-  if(this.captionInput||this.captionElement.hidden)return;
-  const input=document.createElement('input');
-  input.type='text';
-  input.className='rk-table-caption-input';
-  input.setAttribute('aria-label','直接编辑表格图注');
-  input.maxLength=240;
-  input.value=cleanTableCaption(this.currentNode.attrs.caption);
-  const finish=(save:boolean)=>{
-   if(this.captionInput!==input)return;
-   this.captionInput=null;
-   const caption=cleanTableCaption(input.value);
-   const prior=cleanTableCaption(this.currentNode.attrs.caption);
-   if(save&&caption!==prior){
-    const pos=this.findTablePos();
-    const original=pos!==null?this.editorView.state.doc.nodeAt(pos):null;
-    if(original?.type.name==='table'){
-     try{
-      const tr=this.editorView.state.tr.setNodeMarkup(pos!,undefined,{...original.attrs,caption});
-      tr.doc.check();
-      this.editorView.dispatch(tr);
-     }catch{/* Keep the previous caption if the node changed. */}
-    }
+ private finishCaptionEdit(save:boolean){
+  if(!this.captionEditing)return;
+  this.captionEditing=false;
+  const caption=cleanTableCaption(this.captionElement.textContent);
+  const prior=cleanTableCaption(this.currentNode.attrs.caption);
+  if(save&&caption!==prior){
+   const pos=this.findTablePos();
+   const original=pos!==null?this.editorView.state.doc.nodeAt(pos):null;
+   if(original?.type.name==='table'){
+    try{
+     const tr=this.editorView.state.tr.setNodeMarkup(pos!,undefined,{...original.attrs,caption});
+     tr.doc.check();
+     this.editorView.dispatch(tr);
+    }catch{/* Keep the previous caption if the node changed. */}
    }
-   this.paint(this.currentNode);
-  };
-  input.addEventListener('keydown',event=>{
-   event.stopPropagation();
-   if(event.isComposing)return;
-   if(event.key==='Enter'){event.preventDefault();finish(true);}
-   else if(event.key==='Escape'){event.preventDefault();finish(false);}
-  });
-  input.addEventListener('blur',()=>finish(true));
-  input.addEventListener('pointerdown',event=>event.stopPropagation());
-  input.addEventListener('click',event=>event.stopPropagation());
-  this.captionInput=input;
-  this.captionElement.replaceChildren(input);
-  input.focus();
-  input.select();
+  }
+  this.paint(this.currentNode);
  }
  private paint(node:PMNode){
   const id=safeTableId(node.attrs.tableId)?node.attrs.tableId as string:null;
@@ -123,8 +107,8 @@ export class CaptionedScrollTableView extends ScrollTableView{
    this.dom.id=headingAnchor(id);
    this.dom.dataset.rkTableId=id;
   }else{this.dom.removeAttribute('id');delete this.dom.dataset.rkTableId;}
-  this.captionElement.hidden=!id||(!caption&&!this.captionInput);
-  if(!this.captionInput)this.captionElement.textContent=caption;
+  this.captionElement.hidden=!id||(!caption&&!this.captionEditing);
+  if(!this.captionEditing)this.captionElement.textContent=caption;
  }
  update(node:PMNode):boolean{
   if(!super.update(node))return false;

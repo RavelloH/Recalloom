@@ -38,37 +38,45 @@ try{
   await page.goto(base+'/records/'+created.data.id+'?mode=visual');
 
   const card=page.locator('.tiptap .rk-rich-link-card').first();
-  await card.getByRole('button',{name:'直接编辑链接卡片标题'}).click();
   const cardInput=card.getByRole('textbox',{name:'直接编辑链接卡片标题'});
+  const cardElement=await cardInput.elementHandle();
+  await cardInput.click();
+  assert.equal(await card.locator('input').count(),0,'clicking card title must never open a text input');
   await cardInput.fill('New Card');
   await cardInput.press('Enter');
-  await card.getByRole('button',{name:'直接编辑链接卡片标题'}).getByText('New Card').waitFor();
+  await cardInput.filter({hasText:'New Card'}).waitFor();
+  assert.equal(await cardElement.evaluate(el=>el.isConnected),true,'editing keeps the exact visible title node');
 
   const figure=page.locator('.tiptap .rk-rich-figure').first();
-  await figure.getByRole('button',{name:'直接编辑图片图注'}).click();
   const figureInput=figure.getByRole('textbox',{name:'直接编辑图片图注'});
+  const figureElement=await figureInput.elementHandle();
+  await figureInput.click();
+  assert.equal(await figure.locator('.rk-figure-caption-hit input').count(),0,'image caption does not create a child input');
   await figureInput.fill('New Figure');
   await figureInput.press('Enter');
-  await figure.getByRole('button',{name:'直接编辑图片图注'}).getByText('New Figure').waitFor();
+  await figureInput.filter({hasText:'New Figure'}).waitFor();
+  assert.equal(await figureElement.evaluate(el=>el.isConnected),true,'image caption edits the same text node');
 
-  await figure.getByRole('button',{name:'直接编辑图片图注'}).click();
+  await figureInput.click();
   await figure.getByRole('textbox',{name:'直接编辑图片图注'}).fill('Cancel Figure');
   await figure.getByRole('textbox',{name:'直接编辑图片图注'}).press('Escape');
-  await figure.getByRole('button',{name:'直接编辑图片图注'}).getByText('New Figure').waitFor();
+  await figureInput.filter({hasText:'New Figure'}).waitFor();
 
   const table=page.locator('.tiptap .tableWrapper[data-rk-table-id="tbl-direct"]').first();
-  const tableCaption=table.getByRole('button',{name:'直接编辑表格图注'});
-  await tableCaption.waitFor();
-  await tableCaption.click();
   const tableInput=table.getByRole('textbox',{name:'直接编辑表格图注'});
+  await tableInput.waitFor();
+  const tableElement=await tableInput.elementHandle();
+  await tableInput.click();
+  assert.equal(await table.locator('.rk-table-caption input').count(),0,'table caption stays a single editable DOM node');
   await tableInput.fill('New Table');
   await tableInput.press('Enter');
-  await table.getByRole('button',{name:'直接编辑表格图注'}).getByText('New Table').waitFor();
+  await tableInput.filter({hasText:'New Table'}).waitFor();
+  assert.equal(await tableElement.evaluate(el=>el.isConnected),true,'table caption keeps the original element');
 
-  await tableCaption.click();
+  await tableInput.click();
   await table.getByRole('textbox',{name:'直接编辑表格图注'}).fill('Cancel Table');
   await table.getByRole('textbox',{name:'直接编辑表格图注'}).press('Escape');
-  await table.getByRole('button',{name:'直接编辑表格图注'}).getByText('New Table').waitFor();
+  await tableInput.filter({hasText:'New Table'}).waitFor();
 
   const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,created.data.id);
   assert.equal(persisted,source,'direct inline editing must not auto-save');

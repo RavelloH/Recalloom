@@ -63,6 +63,12 @@ export function blockSiblings(editor:Editor,pos:number):EditableBlock[]{
  });
  return siblings;
 }
+/** Only explicit ::: RMD blocks expose a floating handle. Plain paragraphs,
+ * headings, lists, tables and fenced code keep native text editing only. */
+export function isExplicitRmdBlock(editor:Editor,pos:number):boolean{
+ const node=editableBlockAt(editor,pos)?.node;
+ return !!node&&['richContainer','richLinkCard','wikiEmbed'].includes(node.type.name);
+}
 export function blockCanReorder(editor:Editor,pos:number):boolean{
  const current=editableBlockAt(editor,pos);
  return !!current&&(current.parentPos===null||repeatableChildKinds.has(String(current.node.attrs.kind)));

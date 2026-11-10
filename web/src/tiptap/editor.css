@@ -109,7 +109,15 @@
  * The action stays accessible to keyboard users without changing the layout. */
 .record-main .rk-directive-title-hit{cursor:text;display:inline;min-width:0;border-radius:3px;text-underline-offset:.18em;}
 @media(hover:hover){.record-main .rk-directive-title-hit:hover{text-decoration:underline dotted;}}
-.record-main .rk-directive-title-hit:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
+.record-main .rk-directive-title-hit[contenteditable="true"]{
+ cursor:text;min-width:1ch;max-width:100%;
+ white-space:pre-wrap;overflow-wrap:anywhere;
+ caret-color:var(--color-text-link,#527cb7);
+}
+.record-main .rk-directive-title-hit:focus-visible{
+ outline:none;background:color-mix(in srgb,var(--color-text-link,#527cb7) 9%,transparent);
+ box-shadow:inset 0 -1.5px var(--color-text-link,#527cb7);
+}
 .record-main .rk-rich-inline {display:inline;}
 .record-main .rk-inline-editable {display:inline;}
 .record-main .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
@@ -500,28 +508,32 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 }
 /* Markdown @ attrs markers now open the shared responsive BlockEditorPanel. */
 
-/* Visible document-owned captions and card titles edit in place, without an icon. */
-.record-main .rk-rich-figure .rk-figure-caption-hit,
-.record-main .tiptap .rk-table-caption[role="button"]{
- cursor:text;border-radius:3px;text-underline-offset:.16em;
+/* Document-owned titles and captions are the text-editing surface itself.
+ * Neither click nor focus should replace rendered text with an input field. */
+.record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+ .rk-rich-link-card .rk-link-card-direct-title,
+ .tiptap .rk-table-caption[contenteditable="true"]){
+ cursor:text;caret-color:var(--color-text-link,#527cb7);
+ text-underline-offset:.16em;border-radius:3px;
+ outline-offset:3px;white-space:pre-wrap;overflow-wrap:anywhere;
 }
 @media(hover:hover){
- .record-main .rk-rich-figure .rk-figure-caption-hit:hover,
- .record-main .tiptap .rk-table-caption[role="button"]:hover{text-decoration:underline dotted;}
+ .record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+ .rk-rich-link-card .rk-link-card-direct-title,
+ .tiptap .rk-table-caption[contenteditable="true"]):hover{
+  text-decoration:underline dotted;
+ }
 }
-.record-main .rk-rich-figure .rk-figure-caption-hit:focus-visible,
-.record-main .tiptap .rk-table-caption[role="button"]:focus-visible{
- outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;
+.record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+ .rk-rich-link-card .rk-link-card-direct-title,
+ .tiptap .rk-table-caption[contenteditable="true"]):focus-visible{
+ outline:none;
+ background:color-mix(in srgb,var(--color-text-link,#527cb7) 8%,transparent);
+ box-shadow:inset 0 -1.5px var(--color-text-link,#527cb7);
 }
-.record-main .rk-rich-figure .rk-figure-caption-inline-editor{display:inline-block;min-width:min(18rem,75vw);max-width:100%;}
-.record-main .rk-rich-figure .rk-figure-caption-inline-editor input{width:100%;min-width:0;}
-.record-main .rk-rich-link-card .rk-link-card-inline-editor{
- display:block;overflow:visible;-webkit-line-clamp:unset;width:100%;
+.record-main .rk-rich-link-card .rk-link-card-direct-title:focus{
+ overflow:visible;-webkit-line-clamp:unset;display:block;
 }
-.record-main .rk-rich-link-card .rk-link-card-inline-editor input{font:inherit;min-width:0;}
-.record-main .tiptap .rk-table-caption .rk-table-caption-input{
- width:min(100%,36rem);box-sizing:border-box;padding:.3rem .5rem;
- border:1px solid var(--color-border,rgba(128,128,128,.4));
- border-radius:6px;background:var(--color-background-body,#fff);color:var(--color-text-primary,#222);
- text-align:center;font:inherit;
+.record-main .tiptap .rk-table-caption[contenteditable="true"]{
+ min-height:1.4em;
 }

@@ -30,8 +30,9 @@ try{
   const card=page.locator('.tiptap .rk-rich-link-card').first();
   await card.waitFor();
   assert.equal(await page.getByRole('button',{name:'编辑链接地址'}).count(),0,'old pencil removed');
-  await card.getByRole('button',{name:'直接编辑链接卡片标题'}).click();
   const inlineTitle=card.getByRole('textbox',{name:'直接编辑链接卡片标题'});
+  await inlineTitle.click();
+  assert.equal(await card.locator('.rk-link-card-title input').count(),0,'card title must edit on its existing text node');
   await inlineTitle.fill('Direct Card');
   await inlineTitle.press('Enter');
   await card.locator('.rk-link-card-title').getByText('Direct Card').waitFor();

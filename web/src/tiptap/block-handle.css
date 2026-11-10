@@ -1,25 +1,72 @@
-/* One shared non-editable affordance; never mount this inside ProseMirror. */
-.rk-block-grip {
- position:absolute;z-index:24;
+/* Portaled RMD-only affordance. It never enters ProseMirror/contentDOM or
+ * obscures the rendered block; right, left and top are viewport coordinates. */
+.rk-block-grip{
+ position:fixed;z-index:1200;
  display:flex;align-items:center;gap:1px;
- padding:2px;border:1px solid var(--color-border,rgba(128,128,128,.28));
+ padding:2px;width:70px;height:36px;box-sizing:border-box;
+ border:1px solid var(--color-border,rgba(128,128,128,.28));
  border-radius:9px;
  background:var(--color-background-body,#fff);
- box-shadow:0 3px 12px rgba(0,0,0,.11);
- user-select:none;
+ box-shadow:0 4px 16px rgba(0,0,0,.13);
+ user-select:none;isolation:isolate;
 }
 .rk-block-grip button{display:inline-flex;align-items:center;justify-content:center;min-width:30px;min-height:30px;}
 .rk-block-grip .rk-block-drag{
  border:0;border-radius:6px;padding:0;
  color:var(--color-text-secondary,#666);
- background:transparent;
- cursor:grab;
+ background:transparent;cursor:grab;
 }
 .rk-block-grip .rk-block-drag:hover{background:var(--color-background-muted,rgba(128,128,128,.09));}
 .rk-block-grip .rk-block-drag:active{cursor:grabbing;}
 .rk-block-grip .rk-block-drag:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:2px;}
-/* Touch has no hover. The explicit block selection affordance for coarse
- * pointers is introduced by P3's selection state, not a fake hover. */
+/* Neither a paragraph nor a free-standing image or code fence receives a
+ * handle. Only explicit ::: RMD block wrappers can carry these states. */
+.record-main .tiptap :is(.rk-directive[data-rk-kind],.rk-rich-link-card,.wiki-editor-embed).rk-block-hovered{
+ outline:1px solid color-mix(in srgb,var(--color-text-link,#527cb7) 35%,transparent);
+ outline-offset:4px;
+}
+.record-main .tiptap :is(.rk-directive[data-rk-kind],.rk-rich-link-card,.wiki-editor-embed).rk-block-selected{
+ outline:2px solid var(--color-text-link,#527cb7)!important;
+ outline-offset:5px;
+ border-radius:4px;
+}
+.rk-block-drag-origin{opacity:.07!important;}
+.rk-block-drag-shifting{
+ position:relative;
+ transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;
+ will-change:transform;
+}
+.rk-block-drop-slot{
+ position:fixed;z-index:1090;pointer-events:none;box-sizing:border-box;
+ border:2px dashed var(--color-text-link,#527cb7);
+ border-radius:10px;
+ background:color-mix(in srgb,var(--color-text-link,#527cb7) 10%,transparent);
+ transition:top .17s cubic-bezier(.2,.8,.2,1),left .12s ease;
+}
+.rk-block-drop-slot[data-moved="false"]{border-color:var(--color-border,rgba(128,128,128,.4));opacity:.65;}
+.rk-block-drag-floating{
+ position:fixed;z-index:1300;left:-9999px;top:-9999px;
+ max-width:min(320px,75vw);min-width:150px;max-height:120px;
+ padding:12px 14px;display:flex;align-items:flex-start;gap:10px;
+ border:1px solid var(--color-text-link,#527cb7);border-radius:11px;
+ background:var(--color-background-body,#fff);
+ box-shadow:0 12px 30px rgba(0,0,0,.2);
+ color:var(--color-text-primary,#222);
+ font-size:13px;line-height:1.5;font-weight:500;
+ overflow:hidden;overflow-wrap:anywhere;
+ opacity:.95;pointer-events:none;user-select:none;
+ transform:rotate(-1.5deg);
+}
+.rk-block-drag-floating-icon{color:var(--color-text-link,#527cb7);line-height:1;flex:none;display:grid;place-items:center;}
+.rk-block-drag-floating-icon svg{width:20px;height:20px;stroke-width:1.8;}
+.rk-block-drag-floating-copy{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.rk-block-drag-floating-copy strong{font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rk-block-drag-floating-copy > span{color:var(--color-text-secondary,#777);font-size:11px;line-height:1.45;max-height:3em;overflow:hidden;}
+body.rk-block-drag-active,body.rk-block-drag-active *{cursor:grabbing!important;}
 @media(pointer:coarse){
- .rk-block-grip button{min-height:44px;min-width:44px;}
+ .rk-block-grip{height:48px;width:98px;}
+ .rk-block-grip button{min-height:42px;min-width:42px;}
+}
+@media(prefers-reduced-motion:reduce){
+ .rk-block-drag-shifting,.rk-block-drop-slot{transition:none!important;}
 }

@@ -80,7 +80,9 @@ for(const title of standard){
  const sharedEntry=sharedMarks.has(title);
  assert.ok(sharedEntry?compact.includes('{inlineMarks}')&&shared.includes(symbol):compact.includes(symbol),
   'mobile toolbar missing standard inline mark '+title);
- assert.ok(sharedEntry?desktop.includes('{inlineMarks}')&&shared.includes(symbol):desktop.includes(symbol),
+ const desktopMoreEntry=title==='上标'?"id:'inline-more-super'":title==='下标'?"id:'inline-more-sub'":null;
+ assert.ok(sharedEntry?desktop.includes('{inlineMarks}')&&shared.includes(symbol):
+  desktop.includes(symbol)||!!desktopMoreEntry&&desktop.includes('{inlineMarks}')&&shared.includes(desktopMoreEntry),
   'desktop selection toolbar missing '+title);
 }
 for(const action of ['插入或编辑链接','引用 Wiki 文档','插入行内公式'])

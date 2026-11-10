@@ -8,7 +8,7 @@ const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Pr
 const browser=await chromium.launch({headless:true,executablePath:bin,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-const input='# Editor context actions\n\nFirst line.\n\nSecond line.';
+const input='# Editor context actions\n\nFirst line.\n\nSecond line.\n\n::: warning 右键块\n\n可选择的块内容。\n\n:::';
 try{
  await page.goto(base+'/login');
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
@@ -29,6 +29,11 @@ try{
  assert.notEqual(selCss,'none','text selection cannot be disabled');
  await first.click({button:'right'});
  const context=page.getByRole('menu').last();await context.waitFor();
+ const popupWidth=await context.evaluate(el=>el.getBoundingClientRect().width);
+ assert.ok(popupWidth>=170&&popupWidth<=275,'right-click popup must be narrow, not fullscreen: '+popupWidth);
+ assert.ok(await context.locator('[role="menuitem"] svg').count()>=3,'menu actions need leading icons');
+ assert.ok(await context.getByRole('group',{name:'文字格式'}).count()>=1,'selection actions should be organized');
+ console.log('PASS compact organized context menu',popupWidth);
  await context.getByRole('menuitem',{name:'复制块',exact:true}).click();
  await page.waitForTimeout(120);
  assert.equal(await page.locator('.tiptap p').filter({hasText:'First line.'}).count(),2,'right-click duplicates only selected block');
@@ -55,6 +60,12 @@ try{
  await formatMenu.getByRole('menuitem',{name:'普通下划线'}).click();
  await page.locator('.tiptap u').filter({hasText:'Second line.'}).first().waitFor();
  console.log('PASS context menu restores selection for standard Markdown formatting');
+ const callout=page.locator('.tiptap .rk-directive-warning').first();
+ await callout.click({button:'right'});
+ await page.getByRole('menu').last().waitFor();
+ assert.equal(await callout.evaluate(el=>el.classList.contains('rk-block-selected')),true,'right click should outline the chosen ::: block');
+ await page.keyboard.press('Escape');
+ console.log('PASS selected explicit block outline');
  await another.click();
  await page.keyboard.press('End');
  await page.keyboard.press('Shift+F10');

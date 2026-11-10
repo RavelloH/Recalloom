@@ -67,7 +67,7 @@ try{
   assert.match(await details.innerText(),/折叠内容保持完整/,'click title must not collapse details or discard body');
   const tabs=page.locator('.rk-directive-tabs').first();
   await tabs.locator('.rk-directive-title-hit').first().click();
-  const tinput=tabs.getByRole('textbox',{name:'容器标题'});
+  const tinput=tabs.getByRole('textbox',{name:'容器标题'}).first();
   await tinput.fill('标签页标题');await tinput.press('Enter');
   await tabs.locator('.rk-directive-title-hit').first().getByText('标签页标题').waitFor();
   await page.getByRole('button',{name:'源码'}).click();

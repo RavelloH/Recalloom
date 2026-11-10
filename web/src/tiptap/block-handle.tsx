@@ -1,49 +1,149 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
 import type {RefObject} from 'react';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {IconGripVertical,IconDots} from '@tabler/icons-react';
-import {blockCanReorder,editableBlockAt,editableBlockFromDocumentPosition,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
+import {blockCanReorder,blockSiblings,editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
 import './block-handle.css';
 
 type HoverBlock={pos:number;x:number;y:number;element:HTMLElement};
-function findDirectBlock(view:HTMLElement,target:EventTarget|null):HTMLElement|null{
- if(!(target instanceof Node)||!view.contains(target))return null;
- let node=target instanceof Element?target:target.parentElement;
- while(node&&node.parentElement!==view)node=node.parentElement;
- return node instanceof HTMLElement&&node.parentElement===view?node:null;
+type DragEntry={pos:number;element:HTMLElement;rect:DOMRect;selector:string};
+type DragSession={
+ source:HoverBlock;sourceIndex:number;entries:DragEntry[];
+ target:{pos:number;after:boolean}|null;floating:HTMLElement;slot:HTMLElement;css:HTMLStyleElement;offset:number;
+};
+const explicitSelector='.rk-directive[data-rk-kind], .rk-rich-link-card[data-rk-link-card], .wiki-editor-embed';
+function gripPosition(element:HTMLElement){
+ const r=element.getBoundingClientRect();
+ const width=matchMedia('(pointer:coarse)').matches?98:70;
+ const height=matchMedia('(pointer:coarse)').matches?48:36;
+ // A handle is always OUTSIDE the RMD block. If the right gutter is too
+ // narrow, put it in the left gutter or above the block, never on the text.
+ const rightFits=r.right+9+width<=innerWidth-6;
+ const leftFits=r.left-width-9>=6;
+ const x=rightFits?r.right+9:leftFits?r.left-width-9:
+  Math.max(6,Math.min(r.right-width,innerWidth-width-6));
+ const top=rightFits||leftFits?r.top+4:r.top-height-5;
+ // Programmatic selection of an offscreen block (or virtual keyboard resize)
+ // must not strand the grip in an unreachable viewport coordinate.
+ const y=Math.max(6,Math.min(innerHeight-height-6,top));
+ return {x,y};
 }
-function hoveredBlock(editor:Editor,surface:HTMLElement,target:EventTarget|null):HoverBlock|null{
+function findExplicitBlock(editor:Editor,target:EventTarget|null):HoverBlock|null{
  const view=editor.view.dom;
  const source=target instanceof Element?target:target instanceof Node?target.parentElement:null;
- // Prefer a nested child wrapper over its parent. Never expose arbitrary
- // paragraphs as independent structurally movable RMD children.
- const nested=source?.closest<HTMLElement>('.rk-directive[data-rk-kind]');
- if(nested&&view.contains(nested)){
-  try{
-   const domPos=editor.view.posAtDOM(nested,0),kind=nested.dataset.rkKind;
-   for(const position of [domPos,domPos-1,domPos+1]){
-    const candidate=editableBlockAt(editor,position)??editableBlockFromDocumentPosition(editor,position);
-    if(candidate?.parentKind&&candidate.node.attrs.kind===kind){
-     const a=nested.getBoundingClientRect(),s=surface.getBoundingClientRect();
-     return {pos:candidate.pos,element:nested,
-      x:Math.max(0,Math.min(a.right-s.left+4,s.width-78)),y:Math.max(0,a.top-s.top+3)};
-    }
-   }
-  }catch{/* Fall through to the enclosing top-level block. */}
- }
- const element=findDirectBlock(view,target);
- if(!element)return null;
+ const element=source?.closest<HTMLElement>(explicitSelector);
+ if(!element||!view.contains(element))return null;
  let pos:number;
- try{pos=editor.view.posAtDOM(element,0);}catch{return null;}
- const block=topLevelAtDocumentPosition(editor,pos);
- if(!block)return null;
- const a=element.getBoundingClientRect(),s=surface.getBoundingClientRect();
- return {pos:block.pos,element,
-  x:Math.max(0,Math.min(a.right-s.left+4,s.width-78)),
-  y:Math.max(0,a.top-s.top+3)};
+ try{
+  const domPos=editor.view.posAtDOM(element,0);
+  // NodeView wrappers sometimes report the position immediately inside the
+  // wrapper. Probe the boundary without ever selecting an arbitrary paragraph.
+  const kind=element.dataset.rkKind;
+  const candidates=[domPos,domPos-1,domPos+1].map(p=>
+   editableBlockAt(editor,p)??editableBlockFromDocumentPosition(editor,p));
+  const match=candidates.find(block=>block&&isExplicitRmdBlock(editor,block.pos)&&
+   (kind?block.node.type.name==='richContainer'&&block.node.attrs.kind===kind:
+    element.matches('.rk-rich-link-card')?block.node.type.name==='richLinkCard':
+    block.node.type.name==='wikiEmbed'));
+  if(!match)return null;
+  pos=match.pos;
+ }catch{return null;}
+ return {pos,element,...gripPosition(element)};
 }
+function blockNode(editor:Editor,pos:number):HTMLElement|null{
+ const node=editor.view.nodeDOM(pos);
+ return node instanceof HTMLElement?node:node instanceof Element?node.closest<HTMLElement>(explicitSelector):null;
+}
+/** A temporary stylesheet moves ProseMirror-owned paragraphs and list nodes.
+ * Changing className/style on those nodes directly makes ProseMirror restore
+ * their attributes during drag, causing jitter and lost transforms. */
+function nodeSelector(element:HTMLElement,root:HTMLElement):string|null{
+ if(!root.contains(element))return null;
+ let current:HTMLElement|null=element;
+ const steps:string[]=[];
+ while(current&&current!==root){
+  const parent:HTMLElement|null=current.parentElement;
+  if(!parent)return null;
+  steps.unshift(' > :nth-child('+(Array.from(parent.children).indexOf(current)+1)+')');
+  current=parent;
+ }
+ return '.record-main .tiptap'+steps.join('');
+}
+function makeDragSession(editor:Editor,source:HoverBlock,handle:HTMLElement):DragSession|null{
+ const siblings=blockSiblings(editor,source.pos);
+ const entries=siblings.map(item=>{
+  const node=editor.view.nodeDOM(item.pos);
+  const element=node instanceof HTMLElement?node:null;
+  const selector=element?nodeSelector(element,editor.view.dom):null;
+  return element&&selector?{pos:item.pos,element,rect:element.getBoundingClientRect(),selector}:null;
+ }).filter((value):value is DragEntry=>value!==null);
+ const sourceIndex=entries.findIndex(item=>item.pos===source.pos);
+ if(sourceIndex<0||entries.length<2)return null;
+ const floating=document.createElement('div');
+ floating.className='rk-block-drag-floating';
+ const icon=document.createElement('span');icon.className='rk-block-drag-floating-icon';
+ const gripIcon=handle.querySelector('svg')?.cloneNode(true);
+ if(gripIcon)icon.appendChild(gripIcon);
+ const copy=document.createElement('span');copy.className='rk-block-drag-floating-copy';
+ const title=document.createElement('strong');
+ title.textContent=source.element.querySelector('.rk-directive-title-hit,.rk-link-card-title')?.textContent?.trim()||
+  source.element.dataset.rkKind||'RMD 块';
+ const summary=document.createElement('span');
+ summary.textContent=source.element.querySelector('.rk-directive-body')?.textContent?.trim().slice(0,94)||'拖动以调整块的位置';
+ copy.append(title,summary);floating.append(icon,copy);
+ document.body.appendChild(floating);
+ document.body.classList.add('rk-block-drag-active');
+ const slot=document.createElement('div');
+ slot.className='rk-block-drop-slot';slot.setAttribute('aria-hidden','true');
+ document.body.appendChild(slot);
+ const css=document.createElement('style');
+ css.setAttribute('data-rk-drag-styles','');document.head.appendChild(css);
+ const rect=entries[sourceIndex]!.rect;
+ slot.style.left=rect.left+'px';slot.style.top=rect.top+'px';
+ slot.style.width=rect.width+'px';slot.style.height=Math.max(rect.height,24)+'px';
+ return {source,sourceIndex,entries,target:null,floating,slot,css,offset:0};
+}
+function paintDrag(session:DragSession,index:number,clientX:number,clientY:number){
+ const source=session.entries[session.sourceIndex]!;
+ // Include the existing block gap so the displaced neighbours move into
+ // the vacated slot without touching ProseMirror's DOM or transaction history.
+ const below=session.entries[session.sourceIndex+1];
+ const above=session.entries[session.sourceIndex-1];
+ const downGap=below?Math.max(source.rect.height,below.rect.top-source.rect.top):source.rect.height;
+ const upGap=above?Math.max(source.rect.height,source.rect.bottom-above.rect.bottom):source.rect.height;
+ const delta=index>session.sourceIndex?downGap:index<session.sourceIndex?upGap:0;
+ session.offset=delta;
+ const rules=[source.selector+'{opacity:.07!important;}'];
+ for(let i=0;i<session.entries.length;i++){
+  const entry=session.entries[i]!;
+  if(i===session.sourceIndex)continue;
+  const shift=index>session.sourceIndex&&i>session.sourceIndex&&i<=index?-delta:
+   index<session.sourceIndex&&i>=index&&i<session.sourceIndex?delta:0;
+  if(shift)rules.push(entry.selector+'{transform:translate3d(0,'+shift+
+   'px,0)!important;transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;}');
+  else rules.push(entry.selector+'{transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;}');
+ }
+ session.css.textContent=rules.join(String.fromCharCode(10));
+ const top=index<session.sourceIndex?session.entries[index]!.rect.top:
+  index>session.sourceIndex?session.entries[index]!.rect.bottom-delta:source.rect.top;
+ session.slot.style.left=source.rect.left+'px';session.slot.style.top=top+'px';
+ session.slot.style.width=source.rect.width+'px';
+ session.slot.style.height=Math.max(24,source.rect.height)+'px';
+ session.slot.dataset.moved=String(index!==session.sourceIndex);
+ session.slot.dataset.motion=JSON.stringify({sourceIndex:session.sourceIndex,index,entries:session.entries.length,delta});
+ session.floating.style.left=Math.min(innerWidth-100,clientX+16)+'px';
+ session.floating.style.top=Math.min(innerHeight-48,clientY+14)+'px';
+}
+function clearDrag(session:DragSession|null){
+ if(!session)return;
+ session.css.remove();
+ session.floating.remove();session.slot.remove();
+ document.body.classList.remove('rk-block-drag-active');
+}
+
 export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
  editor:Editor;surfaceRef:RefObject<HTMLDivElement|null>;
  onEditBlock:(pos:number)=>void;
@@ -52,60 +152,102 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
  const hoverRef=useRef<HoverBlock|null>(null);hoverRef.current=hover;
  const [menuOpen,setMenuOpen]=useState(false);
  const menuOpenRef=useRef(false);menuOpenRef.current=menuOpen;
- const dragSource=useRef<number|null>(null);
- const dropTarget=useRef<{pos:number;after:boolean}|null>(null);
+ const dragRef=useRef<DragSession|null>(null);
+ const selectedElement=useRef<HTMLElement|null>(null);
+ const selectedPos=useRef<number|null>(null);
+ const select=(pos:number|null,element:HTMLElement|null)=>{
+  selectedElement.current?.classList.remove('rk-block-selected');
+  selectedElement.current=null;selectedPos.current=null;
+  if(pos!==null&&element&&isExplicitRmdBlock(editor,pos)){
+   selectedElement.current=element;selectedPos.current=pos;
+   element.classList.add('rk-block-selected');
+  }
+ };
+ const selectRef=useRef(select);selectRef.current=select;
  useEffect(()=>{
   const surface=surfaceRef.current;
   if(!surface)return;
-  const position=(node:HTMLElement,pos:number)=>{
-   const a=node.getBoundingClientRect(),s=surface.getBoundingClientRect();
-   setHover(last=>{
-    const x=Math.max(0,Math.min(a.right-s.left+4,s.width-78)),y=Math.max(0,a.top-s.top+3);
-    return last?.pos===pos&&Math.abs(last.x-x)<1&&Math.abs(last.y-y)<1?last:{pos,element:node,x,y};
-   });
+  const place=(block:HoverBlock)=>{
+   const next={...block,...gripPosition(block.element)};
+   setHover(last=>last?.pos===next.pos&&last.element===next.element&&
+    Math.abs(last.x-next.x)<1&&Math.abs(last.y-next.y)<1?last:next);
   };
   const move=(event:PointerEvent)=>{
-   if(event.pointerType==='touch'||dragSource.current!==null)return;
-   const grip=(event.target as Element)?.closest?.('.rk-block-grip');
-   if(grip)return;
-   const block=hoveredBlock(editor,surface,event.target);
-   if(block)position(block.element,block.pos);
+   if(event.pointerType==='touch'||dragRef.current)return;
+   if((event.target as Element)?.closest?.('.rk-block-grip'))return;
+   const block=findExplicitBlock(editor,event.target);
+   if(block)place(block);
    else if(!menuOpenRef.current)setHover(null);
   };
   const tap=(event:PointerEvent)=>{
-   // On touch devices selection replaces hover, without hijacking the native
-   // long-press text selection or the editable ProseMirror content.
-   if(event.pointerType!=='touch')return;
-   const block=hoveredBlock(editor,surface,event.target);
-   if(block)position(block.element,block.pos);
-  };
-  const leave=()=>{if(!menuOpenRef.current&&dragSource.current===null)setHover(null)};
-  const scroll=()=>{
-   const current=hoverRef.current;
-   if(current&&current.element.isConnected)position(current.element,current.pos);
-  };
-  const dragOver=(event:DragEvent)=>{
-   if(dragSource.current===null)return;
-   event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='move';
-   const block=hoveredBlock(editor,surface,event.target);
-   if(block){
-    const r=block.element.getBoundingClientRect();
-    dropTarget.current={pos:block.pos,after:event.clientY>r.top+r.height/2};
+   if(event.pointerType==='touch'){
+    const block=findExplicitBlock(editor,event.target);
+    if(block)place(block);
+    return;
+   }
+   if(event.button===0&&!dragRef.current){
+    const target=event.target as Element;
+    if(!target?.closest?.('.rk-block-grip'))selectRef.current(null,null);
    }
   };
+  const leave=(event:PointerEvent)=>{
+   if(!menuOpenRef.current&&!dragRef.current&&!(event.relatedTarget instanceof Element&&
+    event.relatedTarget.closest('.rk-block-grip')))setHover(null);
+  };
+  const scroll=()=>{
+   const current=hoverRef.current;
+   if(current?.element.isConnected)place(current);
+  };
+  const selectFromContext=(event:Event)=>{
+   const detail=(event as CustomEvent<{pos:number;element?:HTMLElement|null}>).detail;
+   const block=Number.isInteger(detail?.pos)&&isExplicitRmdBlock(editor,detail.pos)?
+    detail.pos:null;
+   const element=block!==null?(detail.element??blockNode(editor,block)):null;
+   selectRef.current(block,element);
+  };
+  const dragOver=(event:DragEvent)=>{
+   const session=dragRef.current;
+   if(!session)return;
+   event.preventDefault();
+   if(event.dataTransfer)event.dataTransfer.dropEffect='move';
+   session.floating.style.left=Math.min(innerWidth-100,event.clientX+16)+'px';
+   session.floating.style.top=Math.min(innerHeight-48,event.clientY+14)+'px';
+   const at=editor.view.posAtCoords({left:event.clientX,top:event.clientY});
+   const source=editableBlockAt(editor,session.source.pos);
+   const top=at?topLevelAtDocumentPosition(editor,at.pos):null;
+   const candidate=at&&source?(source.parentPos===null?
+    (top?{...top,parentPos:null,parentKind:null}:null):
+    editableBlockFromDocumentPosition(editor,at.pos)):null;
+   if(!source||!candidate||!blockCanReorder(editor,source.pos)||
+    (source.parentPos===null?false:
+      candidate.parentPos!==source.parentPos||candidate.node.attrs.kind!==source.node.attrs.kind)){
+    session.target=null;paintDrag(session,session.sourceIndex,event.clientX,event.clientY);return;
+   }
+   const targetIndex=session.entries.findIndex(entry=>entry.pos===candidate.pos);
+   if(targetIndex<0){session.target=null;paintDrag(session,session.sourceIndex,event.clientX,event.clientY);return;}
+   const target=session.entries[targetIndex]!;
+   const after=event.clientY>=target.rect.top+target.rect.height/2;
+   const rawIndex=targetIndex+(after?1:0);
+   const newIndex=Math.max(0,Math.min(session.entries.length-1,rawIndex>session.sourceIndex?rawIndex-1:rawIndex));
+   session.target=newIndex===session.sourceIndex?null:{pos:target.pos,after};
+   paintDrag(session,newIndex,event.clientX,event.clientY);
+  };
   const drop=(event:DragEvent)=>{
-   if(dragSource.current===null)return;
+   const session=dragRef.current;
+   if(!session)return;
    event.preventDefault();event.stopPropagation();
-   const source=dragSource.current,target=dropTarget.current;
-   dragSource.current=null;dropTarget.current=null;
-   if(target)moveBlockTo(editor,source,target.pos,target.after);
-   setHover(null);
+   dragRef.current=null;
+   const target=session.target;
+   clearDrag(session);
+   if(target)moveBlockTo(editor,session.source.pos,target.pos,target.after);
+   selectRef.current(null,null);setHover(null);
   };
   surface.addEventListener('pointermove',move);
   surface.addEventListener('pointerdown',tap);
   surface.addEventListener('pointerleave',leave);
   surface.addEventListener('dragover',dragOver,true);
   surface.addEventListener('drop',drop,true);
+  surface.addEventListener('rk-block-select',selectFromContext);
   window.addEventListener('scroll',scroll,true);
   window.addEventListener('resize',scroll);
   return()=>{
@@ -114,31 +256,49 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
    surface.removeEventListener('pointerleave',leave);
    surface.removeEventListener('dragover',dragOver,true);
    surface.removeEventListener('drop',drop,true);
+   surface.removeEventListener('rk-block-select',selectFromContext);
    window.removeEventListener('scroll',scroll,true);
    window.removeEventListener('resize',scroll);
+   clearDrag(dragRef.current);dragRef.current=null;
+   selectedElement.current?.classList.remove('rk-block-selected');
   };
  },[editor,surfaceRef]);
- const pos=hover?.pos??null;
- return <>{hover&&<div className="rk-block-grip" role="group" aria-label="块把手"
-  style={{left:hover.x,top:hover.y}} onPointerDown={e=>e.stopPropagation()}>
+ useEffect(()=>{
+  const element=hover?.element;
+  if(!element)return;
+  element.classList.add('rk-block-hovered');
+  return()=>element.classList.remove('rk-block-hovered');
+ },[hover?.element]);
+ const startDrag=(event:React.DragEvent<HTMLButtonElement>)=>{
+  if(!hover||!blockCanReorder(editor,hover.pos)){event.preventDefault();return;}
+  const session=makeDragSession(editor,hover,event.currentTarget);
+  if(!session){event.preventDefault();return;}
+  dragRef.current=session;selectRef.current(hover.pos,hover.element);
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('application/x-recalloom-block',String(hover.pos));
+  event.dataTransfer.setData('text/plain','移动 RMD 块');
+  // The browser's default semi-transparent screenshot obscures the live
+  // placeholder, so use our own small floating block card instead.
+  const transparent=document.createElement('canvas');transparent.width=1;transparent.height=1;
+  event.dataTransfer.setDragImage(transparent,0,0);
+  setMenuOpen(false);
+ };
+ const finishDrag=()=>{
+  clearDrag(dragRef.current);dragRef.current=null;
+  selectRef.current(null,null);setHover(null);
+ };
+ return <>{hover&&createPortal(<div className="rk-block-grip" role="group" aria-label="块把手"
+  style={{left:hover.x,top:hover.y}} onPointerDown={event=>event.stopPropagation()}>
   <button type="button" className="rk-block-drag" aria-label="拖动块"
    title={blockCanReorder(editor,hover.pos)?'拖动调整块顺序；点击打开块操作':'点击打开子块操作（此类块不可拖动）'}
    draggable={blockCanReorder(editor,hover.pos)}
-   onClick={()=>setMenuOpen(open=>!open)}
-   onDragStart={event=>{
-    if(!blockCanReorder(editor,hover.pos)){event.preventDefault();return;}
-    dragSource.current=hover.pos;dropTarget.current=null;
-    event.dataTransfer.effectAllowed='move';
-    event.dataTransfer.setData('application/x-recalloom-block',String(hover.pos));
-    event.dataTransfer.setData('text/plain','移动文档块');
-    setMenuOpen(false);
-   }}
-   onDragEnd={()=>{dragSource.current=null;dropTarget.current=null;setHover(null);}}>
+   onClick={()=>{selectRef.current(hover.pos,hover.element);setMenuOpen(open=>!open);}}
+   onDragStart={startDrag} onDragEnd={finishDrag}>
    <IconGripVertical size="var(--rk-icon-md)"/>
   </button>
   <MoreMenu label="块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
    variant="ghost" size="sm" presentation="adaptive"
    isMenuOpen={menuOpen} onOpenChange={setMenuOpen}
    items={blockMenuItems({editor,pos:hover.pos,onEditBlock,onAction:()=>{setMenuOpen(false);setHover(null);}})}/>
- </div>}</>;
+ </div>,document.body)}</>;
 }

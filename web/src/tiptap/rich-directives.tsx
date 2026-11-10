@@ -9,7 +9,6 @@ import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {RmdChatMessage,RmdChatTranscript} from '../rmd-chat';
 import {isSketchKind} from '../sketch-geometry';
-import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconEye,IconEyeOff} from '@tabler/icons-react';
 import {richTitle} from './rich-schema';
 import {isRmdId} from '../rmd-schema';
@@ -33,31 +32,34 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
  const [selected,setSelected]=useState('0');
  const [flashcardOpen,setFlashcardOpen]=useState(false);
  const activeTab=Math.min(Math.max(0,Number(selected)||0),Math.max(0,tabs.length-1));
- const [editing,setEditing]=useState(false);
- const [draft,setDraft]=useState(title);
- const titleFinished=useRef(false);
- const startTitleEdit=()=>{titleFinished.current=false;setDraft(title);setEditing(true);};
- const finishTitleEdit=()=>{
-  if(titleFinished.current)return;
-  titleFinished.current=true;
-  const next=safeTitle(draft);
-  if(next!==title)updateAttributes({title:next});
-  setEditing(false);
+ // The title is the editing surface itself. Never replace it with a text input
+ // (which changes its dimensions and breaks the click-to-caret experience).
+ const titleElement=useRef<HTMLSpanElement|null>(null);
+ const titleEditing=useRef(false);
+ const finishTitleEdit=(save:boolean)=>{
+  if(!titleEditing.current)return;
+  titleEditing.current=false;
+  const element=titleElement.current;
+  const next=safeTitle(element?.textContent??'');
+  if(save&&next!==title)updateAttributes({title:next});
+  if(element&&!save)element.textContent=richTitle(kind,title);
+  if(element&&!next&&save)element.textContent=richTitle(kind,'');
  };
- const cancelTitleEdit=()=>{titleFinished.current=true;setEditing(false);};
  const editTitle=<span className="rk-directive-title" contentEditable={false}>
-  {editing?<TextInput label="容器标题" value={draft} onChange={setDraft} aria-label="容器标题"
-    onKeyDown={event=>{
-     if(event.key==='Enter'){event.preventDefault();event.stopPropagation();finishTitleEdit();}
-     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();cancelTitleEdit();}
-    }} onBlur={finishTitleEdit}/>
-   :<span className="rk-directive-title-hit" role="button" tabIndex={0}
-     aria-label={'编辑'+kind+'标题'} title="点击直接编辑标题"
-     onMouseDown={event=>event.stopPropagation()}
-     onClick={event=>{event.stopPropagation();startTitleEdit();}}
-     onKeyDown={event=>{
-      if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();startTitleEdit();}
-     }}>{richTitle(kind,title)}</span>}
+  <span ref={titleElement} className="rk-directive-title-hit" contentEditable
+   suppressContentEditableWarning role="textbox" tabIndex={0}
+   aria-label="容器标题" aria-multiline={false} spellCheck
+   title="点击文字即可直接编辑；Enter 确认、Esc 取消"
+   onPointerDown={event=>event.stopPropagation()}
+   onClick={event=>event.stopPropagation()}
+   onFocus={event=>{titleEditing.current=true;if(!title)event.currentTarget.textContent='';}}
+   onBlur={()=>finishTitleEdit(true)}
+   onKeyDown={event=>{
+    event.stopPropagation();
+    if(event.nativeEvent.isComposing)return;
+    if(event.key==='Enter'){event.preventDefault();finishTitleEdit(true);event.currentTarget.blur();}
+    else if(event.key==='Escape'){event.preventDefault();finishTitleEdit(false);event.currentTarget.blur();}
+   }}>{richTitle(kind,title)}</span>
  </span>;
  const stableId=typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined;
  return <NodeViewWrapper id={stableId} className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>
