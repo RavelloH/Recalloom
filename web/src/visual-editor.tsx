@@ -446,12 +446,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!range){const {from,to}=editor.state.selection;if(from!==to)range={from,to};}
   inlineSelectionRef.current=range;
  };
- const runInlineFromMenu=(command:InlineCommand)=>{
+ const runCapturedInline=(run:()=>void)=>{
   const range=inlineSelectionRef.current;inlineSelectionRef.current=null;
   if(range&&range.from<range.to&&range.to<=editor.state.doc.content.size)
    editor.commands.setTextSelection(range);
-  command.run(editor);
+  run();
  };
+ const runInlineFromMenu=(command:InlineCommand)=>runCapturedInline(()=>{command.run(editor);});
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
   <ToggleButton key={name} label={name} size="sm" isPressed={pressed} onPressedChange={run}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
@@ -474,6 +475,22 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     id:command.id,label:command.title,description:command.description,
     isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
    }))}/>
+  <DropdownMenu button={{label:'更多行内功能',variant:'ghost',size:'sm',icon:<IconLink size="var(--rk-icon-sm)"/>,onPointerDown:captureInlineRange}}
+   presentation="adaptive" items={[
+    {id:'inline-more-link',label:'链接',description:'为选中文字添加或编辑网页链接',
+     onClick:()=>runCapturedInline(openLink)},
+    {id:'inline-more-math',label:'行内公式',description:'插入可编辑 LaTeX 公式',
+     onClick:()=>runCapturedInline(()=>openMath('inline'))},
+    {id:'inline-more-wiki',label:'Wiki 引用',description:'在光标处输入 [[ 并搜索知识库文档',
+     isDisabled:!editor.state.selection.empty,
+     onClick:()=>runCapturedInline(()=>{editor.chain().focus().insertContent('[[').run();})},
+    {id:'inline-more-footnote',label:'脚注引用',description:'在光标处插入可关联脚注定义的引用',
+     isDisabled:!editor.state.selection.empty,
+     onClick:()=>runCapturedInline(()=>{editor.chain().focus().insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run();})},
+    {id:'inline-more-comment',label:'弱化注释',description:'把选中文字标记为可见注释',
+     isDisabled:editor.state.selection.empty,
+     onClick:()=>runCapturedInline(()=>{editor.chain().focus().setMark('visibleComment').run();})}
+   ]}/>
  </>;
  return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
   <div className="rk-editor-block-canvas">

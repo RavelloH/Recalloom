@@ -21,4 +21,9 @@ describe('Rich Markdown slash commands do not shadow existing actions',()=>{
   assert.equal(filterSlashCommands(editor,'链接卡片')[0]?.id,'link-card');
   assert.equal(filterSlashCommands(editor,'标签页')[0]?.id,'tabs');
  });
+ it('exposes every supported heading level and an editable footnote definition',()=>{
+  for(const level of [1,2,3,4,5,6])
+   assert.equal(filterSlashCommands(editor,'h'+level)[0]?.id,'h'+level);
+  assert.equal(filterSlashCommands(editor,'脚注定义')[0]?.id,'footnote-definition');
+ });
 });

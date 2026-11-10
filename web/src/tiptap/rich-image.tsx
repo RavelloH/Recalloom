@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import Image from '@tiptap/extension-image';
 import {ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {TextInput} from '@astryxdesign/core/TextInput';
@@ -18,6 +18,8 @@ function cleanText(value:unknown,max=240):string{
 function FigureNodeView({node,updateAttributes,selected,editor,getPos}:NodeViewProps){
  const attrs=node.attrs as {src?:string;alt?:string;title?:string;width?:number;height?:number;caption?:string;figureId?:string};
  const [caption,setCaption]=useState(cleanText(attrs.caption));
+ const [editingCaption,setEditingCaption]=useState(false);
+ const captionFinished=useRef(false);
  const [width,setWidth]=useState(attrs.width?String(attrs.width):'');
  const [height,setHeight]=useState(attrs.height?String(attrs.height):'');
  const [figureId,setFigureId]=useState(String(attrs.figureId??''));
@@ -28,6 +30,16 @@ function FigureNodeView({node,updateAttributes,selected,editor,getPos}:NodeViewP
  useEffect(()=>setWidth(attrs.width?String(attrs.width):''),[attrs.width]);
  useEffect(()=>setHeight(attrs.height?String(attrs.height):''),[attrs.height]);
  useEffect(()=>setFigureId(String(attrs.figureId??'')),[attrs.figureId]);
+ const startCaption=()=>{captionFinished.current=false;setCaption(cleanText(attrs.caption));setEditingCaption(true);};
+ const finishCaption=(save:boolean)=>{
+  if(captionFinished.current)return;
+  captionFinished.current=true;
+  if(save){
+   const next=cleanText(caption);
+   if(next!==cleanText(attrs.caption))updateAttributes({caption:next});
+  }else setCaption(cleanText(attrs.caption));
+  setEditingCaption(false);
+ };
  const commitCaption=()=>{const next=cleanText(caption);if(next!==cleanText(attrs.caption))updateAttributes({caption:next});};
  const commitSize=(field:'width'|'height',draft:string)=>{
   const next=draft.trim()?sizeAttr(draft):null;
@@ -45,7 +57,24 @@ function FigureNodeView({node,updateAttributes,selected,editor,getPos}:NodeViewP
      draggable={false} referrerPolicy="no-referrer"
      style={{width:widthValue?widthValue+'px':undefined,height:heightValue?heightValue+'px':undefined,objectFit:'contain'}}/>
    :<div className="rk-rich-figure-invalid">图片地址不可用</div>}
-  {(attrs.caption||number)&&<figcaption className="rk-rich-figcaption">{number&&<strong className="rk-cross-caption-number">{number}{attrs.caption?'：':''}</strong>}{cleanText(attrs.caption)}</figcaption>}
+  {(attrs.caption||number||editingCaption)&&<figcaption className="rk-rich-figcaption">
+   {number&&<strong className="rk-cross-caption-number">{number}{attrs.caption?'：':''}</strong>}
+   {editingCaption?<span contentEditable={false} className="rk-figure-caption-inline-editor">
+    <TextInput label="直接编辑图片图注" width="100%" value={caption} onChange={setCaption} hasAutoFocus
+     onBlur={()=>finishCaption(true)}
+     onKeyDown={event=>{
+      if(event.nativeEvent.isComposing)return;
+      if(event.key==='Enter'){event.preventDefault();event.stopPropagation();finishCaption(true);}
+      else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finishCaption(false);}
+     }}/>
+   </span>:<span className="rk-figure-caption-hit" role="button" tabIndex={0}
+    aria-label="直接编辑图片图注" title="点击直接编辑图注"
+    onMouseDown={event=>event.stopPropagation()}
+    onClick={event=>{event.preventDefault();event.stopPropagation();startCaption();}}
+    onKeyDown={event=>{
+     if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();startCaption();}
+    }}>{cleanText(attrs.caption)||'添加图注'}</span>}
+  </figcaption>}
   {formatRmdBlockAttrs({type:'image',attrs})&&<button type="button" contentEditable={false} className="rk-rmd-attrs-decoration" data-rk-attrs-kind="image"
     aria-label="编辑图片 Markdown 属性"
     onMouseDown={e=>e.preventDefault()}

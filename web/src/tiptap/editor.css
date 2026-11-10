@@ -499,3 +499,29 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  display:table;margin:.35rem auto .65rem;max-width:100%;text-align:center;
 }
 /* Markdown @ attrs markers now open the shared responsive BlockEditorPanel. */
+
+/* Visible document-owned captions and card titles edit in place, without an icon. */
+.record-main .rk-rich-figure .rk-figure-caption-hit,
+.record-main .tiptap .rk-table-caption[role="button"]{
+ cursor:text;border-radius:3px;text-underline-offset:.16em;
+}
+@media(hover:hover){
+ .record-main .rk-rich-figure .rk-figure-caption-hit:hover,
+ .record-main .tiptap .rk-table-caption[role="button"]:hover{text-decoration:underline dotted;}
+}
+.record-main .rk-rich-figure .rk-figure-caption-hit:focus-visible,
+.record-main .tiptap .rk-table-caption[role="button"]:focus-visible{
+ outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;
+}
+.record-main .rk-rich-figure .rk-figure-caption-inline-editor{display:inline-block;min-width:min(18rem,75vw);max-width:100%;}
+.record-main .rk-rich-figure .rk-figure-caption-inline-editor input{width:100%;min-width:0;}
+.record-main .rk-rich-link-card .rk-link-card-inline-editor{
+ display:block;overflow:visible;-webkit-line-clamp:unset;width:100%;
+}
+.record-main .rk-rich-link-card .rk-link-card-inline-editor input{font:inherit;min-width:0;}
+.record-main .tiptap .rk-table-caption .rk-table-caption-input{
+ width:min(100%,36rem);box-sizing:border-box;padding:.3rem .5rem;
+ border:1px solid var(--color-border,rgba(128,128,128,.4));
+ border-radius:6px;background:var(--color-background-body,#fff);color:var(--color-text-primary,#222);
+ text-align:center;font:inherit;
+}

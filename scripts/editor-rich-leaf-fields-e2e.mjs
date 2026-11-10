@@ -30,7 +30,17 @@ try{
   const card=page.locator('.tiptap .rk-rich-link-card').first();
   await card.waitFor();
   assert.equal(await page.getByRole('button',{name:'编辑链接地址'}).count(),0,'old pencil removed');
-  await card.getByRole('button',{name:'编辑链接卡片'}).click();
+  await card.getByRole('button',{name:'直接编辑链接卡片标题'}).click();
+  const inlineTitle=card.getByRole('textbox',{name:'直接编辑链接卡片标题'});
+  await inlineTitle.fill('Direct Card');
+  await inlineTitle.press('Enter');
+  await card.locator('.rk-link-card-title').getByText('Direct Card').waitFor();
+  if(width===1280)await card.hover();
+  else await card.dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  const cardGrip=page.getByRole('group',{name:'块把手'});
+  await cardGrip.waitFor();
+  await cardGrip.getByRole('button',{name:'块操作'}).click();
+  await page.getByRole('menuitem',{name:'编辑块'}).last().click();
   const panel=page.getByRole(width===1280?'complementary':'dialog',{name:'块编辑面板'});
   await panel.waitFor();
   assert.equal(await panel.getByRole('region',{name:'链接卡片属性'}).count(),1);

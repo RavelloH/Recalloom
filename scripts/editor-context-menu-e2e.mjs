@@ -32,6 +32,13 @@ try{
  await context.getByRole('menuitem',{name:'复制块',exact:true}).click();
  await page.waitForTimeout(120);
  assert.equal(await page.locator('.tiptap p').filter({hasText:'First line.'}).count(),2,'right-click duplicates only selected block');
+ await first.click({button:'right'});
+ await page.getByRole('menu').last().getByRole('menuitem',{name:'撤销',exact:true}).click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('.tiptap p')].filter(p=>p.textContent?.includes('First line.')).length===1);
+ await first.click({button:'right'});
+ await page.getByRole('menu').last().getByRole('menuitem',{name:'重做',exact:true}).click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('.tiptap p')].filter(p=>p.textContent?.includes('First line.')).length===2);
+ console.log('PASS context menu undo/redo of block operations');
  const another=page.locator('.tiptap p').filter({hasText:'Second line.'}).first();
  await another.click();
  await page.keyboard.press('End');await page.keyboard.press('Shift+Home');

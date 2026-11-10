@@ -2,6 +2,7 @@
  * The actual mutations are implemented once in editor-block-actions.ts.
  */
 import type {Editor} from '@tiptap/core';
+import {undo,redo,undoDepth,redoDepth} from '@tiptap/pm/history';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {serializeRmdBlock} from '../rmd-serialize';
 import {blockCanDelete,blockCanDuplicate,blockCanReorder,blockSiblings,duplicateBlock,editableBlockAt,moveBlockBy,removeBlock} from './editor-block-actions';
@@ -32,7 +33,12 @@ export function blockMenuItems({editor,pos,onEditBlock,onAction}:BlockMenuOption
    onClick:run(()=>{moveBlockBy(editor,pos,1);})},
   {type:'divider'},
   {id:'remove-block',label:'删除块',variant:'destructive',isDisabled:!blockCanDelete(editor,pos),
-   onClick:run(()=>{removeBlock(editor,pos);})}
+   onClick:run(()=>{removeBlock(editor,pos);})},
+  {type:'divider'},
+  {id:'undo',label:'撤销',isDisabled:undoDepth(editor.state)===0,
+   onClick:run(()=>{undo(editor.state,editor.view.dispatch);editor.view.focus();})},
+  {id:'redo',label:'重做',isDisabled:redoDepth(editor.state)===0,
+   onClick:run(()=>{redo(editor.state,editor.view.dispatch);editor.view.focus();})}
  ];
 }
 /** Restore the captured text selection before a context-menu action takes focus. */
@@ -42,7 +48,7 @@ export function runWithTextSelection<T>(editor:Editor,range:{from:number;to:numb
  return run();
 }
 /** Selection commands share executors with the inline toolbar and RMD menus. */
-export function inlineContextItems(editor:Editor){
+export function inlineContextItems(editor:Editor):DropdownMenuOption[]{
  const {empty,from,to}=editor.state.selection;
  const range={from,to};
  const selectedText=empty?'':editor.state.doc.textBetween(from,to,' ');
@@ -50,6 +56,19 @@ export function inlineContextItems(editor:Editor){
  return [
   {id:'copy-selected-text',label:'复制选中文字',isDisabled:empty,
    onClick:()=>{if(selectedText)void navigator.clipboard.writeText(selectedText).catch(()=>undefined);}},
+  {id:'cut-selected-text',label:'剪切选中文字',isDisabled:empty,
+   onClick:()=>{
+    if(!selectedText||!navigator.clipboard?.writeText)return;
+    const original=editor.state.doc;
+    // Clipboard must succeed before a destructive edit. A concurrent document
+    // change invalidates the captured positional range.
+    void navigator.clipboard.writeText(selectedText).then(()=>{
+     if(editor.state.doc===original)runWithTextSelection(editor,range,()=>editor.chain().focus().deleteSelection().run());
+    }).catch(()=>undefined);
+   }},
+  {id:'delete-selected-text',label:'删除选中文字',isDisabled:empty,
+   onClick:action(()=>editor.chain().focus().deleteSelection().run())},
+  {type:'divider'},
   {id:'selection-bold',label:'加粗',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('bold').run())},
   {id:'selection-italic',label:'斜体',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('italic').run())},
   {id:'selection-underline',label:'普通下划线',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('underline').run())},
