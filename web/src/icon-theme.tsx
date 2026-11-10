@@ -1,10 +1,11 @@
 import React from 'react';
 import type {IconRegistry} from '@astryxdesign/core/Icon';
 import {neutralTheme} from '@astryxdesign/theme-neutral/built';
+import {Icon} from './icon';
 import {
  IconX,IconChevronDown,IconChevronLeft,IconChevronRight,IconChevronsLeft,IconChevronsRight,
  IconCheck,IconCircleCheck,IconCircleX,IconAlertTriangle,IconInfoCircle,IconCalendar,IconClock,
- IconExternalLink,IconMenu2,IconDots,IconSearch,IconUpload,IconArrowUp,IconArrowDown,
+ IconExternalLink,IconMenu2,IconDots,IconUpload,IconArrowUp,IconArrowDown,
  IconArrowsSort,IconFilter,IconEyeOff,IconColumns3,IconCopy,IconChecks,IconTool,
  IconSquare,IconMicrophone
 } from '@tabler/icons-react';
@@ -30,7 +31,7 @@ const icons:IconRegistry={
  externalLink:<IconExternalLink {...glyph}/>,
  menu:<IconMenu2 {...glyph}/>,
  moreHorizontal:<IconDots {...glyph}/>,
- search:<IconSearch {...glyph}/>,
+ search:<Icon name="search" size="sm"/>,
  upload:<IconUpload {...glyph}/>,
  arrowUp:<IconArrowUp {...glyph}/>,
  arrowDown:<IconArrowDown {...glyph}/>,
