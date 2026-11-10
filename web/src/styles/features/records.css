@@ -1,0 +1,390 @@
+/* Recalloom styles — owned by features / records */
+
+.record-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  min-width: 0;
+}
+
+.record-inspector dt {
+  color: var(--color-text-secondary,#888);
+}
+
+.record-inspector dd {
+  margin: 0;
+}
+
+.tiptap {
+  min-height: 430px;
+  padding: 28px 44px;
+  outline: 0;
+  font-size: 14px;
+  line-height: 1.75;
+  max-width: 940px;
+  margin: auto;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid var(--color-border,#ddd);
+  padding-left: 15px;
+  margin-left: 0;
+}
+
+.cm-editor {
+  font-size: 13px;
+}
+
+.tiptap h1 {
+  font-size: 25px;
+}
+
+.tiptap h2 {
+  margin-top: 20px;
+  font-size: 20px;
+}
+
+.tiptap h3 {
+  font-size: 17px;
+}
+
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+  font-size: 13px;
+  margin: 15px 0;
+}
+
+.tiptap td {
+  border: 1px solid var(--color-border,#aaa);
+  padding: 8px 11px;
+  text-align: left;
+  min-width: 70px;
+}
+
+.tiptap th {
+  border: 1px solid var(--color-border,#aaa);
+  padding: 8px 11px;
+  text-align: left;
+  min-width: 70px;
+  background: var(--color-background-muted,#eee);
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+}
+
+.tiptap pre {
+  overflow: auto;
+  background: var(--color-background-muted,#f6f6f6);
+  padding: 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.tiptap code {
+  font-family: ui-monospace,Consolas,monospace;
+  font-size: .9em;
+}
+
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tiptap li[data-type="taskItem"] {
+  display: flex;
+  gap: 8px;
+}
+
+.tiptap li[data-type="taskItem"]>label {
+  flex: none;
+}
+
+.tiptap li[data-type="taskItem"]>div {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-inspector dl {
+  display: grid;
+  grid-template-columns: 90px minmax(0,1fr);
+  gap: 13px 8px;
+  margin: 26px 0;
+  font-size: 13px;
+}
+
+.record-inspector {
+  flex: none;
+  padding: 16px;
+  font-size: 12px;
+  width: 292px;
+  min-width: 0;
+  animation: rk-fade-in 150ms ease-out both;
+}
+
+.context-panel-inner .record-inspector {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  flex: none;
+  box-sizing: border-box;
+}
+
+.context-panel-inner .record-inspector dl {
+  margin: 18px 0;
+  grid-template-columns: minmax(74px,110px) minmax(0,1fr);
+}
+
+.record-main .tiptap > .tableWrapper {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  margin-block: 23px;
+}
+
+.record-main .tiptap > .tableWrapper > table {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+}
+
+.record-main .tiptap [data-type="block-math"] .block-math-inner {
+  width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+  margin-inline: auto;
+}
+
+.record-main .tiptap [data-type="block-math"] {
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: .4em;
+  text-align: center;
+  overflow-x: clip;
+  overflow-y: visible;
+  overscroll-behavior-y: auto;
+}
+
+.record-main .tiptap [data-type="block-math"].rk-math-scroll-active {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-y: auto;
+}
+
+.record-main .tiptap .tiptap-mathematics-render--editable:not([data-type="block-math"]) {
+  overflow: visible;
+}
+
+.record-main .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-inline-start: 0;
+}
+
+.record-main .tiptap ul[data-type="taskList"] > li {
+  padding-inline-start: 0;
+}
+
+.record-main .tiptap ul[data-type="taskList"] > li > div > p {
+  margin-block: 0;
+}
+
+.record-main .tiptap {
+  max-width: none;
+  width: 100%;
+  margin-inline: 0;
+  box-sizing: border-box;
+  counter-reset: rk-table;
+}
+
+.record-main .rk-numbered-math-projection {
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  position: relative;
+  gap: .75rem;
+  max-width: 100%;
+  padding-inline: .6rem;
+  margin-block: 1rem;
+}
+
+.record-main .rk-numbered-math-content {
+  min-width: 0;
+  overflow-x: auto;
+  flex: 1;
+  max-width: 100%;
+}
+
+.record-main .rk-numbered-math-label {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: .85rem;
+}
+
+.record-main .rk-cross-reference-read {
+  color: var(--color-primary,#3988dc);
+  text-decoration: underline;
+  text-underline-offset: .16em;
+  white-space: nowrap;
+}
+
+.record-main .rk-cross-reference-read.rk-cross-reference-missing {
+  text-decoration-style: dashed;
+  color: var(--color-danger,#b94a48);
+}
+
+.record-page .doc-header .page-properties {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rk-border-soft);
+}
+
+.record-main .doc-notice {
+  --rk-doc-pad: var(--rk-document-pad);
+}
+
+.record-page .record-main .page-actions-bar {
+  margin: 10px 0 2px;
+  flex-wrap: wrap;
+}
+
+.tiptap :is(p, h1, h2, h3, h4, h5, h6).is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--rk-ink-faint);
+}
+
+.record-page {
+  max-width: none;
+  padding-right: 28px;
+  --rk-doc-measure: 720px;
+  --rk-doc-pad: 0px;
+}
+
+.record-main {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  --rk-document-leading: 1.82;
+  --rk-document-ink: var(--color-text-primary, #202020);
+  --rk-document-muted: var(--color-text-secondary, #737373);
+  --rk-document-border: var(--color-border, rgba(128,128,128,.22));
+  --rk-document-wash: var(--color-background-muted, rgba(128,128,128,.045));
+  --rk-prose-measure: 100%;
+  --rk-wide-measure: 100%;
+  --rk-document-pad: 0px;
+}
+
+.record-main .cm-editor {
+  width: 100%;
+  max-width: 100%;
+}
+
+.record-main .tiptap ul[data-type="taskList"] > li > label input {
+  margin: 0;
+}
+
+.record-main .tiptap :is(th, td) > p {
+  margin: 0;
+  font-weight: inherit;
+}
+
+@media (max-width: 1000px) {
+
+.tiptap {
+  padding: 22px 25px;
+}
+
+.record-inspector {
+  width: 250px;
+}
+}
+
+@media (max-width: 720px) {
+
+.record-layout {
+  display: block;
+}
+
+.tiptap {
+  min-height: 360px;
+  padding: 18px;
+  font-size: 16px;
+}
+
+.tiptap table {
+  font-size: 12px;
+}
+
+.record-inspector {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.context-panel-inner .record-inspector {
+  width: 100%;
+  margin-top: 0;
+}
+
+.record-main {
+  --rk-prose-measure: 100%;
+  --rk-document-pad: 16px;
+  --rk-document-leading: 1.75;
+}
+
+.record-page {
+  --rk-doc-pad: 16px;
+}
+
+.record-page .record-main .page-actions-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.record-page .record-main .page-actions-bar > * {
+  flex: none;
+}
+
+.record-page .record-main .page-actions-bar {
+  margin: 8px 0 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  padding: 0 0 4px;
+  justify-content: space-between;
+}
+
+.record-page .record-main .page-actions-bar .save-status {
+  display: none;
+}
+
+.record-main .page-actions-bar [role="group"] button svg {
+  display: none;
+}
+
+.record-main .page-actions-bar [role="group"] button {
+  padding-inline: 10px;
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+.record-inspector {
+  animation: none !important;
+}
+}

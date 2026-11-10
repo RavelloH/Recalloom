@@ -59,9 +59,9 @@ for(const file of srcFiles){
  }
  inspect(sf);
 }
-const sharedCss=readFileSync('web/src/icon-layout.css','utf8');
+const sharedCss=readFileSync('web/src/styles/foundation/tokens.css','utf8');
 for(const token of ['xs','sm','md','lg','nav','bottom'])
- if(!sharedCss.includes('--rk-icon-'+token+':'))failures.push('icon-layout.css: missing shared token '+token);
+ if(!sharedCss.includes('--rk-icon-'+token+':'))failures.push('styles/foundation/tokens.css: missing shared icon token '+token);
 const pkg=JSON.parse(readFileSync('package.json','utf8'));
 assert.ok(pkg.dependencies['@tabler/icons-react'],'Tabler must be a direct dependency');
 if(pkg.dependencies['lucide-react'])failures.push('package.json: legacy Lucide dependency');

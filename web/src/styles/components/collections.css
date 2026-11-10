@@ -1,0 +1,48 @@
+/* Recalloom styles — owned by components / collections */
+
+.grant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border,rgba(128,128,128,.15));
+}
+
+.grant-row:first-of-type {
+  border-top: 0;
+}
+
+.grant-details {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.grant-details strong {
+  font-size: var(--rk-font-body);
+  font-weight: 620;
+}
+
+.grant-details p {
+  margin: 6px 0 0;
+}
+
+.grant-scopes {
+  color: var(--color-text-secondary,#888);
+  font-size: var(--rk-font-small);
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+
+.grant-row {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grant-row > button {
+  align-self: flex-end;
+}
+}

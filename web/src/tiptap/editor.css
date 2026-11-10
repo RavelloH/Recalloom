@@ -253,7 +253,7 @@ html[data-effective-theme="dark"] .record-main {
 .record-main .rk-code-title {flex:1;}
 .record-main .rk-code-title > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .record-main .rk-code-title-hit{cursor:text;display:inline-block;min-width:0;border-radius:3px;text-underline-offset:.18em;}
-@media(hover:hover){.record-main .rk-code-title-hit:hover{text-decoration:underline dotted;}}
+@media (hover: hover) and (pointer: fine){.record-main .rk-code-title-hit:hover{text-decoration:underline dotted;}}
 .record-main .rk-code-title-hit:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
 .record-main .rk-code-title input {max-width:260px;}
 .record-main .rk-code-viewport {
@@ -327,7 +327,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.78rem;line-height:1.5;text-decoration:none!important;margin-top:.15rem;}
 .record-main .rk-link-card-open:hover{text-decoration:underline!important;}
 .record-main .rk-rich-link-card .rk-link-card-title[role='button']{cursor:text;border-radius:3px;text-underline-offset:.16em;}
-@media(hover:hover){.record-main .rk-rich-link-card .rk-link-card-title[role='button']:hover{text-decoration:underline dotted;}}
+@media (hover: hover) and (pointer: fine){.record-main .rk-rich-link-card .rk-link-card-title[role='button']:hover{text-decoration:underline dotted;}}
 .record-main .rk-rich-link-card .rk-link-card-title[role='button']:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
 
 .record-main .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
@@ -591,7 +591,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  text-underline-offset:.16em;border-radius:3px;
  outline-offset:3px;white-space:pre-wrap;overflow-wrap:anywhere;
 }
-@media(hover:hover){
+@media (hover: hover) and (pointer: fine){
  .record-main :is(.rk-rich-figure .rk-figure-caption-hit,
  .rk-rich-link-card .rk-link-card-direct-title,
  .tiptap .rk-table-caption[contenteditable="true"]):hover{

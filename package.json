@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "pnpm build:web && node scripts/generate-help.mjs --watch -- node ./node_modules/wrangler/bin/wrangler.js dev",
     "deploy": "pnpm help:check && pnpm build:web && node scripts/predeploy-check.mjs && wrangler d1 migrations apply DB --remote --config wrangler.deploy.jsonc && wrangler deploy --config wrangler.deploy.jsonc",
-    "check": "pnpm help:check && pnpm icons:check && pnpm syntax:check && tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "check": "pnpm styles:check && pnpm help:check && pnpm icons:check && pnpm syntax:check && tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
     "syntax:check": "node scripts/audit-editor-syntax.mjs",
+    "styles:check": "node scripts/check-style-architecture.mjs",
     "icons:check": "node scripts/check-icons.mjs",
     "test:icons:ui": "node scripts/icon-system-e2e.mjs",
     "test:chat:ui": "node scripts/rmd-chat-ui-e2e.mjs",

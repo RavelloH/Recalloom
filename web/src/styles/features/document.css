@@ -1,0 +1,142 @@
+/* Recalloom styles — Rendered Markdown and document typography. One owning module per selector; do not reintroduce cross-file overrides. */
+
+.markdown-preview {
+  min-height: 420px;
+  padding: 28px 44px;
+  margin: auto;
+  max-width: 980px;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.markdown-preview h1 {
+  font-size: 25px;
+}
+
+.markdown-preview h2 {
+  font-size: 20px;
+}
+
+.markdown-preview h3 {
+  font-size: 17px;
+}
+
+.markdown-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+  font-size: 13px;
+  margin: 15px 0;
+}
+
+.markdown-preview td {
+  border: 1px solid var(--color-border,#aaa);
+  padding: 8px 11px;
+  text-align: left;
+  min-width: 70px;
+}
+
+.markdown-preview th {
+  border: 1px solid var(--color-border,#aaa);
+  padding: 8px 11px;
+  text-align: left;
+  min-width: 70px;
+  background: var(--color-background-muted,#eee);
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+}
+
+.markdown-preview pre {
+  background: var(--color-background-muted,#f6f6f6);
+  padding: 14px;
+  overflow-x: auto;
+  border-radius: 6px;
+}
+
+.markdown-preview code {
+  font-family: ui-monospace,Consolas,monospace;
+  font-size: .9em;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--color-border,#aaa);
+  padding-left: 15px;
+  margin-left: 0;
+  color: var(--color-text-secondary,#666);
+}
+
+.markdown-preview hr {
+  border: 0;
+  border-top: 1px solid var(--color-border,#ddd);
+  margin: 20px 0;
+}
+
+.markdown-preview a {
+  color: var(--color-text-link,#226ec2);
+  text-decoration: underline;
+}
+
+.markdown-preview input[type=checkbox] {
+  accent-color: var(--color-text-primary,#222);
+}
+
+.markdown-preview .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+:is(.tiptap, .markdown-preview) mark {
+  padding: 0 .1em;
+  background: var(--rk-mark-background);
+  color: var(--rk-mark-foreground);
+  border-radius: 2px;
+}
+
+.markdown-preview [data-align="center"] {
+  text-align: center;
+}
+
+.markdown-preview [data-align="right"] {
+  text-align: right;
+}
+
+.markdown-preview [data-align="left"] {
+  text-align: left;
+}
+
+.markdown-preview ul ul {
+  list-style-type: circle;
+}
+
+.markdown-preview ul ul ul {
+  list-style-type: square;
+}
+
+.markdown-preview ol ol {
+  list-style-type: lower-alpha;
+}
+
+.markdown-preview ol ol ol {
+  list-style-type: lower-roman;
+}
+
+@media (max-width: 720px) {
+
+.markdown-preview {
+  padding: 15px;
+  font-size: 15px;
+  min-height: 330px;
+}
+
+.markdown-preview table {
+  font-size: 12px;
+}
+}

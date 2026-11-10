@@ -1,0 +1,168 @@
+/* Recalloom styles — Global element resets, typography and elemental helpers. One owning module per selector; do not reintroduce cross-file overrides. */
+
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+}
+
+textarea {
+  font: inherit;
+}
+
+a:hover {
+  color: var(--color-text-primary,inherit);
+}
+
+.muted {
+  color: var(--color-text-secondary,#777);
+}
+
+.subtle {
+  color: var(--color-text-secondary,#777);
+}
+
+.small {
+  font-size: var(--rk-font-small);
+}
+
+.tiny {
+  font-size: var(--rk-font-caption);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.break-word {
+  overflow-wrap: anywhere;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.gap {
+  gap: 9px;
+}
+
+html {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+select {
+  font: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input {
+  font: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-text-primary,currentColor);
+  outline-offset: 3px;
+}
+
+a.activity-resource:hover {
+  text-decoration: underline;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+  color: var(--color-text-primary,#171717);
+  background: var(--color-background-body,#fff);
+  overscroll-behavior-y: contain;
+  font-size: var(--rk-font-body);
+  line-height: 1.5;
+}
+
+html[data-effective-theme="dark"] .panel {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+a.crumb:hover {
+  background: var(--rk-hover);
+  color: var(--color-text-primary, inherit);
+}
+
+html[data-effective-theme="dark"] {
+  --rk-sidebar-bg: color-mix(in srgb, var(--color-background-surface, #262626) 45%, var(--rk-canvas));
+  --rk-popover: var(--color-background-surface, #262626);
+  --rk-pop-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 3px 6px rgba(0,0,0,.35), 0 9px 24px rgba(0,0,0,.5);
+  --rk-code-ink: color-mix(in srgb, var(--color-text-primary, #eee) 85%, #fb923c);
+  --rk-selection: color-mix(in srgb, var(--color-text-link, #74a7f7) 37%, transparent);
+  --rk-elev-1: 0 0 0 1px rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.3);
+  --rk-elev-1-hover: 0 0 0 1px rgba(255,255,255,.13), 0 6px 18px rgba(0,0,0,.42);
+  --rk-elev-3: 0 0 0 1px rgba(255,255,255,.08), 0 16px 40px rgba(0,0,0,.55);
+}
+
+html:not([data-scrollbar-mode="native"]) {
+  scrollbar-width: none;
+}
+
+html:not([data-scrollbar-mode="native"]) * {
+  scrollbar-width: none;
+}
+
+html:not([data-scrollbar-mode="native"]) ::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@media (max-width: 720px) {
+
+input:not([type="checkbox"]) {
+  font-size: var(--rk-font-control);
+}
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+* {
+  animation-duration: .01ms !important;
+  transition-duration: .01ms !important;
+}
+
+*:before {
+  animation-duration: .01ms !important;
+  transition-duration: .01ms !important;
+}
+
+*:after {
+  animation-duration: .01ms !important;
+  transition-duration: .01ms !important;
+}
+}

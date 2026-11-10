@@ -1,0 +1,231 @@
+/* Recalloom styles — owned by features / editor-chrome */
+
+.wysiwyg-toolbar button {
+  min-height: 40px;
+  min-width: 38px;
+}
+
+.editor-topline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wysiwyg-toolbar {
+  display: flex;
+  border-bottom: 1px solid var(--color-border,#ddd);
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 14px;
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--color-background-body, white) 95%, transparent);
+  transition: background-color 200ms ease;
+}
+
+html[data-effective-theme="dark"] .wysiwyg-toolbar {
+  background: color-mix(in srgb, var(--color-background-body, #1a1a1a) 95%, transparent);
+}
+
+.wysiwyg {
+  min-height: 440px;
+  min-width: 0;
+  width: 100%;
+}
+
+.editor-section {
+  min-width: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.editor-body {
+  min-width: 0;
+  width: 100%;
+  min-height: 360px;
+}
+
+.bubble-menu {
+  z-index: 40;
+}
+
+.bubble-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bubble-menu-inner button {
+  box-sizing: border-box !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+.bubble-menu-inner button > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.bubble-menu-inner button svg {
+  width: var(--rk-icon-sm) !important;
+  height: var(--rk-icon-sm) !important;
+  flex: none;
+  stroke-width: 1.85;
+}
+
+.bubble-menu-inner button:has(.rk-inline-dropdown-icon) {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+}
+
+.bubble-menu-inner .rk-inline-dropdown-icon .rk-inline-dropdown-chevron {
+  width: 10px !important;
+  height: 10px !important;
+  flex: none;
+  stroke-width: 1.9;
+}
+
+.bubble-menu-inner .bubble-group > * {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.bubble-menu-inner .toolbar-highlight {
+  width: auto !important;
+  height: auto !important;
+  padding: 0 2px;
+}
+
+.bubble-link {
+  display: none;
+}
+
+.bubble-menu-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--rk-popover);
+  box-shadow: var(--rk-pop-shadow);
+  white-space: nowrap;
+  width: max-content;
+  max-width: calc(100vw - 18px);
+  animation: rk-pop-in 160ms var(--rk-ease-out) both;
+}
+
+.editor-pending {
+  min-height: 360px;
+}
+
+.editor-table-actions:not([hidden]) {
+  animation: rk-pop-in 160ms var(--rk-ease-out) both;
+  left: 0;
+  right: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--rk-popover);
+  box-shadow: var(--rk-elev-2);
+}
+
+.source-editor {
+  min-height: 360px;
+}
+
+.source-editor .cm-editor {
+  font-size: 16px;
+  background: transparent;
+}
+
+.source-editor .cm-editor .cm-content {
+  font-family: inherit;
+}
+
+@media (max-width: 720px) {
+
+.editor-topline {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.editor-body {
+  min-height: 360px;
+}
+
+.editor-topline .row {
+  flex-wrap: wrap;
+}
+
+.editor-topline button {
+  min-height: 44px;
+}
+
+html[data-effective-theme="dark"] .wysiwyg-toolbar {
+  background: var(--rk-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.wysiwyg-toolbar {
+  position: sticky;
+  background: var(--rk-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  top: 0;
+  z-index: 8;
+  margin-inline: calc(-1 * var(--rk-gutter));
+  padding-inline: var(--rk-gutter);
+  border-bottom: 1px solid var(--rk-border-soft);
+}
+
+.source-editor .cm-editor {
+  font-size: 16px;
+}
+
+.record-main .wysiwyg .wysiwyg-toolbar {
+  background: var(--rk-canvas);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+}
+
+@media (hover: hover) and (pointer: fine) {
+
+.bubble-menu-inner {
+  animation: rk-popover-appear .17s ease-out both;
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+.bubble-menu-inner {
+  animation: none !important;
+}
+
+.editor-table-actions {
+  animation: none !important;
+}
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.bubble-menu-inner {
+  animation: none !important;
+  transition: none !important;
+}
+}

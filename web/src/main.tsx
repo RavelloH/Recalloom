@@ -13,17 +13,7 @@ import {applyScrollbarPolicy} from './scrollbars';
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
-import './style.css';
-import './design-system.css';
-import './motion.css';
-import './ui-enhancements.css';
-import './content-layout.css';
-import './document-typography.css';
-import './graph.css';
-import './wiki.css';
-import './workspace.css';
-import './polish.css';
-import './icon-layout.css';
+import './styles/index.css';
 applyScrollbarPolicy();
 // Keep Cap.js proof-of-work self-hosted: no third-party runtime download.
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';

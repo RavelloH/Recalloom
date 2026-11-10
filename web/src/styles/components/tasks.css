@@ -1,0 +1,209 @@
+/* Recalloom styles — owned by components / tasks */
+
+.task-item:last-child {
+  border: 0;
+}
+
+.task-item>input {
+  margin-top: 3px;
+}
+
+.task-content p {
+  line-height: 1.5;
+  margin: 7px 0;
+}
+
+.task-done {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary,#aaa);
+}
+
+.task-item select {
+  padding: 5px;
+}
+
+.task-title {
+  font-weight: 550;
+  font-size: var(--rk-font-body);
+  line-height: 1.5;
+}
+
+.task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-item:nth-child(1) {
+  --row-delay: 0ms;
+}
+
+.task-item:nth-child(2) {
+  --row-delay: 35ms;
+}
+
+.task-item:nth-child(3) {
+  --row-delay: 70ms;
+}
+
+.task-item:nth-child(4) {
+  --row-delay: 105ms;
+}
+
+.task-item:nth-child(5) {
+  --row-delay: 140ms;
+}
+
+.task-item:nth-child(n+6) {
+  --row-delay: 165ms;
+}
+
+.skeleton-tasks .task-item {
+  pointer-events: none;
+}
+
+.task-list {
+  border: 1px solid var(--color-border,#ddd);
+  border-radius: 9px;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+}
+
+.task-item {
+  border-bottom: 1px solid var(--color-border,#ddd);
+  font-size: var(--rk-font-small);
+  transition: background-color var(--rk-motion-fast) ease,
+              color var(--rk-motion-fast) ease;
+  animation: data-row-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--row-delay, 0ms);
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+  padding: 18px 20px;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.task-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.task-check {
+  flex: none;
+  min-width: 24px;
+}
+
+.task-heading .task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--rk-font-body);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.task-heading .priority {
+  flex: none;
+  padding-top: 3px;
+}
+
+.task-details {
+  margin: 0 0 0 36px;
+  padding: 0;
+  min-width: 0;
+  max-width: none;
+  width: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--rk-font-label);
+  line-height: 1.65;
+}
+
+.task-footer {
+  margin-left: 36px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.task-footer > .small {
+  font-size: var(--rk-font-small);
+}
+
+.task-status {
+  flex-basis: 118px;
+  flex: 0 0 130px;
+  min-width: 0;
+}
+
+.task-footer .task-status {
+  margin-left: auto;
+}
+
+.skeleton-tasks .task-details {
+  display: grid;
+  gap: 7px;
+}
+
+.skeleton-tasks .task-footer {
+  min-height: 35px;
+}
+
+@media (max-width: 720px) {
+
+.task-item select {
+  max-width: 105px;
+}
+
+.task-item {
+  gap: 9px;
+  padding: 16px 14px;
+}
+
+.task-heading {
+  gap: 10px;
+}
+
+.task-heading .task-title {
+  font-size: var(--rk-font-body);
+}
+
+.task-details {
+  margin-left: 34px;
+  font-size: var(--rk-font-label);
+  line-height: 1.65;
+}
+
+.task-footer {
+  margin-left: 34px;
+}
+
+.task-status {
+  flex-basis: 105px;
+  min-width: 0;
+  flex: 0 0 122px;
+}
+}
+
+@media (hover: hover) and (pointer: fine) {
+
+.task-item:hover {
+  background-color: var(--color-background-muted, rgba(128,128,128,.06));
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+.task-item {
+  transition: none !important;
+  animation: none !important;
+}
+}

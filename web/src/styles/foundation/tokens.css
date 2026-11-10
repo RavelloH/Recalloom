@@ -1,0 +1,51 @@
+/* Recalloom styles — Theme-level and application design tokens. One owning module per selector; do not reintroduce cross-file overrides. */
+
+:root {
+  font-synthesis: none;
+  --rk-page-max: 1192px;
+  --rk-radius: 12px;
+  --rk-space: 16px;
+  --rk-motion-fast: 120ms;
+  --rk-motion-panel: 190ms;
+  --rk-canvas: var(--color-background-card, #fff);
+  --rk-sidebar-bg: color-mix(in srgb, var(--color-background-body, #f1f1f1) 55%, var(--rk-canvas));
+  --rk-hover: var(--color-overlay-hover, rgba(55,53,47,.06));
+  --rk-active: var(--color-overlay-pressed, rgba(55,53,47,.1));
+  --rk-border-soft: color-mix(in srgb, var(--color-border, #e5e5e5) 70%, transparent);
+  --rk-popover: var(--color-background-popover, var(--rk-canvas));
+  --rk-pop-shadow: 0 0 0 1px rgba(15,15,15,.05), 0 3px 6px rgba(15,15,15,.08), 0 9px 24px rgba(15,15,15,.14);
+  --rk-ink-soft: var(--color-text-secondary, #6b6b6b);
+  --rk-ink-faint: var(--color-text-tertiary, #9b9b9b);
+  --rk-measure: 760px;
+  --rk-gutter: clamp(24px, 4vw, 56px);
+  --rk-font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+  --rk-code-ink: color-mix(in srgb, var(--color-text-primary, #222) 88%, #c2410c);
+  --rk-selection: color-mix(in srgb, var(--color-text-link, #3978d2) 27%, transparent);
+  --rk-scroll-thumb: color-mix(in srgb, var(--color-text-primary, #222) 26%, transparent);
+  --rk-scroll-thumb-hover: color-mix(in srgb, var(--color-text-primary, #222) 46%, transparent);
+  --rk-elev-1: 0 0 0 1px var(--rk-border-soft), 0 1px 2px rgba(15,15,15,.04);
+  --rk-elev-1-hover: 0 0 0 1px var(--color-border, #ddd), 0 4px 14px rgba(15,15,15,.07);
+  --rk-elev-2: var(--rk-pop-shadow);
+  --rk-elev-3: 0 0 0 1px rgba(15,15,15,.05), 0 12px 32px rgba(15,15,15,.16), 0 24px 64px rgba(15,15,15,.12);
+  --rk-ease-out: cubic-bezier(.22, 1, .36, 1);
+  --rk-icon-xs: .75rem;
+  --rk-icon-sm: 1rem;
+  --rk-icon-md: 1.125rem;
+  --rk-icon-lg: 1.5rem;
+  --rk-icon-nav: 1.25rem;
+  --rk-icon-bottom: 1.375rem;
+
+  /* Shared interface type scale. Markdown/document typography owns its own scale. */
+  --rk-font-caption: 11px;
+  --rk-font-small: 12px;
+  --rk-font-label: 13px;
+  --rk-font-body: 14px;
+  --rk-font-control: 16px;
+
+  /* Intentional semantic colors; avoid repeating fixed values in feature CSS. */
+  --rk-mark-background: #f5d870;
+  --rk-mark-foreground: #251e0e;
+  --rk-search-hit-background: #ffe08b;
+  --rk-search-hit-background-dark: #715c16;
+  --rk-danger-border: #ce7777;
+}

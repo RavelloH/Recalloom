@@ -1,0 +1,22 @@
+/* Single application stylesheet entry: dependency order is intentional. */
+@import "./foundation/tokens.css";
+@import "./foundation/base.css";
+@import "./layout/shell.css";
+@import "./layout/pages.css";
+@import "./components/library.css";
+@import "./components/search.css";
+@import "./components/tasks.css";
+@import "./components/dashboard.css";
+@import "./components/collections.css";
+@import "./components/forms.css";
+@import "./components/status.css";
+@import "./components/controls.css";
+@import "./components/overlays.css";
+@import "./features/rmd.css";
+@import "./features/editor-chrome.css";
+@import "./features/records.css";
+@import "./features/graph.css";
+@import "./features/wiki.css";
+@import "./features/document.css";
+@import "./features/motion.css";
+@import "./icons.css";

@@ -1,0 +1,182 @@
+/* Recalloom styles — owned by components / forms */
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--rk-font-small);
+  margin: 14px 0;
+}
+
+.settings-panel .field-label {
+  max-width: 370px;
+}
+
+.inline-form>.row {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.inline-form {
+  margin: 0 0 20px;
+  margin-bottom: 22px;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.create-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, .75fr) minmax(200px, 1.4fr) minmax(190px, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.inline-selector {
+  max-width: 100%;
+  flex: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.inline-field {
+  max-width: 100%;
+  flex: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.inline-selector > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+.inline-field > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+.create-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.create-surface {
+  min-width: 0;
+  animation: rk-fade-in 150ms ease-out both;
+}
+
+.property-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+}
+
+.property-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--rk-font-body);
+  color: var(--rk-ink-faint);
+  margin: 0;
+}
+
+.property-value {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--rk-font-body);
+  color: var(--color-text-primary, inherit);
+}
+
+.tag-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.tag-input {
+  display: inline-flex;
+}
+
+.property-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--rk-ink-faint);
+  font: inherit;
+  font-size: var(--rk-font-body);
+}
+
+.property-add:hover {
+  background: var(--rk-hover);
+  color: var(--rk-ink-soft);
+}
+
+.property-error {
+  flex-basis: 100%;
+  font-size: var(--rk-font-small);
+  color: var(--color-error, #c0392b);
+}
+
+@media (max-width: 1000px) {
+
+.create-fields {
+  grid-template-columns: 1fr 1.5fr;
+}
+
+.create-fields > :last-child {
+  grid-column: 1 / -1;
+}
+}
+
+@media (max-width: 720px) {
+
+.inline-selector {
+  flex: 1 1 100%;
+}
+
+.inline-field {
+  flex: 1 1 100%;
+}
+
+.create-fields {
+  grid-template-columns: minmax(0,1fr);
+  gap: 14px;
+}
+
+.create-fields > :last-child {
+  grid-column: auto;
+}
+
+.create-actions {
+  justify-content: stretch;
+}
+
+.create-actions > * {
+  flex: 1 1 0;
+}
+
+.property-row {
+  grid-template-columns: 104px minmax(0, 1fr);
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+.create-surface {
+  animation: none !important;
+}
+}
