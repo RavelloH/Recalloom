@@ -236,6 +236,17 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
   width:100%;height:100%;
 }
 .bubble-menu-inner button svg {width:var(--rk-icon-sm)!important;height:var(--rk-icon-sm)!important;flex:none;stroke-width:1.85;}
+.bubble-menu-inner button:has(.rk-inline-dropdown-icon){
+ width:44px!important;min-width:44px!important;max-width:44px!important;
+}
+.rk-inline-dropdown-icon{
+ display:inline-flex;align-items:center;justify-content:center;gap:3px;
+ width:100%;height:100%;line-height:1;
+}
+.rk-inline-dropdown-icon .rk-inline-dropdown-chevron,
+.bubble-menu-inner .rk-inline-dropdown-icon .rk-inline-dropdown-chevron{
+ width:10px!important;height:10px!important;flex:none;stroke-width:1.9;
+}
 .bubble-menu-inner .bubble-group > * {flex:0 0 auto;min-width:0;}
 .bubble-link {display:none;}
 .slash-menu {

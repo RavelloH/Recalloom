@@ -21,7 +21,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
  // paint would continuously fire initial ResizeObserver entries and redraw.
  const observed=new Set<HTMLElement>();
  resize.observe(root);
- const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean)=>{
+ const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0)=>{
   if(!isSketchKind(kind)||rect.width<1||rect.height<1)return;
   const stroke=parseSketchNumber(element.dataset.rkSketchStroke,'stroke')??2;
   const padding=parseSketchNumber(element.dataset.rkSketchPadding,'padding')??(kind==='circle'||kind==='box'||kind==='bracket'?5:3);
@@ -41,7 +41,11 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   svg.setAttribute('height',String(height));
   svg.setAttribute('viewBox','0 0 '+width+' '+height);
   svg.style.left=(rect.left-anchor.left-padding+root.scrollLeft)+'px';
-  svg.style.top=(rect.top-anchor.top-padding+root.scrollTop)+'px';
+  // Align block outlines with the actual text ink center, not an arbitrary
+  // line-height offset. The clamped, measured correction varies with fonts.
+  const proseOutline=!hasMath&&(kind==='box'||kind==='circle'||kind==='bracket');
+  const opticalShift=proseOutline?Math.max(-4,Math.min(4,inkOffset)):0;
+  svg.style.top=(rect.top-anchor.top-padding+root.scrollTop-opticalShift)+'px';
   for(const p of paths){
    const path=document.createElementNS(SVG_NS,'path');
    path.setAttribute('d',p.d);
@@ -77,7 +81,8 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    const lines=element.classList.contains('rk-sketch-block')
     ?[measureBlockSketchLine(element)]
     :measureInlineSketchLines(element);
-   lines.forEach(({rect,hasMath},index)=>make(kind,rect,base,element,index,hasMath));
+   lines.forEach((line,index)=>make(kind,line.rect,base,element,index,line.hasMath,
+    'inkOffset' in line&&typeof line.inkOffset==='number'?line.inkOffset:0));
   }
   for(const old of observed)if(!currentlyVisible.has(old)){
    resize.unobserve(old);observed.delete(old);

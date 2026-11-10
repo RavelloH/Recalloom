@@ -18,7 +18,7 @@ import {InlineMath} from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor,JSONContent} from '@tiptap/core';
-import {IconLink,IconPhotoPlus,IconMathFunction,IconTable,IconTableRow,IconColumns3,IconTrash,IconAlignLeft,IconAlignCenter,IconAlignRight,IconPlus,IconMinus,IconCode,IconPencil,IconBold,IconItalic,IconUnderline,IconStrikethrough,IconHighlight,IconSuperscript,IconSubscript,IconH2,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconBrackets,IconSum} from '@tabler/icons-react';
+import {IconLink,IconPhotoPlus,IconMathFunction,IconTable,IconTableRow,IconColumns3,IconTrash,IconAlignLeft,IconAlignCenter,IconAlignRight,IconPlus,IconMinus,IconCode,IconPencil,IconBold,IconItalic,IconUnderline,IconStrikethrough,IconHighlight,IconSuperscript,IconSubscript,IconH2,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconBrackets,IconSum,IconChevronDown,IconMessageCircle,IconDots} from '@tabler/icons-react';
 import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
@@ -486,23 +486,26 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   <Button key={name} label={name} variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
  const slashGroups=slash?groupSlashCommands(slashItems):[];
+ const menuIcon=(icon:React.ReactNode)=><span className="rk-inline-dropdown-icon" aria-hidden="true">
+  {icon}<IconChevronDown className="rk-inline-dropdown-chevron" size="var(--rk-icon-xs)"/>
+ </span>;
  const inlineMarks=<>
   {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<IconBold size="var(--rk-icon-sm)"/>)}
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<IconItalic size="var(--rk-icon-sm)"/>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
   {toggle('语义 Mark',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<IconHighlight size="var(--rk-icon-sm)"/>)}
-  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',isIconOnly:true,icon:<IconPencil size="var(--rk-icon-sm)"/>,onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
+  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconPencil size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
    presentation="adaptive" items={inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,description:command.description,
     isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
    }))}/>
-  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',isIconOnly:true,icon:<IconPlus size="var(--rk-icon-sm)"/>,onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
+  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconPlus size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
    presentation="adaptive" items={inlineCommandsByGroup('inline-component').map(command=>({
     id:command.id,label:command.title,description:command.description,
     isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
    }))}/>
-  <DropdownMenu button={{label:'更多行内功能',variant:'ghost',size:'sm',isIconOnly:true,icon:<IconLink size="var(--rk-icon-sm)"/>,onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
+  <DropdownMenu button={{label:'更多行内功能',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconDots size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
    presentation="adaptive" items={[
     {id:'inline-more-link',label:'链接',description:'为选中文字添加或编辑网页链接',
      onClick:()=>runCapturedInline(openLink)},
@@ -585,7 +588,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       :<div className="bubble-group">
        {inlineMarks}
        {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
-       {action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)}
+       {toggle('弱化注释',editor.isActive('visibleComment'),()=>editor.chain().focus().toggleMark('visibleComment').run(),<IconMessageCircle size="var(--rk-icon-sm)"/>)}
+       {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
+       {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
       </div>}
    </div>
   </BubbleMenu>}

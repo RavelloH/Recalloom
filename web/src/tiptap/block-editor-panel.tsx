@@ -138,7 +138,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   </header>
   <section className="rk-block-panel-preview" aria-label="当前块预览">
    <div className="rk-block-panel-section-heading"><IconEye size="var(--rk-icon-sm)"/><span>实时预览</span></div>
-   <div className="rk-block-panel-preview-body">
+   <div className="rk-block-panel-preview-body record-main">
     <React.Suspense fallback={<div className="muted small">准备预览…</div>}>
      <Preview content={presentation} sourceId={recordId}/>
     </React.Suspense>

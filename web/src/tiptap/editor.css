@@ -103,20 +103,18 @@
 .record-main .rk-directive-body {min-width:0;overflow-wrap:anywhere;}
 .record-main .rk-directive-body > :first-child {margin-top:0;}
 .record-main .rk-directive-body > :last-child {margin-bottom:0;}
-.record-main .rk-directive-title {display:inline-flex;gap:.45rem;align-items:center;min-width:0;}
-.record-main .rk-directive-title input {max-width:min(28ch,60vw);}
-/* Structural titles are edited at the text itself, not via an adjacent pencil.
- * The action stays accessible to keyboard users without changing the layout. */
-.record-main .rk-directive-title-hit{cursor:text;display:inline;min-width:0;border-radius:3px;text-underline-offset:.18em;}
-@media(hover:hover){.record-main .rk-directive-title-hit:hover{text-decoration:underline dotted;}}
+/* Callout/Details/Tabs headers are document text, not input fields.
+ * Preserve the Banner's own typography and box size through focus/typing. */
 .record-main .rk-directive-title-hit[contenteditable="true"]{
- cursor:text;min-width:1ch;max-width:100%;
+ display:inline;min-width:0;max-width:100%;border:0;outline:none;
+ padding:0;margin:0;background:transparent;box-shadow:none;
+ font:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;
  white-space:pre-wrap;overflow-wrap:anywhere;
- caret-color:var(--color-text-link,#527cb7);
+ cursor:text;caret-color:currentColor;vertical-align:baseline;
 }
-.record-main .rk-directive-title-hit:focus-visible{
- outline:none;background:color-mix(in srgb,var(--color-text-link,#527cb7) 9%,transparent);
- box-shadow:inset 0 -1.5px var(--color-text-link,#527cb7);
+.record-main .rk-directive-title-hit[contenteditable="true"]:focus,
+.record-main .rk-directive-title-hit[contenteditable="true"]:focus-visible{
+ outline:none;background:transparent;box-shadow:none;
 }
 .record-main .rk-rich-inline {display:inline;}
 .record-main .rk-inline-editable {display:inline;}

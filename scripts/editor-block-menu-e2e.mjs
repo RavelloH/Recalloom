@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from 'playwright-core';
 
-const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8825';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8826';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
 const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
 assert.ok(secret);

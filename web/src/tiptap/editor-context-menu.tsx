@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {undo,redo,undoDepth,redoDepth} from '@tiptap/pm/history';
 import type {ReactNode} from 'react';
@@ -42,12 +42,129 @@ function getMenuPos(editor:Editor,event:React.MouseEvent<HTMLElement>):number{
  if(event.detail===0&&event.clientX===0&&event.clientY===0)return editor.state.selection.from;
  return editor.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos??editor.state.selection.from;
 }
+/** A selection is contextual ONLY when the pointer is over its glyph rects.
+ * A non-empty document selection elsewhere is not enough: right-clicking a
+ * nearby block must not expose format/cut commands for unrelated text. */
+type TextRange={from:number;to:number;doc:Editor['state']['doc']};
+function currentTextRange(editor:Editor):TextRange|null{
+ const {from,to}=editor.state.selection;
+ return from<to?{from,to,doc:editor.state.doc}:null;
+}
+function nativeTextRange(editor:Editor):TextRange|null{
+ const dom=window.getSelection(),view=editor.view.dom;
+ if(!dom||dom.isCollapsed||!dom.anchorNode||!dom.focusNode||
+  !view.contains(dom.anchorNode)||!view.contains(dom.focusNode))return null;
+ try{
+  const a=editor.view.posAtDOM(dom.anchorNode,dom.anchorOffset);
+  const b=editor.view.posAtDOM(dom.focusNode,dom.focusOffset);
+  return a===b?null:{from:Math.min(a,b),to:Math.max(a,b),doc:editor.state.doc};
+ }catch{return null;}
+}
+/** Context actions are allowed only when the pointer intersects selected
+ * glyph rectangles, not merely because a selection exists somewhere.
+ * Accept snapshots because the browser can collapse the PM/native selection
+ * before firing contextmenu after a right-button pointerdown. */
+function clickedSelectedText(editor:Editor,event:React.MouseEvent<HTMLElement>,
+ selection:TextRange|null):boolean{
+ if(!selection||selection.doc!==editor.state.doc||selection.from>=selection.to||
+  selection.to>editor.state.doc.content.size)return false;
+ if(event.detail===0&&event.clientX===0&&event.clientY===0)return true;
+ try{
+  const start=editor.view.domAtPos(selection.from),end=editor.view.domAtPos(selection.to);
+  const range=document.createRange();
+  range.setStart(start.node,start.offset);range.setEnd(end.node,end.offset);
+  return Array.from(range.getClientRects()).some(rect=>
+   event.clientX>=rect.left-2&&event.clientX<=rect.right+2&&
+   event.clientY>=rect.top-2&&event.clientY<=rect.bottom+2);
+ }catch{return false;}
+}
 /** Desktop-only: on touch, keep the native OS selection/callout behaviour. */
 export function EditorContextMenu({editor,onEditBlock,children}:{
  editor:Editor;onEditBlock:(pos:number)=>void;children:ReactNode;
 }){
  const [items,setItems]=useState<ContextMenuOption[]>([]);
+ const [cursor,setCursor]=useState({x:0,y:0});
+ const rightPointerSelection=useRef<(TextRange&{x:number;y:number})|null>(null);
+ const recentTextSelection=useRef<TextRange|null>(null);
+ useEffect(()=>{
+  const remember=()=>{const selected=currentTextRange(editor);if(selected)recentTextSelection.current=selected;};
+  const invalidate=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
+   if(transaction.docChanged)recentTextSelection.current=null;
+  };
+  editor.on('selectionUpdate',remember);editor.on('transaction',invalidate);
+  remember();
+  return()=>{editor.off('selectionUpdate',remember);editor.off('transaction',invalidate);};
+ },[editor]);
+ const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const hoverRow=useRef<HTMLElement|null>(null);
+ useEffect(()=>()=>{if(hoverTimer.current!==null)clearTimeout(hoverTimer.current);},[]);
+ const hoverNestedMenu=(event:React.PointerEvent<HTMLDivElement>)=>{
+  if(event.pointerType!=='mouse')return;
+  const target=event.target instanceof Element?event.target:null;
+  const row=target?.closest<HTMLElement>('.rk-editor-context-popover [role="menuitem"][aria-haspopup="menu"]');
+  if(!row||row===hoverRow.current)return;
+  if(hoverTimer.current!==null)clearTimeout(hoverTimer.current);
+  hoverRow.current=row;
+  // Astryx ContextMenu's data flyouts sometimes miss hover-intent after the
+  // outer layer is positioned manually. Preserve click semantics and add a
+  // guarded hover-open fallback without stealing focus from text selection.
+  hoverTimer.current=setTimeout(()=>{
+   hoverTimer.current=null;
+   if(row.isConnected&&hoverRow.current===row&&row.getAttribute('aria-expanded')!=='true')
+    row.click();
+  },180);
+ };
+ const leaveNestedMenu=(event:React.PointerEvent<HTMLDivElement>)=>{
+  const row=hoverRow.current;
+  if(!row||!(event.target instanceof Node)||!row.contains(event.target))return;
+  if(event.relatedTarget instanceof Node&&row.contains(event.relatedTarget))return;
+  hoverRow.current=null;
+  if(hoverTimer.current!==null){clearTimeout(hoverTimer.current);hoverTimer.current=null;}
+ };
+ const captureRightPointer=(event:React.PointerEvent<HTMLDivElement>)=>{
+  if(event.button===0){recentTextSelection.current=null;rightPointerSelection.current=null;return;}
+  if(event.button!==2)return;
+  const evt=event as unknown as React.MouseEvent<HTMLElement>;
+  const choices=[currentTextRange(editor),nativeTextRange(editor),recentTextSelection.current];
+  const matched=choices.find(range=>clickedSelectedText(editor,evt,range));
+  rightPointerSelection.current=matched?{...matched,x:event.clientX,y:event.clientY}:null;
+ };
+ useLayoutEffect(()=>{
+  // The third-party layer positions its container near the anchor and may
+  // establish a containing block for a fixed child. Correct against the
+  // ACTUAL viewport rect after the menu mounts, not guessed DOM ancestry.
+  let frame=0;
+  const start=performance.now();
+  const align=()=>{
+   const menu=document.querySelector<HTMLElement>('.rk-editor-context-popover[role="menu"]');
+   if(menu){
+    const rect=menu.getBoundingClientRect();
+    if(rect.width>1&&rect.height>1){
+     const left=Math.max(8,Math.min(cursor.x,innerWidth-rect.width-8));
+     const top=Math.max(8,Math.min(cursor.y,innerHeight-rect.height-8));
+     const dx=left-rect.left,dy=top-rect.top;
+     if(Math.abs(dx)>1)menu.style.left=((Number.parseFloat(menu.style.left)||0)+dx)+'px';
+     if(Math.abs(dy)>1)menu.style.top=((Number.parseFloat(menu.style.top)||0)+dy)+'px';
+    }
+   }
+   // The third-party popover flips/re-sizes while its entrance animation and
+   // nested menu rows settle. Keep it at the clicked viewport point just
+   // during that short entrance, then stop all layout reads.
+   if(performance.now()-start<480)frame=requestAnimationFrame(align);
+  };
+  frame=requestAnimationFrame(align);
+  return()=>cancelAnimationFrame(frame);
+ },[cursor]);
  const createMenu=(event:React.MouseEvent<HTMLElement>)=>{
+  const keyboard=event.detail===0&&event.clientX===0&&event.clientY===0;
+  const keyboardRect=keyboard?editor.view.coordsAtPos(editor.state.selection.from):null;
+  const px=keyboardRect?keyboardRect.left:event.clientX;
+  const py=keyboardRect?keyboardRect.bottom:event.clientY;
+  // Astryx cursor-anchor positioning can resolve to the trigger's left edge
+  // when the ProseMirror NodeView is nested/scrolling. Give the portaled menu
+  // an explicit viewport coordinate, clamped to the visible screen.
+  setCursor({x:Math.max(8,Math.min(px,innerWidth-252)),
+   y:Math.max(8,Math.min(py,innerHeight-160))});
   const position=getMenuPos(editor,event);
   const current=editableBlockFromDocumentPosition(editor,position);
   const explicit=!!current&&isExplicitRmdBlock(editor,current.pos);
@@ -55,11 +172,21 @@ export function EditorContextMenu({editor,onEditBlock,children}:{
    event.target.closest<HTMLElement>('.rk-directive[data-rk-kind],.rk-rich-link-card,.wiki-editor-embed'):null);
   editor.view.dom.dispatchEvent(new CustomEvent('rk-block-select',{bubbles:true,
    detail:{pos:explicit?current!.pos:null,element}}));
+  const captured=rightPointerSelection.current;
+  const samePoint=captured&&Math.abs(captured.x-event.clientX)<3&&Math.abs(captured.y-event.clientY)<3;
+  const matched=samePoint&&captured.doc===editor.state.doc?captured:
+   [currentTextRange(editor),nativeTextRange(editor),recentTextSelection.current].find(range=>
+    clickedSelectedText(editor,event,range));
+  rightPointerSelection.current=null;
+  const selected=!!matched;
+  if(matched)editor.commands.setTextSelection({from:matched.from,to:matched.to});
   const selection={from:editor.state.selection.from,to:editor.state.selection.to};
-  const selected=!editor.state.selection.empty;
   const formats=selected?inlineContextItems(editor):[];
   const copyActions=formats.filter(item=>isAction(item)&&['copy-selected-text','cut-selected-text','delete-selected-text'].includes(item.id??''));
   const textFormats=formats.filter(item=>isAction(item)&&!['copy-selected-text','cut-selected-text','delete-selected-text'].includes(item.id??''));
+  const basicIds=['selection-bold','selection-italic','selection-underline','selection-rmd-mark'];
+  const basicFormats=textFormats.filter(item=>isAction(item)&&basicIds.includes(item.id??''));
+  const advancedFormats=textFormats.filter(item=>isAction(item)&&!basicIds.includes(item.id??''));
   const handDrawn:ContextMenuOption={id:'rmd-inline-sketch',label:'手绘标记',icon:<IconPencil size="var(--rk-icon-sm)"/>,
    items:inlineCommandsByGroup('hand-drawn').map(cmd=>({
     id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<IconPencil size="var(--rk-icon-sm)"/>,
@@ -72,7 +199,7 @@ export function EditorContextMenu({editor,onEditBlock,children}:{
    }))};
   const actions=current?blockMenuItems({editor,pos:current.pos,onEditBlock}):[];
   const history=actions.filter(item=>isAction(item)&&['undo','redo'].includes(item.id??''));
-  const blockActions=actions.filter(item=>isAction(item)&&!['undo','redo'].includes(item.id??''));
+  const blockActions=selected?[]:actions.filter(item=>isAction(item)&&!['undo','redo'].includes(item.id??''));
   const fallbackHistory:ContextMenuOption[]=history.length?history:[
    {id:'undo',label:'撤销',isDisabled:undoDepth(editor.state)===0,
     onClick:()=>{undo(editor.state,editor.view.dispatch);editor.view.focus();}},
@@ -80,21 +207,31 @@ export function EditorContextMenu({editor,onEditBlock,children}:{
     onClick:()=>{redo(editor.state,editor.view.dispatch);editor.view.focus();}}
   ];
   const structure:ContextMenuOption[]=[];
-  for(const group of [
-   selected?grouped('剪贴板',copyActions):null,
-   selected?grouped('文字格式',textFormats):null
-  ])if(group)structure.push(group);
-  if(selected)structure.push(handDrawn,components,{type:'divider'});
+  if(selected){
+   const clipboard=grouped('剪贴板',copyActions);
+   const common=grouped('常用文字格式',basicFormats);
+   if(clipboard)structure.push(clipboard);
+   if(common)structure.push(common);
+   // Related commands are a hierarchy, not a flat 15-row context menu.
+   // Astryx nested items support both hover and click flyouts.
+   structure.push({id:'selection-more',label:'更多文字格式',
+    icon:<IconDots size="var(--rk-icon-sm)"/>,items:advancedFormats.filter(isAction).map(iconOption)});
+   structure.push(handDrawn,components);
+   structure.push({type:'divider'});
+  }
   const blocks=grouped('块操作',blockActions);
   if(blocks)structure.push(blocks);
   const edits=grouped('历史',fallbackHistory);
   if(edits)structure.push(edits);
   setItems(structure);
  };
- return <div className="rk-editor-context-area">
+ return <div className="rk-editor-context-area"
+  onPointerDownCapture={captureRightPointer} onPointerOverCapture={hoverNestedMenu}
+  onPointerOutCapture={leaveNestedMenu}>
   <ContextMenu label="编辑器右键菜单" menuWidth={244} size="sm"
    className="rk-editor-context-popover" presentation="popover"
-   items={items} onContextMenu={createMenu}>
+   items={items} onContextMenu={createMenu}
+   style={{position:'fixed',left:cursor.x,top:cursor.y,right:'auto',bottom:'auto'}}>
    {children}
   </ContextMenu>
  </div>;

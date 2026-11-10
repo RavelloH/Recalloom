@@ -20,9 +20,23 @@
  background:var(--color-background-muted,rgba(128,128,128,.035));}
 .rk-block-panel-section-heading{display:flex;align-items:center;gap:7px;color:var(--color-text-secondary,#777);
  font-size:12px;font-weight:600;min-height:23px;}
-.rk-block-panel-preview-body{font-size:12px;min-width:0;overflow-wrap:anywhere;}
-.rk-block-panel-preview-body .markdown-preview{width:100%;max-width:100%;min-height:0!important;padding:7px 0!important;margin:0!important;}
-.rk-block-panel-preview-body .markdown-preview :first-child{margin-top:0;}
+/* The Drawer is portaled outside .record-main. Restore the same document
+ * typography/theme scope in the preview, then adapt the page-sized measure to
+ * a compact inspector without changing any global Markdown styles. */
+.rk-block-panel-preview-body.record-main{
+ --rk-document-pad:0px;--rk-prose-measure:100%;--rk-wide-measure:100%;
+ min-width:0;width:100%;font-size:13px;line-height:1.55;
+ color:var(--rk-document-ink);overflow-wrap:anywhere;
+}
+.rk-block-panel-preview-body.record-main .markdown-preview{
+ box-sizing:border-box;width:100%;max-width:100%;min-height:0!important;
+ padding:7px 0!important;margin:0!important;font-size:13px!important;
+ line-height:1.55!important;overflow:visible;
+}
+.rk-block-panel-preview-body.record-main .markdown-preview > :first-child{margin-block-start:0!important;}
+.rk-block-panel-preview-body.record-main .markdown-preview > :last-child{margin-block-end:0!important;}
+.rk-block-panel-preview-body.record-main .markdown-preview :is(.rk-rmd-callout,.rk-rmd-block-mark,.rk-sketch-block){max-width:100%;}
+.rk-block-panel-preview-body.record-main .markdown-preview :is(pre,table,.tableWrapper,figure){max-width:100%;}
 .rk-block-panel-fields{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:auto;gap:11px;padding:14px;}
 .rk-block-panel-fields textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.65;}
 .rk-block-panel-desc,.rk-block-panel-help{font-size:12px;line-height:1.65;color:var(--color-text-secondary,#777);margin:0;}

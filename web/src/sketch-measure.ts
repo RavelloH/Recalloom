@@ -55,7 +55,7 @@ export function measureInlineSketchLines(element:HTMLElement):{rect:DOMRect;hasM
  return lines.map(line=>({rect:asRect(line.bounds),hasMath:line.hasMath}));
 }
 
-export function measureBlockSketchLine(element:HTMLElement):{rect:DOMRect;hasMath:boolean}{
+export function measureBlockSketchLine(element:HTMLElement):{rect:DOMRect;hasMath:boolean;inkOffset:number}{
  const mathOnly=element.dataset.rkSketchMathOnly==='true';
  const math=mathOnly?element.querySelector<HTMLElement>('.katex-html'):null;
  const target=math??element.querySelector<HTMLElement>('.rk-sketch-content')??element;
@@ -66,5 +66,15 @@ export function measureBlockSketchLine(element:HTMLElement):{rect:DOMRect;hasMat
    if(valid(glyph))bounds=union(bounds,glyph);
   }
  }
- return {rect:asRect(bounds),hasMath:!!element.querySelector('.katex')};
+ // CSS line-height is not optically centered on text ink; its extra
+ // ascent/descent leading depends on font and script (Latin/CJK). Measure the
+ // actual text range once per annotation redraw rather than guessing pixels.
+ let inkOffset=0;
+ if(!math&&target.textContent?.trim()&&!element.querySelector('.katex')){
+  const range=document.createRange();
+  range.selectNodeContents(target);
+  const ink=toBounds(range.getBoundingClientRect());
+  if(valid(ink))inkOffset=(bounds.top+bounds.bottom-ink.top-ink.bottom)/2;
+ }
+ return {rect:asRect(bounds),hasMath:!!element.querySelector('.katex'),inkOffset};
 }

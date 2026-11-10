@@ -12,7 +12,9 @@ type HoverBlock={pos:number;x:number;y:number;element:HTMLElement};
 type DragEntry={pos:number;element:HTMLElement;rect:DOMRect;selector:string};
 type DragSession={
  source:HoverBlock;sourceIndex:number;entries:DragEntry[];
- target:{pos:number;after:boolean}|null;floating:HTMLElement;slot:HTMLElement;css:HTMLStyleElement;offset:number;
+ target:{pos:number;after:boolean}|null;floating:HTMLElement;slot:HTMLElement;css:HTMLStyleElement;
+ indexMap:Map<number,number>;lastPreviewIndex:number;
+ styleRules:CSSStyleRule[];shiftValues:number[];
 };
 const explicitSelector='.rk-directive[data-rk-kind], .rk-rich-link-card[data-rk-link-card], .wiki-editor-embed';
 function gripPosition(element:HTMLElement){
@@ -101,12 +103,34 @@ function makeDragSession(editor:Editor,source:HoverBlock,handle:HTMLElement):Dra
  document.body.appendChild(slot);
  const css=document.createElement('style');
  css.setAttribute('data-rk-drag-styles','');document.head.appendChild(css);
+ // One CSSOM rule per sibling. Never rewrite style.textContent or touch PM
+ // contentDOM while the pointer moves. Update only siblings whose offset
+ // actually changed; this reduces O(n) stylesheet reparses to O(delta).
+ const styleRules:CSSStyleRule[]=[];
+ const sheet=css.sheet;
+ for(let i=0;i<entries.length;i++){
+  if(!sheet)break;
+  const selector=entries[i]!.selector;
+  const opacity=i===sourceIndex?'opacity:.07!important;':'';
+  sheet.insertRule(selector+'{'+opacity+
+   'transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;}',sheet.cssRules.length);
+  styleRules.push(sheet.cssRules[sheet.cssRules.length-1] as CSSStyleRule);
+ }
  const rect=entries[sourceIndex]!.rect;
  slot.style.left=rect.left+'px';slot.style.top=rect.top+'px';
  slot.style.width=rect.width+'px';slot.style.height=Math.max(rect.height,24)+'px';
- return {source,sourceIndex,entries,target:null,floating,slot,css,offset:0};
+ return {source,sourceIndex,entries,target:null,floating,slot,css,
+  indexMap:new Map(entries.map((entry,i)=>[entry.pos,i])),lastPreviewIndex:-1,
+  styleRules,shiftValues:entries.map(()=>0)};
 }
 function paintDrag(session:DragSession,index:number,clientX:number,clientY:number){
+ // Pointer tracking is compositor-only: moving the thumbnail must not
+ // repaint or re-layout the entire editor on every dragover event.
+ const x=Math.max(6,Math.min(innerWidth-120,clientX+16));
+ const y=Math.max(6,Math.min(innerHeight-65,clientY+14));
+ session.floating.style.transform='translate3d('+x+'px,'+y+'px,0) rotate(-1.5deg)';
+ if(index===session.lastPreviewIndex)return;
+ session.lastPreviewIndex=index;
  const source=session.entries[session.sourceIndex]!;
  // Include the existing block gap so the displaced neighbours move into
  // the vacated slot without touching ProseMirror's DOM or transaction history.
@@ -115,27 +139,23 @@ function paintDrag(session:DragSession,index:number,clientX:number,clientY:numbe
  const downGap=below?Math.max(source.rect.height,below.rect.top-source.rect.top):source.rect.height;
  const upGap=above?Math.max(source.rect.height,source.rect.bottom-above.rect.bottom):source.rect.height;
  const delta=index>session.sourceIndex?downGap:index<session.sourceIndex?upGap:0;
- session.offset=delta;
- const rules=[source.selector+'{opacity:.07!important;}'];
  for(let i=0;i<session.entries.length;i++){
-  const entry=session.entries[i]!;
   if(i===session.sourceIndex)continue;
   const shift=index>session.sourceIndex&&i>session.sourceIndex&&i<=index?-delta:
    index<session.sourceIndex&&i>=index&&i<session.sourceIndex?delta:0;
-  if(shift)rules.push(entry.selector+'{transform:translate3d(0,'+shift+
-   'px,0)!important;transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;}');
-  else rules.push(entry.selector+'{transition:transform .18s cubic-bezier(.2,.8,.2,1)!important;}');
+  if(shift===session.shiftValues[i])continue;
+  session.shiftValues[i]=shift;
+  const rule=session.styleRules[i];
+  if(!rule)continue;
+  if(shift)rule.style.setProperty('transform','translate3d(0,'+shift+'px,0)','important');
+  else rule.style.removeProperty('transform');
  }
- session.css.textContent=rules.join(String.fromCharCode(10));
  const top=index<session.sourceIndex?session.entries[index]!.rect.top:
   index>session.sourceIndex?session.entries[index]!.rect.bottom-delta:source.rect.top;
  session.slot.style.left=source.rect.left+'px';session.slot.style.top=top+'px';
  session.slot.style.width=source.rect.width+'px';
  session.slot.style.height=Math.max(24,source.rect.height)+'px';
  session.slot.dataset.moved=String(index!==session.sourceIndex);
- session.slot.dataset.motion=JSON.stringify({sourceIndex:session.sourceIndex,index,entries:session.entries.length,delta});
- session.floating.style.left=Math.min(innerWidth-100,clientX+16)+'px';
- session.floating.style.top=Math.min(innerHeight-48,clientY+14)+'px';
 }
 function clearDrag(session:DragSession|null){
  if(!session)return;
@@ -190,9 +210,24 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
     if(!target?.closest?.('.rk-block-grip'))selectRef.current(null,null);
    }
   };
-  const leave=(event:PointerEvent)=>{
-   if(!menuOpenRef.current&&!dragRef.current&&!(event.relatedTarget instanceof Element&&
-    event.relatedTarget.closest('.rk-block-grip')))setHover(null);
+  const outsideMove=(event:PointerEvent)=>{
+   const current=hoverRef.current;
+   if(!current||event.pointerType==='touch'||dragRef.current||menuOpenRef.current)return;
+   const target=event.target;
+   // ProseMirror handles all pointer movement *inside* its surface.
+   if(target instanceof Node&&surface.contains(target))return;
+   if(target instanceof Element&&target.closest('.rk-block-grip'))return;
+   const block=current.element.getBoundingClientRect();
+   const gWidth=matchMedia('(pointer:coarse)').matches?98:70;
+   const gHeight=matchMedia('(pointer:coarse)').matches?48:36;
+   const left=Math.min(block.left,current.x)-13;
+   const right=Math.max(block.right,current.x+gWidth)+13;
+   const top=Math.min(block.top,current.y)-13;
+   const bottom=Math.max(block.bottom,current.y+gHeight)+13;
+   // Keep a continuous hover corridor between the block and its portaled
+   // handle. Otherwise pointerleave kills the handle while crossing the gap.
+   if(event.clientX<left||event.clientX>right||event.clientY<top||event.clientY>bottom)
+    setHover(null);
   };
   const scroll=()=>{
    const current=hoverRef.current;
@@ -210,8 +245,6 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
    if(!session)return;
    event.preventDefault();
    if(event.dataTransfer)event.dataTransfer.dropEffect='move';
-   session.floating.style.left=Math.min(innerWidth-100,event.clientX+16)+'px';
-   session.floating.style.top=Math.min(innerHeight-48,event.clientY+14)+'px';
    const at=editor.view.posAtCoords({left:event.clientX,top:event.clientY});
    const source=editableBlockAt(editor,session.source.pos);
    const top=at?topLevelAtDocumentPosition(editor,at.pos):null;
@@ -223,7 +256,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
       candidate.parentPos!==source.parentPos||candidate.node.attrs.kind!==source.node.attrs.kind)){
     session.target=null;paintDrag(session,session.sourceIndex,event.clientX,event.clientY);return;
    }
-   const targetIndex=session.entries.findIndex(entry=>entry.pos===candidate.pos);
+   const targetIndex=session.indexMap.get(candidate.pos)??-1;
    if(targetIndex<0){session.target=null;paintDrag(session,session.sourceIndex,event.clientX,event.clientY);return;}
    const target=session.entries[targetIndex]!;
    const after=event.clientY>=target.rect.top+target.rect.height/2;
@@ -244,7 +277,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
   };
   surface.addEventListener('pointermove',move);
   surface.addEventListener('pointerdown',tap);
-  surface.addEventListener('pointerleave',leave);
+  window.addEventListener('pointermove',outsideMove,true);
   surface.addEventListener('dragover',dragOver,true);
   surface.addEventListener('drop',drop,true);
   surface.addEventListener('rk-block-select',selectFromContext);
@@ -253,7 +286,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
   return()=>{
    surface.removeEventListener('pointermove',move);
    surface.removeEventListener('pointerdown',tap);
-   surface.removeEventListener('pointerleave',leave);
+   window.removeEventListener('pointermove',outsideMove,true);
    surface.removeEventListener('dragover',dragOver,true);
    surface.removeEventListener('drop',drop,true);
    surface.removeEventListener('rk-block-select',selectFromContext);
@@ -274,6 +307,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
   const session=makeDragSession(editor,hover,event.currentTarget);
   if(!session){event.preventDefault();return;}
   dragRef.current=session;selectRef.current(hover.pos,hover.element);
+  paintDrag(session,session.sourceIndex,event.clientX,event.clientY);
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('application/x-recalloom-block',String(hover.pos));
   event.dataTransfer.setData('text/plain','移动 RMD 块');

@@ -45,21 +45,26 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
   if(element&&!save)element.textContent=richTitle(kind,title);
   if(element&&!next&&save)element.textContent=richTitle(kind,'');
  };
+ // Use the rendered title itself as the editing surface. There is no
+ // separate input, floating field, or additional editor wrapper to resize it.
+ // This inert outer span prevents ProseMirror from trying to parse title
+ // keystrokes as changes to its separate NodeView contentDOM. It is not an
+ // input and has no form styling: the inner text remains directly editable.
  const editTitle=<span className="rk-directive-title" contentEditable={false}>
-  <span ref={titleElement} className="rk-directive-title-hit" contentEditable
-   suppressContentEditableWarning role="textbox" tabIndex={0}
-   aria-label="容器标题" aria-multiline={false} spellCheck
-   title="点击文字即可直接编辑；Enter 确认、Esc 取消"
-   onPointerDown={event=>event.stopPropagation()}
-   onClick={event=>event.stopPropagation()}
-   onFocus={event=>{titleEditing.current=true;if(!title)event.currentTarget.textContent='';}}
-   onBlur={()=>finishTitleEdit(true)}
-   onKeyDown={event=>{
-    event.stopPropagation();
-    if(event.nativeEvent.isComposing)return;
-    if(event.key==='Enter'){event.preventDefault();finishTitleEdit(true);event.currentTarget.blur();}
-    else if(event.key==='Escape'){event.preventDefault();finishTitleEdit(false);event.currentTarget.blur();}
-   }}>{richTitle(kind,title)}</span>
+ <span ref={titleElement} className="rk-directive-title-hit" contentEditable
+  suppressContentEditableWarning role="textbox" tabIndex={0}
+  aria-label="容器标题" aria-multiline={false} spellCheck
+  title="直接在标题文字上编辑；Enter 确认、Esc 取消"
+  onPointerDown={event=>event.stopPropagation()}
+  onClick={event=>event.stopPropagation()}
+  onFocus={event=>{titleEditing.current=true;if(!title)event.currentTarget.textContent='';}}
+  onBlur={()=>finishTitleEdit(true)}
+  onKeyDown={event=>{
+   event.stopPropagation();
+   if(event.nativeEvent.isComposing)return;
+   if(event.key==='Enter'){event.preventDefault();finishTitleEdit(true);event.currentTarget.blur();}
+   else if(event.key==='Escape'){event.preventDefault();finishTitleEdit(false);event.currentTarget.blur();}
+  }}>{richTitle(kind,title)}</span>
  </span>;
  const stableId=typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined;
  return <NodeViewWrapper id={stableId} className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from 'playwright-core';
 
-const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8825';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8815';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
 const binary=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 assert.ok(binary);
@@ -21,10 +21,15 @@ const selectFixtureLine=async locator=>{
   await page.keyboard.press('Shift+Home');
   const selected=await page.evaluate(()=>window.getSelection()?.toString().trim()??'');
   if(selected==='alpha beta gamma'){
-   // Tiptap's selection BubbleMenu is debounced. Wait for the actual
-   // visible selection toolbar rather than racing its scheduled update.
-   await page.waitForTimeout(350);
-   return;
+   // Source text selection can race the debounced desktop BubbleMenu when
+   // switching RMD documents. Require the real action to be visible, not
+   // merely a non-empty browser selection.
+   const name=page.viewportSize()?.width>720?'文本格式':'格式工具栏';
+   try{
+    await page.getByRole('toolbar',{name}).first()
+     .getByRole('button',{name:'行内组件'}).waitFor({state:'visible',timeout:1700});
+    return;
+   }catch{/* A missed toolbar update should trigger one fresh selection. */}
   }
   await page.waitForTimeout(125);
  }

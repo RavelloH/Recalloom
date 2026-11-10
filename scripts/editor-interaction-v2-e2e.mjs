@@ -70,7 +70,8 @@ try{
  });
  assert.ok(toolbarStats.count>=8&&toolbarStats.count<=12,'compact toolbar should have few icon actions');
  assert.ok(toolbarStats.buttonText.every(t=>t===''),'floating toolbar must be icon-only: '+JSON.stringify(toolbarStats));
- assert.ok(toolbarStats.geometry.every(g=>g.width<=34&&g.height<=34&&g.icon),'icon geometry must be uniform: '+JSON.stringify(toolbarStats));
+ assert.ok(toolbarStats.geometry.every(g=>g.width<=48&&g.height<=34&&g.icon),'icon buttons including chevrons must fit compact bounds: '+JSON.stringify(toolbarStats));
+ assert.equal(toolbarStats.geometry.filter(g=>g.width>34).length,3,'only three categorized dropdowns may use wider icon-plus-chevron buttons');
  console.log('PASS compact icon-only aligned text selection toolbar',toolbarStats);
 
  await first.click({button:'right'});

@@ -8,12 +8,19 @@
 /* The menu is a compact popover, never a sheet or a full-width trigger.
  * ContextMenu forwards className to its actual portaled menu, not the area. */
 .rk-editor-context-popover[role="menu"]{
+ /* Portaled ContextMenu: position to the actual contextmenu event instead of
+  * inheriting a nested NodeView's incompatible anchor-positioning context. */
+ position:fixed!important;right:auto!important;bottom:auto!important;
+ inset-inline-start:auto;inset-block-start:auto;
+ margin:0!important;translate:none!important;transform:none!important;
  box-sizing:border-box!important;
  width:min(244px,calc(100vw - 24px))!important;
  min-width:0!important;
  max-width:calc(100vw - 24px)!important;
- max-height:min(65vh,490px)!important;
- overflow-x:hidden!important;
+ max-height:min(70vh,540px)!important;
+ /* Nested flyouts are inline under Astryx's root menu. Clipping the root
+  * hides them, so leave overflow visible for hover/click submenus. */
+ overflow:visible!important;
  border:1px solid var(--color-border,rgba(128,128,128,.24));
  border-radius:11px;
 }
@@ -30,4 +37,12 @@
 }
 .rk-editor-context-popover [role="menuitem"] svg{
  width:16px;height:16px;flex:none;stroke-width:1.8;
+}
+
+/* Astryx's animated layer wraps the menu in a transformed positioning root.
+ * A transformed ancestor becomes the containing block of position:fixed
+ * descendants, doubling the pointer's vertical offset. Disable the
+ * positional transform ONLY for this editor context menu's layer. */
+div:has(> .rk-editor-context-popover[role="menu"]){
+ transform:none!important;will-change:auto!important;
 }

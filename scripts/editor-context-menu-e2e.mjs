@@ -8,6 +8,16 @@ const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Pr
 const browser=await chromium.launch({headless:true,executablePath:bin,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
+async function rightClickSelectedGlyphs(){
+ const pt=await page.evaluate(()=>{
+  const selected=getSelection();
+  if(!selected||selected.isCollapsed||!selected.rangeCount)return null;
+  const r=selected.getRangeAt(0).getBoundingClientRect();
+  return {x:r.left+r.width*.5,y:r.top+r.height*.5};
+ });
+ assert.ok(pt,'right-click selection requires a visible nonempty glyph range');
+ await page.mouse.click(pt.x,pt.y,{button:'right'});
+}
 const input='# Editor context actions\n\nFirst line.\n\nSecond line.\n\n::: warning 右键块\n\n可选择的块内容。\n\n:::';
 try{
  await page.goto(base+'/login');
@@ -27,14 +37,20 @@ try{
  assert.equal(await page.evaluate(()=>window.getSelection()?.toString()),'First line.','desktop ContextMenu wrapper must preserve text selection');
  const selCss=await page.locator('.tiptap').evaluate(el=>getComputedStyle(el).userSelect);
  assert.notEqual(selCss,'none','text selection cannot be disabled');
- await first.click({button:'right'});
- const context=page.getByRole('menu').last();await context.waitFor();
+ await rightClickSelectedGlyphs();
+ const context=page.getByRole('menu',{name:'编辑器右键菜单'});await context.waitFor();
  const popupWidth=await context.evaluate(el=>el.getBoundingClientRect().width);
  assert.ok(popupWidth>=170&&popupWidth<=275,'right-click popup must be narrow, not fullscreen: '+popupWidth);
  assert.ok(await context.locator('[role="menuitem"] svg').count()>=3,'menu actions need leading icons');
- assert.ok(await context.getByRole('group',{name:'文字格式'}).count()>=1,'selection actions should be organized');
- console.log('PASS compact organized context menu',popupWidth);
- await context.getByRole('menuitem',{name:'复制块',exact:true}).click();
+ assert.ok(await context.getByRole('group',{name:'常用文字格式'}).count()>=1,'selected glyph context should show organized text commands');
+ assert.equal(await context.getByRole('group',{name:'块操作'}).count(),0,'selected glyph context must not show block commands');
+ console.log('PASS compact text-only context menu',popupWidth);
+ await page.keyboard.press('Escape');
+ await first.click(); // clear text selection before invoking a paragraph-block context
+ await first.click({button:'right'});
+ const blockContext=page.getByRole('menu',{name:'编辑器右键菜单'});await blockContext.waitFor();
+ assert.equal(await blockContext.getByRole('group',{name:'常用文字格式'}).count(),0,'paragraph context must not inherit unrelated text commands');
+ await blockContext.getByRole('menuitem',{name:'复制块',exact:true}).click();
  await page.waitForTimeout(120);
  assert.equal(await page.locator('.tiptap p').filter({hasText:'First line.'}).count(),2,'right-click duplicates only selected block');
  await first.click({button:'right'});
@@ -48,15 +64,15 @@ try{
  await another.click();
  await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
  assert.equal(await page.evaluate(()=>window.getSelection()?.toString()),'Second line.');
- await another.click({button:'right'});
- const selectionMenu=page.getByRole('menu').last();await selectionMenu.waitFor();
+ await rightClickSelectedGlyphs();
+ const selectionMenu=page.getByRole('menu',{name:'编辑器右键菜单'});await selectionMenu.waitFor();
  await selectionMenu.getByRole('menuitem',{name:'手绘标记'}).click();
  await page.getByRole('menuitem',{name:'手绘圈选'}).last().click();
  await page.locator('.tiptap .rk-sketch-inline[data-rk-sketch-kind="circle"]').first().waitFor();
  console.log('PASS desktop context menu: select, duplicate, handdrawn mark');
  await another.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
- await another.click({button:'right'});
- const formatMenu=page.getByRole('menu').last();await formatMenu.waitFor();
+ await rightClickSelectedGlyphs();
+ const formatMenu=page.getByRole('menu',{name:'编辑器右键菜单'});await formatMenu.waitFor();
  await formatMenu.getByRole('menuitem',{name:'普通下划线'}).click();
  await page.locator('.tiptap u').filter({hasText:'Second line.'}).first().waitFor();
  console.log('PASS context menu restores selection for standard Markdown formatting');
