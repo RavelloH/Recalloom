@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {capChallenge,checkOrigin,cookie,WEB_COOKIE,session} from '../src/web-auth.js';
+import {capChallenge,checkOrigin,cookie,WEB_COOKIE,session,webRateLimitEnabled} from '../src/web-auth.js';
 import {deriveWebKey,webHmacHex} from '../src/web-keys.js';
 import type {Env} from '../src/types.js';
 
@@ -12,6 +12,40 @@ test('web browser mutations require same Origin and reject cross-site Fetch Meta
   assert.equal(checkOrigin(request('https://example.test','cross-site')),false);
   assert.equal(checkOrigin(request('https://attacker.test')),false);
   assert.equal(checkOrigin(new Request('https://example.test/api/records',{method:'POST'})),false);
+});
+test('web login rate limiting defaults ON and may only be disabled on loopback',()=>{
+  const env=(flag?:string)=>({WEB_AUTH_RATE_LIMIT_ENABLED:flag} as Env);
+  const local=new Request('http://127.0.0.1:8825/api/auth/login');
+  const localhost=new Request('http://localhost:8825/api/auth/login');
+  const ipv6=new Request('http://[::1]:8825/api/auth/login');
+  const publicUrl=new Request('https://recalloom.example.test/api/auth/login');
+  for(const flag of [undefined,'true','FALSE','0','','off']){
+    assert.equal(webRateLimitEnabled(local,env(flag)),true,JSON.stringify(flag));
+    assert.equal(webRateLimitEnabled(publicUrl,env(flag)),true,JSON.stringify(flag));
+  }
+  for(const request of [local,localhost,ipv6]){
+    assert.equal(webRateLimitEnabled(request,env('false')),false,'explicit loopback-only test override');
+  }
+  assert.equal(webRateLimitEnabled(publicUrl,env('false')),true,'production domain must remain protected');
+});
+test('loopback test override skips only rate-limit DB and still requires valid Cap proof',async()=>{
+  const base='http://127.0.0.1:8825';
+  let rateQueries=0;
+  const env={
+    MCP_AUTH_SECRET:'a real local test-only oauth master key',
+    WEB_AUTH_RATE_LIMIT_ENABLED:'false',
+    DB:{prepare:()=>{rateQueries++;throw new Error('unexpected rate-limit DB query');}}
+  } as unknown as Env;
+  const request=new Request(base+'/api/auth/cap/challenge',{method:'POST',headers:{origin:base}});
+  const response=await capChallenge(request,env);
+  assert.equal(response.status,200,'Cap generation remains enabled');
+  assert.equal(rateQueries,0,'rate-limit counter must not be read or modified');
+  const payload=await response.json() as {token?:string};
+  assert.equal(typeof payload.token,'string');
+  const rejected=await capChallenge(new Request(base+'/api/auth/cap/challenge',{
+    method:'POST',headers:{origin:'http://untrusted.example'}
+  }),env);
+  assert.equal(rejected.status,403,'Origin protection must remain enabled');
 });
 test('session cookie is HttpOnly, Secure, Strict and scoped to origin root',()=>{
   const value=cookie('test-opaque-value',Date.now()+300000);

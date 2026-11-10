@@ -2,3 +2,8 @@
 MCP_AUTH_SECRET=replace-with-a-random-secret
 # The same MCP_AUTH_SECRET is used to approve MCP OAuth clients and log into the Web API.
 # Server-side HMAC derives only internal signing/session keys; no second login password is needed.
+# Web authentication rate limiting is ON by default (when unset).
+# Optional local-only E2E override, effective ONLY on 127.0.0.1 / localhost / ::1:
+# WEB_AUTH_RATE_LIMIT_ENABLED=false
+# This does not bypass Cap.js, credentials, Origin checks or session validation.
+# pnpm test:editor automatically injects the override for its temporary local Worker.

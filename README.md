@@ -135,6 +135,20 @@ pnpm dev
 
 本地 MCP 地址为 `http://localhost:8787/mcp`。如需开发网页，在另一个终端运行 `pnpm dev:web`，打开 `http://localhost:5173`；它会将 API 请求代理到本地 Worker。运行 `pnpm check`、`pnpm test` 和 `pnpm build:web` 验证更改。
 
+### 编辑器浏览器回归（单命令、隔离环境）
+
+```bash
+pnpm test:editor
+# 可选：已构建 dist/web，只跑一两个 E2E 用例
+node scripts/run-editor-e2e.mjs editor-interaction-v3-e2e.mjs
+# 可选：不重新构建、运行全部浏览器 E2E
+pnpm test:editor:quick
+```
+
+运行器自动创建一次性本地 D1、应用迁移、选取空闲的 `127.0.0.1` 端口、启动 Wrangler、顺序运行 25 个真实浏览器脚本，并在退出时回收子进程与测试数据。不再要求手工管理五个测试端口，也不需要清空 `web_rate_limits` 表。
+
+网页登录限流**默认开启**。测试运行器对它启动的本地 Worker 显式注入 `WEB_AUTH_RATE_LIMIT_ENABLED=false`，仅跳过 Cap Challenge、Cap Redeem 和 Login 的**限流计数**，仍要求 Cap.js 验证、合法 Origin、正确 OAuth 密钥、重放保护与有效会话。此开关只有在服务地址为 `127.0.0.1`、`localhost` 或 `::1` 时才生效；公网域名即使误设为 `false` 仍保持限流。日常 `pnpm dev` 不自动关闭保护；如需手动关闭本地开发环境限流，可在被 Git 忽略的 `.dev.vars` 中加入 `WEB_AUTH_RATE_LIMIT_ENABLED=false`。验证限流本身时可用 `RECALLOOM_E2E_PROTECTED=true` 运行单个浏览器脚本，不建议在开启限流时连续跑整套登录测试。
+
 如果要从本地手动部署，请先通过环境变量配置 `RECALLOOM_KV_ID` 和 `RECALLOOM_D1_ID`，再运行 `pnpm deploy`。部署脚本会执行所需的 D1 迁移。不要提交 `.dev.vars` 或本地生成的部署配置。
 
 ## 数据与安全

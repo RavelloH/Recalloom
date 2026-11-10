@@ -8,6 +8,8 @@ export interface Env {
   AI: Ai;
   MCP_AUTH_SECRET: string;
   MCP_BASE_URL?: string;
+  /** Local E2E only: literal "false" disables Web login rate limiting on loopback. Defaults on. */
+  WEB_AUTH_RATE_LIMIT_ENABLED?: string;
 }
 export type RecordKind = 'document' | 'task_list';
 export type RecordStatus = 'draft' | 'active' | 'completed' | 'superseded' | 'archived';

@@ -45,7 +45,21 @@ async function consume(env:Env,raw:string,expires:number){
   const result=await env.DB.prepare('INSERT OR IGNORE INTO web_nonces(id_hash,expires_at) VALUES(?,?)').bind(hash,expires).run();
   return result.meta.changes===1;
 }
+/**
+ * Rate limiting is enabled by default. The single explicit opt-out is for
+ * locally hosted E2E runs only; it cannot disable production-domain limits
+ * even if someone accidentally deploys WEB_AUTH_RATE_LIMIT_ENABLED=false.
+ * This switch never bypasses Origin, Cap proof, credentials or sessions.
+ */
+export function webRateLimitEnabled(request:Request,env:Env):boolean{
+  if(env.WEB_AUTH_RATE_LIMIT_ENABLED!=='false')return true;
+  try{
+    const host=new URL(request.url).hostname;
+    return host!=='127.0.0.1'&&host!=='localhost'&&host!=='[::1]';
+  }catch{return true;}
+}
 async function rateLimit(request:Request,env:Env,scope:string,max:number,windowMs:number){
+  if(!webRateLimitEnabled(request,env))return true;
   const ip=request.headers.get('cf-connecting-ip')||'unknown';
   const bucket=await webHmacHex(env.MCP_AUTH_SECRET,'rate',scope+':'+ip+':'+Math.floor(Date.now()/windowMs));
   const res=await env.DB.prepare('INSERT INTO web_rate_limits(bucket_hash,attempts,expires_at) VALUES(?,1,?) ON CONFLICT(bucket_hash) DO UPDATE SET attempts=attempts+1 RETURNING attempts')
