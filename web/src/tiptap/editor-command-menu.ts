@@ -4,7 +4,7 @@
 import type {Editor} from '@tiptap/core';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {serializeRmdBlock} from '../rmd-serialize';
-import {duplicateBlock,moveBlockBy,removeBlock,topLevelBlockAt,topLevelBlocks} from './editor-block-actions';
+import {blockCanDelete,blockCanDuplicate,blockCanReorder,blockSiblings,duplicateBlock,editableBlockAt,moveBlockBy,removeBlock} from './editor-block-actions';
 
 export type BlockMenuOptions={
  editor:Editor;
@@ -13,8 +13,9 @@ export type BlockMenuOptions={
  onAction?:()=>void;
 };
 export function blockMenuItems({editor,pos,onEditBlock,onAction}:BlockMenuOptions):DropdownMenuOption[]{
- const current=topLevelBlockAt(editor,pos);
- const index=topLevelBlocks(editor).findIndex(entry=>entry.pos===pos);
+ const current=editableBlockAt(editor,pos);
+ const siblings=blockSiblings(editor,pos),index=siblings.findIndex(entry=>entry.pos===pos);
+ const canMove=blockCanReorder(editor,pos);
  const run=(fn:()=>void)=>()=>{fn();onAction?.();};
  return [
   {id:'edit-block',label:'编辑块',isDisabled:!current,
@@ -22,14 +23,14 @@ export function blockMenuItems({editor,pos,onEditBlock,onAction}:BlockMenuOption
   {id:'copy-block-rmd',label:'复制块 RMD 源码',isDisabled:!current,
    onClick:run(()=>{if(current)void navigator.clipboard.writeText(serializeRmdBlock(current.node.toJSON())).catch(()=>undefined);})},
   {type:'divider'},
-  {id:'duplicate-block',label:'复制块',isDisabled:!current,
+  {id:'duplicate-block',label:'复制块',isDisabled:!blockCanDuplicate(editor,pos),
    onClick:run(()=>{duplicateBlock(editor,pos);})},
-  {id:'move-block-up',label:'上移块',isDisabled:index<=0,
+  {id:'move-block-up',label:'上移块',isDisabled:!canMove||index<=0,
    onClick:run(()=>{moveBlockBy(editor,pos,-1);})},
-  {id:'move-block-down',label:'下移块',isDisabled:index<0||index===topLevelBlocks(editor).length-1,
+  {id:'move-block-down',label:'下移块',isDisabled:!canMove||index<0||index===siblings.length-1,
    onClick:run(()=>{moveBlockBy(editor,pos,1);})},
   {type:'divider'},
-  {id:'remove-block',label:'删除块',variant:'destructive',isDisabled:!current,
+  {id:'remove-block',label:'删除块',variant:'destructive',isDisabled:!blockCanDelete(editor,pos),
    onClick:run(()=>{removeBlock(editor,pos);})}
  ];
 }

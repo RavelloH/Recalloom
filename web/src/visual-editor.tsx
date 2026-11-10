@@ -47,7 +47,7 @@ import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/sl
 import {BlockHandleLayer} from './tiptap/block-handle';
 import {BlockEditorPanel} from './tiptap/block-editor-panel';
 import {EditorContextMenu} from './tiptap/editor-context-menu';
-import {topLevelBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
+import {editableBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {inlineCommandsByGroup,runInlineRmdCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
@@ -276,7 +276,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const openDirectBlock=(event:Event)=>{
    const pos=(event as CustomEvent<{pos:number}>).detail?.pos;
    if(!Number.isInteger(pos))return;
-   const target=topLevelBlockAt(editor,pos);
+   const target=editableBlockAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
    attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
@@ -302,8 +302,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    // node, which mapping marks deleted; association -1 retains that anchor.
    const fromPanel=transaction.getMeta('rk-block-panel-edit')===true;
    const mapped=transaction.mapping.mapResult(previous.pos,fromPanel?-1:1);
-   const current=topLevelBlockAt(editor,mapped.pos);
-   if(!current||current.node.type!==previous.node.type||(!fromPanel&&mapped.deleted)){
+   const current=editableBlockAt(editor,mapped.pos);
+   if(!current||current.node.type!==previous.node.type||
+    current.node.type.name==='richContainer'&&current.node.attrs.kind!==previous.node.attrs.kind||
+    (!fromPanel&&mapped.deleted)){
     blockPanelRef.current=null;attributeNodeRef.current=null;
     setBlockPanelPos(null);setAttributeNodePos(null);return;
    }
@@ -554,7 +556,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    </div>
   </div>}
   {compact?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={pos=>{
-   const target=topLevelBlockAt(editor,pos);
+   const target=editableBlockAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
    attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
@@ -562,7 +564,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    setBlockPanelPos(pos);
   }}><EditorContent editor={editor}/></EditorContextMenu>}
   <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} onEditBlock={pos=>{
-   const target=topLevelBlockAt(editor,pos);
+   const target=editableBlockAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
    attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;

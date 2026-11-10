@@ -3,7 +3,7 @@ import type {Editor} from '@tiptap/core';
 import type {RefObject} from 'react';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {IconGripVertical,IconDots} from '@tabler/icons-react';
-import {moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
+import {blockCanReorder,editableBlockAt,editableBlockFromDocumentPosition,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
 import './block-handle.css';
 
@@ -15,7 +15,25 @@ function findDirectBlock(view:HTMLElement,target:EventTarget|null):HTMLElement|n
  return node instanceof HTMLElement&&node.parentElement===view?node:null;
 }
 function hoveredBlock(editor:Editor,surface:HTMLElement,target:EventTarget|null):HoverBlock|null{
- const view=editor.view.dom,element=findDirectBlock(view,target);
+ const view=editor.view.dom;
+ const source=target instanceof Element?target:target instanceof Node?target.parentElement:null;
+ // Prefer a nested child wrapper over its parent. Never expose arbitrary
+ // paragraphs as independent structurally movable RMD children.
+ const nested=source?.closest<HTMLElement>('.rk-directive[data-rk-kind]');
+ if(nested&&view.contains(nested)){
+  try{
+   const domPos=editor.view.posAtDOM(nested,0),kind=nested.dataset.rkKind;
+   for(const position of [domPos,domPos-1,domPos+1]){
+    const candidate=editableBlockAt(editor,position)??editableBlockFromDocumentPosition(editor,position);
+    if(candidate?.parentKind&&candidate.node.attrs.kind===kind){
+     const a=nested.getBoundingClientRect(),s=surface.getBoundingClientRect();
+     return {pos:candidate.pos,element:nested,
+      x:Math.max(0,Math.min(a.right-s.left+4,s.width-78)),y:Math.max(0,a.top-s.top+3)};
+    }
+   }
+  }catch{/* Fall through to the enclosing top-level block. */}
+ }
+ const element=findDirectBlock(view,target);
  if(!element)return null;
  let pos:number;
  try{pos=editor.view.posAtDOM(element,0);}catch{return null;}
@@ -104,9 +122,11 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
  return <>{hover&&<div className="rk-block-grip" role="group" aria-label="块把手"
   style={{left:hover.x,top:hover.y}} onPointerDown={e=>e.stopPropagation()}>
   <button type="button" className="rk-block-drag" aria-label="拖动块"
-   title="拖动调整块顺序；点击打开块操作" draggable
+   title={blockCanReorder(editor,hover.pos)?'拖动调整块顺序；点击打开块操作':'点击打开子块操作（此类块不可拖动）'}
+   draggable={blockCanReorder(editor,hover.pos)}
    onClick={()=>setMenuOpen(open=>!open)}
    onDragStart={event=>{
+    if(!blockCanReorder(editor,hover.pos)){event.preventDefault();return;}
     dragSource.current=hover.pos;dropTarget.current=null;
     event.dataTransfer.effectAllowed='move';
     event.dataTransfer.setData('application/x-recalloom-block',String(hover.pos));

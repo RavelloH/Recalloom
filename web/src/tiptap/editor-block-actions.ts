@@ -1,7 +1,4 @@
-/** Transaction-only operations for whole top-level document blocks.
- * Reuse these from grip handle, keyboard actions and context menus. Nested
- * containers deliberately are NOT movable with this top-level protocol.
- */
+/** Transaction-only actions for top-level and legally nested RMD blocks. */
 import type {Editor,JSONContent} from '@tiptap/core';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 
@@ -18,10 +15,70 @@ export function topLevelAtDocumentPosition(editor:Editor,pos:number):TopLevelBlo
  const blocks=topLevelBlocks(editor);
  return blocks.find(x=>x.pos===pos)??blocks.find(x=>pos>x.pos&&pos<x.pos+x.node.nodeSize)??null;
 }
+/** Structural RMD children cannot be detached from their legal parent.
+ * Flashcard front/back are inspectable, but not reorderable or duplicable.
+ */
+const childParents:Readonly<Record<string,string>>={
+ message:'chat',tab:'tabs',definition:'glossary',front:'flashcard',back:'flashcard'
+};
+const repeatableChildKinds=new Set(['message','tab','definition']);
+export type EditableBlock=TopLevelBlock&{parentPos:number|null;parentKind:string|null};
+export function editableBlockAt(editor:Editor,pos:number):EditableBlock|null{
+ const top=topLevelBlockAt(editor,pos);
+ if(top)return {...top,parentPos:null,parentKind:null};
+ if(pos<0||pos>editor.state.doc.content.size)return null;
+ const node=editor.state.doc.nodeAt(pos);
+ if(!node||node.type.name!=='richContainer')return null;
+ const kind=String(node.attrs.kind??''),parentKind=childParents[kind];
+ if(!parentKind)return null;
+ const resolved=editor.state.doc.resolve(pos),parent=resolved.parent;
+ if(parent.type.name!=='richContainer'||parent.attrs.kind!==parentKind)return null;
+ const index=resolved.index();
+ if(parent.child(index)!==node)return null;
+ return {pos,node,index,parentKind,parentPos:resolved.before(resolved.depth)};
+}
+export function editableBlockFromDocumentPosition(editor:Editor,pos:number):EditableBlock|null{
+ const doc=editor.state.doc;
+ if(pos<0||pos>doc.content.size)return null;
+ const resolved=doc.resolve(pos);
+ const direct=editableBlockAt(editor,pos);
+ if(direct?.parentKind)return direct;
+ for(let depth=resolved.depth;depth>=1;depth--){
+  const candidate=editableBlockAt(editor,resolved.before(depth));
+  if(candidate?.parentKind)return candidate;
+ }
+ const top=topLevelAtDocumentPosition(editor,pos);
+ return top?{...top,parentPos:null,parentKind:null}:null;
+}
+export function blockSiblings(editor:Editor,pos:number):EditableBlock[]{
+ const current=editableBlockAt(editor,pos);
+ if(!current)return [];
+ if(current.parentPos===null)return topLevelBlocks(editor).map(item=>({...item,parentPos:null,parentKind:null}));
+ const parent=editor.state.doc.nodeAt(current.parentPos);
+ if(!parent)return [];
+ const siblings:EditableBlock[]=[];
+ parent.forEach((node,offset,index)=>{
+  if(node.type.name==='richContainer'&&String(node.attrs.kind)===String(current.node.attrs.kind))
+   siblings.push({node,pos:current.parentPos!+1+offset,index,parentPos:current.parentPos,parentKind:current.parentKind});
+ });
+ return siblings;
+}
+export function blockCanReorder(editor:Editor,pos:number):boolean{
+ const current=editableBlockAt(editor,pos);
+ return !!current&&(current.parentPos===null||repeatableChildKinds.has(String(current.node.attrs.kind)));
+}
+export function blockCanDuplicate(editor:Editor,pos:number):boolean{return blockCanReorder(editor,pos);}
+export function blockCanDelete(editor:Editor,pos:number):boolean{
+ const current=editableBlockAt(editor,pos);
+ return !!current&&(current.parentPos===null||
+  repeatableChildKinds.has(String(current.node.attrs.kind))&&blockSiblings(editor,pos).length>1);
+}
 /** Direction supports keyboard and drop movement without unsafe node cuts. */
 export function moveBlockTo(editor:Editor,sourcePos:number,targetPos:number,after=false):boolean{
- const source=topLevelBlockAt(editor,sourcePos),target=topLevelBlockAt(editor,targetPos);
+ const source=editableBlockAt(editor,sourcePos),target=editableBlockAt(editor,targetPos);
  if(!source||!target||source.pos===target.pos)return false;
+ if(!blockCanReorder(editor,sourcePos)||source.parentPos!==target.parentPos)return false;
+ if(source.parentPos!==null&&String(source.node.attrs.kind)!==String(target.node.attrs.kind))return false;
  const document=editor.state.doc;
  const insertPos=after?target.pos+target.node.nodeSize:target.pos;
  // A top-level node can only move to a legal sibling position. Do not cross
@@ -38,8 +95,8 @@ export function moveBlockTo(editor:Editor,sourcePos:number,targetPos:number,afte
  return true;
 }
 export function moveBlockBy(editor:Editor,pos:number,step:-1|1):boolean{
- const blocks=topLevelBlocks(editor),index=blocks.findIndex(x=>x.pos===pos);
- if(index<0||index+step<0||index+step>=blocks.length)return false;
+ const blocks=blockSiblings(editor,pos),index=blocks.findIndex(x=>x.pos===pos);
+ if(!blockCanReorder(editor,pos)||index<0||index+step<0||index+step>=blocks.length)return false;
  return moveBlockTo(editor,pos,blocks[index+step]!.pos,step===1);
 }
 const stableIds=['id','blockId','figureId','equationId','tableId'];
@@ -51,8 +108,8 @@ export function withoutBlockIdentity(json:JSONContent):JSONContent{
   ...(json.content?{content:json.content.map(withoutBlockIdentity)}:{})};
 }
 export function duplicateBlock(editor:Editor,pos:number):boolean{
- const source=topLevelBlockAt(editor,pos);
- if(!source)return false;
+ const source=editableBlockAt(editor,pos);
+ if(!source||!blockCanDuplicate(editor,pos))return false;
  const json=withoutBlockIdentity(source.node.toJSON());
  try{
   const node=editor.state.schema.nodeFromJSON(json);
@@ -63,10 +120,10 @@ export function duplicateBlock(editor:Editor,pos:number):boolean{
  }catch{return false;}
 }
 export function removeBlock(editor:Editor,pos:number):boolean{
- const source=topLevelBlockAt(editor,pos);
- if(!source)return false;
+ const source=editableBlockAt(editor,pos);
+ if(!source||!blockCanDelete(editor,pos))return false;
  const tr=editor.state.tr;
- if(editor.state.doc.childCount===1){
+ if(source.parentPos===null&&editor.state.doc.childCount===1){
   const paragraph=editor.state.schema.nodes.paragraph?.create();
   if(!paragraph)return false;
   tr.replaceWith(pos,pos+source.node.nodeSize,paragraph);

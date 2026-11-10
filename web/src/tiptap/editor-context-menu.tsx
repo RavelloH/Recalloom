@@ -3,7 +3,7 @@ import type {Editor} from '@tiptap/core';
 import type {ReactNode} from 'react';
 import {ContextMenu,type ContextMenuOption} from '@astryxdesign/core/ContextMenu';
 import {blockMenuItems,inlineContextItems} from './editor-command-menu';
-import {topLevelAtDocumentPosition} from './editor-block-actions';
+import {editableBlockFromDocumentPosition} from './editor-block-actions';
 import {inlineCommandsByGroup} from './editor-inline-commands';
 import './editor-context-menu.css';
 
@@ -19,7 +19,7 @@ export function EditorContextMenu({editor,onEditBlock,children}:{
   const pos=event.detail===0&&event.clientX===0&&event.clientY===0?
    editor.state.selection.from:
    editor.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos??editor.state.selection.from;
-  const current=topLevelAtDocumentPosition(editor,pos);
+  const current=editableBlockFromDocumentPosition(editor,pos);
   const selected=!editor.state.selection.empty;
   const selectionActions:ContextMenuOption[]=selected?[
    ...inlineContextItems(editor),
