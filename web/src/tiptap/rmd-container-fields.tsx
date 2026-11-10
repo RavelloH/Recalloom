@@ -53,6 +53,11 @@ export function RmdContainerAttributeFields({node,onApply}:{
     value={inputs.title??''} onChange={value=>set('title',value)}/>
    {errors.title&&<p className="rk-block-panel-error" role="alert">{errors.title}</p>}
   </div>}
+  {fields.includes('id')&&<div className="rk-block-schema-field">
+   <TextInput label="容器锚点 ID（可选）" width="100%" value={inputs.id??''}
+    onChange={raw=>set('id',raw)} placeholder="my-block-anchor"/>
+   {errors.id&&<p className="rk-block-panel-error" role="alert">{errors.id}</p>}
+  </div>}
   {fields.includes('sender')&&<div className="rk-block-schema-field">
    <Selector label="消息身份" width="100%" value={inputs.sender||'assistant'}
     options={CHAT_SENDERS.map(sender=>({

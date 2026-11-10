@@ -1,11 +1,10 @@
-/** Editable rich-container attributes derive from the canonical RMD block registry.
- * 'id' is intentionally not advertised here: RichContainer currently does not
- * round-trip block id through Tiptap. Keep it out of the UI until that is fixed.
+/** Editable rich-container fields follow the authoritative RMD registry.
+ * Stable IDs are available only for block kinds supporting id in the schema.
  */
-import {getRmdSchema,isValidRmdValue,RMD_COLORS,type RmdValueType} from '../rmd-schema';
+import {getRmdSchema,isRmdId,isValidRmdValue,RMD_COLORS,type RmdValueType} from '../rmd-schema';
 
 export const CHAT_SENDERS=['assistant','user','system'] as const;
-export type RichContainerField='title'|'sender'|'color'|'stroke'|'padding'|'roughness'|'opacity';
+export type RichContainerField='title'|'id'|'sender'|'color'|'stroke'|'padding'|'roughness'|'opacity';
 export function richContainerFields(kind:string):RichContainerField[]{
  const schema=getRmdSchema('block',kind);
  if(!schema)return [];
@@ -13,6 +12,7 @@ export function richContainerFields(kind:string):RichContainerField[]{
  if(schema.main!=='forbidden')fields.push('title');
  for(const name of ['sender','color','stroke','padding','roughness','opacity'] as const)
   if(name in schema.attributes)fields.push(name);
+ if('id' in schema.attributes)fields.push('id');
  return fields;
 }
 export function normalizeRichContainerField(kind:string,field:RichContainerField,raw:string):
@@ -25,6 +25,10 @@ export function normalizeRichContainerField(kind:string,field:RichContainerField
   return value.length>180?{ok:false,error:'标题不能超过 180 个字符'}:{ok:true,value};
  }
  const clean=raw.trim();
+ if(field==='id'){
+  const id=clean.toLowerCase();
+  return !id||isRmdId(id)?{ok:true,value:id||null}:{ok:false,error:'稳定 ID 必须以英文字母开头，仅可用字母、数字和连字符，最多 80 字符'};
+ }
  if(field==='sender')
   return (CHAT_SENDERS as readonly string[]).includes(clean)
    ?{ok:true,value:clean}:{ok:false,error:'消息身份只能是 assistant、user 或 system'};

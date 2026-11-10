@@ -1,5 +1,5 @@
 import type {JSONContent} from '@tiptap/core';
-import {isRmdId,isValidRmdValue} from './rmd-schema';
+import {getRmdSchema,isRmdId,isValidRmdValue} from './rmd-schema';
 import {isSketchKind,parseSketchNumber} from './sketch-geometry';
 
 const string=(value:unknown)=>String(value??'');
@@ -169,8 +169,9 @@ export function serializeRmdBlock(node:JSONContent):string{
    const kind=string(a.kind),title=string(a.title);
    const body=paragraphs(node.content??[]);
    if(kind==='comment')return '%%\n'+body+'\n%%';
+   const allowedId='id' in (getRmdSchema('block',kind)?.attributes??{});
    const meta=isSketchKind(kind)?params([['color',a.color],['stroke',a.stroke],['padding',a.padding],['roughness',a.roughness],['opacity',kind==='highlight'?a.opacity:null]]):kind==='message'?params([['sender',a.sender]]):'';
-   const head=kind+(title?' '+title:'')+meta;
+   const head=kind+(title?' '+title:'')+meta+(allowedId?params([['id',asId(a.id)]]):'');
    const childFence=body.match(/^(:{3,})/gm)??[];
    const size=Math.max(3,...childFence.map(v=>v.length+1));
    const fence=':'.repeat(size);

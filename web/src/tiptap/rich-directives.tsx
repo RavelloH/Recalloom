@@ -12,6 +12,8 @@ import {isSketchKind} from '../sketch-geometry';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {IconEye,IconEyeOff} from '@tabler/icons-react';
 import {richTitle} from './rich-schema';
+import {isRmdId} from '../rmd-schema';
+import {headingAnchor} from '../wiki-slug';
 import {calloutIcon} from '../callout-icon';
 import {asAstryBadgeVariant} from '../rmd-badge';
 export {richTitle} from './rich-schema';
@@ -57,7 +59,8 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();startTitleEdit();}
      }}>{richTitle(kind,title)}</span>}
  </span>;
- return <NodeViewWrapper className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>
+ const stableId=typeof node.attrs.id==='string'&&isRmdId(node.attrs.id)?headingAnchor(node.attrs.id):undefined;
+ return <NodeViewWrapper id={stableId} className={'rk-directive rk-directive-'+kind+(calloutKinds.has(kind)?' rk-rmd-callout':'')+(sketchKind?' rk-directive-sketch':'')} data-rk-kind={kind}>
   {kind==='tabs'
    ?<Card variant="default" padding={3} className="rk-tabs-edit" data-rk-active-tab={tabs.length<=32?String(activeTab):undefined}>
       <div className="rk-tabs-heading" contentEditable={false}>{editTitle}</div>
@@ -130,7 +133,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
 }
 export const RichContainer=Node.create({
  name:'richContainer',group:'block',content:'block+',defining:true,isolating:true,priority:67,
- addAttributes(){return {kind:{default:'note'},title:{default:''},sender:{default:null},color:{default:null},stroke:{default:null},padding:{default:null},roughness:{default:null},opacity:{default:null}};},
+ addAttributes(){return {kind:{default:'note'},title:{default:''},id:{default:null},sender:{default:null},color:{default:null},stroke:{default:null},padding:{default:null},roughness:{default:null},opacity:{default:null}};},
  parseHTML(){return [{tag:'div[data-rk-kind]'}];},
  renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-kind':HTMLAttributes.kind}),0];},
  addNodeView(){return ReactNodeViewRenderer(ContainerView);}

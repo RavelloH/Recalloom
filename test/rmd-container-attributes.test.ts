@@ -4,18 +4,18 @@ import registry from '../src/rmd/registry.json';
 import {richContainerFields,normalizeRichContainerField,CHAT_SENDERS} from '../web/src/tiptap/rmd-container-attributes';
 
 describe('RMD schema-driven rich container fields',()=>{
- it('exposes only supported visible fields, never the unimplemented container ID',()=>{
+ it('exposes only supported Schema fields, including round-trip stable IDs',()=>{
   for(const kind of ['highlight','circle','box','bracket','underline','double-underline']){
    const def=registry.components.find(x=>x.type==='block'&&x.name===kind)!;
    const fields=richContainerFields(kind);
-   assert.deepEqual(fields,['color','stroke','padding','roughness',...(kind==='highlight'?['opacity']:[])],kind);
+   assert.deepEqual(fields,['color','stroke','padding','roughness',...(kind==='highlight'?['opacity']:[]),'id'],kind);
    assert.equal(def.main,'forbidden');
    assert.equal(fields.includes('title'),false,'sketch blocks must not offer a forbidden title');
-   assert.equal(fields.some(field=>String(field)==='id'),false);
+   assert.ok(fields.includes('id'),'all sketch blocks support stable IDs');
   }
   assert.deepEqual(richContainerFields('message'),['title','sender']);
-  assert.deepEqual(richContainerFields('warning'),['title']);
-  assert.deepEqual(richContainerFields('mark'),[]);
+  assert.deepEqual(richContainerFields('warning'),['title','id']);
+  assert.deepEqual(richContainerFields('mark'),['id']);
   assert.deepEqual(richContainerFields('missing'),[]);
  });
  it('accepts nine explicit sketch colors and a true default with no serialized argument',()=>{
@@ -37,6 +37,14 @@ describe('RMD schema-driven rich container fields',()=>{
   for(const [field,value] of [['stroke','0.49'],['stroke','6.1'],['padding','24.01'],['roughness','-1'],['opacity','0.86'],['opacity','0.001'],['stroke','abc']] as const)
    assert.equal(normalizeRichContainerField('highlight',field,value).ok,false,field+':'+value);
   assert.equal(normalizeRichContainerField('circle','opacity','0.6').ok,false,'only Highlight has opacity');
+ });
+ it('validates stable container IDs only for permitted RMD block kinds',()=>{
+  assert.deepEqual(normalizeRichContainerField('highlight','id','  My-Block '),{ok:true,value:'my-block'});
+  assert.deepEqual(normalizeRichContainerField('chat','id',''),{ok:true,value:null});
+  assert.equal(normalizeRichContainerField('warning','id','3invalid').ok,false);
+  assert.equal(normalizeRichContainerField('note','id','a'.repeat(81)).ok,false);
+  assert.equal(normalizeRichContainerField('message','id','message-id').ok,false);
+  assert.equal(normalizeRichContainerField('tab','id','tab-id').ok,false);
  });
  it('requires a known Chat sender without broadening the wire schema',()=>{
   assert.deepEqual([...CHAT_SENDERS],['assistant','user','system']);
