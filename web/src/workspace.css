@@ -245,6 +245,8 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
   overscroll-behavior: contain;
 }
 .slash-menu-heading { padding: 6px 8px 4px; font-size: 12px; font-weight: 600; color: var(--rk-ink-faint); }
+.slash-category + .slash-category { margin-top: 3px; }
+.slash-category-heading { padding: 6px 8px 3px; font-size: 11px; line-height: 1.3; font-weight: 650; letter-spacing: .02em; color: var(--rk-ink-faint); }
 .slash-item { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 6px; cursor: pointer; user-select: none; }
 .slash-item.is-selected { background: var(--rk-hover); }
 .slash-icon {

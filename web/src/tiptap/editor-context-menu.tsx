@@ -2,7 +2,7 @@ import React,{useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import type {ReactNode} from 'react';
 import {ContextMenu,type ContextMenuOption} from '@astryxdesign/core/ContextMenu';
-import {blockMenuItems,inlineContextItems} from './editor-command-menu';
+import {blockMenuItems,inlineContextItems,runWithTextSelection} from './editor-command-menu';
 import {editableBlockFromDocumentPosition} from './editor-block-actions';
 import {inlineCommandsByGroup} from './editor-inline-commands';
 import './editor-context-menu.css';
@@ -20,16 +20,17 @@ export function EditorContextMenu({editor,onEditBlock,children}:{
    editor.state.selection.from:
    editor.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos??editor.state.selection.from;
   const current=editableBlockFromDocumentPosition(editor,pos);
+  const selection={from:editor.state.selection.from,to:editor.state.selection.to};
   const selected=!editor.state.selection.empty;
   const selectionActions:ContextMenuOption[]=selected?[
    ...inlineContextItems(editor),
    {id:'rmd-inline-sketch',label:'手绘标记',items:inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,isDisabled:!command.isAvailable(editor),
-    onClick:()=>{command.run(editor);}
+    onClick:()=>{runWithTextSelection(editor,selection,()=>command.run(editor));}
    }))},
    {id:'rmd-inline-components',label:'行内组件',items:inlineCommandsByGroup('inline-component').map(command=>({
     id:command.id,label:command.title,isDisabled:!command.isAvailable(editor),
-    onClick:()=>{command.run(editor);}
+    onClick:()=>{runWithTextSelection(editor,selection,()=>command.run(editor));}
    }))},
    {type:'divider'}
   ]:[];

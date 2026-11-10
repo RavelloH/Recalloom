@@ -42,6 +42,12 @@ try{
  await page.getByRole('menuitem',{name:'手绘圈选'}).last().click();
  await page.locator('.tiptap .rk-sketch-inline[data-rk-sketch-kind="circle"]').first().waitFor();
  console.log('PASS desktop context menu: select, duplicate, handdrawn mark');
+ await another.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+ await another.click({button:'right'});
+ const formatMenu=page.getByRole('menu').last();await formatMenu.waitFor();
+ await formatMenu.getByRole('menuitem',{name:'普通下划线'}).click();
+ await page.locator('.tiptap u').filter({hasText:'Second line.'}).first().waitFor();
+ console.log('PASS context menu restores selection for standard Markdown formatting');
  await another.click();
  await page.keyboard.press('End');
  await page.keyboard.press('Shift+F10');

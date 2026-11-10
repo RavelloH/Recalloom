@@ -43,13 +43,13 @@ import Link from '@tiptap/extension-link';
 import {decorateEditorLinks} from './link-metadata-client';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
-import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {filterSlashCommands,groupSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
 import {BlockHandleLayer} from './tiptap/block-handle';
 import {BlockEditorPanel} from './tiptap/block-editor-panel';
 import {EditorContextMenu} from './tiptap/editor-context-menu';
 import {editableBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
-import {inlineCommandsByGroup,runInlineRmdCommand} from './tiptap/editor-inline-commands';
+import {inlineCommandsByGroup,runInlineRmdCommand,type InlineCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
 import {safeTableId,cleanTableCaption} from './table-caption';
 
@@ -84,6 +84,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
  const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
+ const inlineSelectionRef=useRef<{from:number;to:number}|null>(null);
  const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
  const attributeNodeRef=useRef<{pos:number;type:string}|null>(null);
  const compact=useCompactLayout();
@@ -431,26 +432,47 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   command.run(editor,{openLink,openImage,openMath,openWikiEmbed});
  };
  if(!editor||!ready)return <div className="content-loading">正在准备可视化编辑器…</div>;
+ const captureInlineRange=()=>{
+  const dom=window.getSelection();
+  let range:{from:number;to:number}|null=null;
+  if(dom&&!dom.isCollapsed&&dom.anchorNode&&dom.focusNode&&
+    editor.view.dom.contains(dom.anchorNode)&&editor.view.dom.contains(dom.focusNode)){
+   try{
+    const a=editor.view.posAtDOM(dom.anchorNode,dom.anchorOffset);
+    const b=editor.view.posAtDOM(dom.focusNode,dom.focusOffset);
+    if(a!==b)range={from:Math.min(a,b),to:Math.max(a,b)};
+   }catch{/* fall back to the last ProseMirror selection */}
+  }
+  if(!range){const {from,to}=editor.state.selection;if(from!==to)range={from,to};}
+  inlineSelectionRef.current=range;
+ };
+ const runInlineFromMenu=(command:InlineCommand)=>{
+  const range=inlineSelectionRef.current;inlineSelectionRef.current=null;
+  if(range&&range.from<range.to&&range.to<=editor.state.doc.content.size)
+   editor.commands.setTextSelection(range);
+  command.run(editor);
+ };
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
   <ToggleButton key={name} label={name} size="sm" isPressed={pressed} onPressedChange={run}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
   <Button key={name} label={name} variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
+ const slashGroups=slash?groupSlashCommands(slashItems):[];
  const inlineMarks=<>
   {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
   {toggle('语义 Mark',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">M</span>)}
-  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',icon:<IconPencil size="var(--rk-icon-sm)"/>}}
+  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',icon:<IconPencil size="var(--rk-icon-sm)"/>,onPointerDown:captureInlineRange}}
    presentation="adaptive" items={inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,description:command.description,
-    isDisabled:!command.isAvailable(editor),onClick:()=>{command.run(editor);}
+    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
    }))}/>
-  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',icon:<IconPlus size="var(--rk-icon-sm)"/>}}
+  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',icon:<IconPlus size="var(--rk-icon-sm)"/>,onPointerDown:captureInlineRange}}
    presentation="adaptive" items={inlineCommandsByGroup('inline-component').map(command=>({
     id:command.id,label:command.title,description:command.description,
-    isDisabled:!command.isAvailable(editor),onClick:()=>{command.run(editor);}
+    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
    }))}/>
  </>;
  return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
@@ -572,11 +594,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    setAttributeNodePos(attributeNodeRef.current?.pos??null);
    setBlockPanelPos(pos);
   }}/>
-  {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
-   <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>
-   {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
-    onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
-    <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+  {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入内容" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
+   <div className="slash-menu-heading">{slash.query?'匹配的命令':'插入内容'}</div>
+   {slashGroups.map(group=><div className="slash-category" key={group.id}>
+    <div className="slash-category-heading">{group.label}</div>
+    {group.commands.map(command=>{const index=slashItems.findIndex(item=>item.id===command.id);const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
+     onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
+     <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+   </div>)}
   </div>}
   {wiki&&<div className="slash-menu wiki-completion" role="listbox" aria-label="引用文档"
    style={{...(wiki.placement==='above'?{bottom:wiki.offset}:{top:wiki.offset}),left:wiki.left,width:SLASH_MENU_WIDTH}}

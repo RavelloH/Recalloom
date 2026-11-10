@@ -18,6 +18,36 @@ export type SlashCommand={
  run:(editor:Editor,helpers:SlashHelpers)=>void;
  isAvailable?:(editor:Editor)=>boolean;
 };
+export type SlashCommandCategory='basic'|'layout'|'callout'|'sketch'|'study'|'reference'|'media'|'format'|'inline';
+export type SlashCommandGroup={id:SlashCommandCategory;label:string;commands:SlashCommand[]};
+const slashCategoryLabels:Readonly<Record<SlashCommandCategory,string>>={
+ basic:'基础',layout:'布局',callout:'提示',sketch:'手绘',study:'学习',reference:'引用',media:'媒体',format:'格式',inline:'行内'
+};
+const slashCategoryOrder:readonly SlashCommandCategory[]=['basic','layout','callout','sketch','study','reference','media','format','inline'];
+function slashCategory(id:string):SlashCommandCategory{
+ if(id.startsWith('rmd-block:')){
+  const syntax=id.slice('rmd-block:'.length);
+  const command=extraBlockCommands.find(item=>item.syntax===syntax);
+  if(command?.category==='callout')return 'callout';
+  if(command?.category==='annotation')return 'sketch';
+  if(command?.category==='child')return ['front','back','definition'].includes(syntax)?'study':'layout';
+ }
+ if(['callout'].includes(id))return 'callout';
+ if(['color-highlight'].includes(id))return 'sketch';
+ if(['details','tabs','chat','table'].includes(id))return 'layout';
+ if(['flashcard','cloze','glossary'].includes(id))return 'study';
+ if(['wiki-embed','link-card','footnote','comment','link'].includes(id))return 'reference';
+ if(['image','inline-math','block-math','mermaid'].includes(id))return 'media';
+ if(id.startsWith('align-'))return 'format';
+ if(['badge','kbd'].includes(id))return 'inline';
+ return 'basic';
+}
+export function groupSlashCommands(commands:readonly SlashCommand[]):SlashCommandGroup[]{
+ return slashCategoryOrder.flatMap(id=>{
+  const matching=commands.filter(command=>slashCategory(command.id)===id);
+  return matching.length?[{id,label:slashCategoryLabels[id],commands:matching}]:[];
+ });
+}
 
 const chain=(editor:Editor)=>editor.chain().focus();
 export const slashCommands:SlashCommand[]=[

@@ -22,7 +22,7 @@ const selectMenu=async query=>{
  await page.keyboard.press('Control+End');
  await page.keyboard.press('Enter');
  await page.keyboard.type('/'+query);
- const list=page.getByRole('listbox',{name:'插入块'});await list.waitFor();
+ const list=page.getByRole('listbox',{name:'插入内容'});await list.waitFor();
  return list;
 };
 try{
@@ -35,7 +35,10 @@ try{
   const created=await create('# Block command gallery\n\nStart.','Slash RMD blocks');
   assert.equal(created.status,201,JSON.stringify(created).slice(0,300));
   await page.goto(base+'/records/'+created.data.id+'?mode=visual');
-  const first=await selectMenu('危险');
+  const gallery=await selectMenu('');
+  const categories=await gallery.locator('.slash-category-heading').allTextContents();
+  assert.deepEqual(categories,['基础','布局','提示','手绘','学习','引用','媒体','格式','行内'],'all syntax families must be discoverable');
+  const first=gallery;
   await first.getByRole('option',{name:/危险 Callout/}).click();
   await page.locator('.tiptap .rk-directive-danger').first().waitFor();
   const sketchMenu=await selectMenu('块级手绘');

@@ -105,6 +105,23 @@ try{
   assert.match(codeMark,/:: mark alpha beta gamma ::/);
   assert.doesNotMatch(codeMark,/:: highlight/);
   console.log('PASS semantic Mark command',size.name);
+  // Capture the browser selection at pointer-down so the menu may take focus
+  // without racing ProseMirror's asynchronous selection observer.
+  const quick=await page.evaluate(async content=>{
+   const r=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Quick inline selection '+Date.now()+'.md',kind:'document',content})});
+   return {status:r.status,data:await r.json()};
+  },source);
+  assert.equal(quick.status,201);
+  await page.goto(base+'/records/'+quick.data.id+'?mode=visual');
+  const quickLine=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
+  await quickLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+  const quickToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
+  await quickToolbar.getByRole('button',{name:'手绘标记'}).click();
+  await page.getByRole('menu').last().getByRole('menuitem',{name:/手绘圈选/}).click();
+  const quickMark=page.locator('.tiptap .rk-sketch-inline[data-rk-sketch-kind="circle"]').last();
+  await quickMark.waitFor();
+  assert.equal(await quickMark.innerText(),'alpha beta gamma','selection survives immediate dropdown focus transfer '+size.name);
+  console.log('PASS immediate selection snapshot and hand-drawn menu command',size.name);
   if(size.name==='mobile'){
    const fresh=await page.evaluate(async content=>{
     const r=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Mobile inline code '+Date.now()+'.md',kind:'document',content})});

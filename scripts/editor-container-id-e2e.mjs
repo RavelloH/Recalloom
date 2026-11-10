@@ -8,7 +8,7 @@ assert.ok(secret&&executablePath);
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 page.setDefaultTimeout(16000);
-const input=['# Stable container anchors','',
+const input=['# Stable container anchors @ attrs shared-anchor @','',
 '::: warning Caution','','Original warning.','',':::','',
 '::: highlight','','Important highlight.','',':::','',
 ':::: chat Discussion | id=conversation-one','','::: message Alice | sender=user','','A message.','',':::','','::: message Agent | sender=assistant','','An answer.','',':::','','::::','',
@@ -39,9 +39,18 @@ try{
   await stableId.fill('9invalid');
   await panel.getByRole('alert').waitFor();
   assert.equal(await page.locator('#user-content-9invalid').count(),0);
+  await stableId.fill('SHARED-ANCHOR');
+  const duplicateFieldError=panel.getByRole('alert').filter({hasText:'标题'});
+  await duplicateFieldError.waitFor();
+  assert.equal(await page.locator('#user-content-shared-anchor').count(),1,'the existing heading anchor must remain unique; the container must not duplicate it');
   await stableId.fill('Block-Caution');
   await page.waitForFunction(()=>!!document.querySelector('.tiptap #user-content-block-caution'));
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('id=block-caution')));
+  const rawSource=panel.getByRole('textbox',{name:'块源码'});
+  const duplicateRaw=(await rawSource.inputValue()).replace('id=block-caution','id=shared-anchor');
+  await rawSource.fill(duplicateRaw);
+  await panel.getByRole('alert').filter({hasText:'标题'}).waitFor();
+  assert.equal(await page.locator('.rk-editor-block-canvas #user-content-block-caution').count(),1,'invalid raw source must leave the editable canvas anchor unchanged');
   await panel.getByRole('button',{name:'关闭块编辑'}).click();
   panel=await open('highlight');
   await panel.getByRole('textbox',{name:'容器锚点 ID（可选）'}).fill('marker-one');

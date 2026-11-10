@@ -1,5 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
+import type {Editor} from '@tiptap/core';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
+import {describeRmdAnchorConflict,findRmdAnchorConflict} from './rmd-anchor-ids';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Selector} from '@astryxdesign/core/Selector';
 import {RMD_COLORS} from '../rmd-schema';
@@ -8,8 +10,8 @@ import {CHAT_SENDERS,normalizeRichContainerField,richContainerFields,type RichCo
 
 /** Same live transaction protocol as the six @ attrs families, but scoped to
  * the valid fields of the current RMD multi-line container. */
-export function RmdContainerAttributeFields({node,onApply}:{
- node:ProseMirrorNode;onApply:(field:RichContainerField,value:string|number|null)=>void;
+export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
+ editor:Editor;pos:number;node:ProseMirrorNode;onApply:(field:RichContainerField,value:string|number|null)=>void;
 }){
  const kind=String(node.attrs.kind??'');
  const fields=richContainerFields(kind);
@@ -34,8 +36,14 @@ export function RmdContainerAttributeFields({node,onApply}:{
  const set=(field:RichContainerField,raw:string)=>{
   setInputs(previous=>({...previous,[field]:raw}));
   const normalized=normalizeRichContainerField(kind,field,raw);
-  setErrors(previous=>({...previous,[field]:normalized.ok?'':normalized.error}));
-  if(normalized.ok)onApply(field,normalized.value);
+  if(!normalized.ok){setErrors(previous=>({...previous,[field]:normalized.error}));return;}
+  if(field==='id'&&typeof normalized.value==='string'){
+   const current=editor.state.doc.nodeAt(pos)??node;
+   const conflict=findRmdAnchorConflict(editor.state.doc,normalized.value,{pos,nodeSize:current.nodeSize});
+   if(conflict){setErrors(previous=>({...previous,[field]:describeRmdAnchorConflict(conflict)}));return;}
+  }
+  setErrors(previous=>({...previous,[field]:''}));
+  onApply(field,normalized.value);
  };
  const sketch=isSketchKind(kind);
  const color=String(node.attrs.color??'');

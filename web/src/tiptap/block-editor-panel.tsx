@@ -11,6 +11,7 @@ import {RmdContainerAttributeFields} from './rmd-container-fields';
 import {RmdLeafAttributeFields} from './rmd-leaf-fields';
 import type {RichContainerField} from './rmd-container-attributes';
 import {isRmdAttrsEditable} from './rmd-schema-attrs-model';
+import {describeRmdAnchorConflict,findRmdAnchorConflictForNode} from './rmd-anchor-ids';
 import './block-editor-panel.css';
 
 const Preview=React.lazy(()=>import('../markdown-preview'));
@@ -114,6 +115,8 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
    if(parsedBlock?.type!==kind||kind==='richContainer'&&parsedBlock.attrs?.kind!==subkind)
     throw new Error('每次只能编辑一个同类型块。转换块类型请使用块操作菜单。');
    const candidate=editor.state.schema.nodeFromJSON(parsedBlock);
+   const anchorConflict=findRmdAnchorConflictForNode(editor.state.doc,candidate,pos);
+   if(anchorConflict)throw new Error(describeRmdAnchorConflict(anchorConflict));
    const existing=editor.state.doc.nodeAt(pos);
    if(!existing||existing.type!==candidate.type)throw new Error('编辑目标已变化，请重新选择块。');
    const tr=editor.state.tr.replaceWith(pos,pos+existing.nodeSize,candidate);
@@ -144,7 +147,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   <section className="rk-block-panel-fields">
    <p className="rk-block-panel-desc">有效修改立即同步文档；保存仍使用页面顶部的「保存」操作。</p>
    {kind==='richContainer'&&<RmdContainerAttributeFields key={'container-'+pos+'-'+String(current.attrs.kind)}
-     node={current} onApply={attr}/>}
+     editor={editor} pos={pos} node={current} onApply={attr}/>}
    {(kind==='richLinkCard'||kind==='wikiEmbed')&&<RmdLeafAttributeFields key={kind+'-'+pos} node={current} onApply={applyLeaf}/>}
    {attributePos!==undefined&&attributePos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(attributePos)?.type.name??'')&&
     <RmdSchemaAttributeFields key={attributePos} editor={editor} pos={attributePos}/>}

@@ -53,7 +53,7 @@ try{
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await page.keyboard.type('/'+item.query);
-  const list=page.getByRole('listbox',{name:'插入块'});
+  const list=page.getByRole('listbox',{name:'插入内容'});
   await list.waitFor();
   const option=list.getByRole('option',{name:new RegExp(item.query)});
   await option.waitFor();
@@ -73,7 +73,7 @@ try{
  await flash.locator('.rk-directive-front .rk-directive-body p').first().click();
  await page.keyboard.press('End');await page.keyboard.press('Enter');
  await page.keyboard.type('/添加闪卡正面');
- assert.equal(await page.getByRole('listbox',{name:'插入块'}).count(),0,'duplicate front must not be insertable');
+ assert.equal(await page.getByRole('listbox',{name:'插入内容'}).count(),0,'duplicate front must not be insertable');
  await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'源码'}).click();
  await page.locator('.cm-content').first().click();

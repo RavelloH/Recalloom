@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type {Editor} from '@tiptap/core';
 import {RMD_REGISTRY} from '../web/src/rmd-schema';
 import {extraBlockCommands,insertionForRmdChild,insertRmdBlock,insertRmdChild} from '../web/src/tiptap/editor-block-commands';
-import {slashCommands,filterSlashCommands} from '../web/src/tiptap/slash-commands';
+import {slashCommands,filterSlashCommands,groupSlashCommands} from '../web/src/tiptap/slash-commands';
 
 function mock(opts:{parents?:{kind:string;childKinds?:string[]}[];nonempty?:boolean;code?:boolean;table?:boolean}={}){
  const calls:{name:string;args:any[]}[]=[];
@@ -37,6 +37,16 @@ describe('RMD block entry registry',()=>{
   assert.ok(slashCommands.some(x=>x.id==='wiki-embed'));
   assert.ok(slashCommands.some(x=>x.id==='link-card'));
   assert.equal(new Set(extraBlockCommands.map(x=>x.syntax)).size,extraBlockCommands.length);
+ });
+ it('groups slash commands into discoverable syntax families without changing flat keyboard order',()=>{
+  const groups=groupSlashCommands(slashCommands);
+  assert.deepEqual(groups.map(group=>group.id),['basic','layout','callout','sketch','study','reference','media','format','inline']);
+  assert.ok(groups.find(group=>group.id==='callout')?.commands.some(command=>command.id==='rmd-block:warning'));
+  assert.ok(groups.find(group=>group.id==='sketch')?.commands.some(command=>command.id==='rmd-block:highlight'));
+  assert.ok(groups.find(group=>group.id==='study')?.commands.some(command=>command.id==='flashcard'));
+  const filtered=groupSlashCommands(filterSlashCommands(mock().editor,'危险'));
+  assert.deepEqual(filtered.map(group=>group.id),['callout']);
+  assert.equal(groups.flatMap(group=>group.commands).length,slashCommands.length);
  });
  it('creates the correct RMD mark, sketch or callout block with valid paragraphs',()=>{
   for(const syntax of ['note','info','tip','success','warning','danger','example','question','mark','highlight','circle','box','bracket','underline','double-underline']){

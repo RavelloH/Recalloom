@@ -5,6 +5,7 @@ import type {Editor} from '@tiptap/core';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {serializeRmdBlock} from '../rmd-serialize';
 import {blockCanDelete,blockCanDuplicate,blockCanReorder,blockSiblings,duplicateBlock,editableBlockAt,moveBlockBy,removeBlock} from './editor-block-actions';
+import {runInlineRmdCommand} from './editor-inline-commands';
 
 export type BlockMenuOptions={
  editor:Editor;
@@ -34,15 +35,28 @@ export function blockMenuItems({editor,pos,onEditBlock,onAction}:BlockMenuOption
    onClick:run(()=>{removeBlock(editor,pos);})}
  ];
 }
-/** Selection commands share the same executor used by inline toolbar & slash. */
+/** Restore the captured text selection before a context-menu action takes focus. */
+export function runWithTextSelection<T>(editor:Editor,range:{from:number;to:number},run:()=>T):T{
+ if(range.from<range.to&&range.from>=0&&range.to<=editor.state.doc.content.size)
+  editor.commands.setTextSelection(range);
+ return run();
+}
+/** Selection commands share executors with the inline toolbar and RMD menus. */
 export function inlineContextItems(editor:Editor){
  const {empty,from,to}=editor.state.selection;
+ const range={from,to};
+ const selectedText=empty?'':editor.state.doc.textBetween(from,to,' ');
+ const action=(run:()=>unknown)=>()=>runWithTextSelection(editor,range,run);
  return [
-  {id:'copy-selected-text',label:'复制选中文字',
-   isDisabled:empty,onClick:()=>{if(!empty)void navigator.clipboard.writeText(editor.state.doc.textBetween(from,to,' ')).catch(()=>undefined);}},
-  {id:'selection-bold',label:'加粗',isDisabled:empty,
-   onClick:()=>{editor.chain().focus().toggleBold().run();}},
-  {id:'selection-italic',label:'斜体',isDisabled:empty,
-   onClick:()=>{editor.chain().focus().toggleItalic().run();}},
+  {id:'copy-selected-text',label:'复制选中文字',isDisabled:empty,
+   onClick:()=>{if(selectedText)void navigator.clipboard.writeText(selectedText).catch(()=>undefined);}},
+  {id:'selection-bold',label:'加粗',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('bold').run())},
+  {id:'selection-italic',label:'斜体',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('italic').run())},
+  {id:'selection-underline',label:'普通下划线',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('underline').run())},
+  {id:'selection-strike',label:'删除线',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('strike').run())},
+  {id:'selection-code',label:'行内代码',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('code').run())},
+  {id:'selection-superscript',label:'上标',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('superscript').run())},
+  {id:'selection-subscript',label:'下标',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('subscript').run())},
+  {id:'selection-rmd-mark',label:'语义 Mark',isDisabled:empty,onClick:action(()=>runInlineRmdCommand(editor,'mark'))}
  ];
 }

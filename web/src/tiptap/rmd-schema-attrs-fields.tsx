@@ -4,6 +4,7 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {
  rmdAttrNodeMapping,pmAttrKey,rmdAttributeDefinition,normalizeRmdAttribute
 } from './rmd-schema-attrs-model';
+import {describeRmdAnchorConflict,findRmdAnchorConflict} from './rmd-anchor-ids';
 
 /** Schema-generated attribute editor embedded in the shared BlockEditorPanel.
  * Inputs are local drafts until valid. Valid values update one PM transaction,
@@ -28,12 +29,16 @@ export function RmdSchemaAttributeFields({editor,pos}:{editor:Editor;pos:number}
  const applyField=(field:string,raw:string)=>{
   setDraft(values=>({...values,[field]:raw}));
   const normalized=normalizeRmdAttribute(type,field,raw);
-  setErrors(values=>({...values,[field]:normalized.ok?'':normalized.error}));
-  if(!normalized.ok)return;
+  if(!normalized.ok){setErrors(values=>({...values,[field]:normalized.error}));return;}
   const current=editor.state.doc.nodeAt(pos);
   if(!current||current.type.name!==type){
    setErrors(values=>({...values,[field]:'目标块已变化，请重新打开编辑面板'}));return;
   }
+  if(field==='id'&&typeof normalized.value==='string'){
+   const conflict=findRmdAnchorConflict(editor.state.doc,normalized.value,{pos,nodeSize:current.nodeSize});
+   if(conflict){setErrors(values=>({...values,[field]:describeRmdAnchorConflict(conflict)}));return;}
+  }
+  setErrors(values=>({...values,[field]:''}));
   const attrName=pmAttrKey(field,mapping);
   if(current.attrs[attrName]===normalized.value)return;
   try{
