@@ -1,3 +1,4 @@
+import {Icon} from '../icon';
 import React,{useRef,useState} from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
@@ -9,7 +10,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
 import {RmdChatMessage,RmdChatTranscript} from '../rmd-chat';
 import {isSketchKind} from '../sketch-geometry';
-import {IconEye,IconEyeOff} from '@tabler/icons-react';
+
 import {richTitle} from './rich-schema';
 import {isRmdId} from '../rmd-schema';
 import {headingAnchor} from '../wiki-slug';
@@ -97,7 +98,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
       <div contentEditable={false} className="rk-flashcard-heading">
        {editTitle}
        <Button variant="ghost" label={flashcardOpen?"收起答案":"显示答案"}
-        icon={flashcardOpen?<IconEyeOff size="var(--rk-icon-sm)" aria-hidden="true"/>:<IconEye size="var(--rk-icon-sm)" aria-hidden="true"/>}
+        icon={flashcardOpen?<Icon name="eyeOff" size="sm" aria-hidden="true"/>:<Icon name="eye" size="sm" aria-hidden="true"/>}
         aria-expanded={flashcardOpen}
         onMouseDown={event=>event.preventDefault()}
         onClick={()=>setFlashcardOpen(open=>!open)}/>

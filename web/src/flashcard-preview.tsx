@@ -1,7 +1,8 @@
+import {Icon} from './icon';
 import React,{useState} from 'react';
 import {Card} from '@astryxdesign/core/Card';
 import {Button} from '@astryxdesign/core/Button';
-import {IconEye,IconEyeOff} from '@tabler/icons-react';
+
 import {richTitle} from './tiptap/rich-schema';
 
 /** Same readable card and answer-toggle placement as VisualEditor.
@@ -13,7 +14,7 @@ export default function FlashcardPreview({children,title}:{children:React.ReactN
   <div className="rk-flashcard-heading rk-flashcard-read-heading">
    <span>{richTitle('flashcard',title)}</span>
    <Button variant="ghost" label={open?'收起答案':'显示答案'}
-    icon={open?<IconEyeOff size="var(--rk-icon-sm)" aria-hidden="true"/>:<IconEye size="var(--rk-icon-sm)" aria-hidden="true"/>}
+    icon={open?<Icon name="eyeOff" size="sm" aria-hidden="true"/>:<Icon name="eye" size="sm" aria-hidden="true"/>}
     aria-expanded={open} onClick={()=>setOpen(value=>!value)}/>
   </div>
   <div className="rk-flashcard-body">{children}</div>

@@ -1,7 +1,8 @@
+import {Icon} from './icon';
 import React from 'react';
 import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
-import {IconFileImport,IconLink,IconAlertCircle,IconExternalLink} from '@tabler/icons-react';
+
 import {api,record} from './api';
 import {queryString} from './api';
 import type {RecordDetail} from './types';
@@ -27,12 +28,12 @@ export function WikiInline({target,alias,anchor,sourceId,plain=false}:{
  const label=alias||q.data?.name||(target.startsWith('id:')?'文档 '+target.slice(3,11):target);
  if(q.isPending)return <span className="wiki-link is-loading" title={target}>{label}</span>;
  if(q.isError||!q.data?.targetId)return <span className="wiki-link is-missing" title={'引用未解析：'+target}>
-  <IconAlertCircle size="1em"/>{alias||target}
+  <Icon name="alertCircle" inline/>{alias||target}
  </span>;
  return <Link to="/records/$recordId" params={{recordId:q.data.targetId}} hash={anchor?headingAnchor(anchor):''}
   className={'wiki-link'+(q.data.status==='path_changed'?' is-stale':'')+(plain?' is-plain':'')}
   title={q.data.status==='path_changed'?'原路径已变更，链接仍指向首次绑定的文档':'打开 '+q.data.name}>
-  <IconLink size="1em"/>{label}{anchor&&<span className="wiki-link-anchor">#{anchor}</span>}
+  <Icon name="link" inline/>{label}{anchor&&<span className="wiki-link-anchor">#{anchor}</span>}
  </Link>;
 }
 export function WikiEmbed({target,anchor,sourceId,trail=[],depth=0,render}:{
@@ -56,9 +57,9 @@ export function WikiEmbed({target,anchor,sourceId,trail=[],depth=0,render}:{
  if(truncated)body=body.slice(0,50000)+'\n\n> 嵌入内容过长，剩余部分请打开源文档查看。';
  return <section className="wiki-embed" aria-label="嵌入文档">
   <header className="wiki-embed-heading">
-   <IconFileImport size="var(--rk-icon-sm)"/>
+   <Icon name="fileImport" size="sm"/>
    {id?<Link to="/records/$recordId" params={{recordId:id}} className="wiki-embed-title">
-    {q.data?.name??target}{anchor?' #'+anchor:''}<IconExternalLink size="1em"/>
+    {q.data?.name??target}{anchor?' #'+anchor:''}<Icon name="externalLink" inline/>
    </Link>:<span className="wiki-embed-title">{target}</span>}
    <span className="wiki-embed-pill">只读嵌入</span>
   </header>

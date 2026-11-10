@@ -1,6 +1,7 @@
+import {Icon} from './icon';
 import React,{useEffect,useState} from 'react';
 import {IconButton} from '@astryxdesign/core/IconButton';
-import {IconCopy,IconTextWrap,IconChevronDown,IconChevronUp,IconFileCode2} from '@tabler/icons-react';
+
 import type {CodeMeta} from './code-meta';
 import MermaidDiagram from './mermaid-diagram';
 import {isRmdId} from './rmd-schema';
@@ -29,10 +30,10 @@ export default function ShikiCodePreview({code,language,id,filename,wrap:default
  },[code,language]);
  return <div id={id&&isRmdId(id)?headingAnchor(id):undefined} className={'rk-code-block rk-code-preview'+(wrap?' rk-code-wrap':'')+(fold?' rk-code-folded':'')}>
   <div className="rk-code-header">
-   <div className="rk-code-title"><IconFileCode2 size="var(--rk-icon-sm)" aria-hidden="true"/><span>{filename||language||'Text'}</span></div>
+   <div className="rk-code-title"><Icon name="fileCode2" size="sm" aria-hidden="true"/><span>{filename||language||'Text'}</span></div>
    <div className="rk-code-actions">
-    <IconButton label={wrap?'关闭自动换行':'开启自动换行'} icon={<IconTextWrap size="var(--rk-icon-sm)"/>} variant="ghost" size="sm" onClick={()=>setWrap(!wrap)}/>
-    <IconButton label="复制代码" icon={<IconCopy size="var(--rk-icon-sm)"/>} variant="ghost" size="sm"
+    <IconButton label={wrap?'关闭自动换行':'开启自动换行'} icon={<Icon name="textWrap" size="sm"/>} variant="ghost" size="sm" onClick={()=>setWrap(!wrap)}/>
+    <IconButton label="复制代码" icon={<Icon name="copy" size="sm"/>} variant="ghost" size="sm"
       onClick={()=>{if(typeof navigator!=='undefined'&&navigator.clipboard)void navigator.clipboard.writeText(code);}}/>
    </div>
   </div>
@@ -43,7 +44,7 @@ export default function ShikiCodePreview({code,language,id,filename,wrap:default
   </div>
   {count>20&&!alwaysExpand&&<div className="rk-code-fold-button">
     <IconButton label={fold?'展开全部代码':'收起长代码'} size="sm" variant="ghost"
-      icon={fold?<IconChevronDown size="var(--rk-icon-sm)"/>:<IconChevronUp size="var(--rk-icon-sm)"/>} onClick={()=>setExpanded(!expanded)}/>
+      icon={fold?<Icon name="chevronDown" size="sm"/>:<Icon name="chevronUp" size="sm"/>} onClick={()=>setExpanded(!expanded)}/>
    </div>}
  </div>;
 }

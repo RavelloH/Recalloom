@@ -1,9 +1,10 @@
+import {Icon} from '../icon';
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
 import type {RefObject} from 'react';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
-import {IconGripVertical,IconDots,IconPencil} from '@tabler/icons-react';
+
 import {blockCanReorder,blockSiblings,editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
 import {SKETCH_DRAG_PREVIEW_EVENT,type SketchDragPreview} from '../sketch-drag-preview';
@@ -340,13 +341,13 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock,enabled}:{
    draggable={blockCanReorder(editor,hover.pos)}
    onClick={()=>{selectRef.current(hover.pos,hover.element);setMenuOpen(open=>!open);}}
    onDragStart={startDrag} onDragEnd={finishDrag}>
-   <IconGripVertical size="var(--rk-icon-md)"/>
+   <Icon name="gripVertical" size="md"/>
   </button>
   <button type="button" className="rk-block-edit" aria-label="编辑块" title="编辑当前块"
     onClick={()=>{selectRef.current(hover.pos,hover.element);onEditBlock(hover.pos);setMenuOpen(false);}}>
-    <IconPencil size="var(--rk-icon-sm)"/>
+    <Icon name="pencil" size="sm"/>
    </button>
-   <MoreMenu label="块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
+   <MoreMenu label="块操作" icon={<Icon name="dots" size="sm"/>}
    variant="ghost" size="sm" presentation="adaptive"
    isMenuOpen={menuOpen} onOpenChange={setMenuOpen}
    items={blockMenuItems({editor,pos:hover.pos,onEditBlock,onAction:()=>{setMenuOpen(false);setHover(null);}})}/>

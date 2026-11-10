@@ -1,3 +1,4 @@
+import {Icon} from './icon';
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
 import {createPortal} from 'react-dom';
 import {useQuery} from '@tanstack/react-query';
@@ -18,7 +19,7 @@ import {InlineMath} from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor,JSONContent} from '@tiptap/core';
-import {IconLink,IconPhotoPlus,IconMathFunction,IconTable,IconTableRow,IconColumns3,IconTrash,IconAlignLeft,IconAlignCenter,IconAlignRight,IconPlus,IconMinus,IconCode,IconPencil,IconBold,IconItalic,IconUnderline,IconStrikethrough,IconSuperscript,IconSubscript,IconH2,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconBrackets,IconSum,IconChevronDown,IconMessageCircle,IconDots} from '@tabler/icons-react';
+
 import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
@@ -555,7 +556,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
  const slashGroups=slash?groupSlashCommands(slashItems):[];
  const menuIcon=(icon:React.ReactNode)=><span className="rk-inline-dropdown-icon" aria-hidden="true">
-  {icon}<IconChevronDown className="rk-inline-dropdown-chevron" size="var(--rk-icon-xs)"/>
+  {icon}<Icon name="chevronDown" className="rk-inline-dropdown-chevron" size="sm"/>
  </span>;
  const moreInlineItems:InlinePopupItem[]=[
   ...inlineCommandsByGroup('inline-component').map(command=>({
@@ -575,15 +576,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  // controls in DOM/tab order. Put the highest-frequency actions in the first
  // screenful on narrow touch devices; secondary formatting scrolls to the right.
  const sharedFormattingToolbar=<>
-  {categoryButton('标题',<IconH2 size="var(--rk-icon-sm)"/>,[
+  {categoryButton('标题',<Icon name="h2" size="sm"/>,[
       ...([1,2,3,4,5,6] as const).map(level=>({
     id:'heading-'+level,label:level+' 级标题',active:editor.isActive('heading',{level}),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleHeading({level}).run())
    }))
   ])}
-  {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<IconBold size="var(--rk-icon-sm)"/>)}
-  {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<IconItalic size="var(--rk-icon-sm)"/>)}
-  {categoryButton('列表',<IconList size="var(--rk-icon-sm)"/>,[
+  {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<Icon name="bold" size="sm"/>)}
+  {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<Icon name="italic" size="sm"/>)}
+  {categoryButton('列表',<Icon name="list" size="sm"/>,[
    {id:'list-bullet',label:'项目列表',active:Boolean(active?.bulletList),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleBulletList().run())},
    {id:'list-ordered',label:'编号列表',active:Boolean(active?.orderedList),
@@ -591,12 +592,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    {id:'list-todo',label:'任务清单',active:Boolean(active?.taskList),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleTaskList().run())}
   ])}
-  {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<IconQuote size="var(--rk-icon-sm)"/>)}
-  {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
-  {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
+  {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<Icon name="quote" size="sm"/>)}
+  {action('插入或编辑链接',()=>runCapturedInline(openLink),<Icon name="link" size="sm"/>)}
+  {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<Icon name="underline" size="sm"/>)}
   {toggle('高亮',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">H</span>)}
-  {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
-  {categoryButton('对齐方式',<IconAlignLeft size="var(--rk-icon-sm)"/>,[
+  {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<Icon name="strikethrough" size="sm"/>)}
+  {categoryButton('对齐方式',<Icon name="alignLeft" size="sm"/>,[
    {id:'align-left',label:'左对齐',active:!active?.alignCenter&&!active?.alignRight,
     run:()=>runCapturedInline(()=>editor.chain().focus().unsetTextAlign().run())},
    {id:'align-center',label:'居中对齐',active:Boolean(active?.alignCenter),
@@ -610,15 +611,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
      if(active?.alignRight)chain.unsetTextAlign().run();else chain.setTextAlign('right').run();
     })}
   ],false)}
-  {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
-  {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
-  {categoryButton('荧光笔与手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
+  {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<Icon name="code" size="sm"/>)}
+  {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<Icon name="math" size="sm"/>)}
+  {categoryButton('荧光笔与手绘标记',<Icon name="pencil" size="sm"/>,
    inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,description:command.description,
     active:command.isActive(editor),disabled:!command.isAvailable(editor),
     run:()=>runInlineFromMenu(command)
    })))}
-  {categoryButton('更多',<IconDots size="var(--rk-icon-sm)"/>,moreInlineItems)}
+  {categoryButton('更多',<Icon name="dots" size="sm"/>,moreInlineItems)}
  </>;
  const editBlock=(pos:number)=>{
   const target=editableBlockAt(editor,pos);
@@ -668,10 +669,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  }}>
   {touchToolbar&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools wysiwyg-tools-leading">
-    {action('插入内容',()=>openInsertMenu(),<IconPlus size="var(--rk-icon-sm)"/>)}
+    {action('插入内容',()=>openInsertMenu(),<Icon name="plus" size="sm"/>)}
     {touchBlockPos!==null&&<span className="wysiwyg-block-leading" role="group" aria-label="当前块操作">
-     {action('编辑当前块',()=>editBlock(touchBlockPos),<IconPencil size="var(--rk-icon-sm)"/>)}
-     <MoreMenu label="更多块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
+     {action('编辑当前块',()=>editBlock(touchBlockPos),<Icon name="pencil" size="sm"/>)}
+     <MoreMenu label="更多块操作" icon={<Icon name="dots" size="sm"/>}
       variant="ghost" size="sm" presentation="adaptive"
       items={blockMenuItems({editor,pos:touchBlockPos,onEditBlock:editBlock})}/>
     </span>}
@@ -688,9 +689,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    }}>
    <div className="bubble-menu-inner" role="toolbar" aria-label="文本格式" onMouseDown={event=>event.preventDefault()}>
     {active?.imageSelected
-     ?action('插入或编辑图片',openImage,<IconPhotoPlus size="var(--rk-icon-sm)"/>)
+     ?action('插入或编辑图片',openImage,<Icon name="photoPlus" size="sm"/>)
      :!active?.textSelection
-      ?action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)
+      ?action('插入或编辑链接',openLink,<Icon name="link" size="sm"/>)
       :<div className="bubble-group">
        {sharedFormattingToolbar}
       </div>}
@@ -698,20 +699,20 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   </BubbleMenu>}
   <div hidden={!((active?.table&&active.focused)||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
    <span className="muted small table-actions-label">表格</span>
-   {action('在上方插入行',()=>tableCommand('addRowBefore'),<><IconTableRow size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addRowBefore())}
-   {action('在下方插入行',()=>tableCommand('addRowAfter'),<><IconTableRow size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addRowAfter())}
-   {action('删除当前行',()=>tableCommand('deleteRow'),<><IconTableRow size="var(--rk-icon-sm)"/><IconMinus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().deleteRow())}
+   {action('在上方插入行',()=>tableCommand('addRowBefore'),<><Icon name="tableRow" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addRowBefore())}
+   {action('在下方插入行',()=>tableCommand('addRowAfter'),<><Icon name="tableRow" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addRowAfter())}
+   {action('删除当前行',()=>tableCommand('deleteRow'),<><Icon name="tableRow" size="sm"/><Icon name="minus" size="sm"/></>,!tableTarget&&!editor.can().deleteRow())}
    <span className="editor-table-sep"/>
-   {action('在前方插入列',()=>tableCommand('addColumnBefore'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addColumnBefore())}
-   {action('在后方插入列',()=>tableCommand('addColumnAfter'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconPlus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().addColumnAfter())}
-   {action('删除当前列',()=>tableCommand('deleteColumn'),<><IconColumns3 size="var(--rk-icon-sm)"/><IconMinus size="var(--rk-icon-xs)"/></>,!tableTarget&&!editor.can().deleteColumn())}
+   {action('在前方插入列',()=>tableCommand('addColumnBefore'),<><Icon name="columns3" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addColumnBefore())}
+   {action('在后方插入列',()=>tableCommand('addColumnAfter'),<><Icon name="columns3" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addColumnAfter())}
+   {action('删除当前列',()=>tableCommand('deleteColumn'),<><Icon name="columns3" size="sm"/><Icon name="minus" size="sm"/></>,!tableTarget&&!editor.can().deleteColumn())}
    <span className="editor-table-sep"/>
-   {action('当前列左对齐',()=>alignTableColumn(editor,'left',lastColumn.current??undefined),<IconAlignLeft size="var(--rk-icon-sm)"/>)}
-   {action('当前列居中对齐',()=>alignTableColumn(editor,'center',lastColumn.current??undefined),<IconAlignCenter size="var(--rk-icon-sm)"/>)}
-   {action('当前列右对齐',()=>alignTableColumn(editor,'right',lastColumn.current??undefined),<IconAlignRight size="var(--rk-icon-sm)"/>)}
+   {action('当前列左对齐',()=>alignTableColumn(editor,'left',lastColumn.current??undefined),<Icon name="alignLeft" size="sm"/>)}
+   {action('当前列居中对齐',()=>alignTableColumn(editor,'center',lastColumn.current??undefined),<Icon name="alignCenter" size="sm"/>)}
+   {action('当前列右对齐',()=>alignTableColumn(editor,'right',lastColumn.current??undefined),<Icon name="alignRight" size="sm"/>)}
    <span className="editor-table-sep"/>
-   {action('编辑表格图注与 ID',editTableCaption,<><IconPencil size="var(--rk-icon-sm)"/><span>表注</span></>)}
-   {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<IconTrash size="var(--rk-icon-sm)"/>,!tableTarget&&!editor.can().deleteTable())}
+   {action('编辑表格图注与 ID',editTableCaption,<><Icon name="pencil" size="sm"/><span>表注</span></>)}
+   {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<Icon name="trash" size="sm"/>,!tableTarget&&!editor.can().deleteTable())}
   </div>
   {tableCaptionOpen&&<div className="rk-table-caption-editor" role="group" aria-label="编辑表格图注与 ID" style={{top:tableToolbarTop+55}}>
    <TextInput label="表格 ID（tbl-...）" value={tableIdDraft} onChange={setTableIdDraft} placeholder="tbl-parameters"/>
@@ -729,9 +730,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    <div className="slash-menu-heading">{slash.query?'匹配的命令':'插入内容'}</div>
    {slashGroups.map(group=><div className="slash-category" key={group.id}>
     <div className="slash-category-heading">{group.label}</div>
-    {group.commands.map(command=>{const index=slashItems.findIndex(item=>item.id===command.id);const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
+    {group.commands.map(command=>{const index=slashItems.findIndex(item=>item.id===command.id);const icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
      onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
-     <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+     <span className="slash-icon"><Icon name={icon} size="md"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
    </div>)}
   </div>}
   {wiki&&<div className="slash-menu wiki-completion" role="listbox" aria-label="引用文档"

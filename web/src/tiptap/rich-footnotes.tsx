@@ -1,8 +1,9 @@
+import {Icon} from '../icon';
 import React from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {Card} from '@astryxdesign/core/Card';
-import {IconNotes} from '@tabler/icons-react';
+
 
 import {safeFootnoteId} from './rich-footnote-utils';
 function FootnoteRefView({node}:NodeViewProps){
@@ -22,7 +23,7 @@ function FootnoteDefView({node}:NodeViewProps){
  const id=safeFootnoteId(String(node.attrs.id??''));
  return <NodeViewWrapper className="rk-footnote-definition" data-rk-footnote-definition={id}>
   <Card variant="muted" padding={3}>
-   <div className="rk-footnote-definition-title" contentEditable={false}><IconNotes size="var(--rk-icon-sm)" aria-hidden="true"/> 脚注 [{id}]</div>
+   <div className="rk-footnote-definition-title" contentEditable={false}><Icon name="footnote" size="sm" aria-hidden="true"/> 脚注 [{id}]</div>
    <NodeViewContent className="rk-footnote-definition-content"/>
   </Card>
  </NodeViewWrapper>;

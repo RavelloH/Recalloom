@@ -1,3 +1,4 @@
+import {Icon} from './icon';
 import React,{useEffect,useRef,useState} from 'react';
 import type {VisualEditorHandle} from './visual-editor';
 import {useBlocker} from '@tanstack/react-router';
@@ -7,7 +8,7 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
 import {Dialog} from '@astryxdesign/core/Dialog';
 import {Banner} from '@astryxdesign/core/Banner';
-import {IconDeviceFloppy,IconHistory,IconCode,IconTypography,IconEye,IconRestore,IconArrowsDiff} from '@tabler/icons-react';
+
 import {ApiError,api,mutate,versions} from './api';
 import {ContextPanel} from './context-panel';
 import {PageActions} from './page-chrome';
@@ -123,10 +124,10 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
  return <div ref={editorSectionRef} className="editor-section">{confirmation}
   <PageActions className="editor-topline" pinned={<>
    <AutoResizer animateWidth animateHeight={false} className="save-status-box"><AutoTransition as="span" transitionKey={busy?'busy':changed?'dirty':'clean'} duration={.14}><span className={'save-status'+(changed?' is-dirty':'')} title={changed?'按 Ctrl/⌘ + S 保存':'所有更改已保存'}>{busy?'保存中…':changed?'未保存':'已保存'}<span className="save-revision"> · R{item.revision}</span></span></AutoTransition></AutoResizer>
-   <Button label="保存" icon={<IconDeviceFloppy/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
+   <Button label="保存" icon={<Icon name="save"/>} variant={changed?'primary':'ghost'} size="sm" onClick={save} isDisabled={!changed||busy} isLoading={busy}/>
   </>}>
-   <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<IconTypography/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="源码" icon={<IconCode/>} variant={mode==='source'?'secondary':'ghost'} onClick={()=>switchMode('source')}/><Button label="预览" icon={<IconEye/>} variant={mode==='preview'?'secondary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup>
-   <IconButton variant="ghost" size="sm" label="历史" icon={<IconHistory/>} onClick={()=>setHistory(v=>!v)}/>
+   <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<Icon name="typography"/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="源码" icon={<Icon name="code"/>} variant={mode==='source'?'secondary':'ghost'} onClick={()=>switchMode('source')}/><Button label="预览" icon={<Icon name="eye"/>} variant={mode==='preview'?'secondary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup>
+   <IconButton variant="ghost" size="sm" label="历史" icon={<Icon name="versionHistory"/>} onClick={()=>setHistory(v=>!v)}/>
    {pageActions}
   </PageActions>
   <AutoResizer><div className="doc-notice">
@@ -136,7 +137,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions}:{item:RecordD
   {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   </div></AutoResizer>
   <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={draft} onChange={changeDraft} focusLine={jumpToLine?.line} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={draft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={draft} recordId={item.id} onChange={changeDraft}/>}</React.Suspense></div></AutoTransition>
-  <ContextPanel open={history} onOpenChange={setHistory} label="版本历史"><div className="history-panel"><div className="panel-heading"><h2>版本历史</h2><IconButton variant="ghost" label="关闭历史" icon={<span aria-hidden="true">×</span>} onClick={()=>setHistory(false)}/></div>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<IconArrowsDiff size="var(--rk-icon-sm)"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<IconRestore size="var(--rk-icon-sm)"/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div></ContextPanel>
+  <ContextPanel open={history} onOpenChange={setHistory} label="版本历史"><div className="history-panel"><div className="panel-heading"><h2>版本历史</h2><IconButton variant="ghost" label="关闭历史" icon={<span aria-hidden="true">×</span>} onClick={()=>setHistory(false)}/></div>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div></ContextPanel>
   <Dialog isOpen={blocker.status==='blocked'} onOpenChange={open=>{if(!open)closeBlocker();}} width={440} padding={4} purpose="info" aria-label="未保存的编辑内容">
    <div className="draft-leave-dialog"><h2>还有未保存的编辑内容</h2><p>离开后当前编辑器将关闭。可以先保留本标签页草稿，下次进入此文档时自动恢复；也可以明确丢弃。</p><div className="draft-leave-actions"><Button label="留在编辑器" variant="primary" onClick={closeBlocker}/><Button label="保留草稿并离开" variant="secondary" isDisabled={busy} onClick={keepAndLeave}/><Button label="丢弃更改并离开" variant="destructive" isDisabled={busy} onClick={discardAndLeave}/></div></div>
   </Dialog>

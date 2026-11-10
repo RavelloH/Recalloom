@@ -105,16 +105,33 @@
   min-height: 100%;
 }
 
-.sidebar-footer button.nav-link > span {
+.rk-nav-row {
+  justify-content: flex-start;
+}
+
+.rk-nav-row > .rk-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.rk-nav-row-label {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: start;
 }
 
-.sidebar-footer button.nav-link > svg {
+.rk-nav-row-trailing {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.sidebar-footer .rk-nav-row > .rk-icon {
   opacity: .8;
 }
 
@@ -268,18 +285,6 @@ html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hove
 .sidebar button.nav-link {
   justify-content: flex-start;
   width: 100%;
-}
-
-.sidebar button.nav-link > span:first-child {
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-start;
-}
-
-.nav-search > span:first-child > :nth-child(2) {
-  flex: 1;
-  min-width: 0;
-  text-align: start;
 }
 
 .nav-kbd {
@@ -638,7 +643,7 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
 /* The scroll viewport continues behind the fixed tab bar. Reserve space
    inside its scroll content so the final row remains reachable. */
 .route-stage {
-  padding-block-end: calc(64px + env(safe-area-inset-bottom,0px));
+  padding-block-end: calc(76px + env(safe-area-inset-bottom,0px));
 }
 
 .sidebar-collapsed .sidebar {

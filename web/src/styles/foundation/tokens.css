@@ -28,12 +28,10 @@
   --rk-elev-2: var(--rk-pop-shadow);
   --rk-elev-3: 0 0 0 1px rgba(15,15,15,.05), 0 12px 32px rgba(15,15,15,.16), 0 24px 64px rgba(15,15,15,.12);
   --rk-ease-out: cubic-bezier(.22, 1, .36, 1);
-  --rk-icon-xs: .75rem;
+  /* Three stable glyph sizes shared with Icon.tsx: 16 / 20 / 24px. */
   --rk-icon-sm: 1rem;
-  --rk-icon-md: 1.125rem;
+  --rk-icon-md: 1.25rem;
   --rk-icon-lg: 1.5rem;
-  --rk-icon-nav: 1.25rem;
-  --rk-icon-bottom: 1.375rem;
 
   /* Shared interface type scale. Markdown/document typography owns its own scale. */
   --rk-font-caption: 11px;

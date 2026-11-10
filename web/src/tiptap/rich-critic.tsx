@@ -1,7 +1,8 @@
+import {Icon} from '../icon';
 import React from 'react';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {NodeViewContent,ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
-import {IconMessage2,IconArrowRight,IconCheck,IconX} from '@tabler/icons-react';
+
 import {resolveCriticSuggestion} from '../critic-review';
 import type {CriticKind} from '../critic-syntax';
 
@@ -15,8 +16,8 @@ export const criticName=(kind:CriticKind)=>titles[kind];
 /** Read-only React Markdown rendering, shared stylistically with Tiptap. */
 export function CriticDisplay({kind,text,before}:{kind:CriticKind;text:string;before?:string}){
  return <span data-rk-critic={kind} className={'rk-critic rk-critic-'+kind} title={titles[kind]}>
-  {kind==='substitution'&&<><del className="rk-critic-before">{before}</del><IconArrowRight size="1em" aria-hidden="true"/></>}
-  {kind==='comment'&&<IconMessage2 size="1em" aria-hidden="true"/>}
+  {kind==='substitution'&&<><del className="rk-critic-before">{before}</del><Icon name="arrowRight" inline aria-hidden="true"/></>}
+  {kind==='comment'&&<Icon name="message2" inline aria-hidden="true"/>}
   {kind==='addition'&&<span className="rk-critic-indicator" aria-hidden="true">+</span>}
   {kind==='deletion'&&<span className="rk-critic-indicator" aria-hidden="true">−</span>}
   <span className="rk-critic-content">{text}</span>
@@ -41,19 +42,19 @@ function CriticEditorView({node,editor,getPos}:NodeViewProps){
  };
  return <NodeViewWrapper as="span" data-rk-critic={kind} className={'rk-critic rk-critic-'+kind} title={titles[kind]}>
   {kind==='substitution'&&<span contentEditable={false} className="rk-critic-before-wrapper">
-   <del className="rk-critic-before">{before}</del><IconArrowRight size="1em" aria-hidden="true"/>
+   <del className="rk-critic-before">{before}</del><Icon name="arrowRight" inline aria-hidden="true"/>
   </span>}
-  {kind==='comment'&&<span contentEditable={false} aria-label="审阅批注"><IconMessage2 size="1em" aria-hidden="true"/></span>}
+  {kind==='comment'&&<span contentEditable={false} aria-label="审阅批注"><Icon name="message2" inline aria-hidden="true"/></span>}
   {(kind==='addition'||kind==='deletion')&&<span className="rk-critic-indicator" contentEditable={false} aria-hidden="true">{kind==='addition'?'+':'−'}</span>}
   <NodeViewContent as={"span" as "div"} className="rk-critic-content"/>
   <span className="rk-critic-actions" contentEditable={false}>
    {kind!=='comment'?<>
     <button type="button" className="rk-critic-accept" aria-label={'接受'+titles[kind]} title="接受建议"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('accept');}}><IconCheck size="1em"/></button>
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('accept');}}><Icon name="check" inline/></button>
     <button type="button" className="rk-critic-reject" aria-label={'拒绝'+titles[kind]} title="拒绝建议"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('reject');}}><IconX size="1em"/></button>
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('reject');}}><Icon name="x" inline/></button>
    </>:<button type="button" aria-label="解决审阅批注" title="解决批注并移除批注标记"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('resolve');}}><IconCheck size="1em"/></button>}
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('resolve');}}><Icon name="check" inline/></button>}
   </span>
  </NodeViewWrapper>;
 }

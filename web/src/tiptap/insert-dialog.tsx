@@ -1,10 +1,11 @@
+import {Icon} from '../icon';
 import React,{useMemo,useState} from 'react';
 import {Dialog} from '@astryxdesign/core/Dialog';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {Button} from '@astryxdesign/core/Button';
 import {Selector} from '@astryxdesign/core/Selector';
-import {IconLink,IconPhoto,IconMathFunction} from '@tabler/icons-react';
+
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import {validLink,validImage} from './editor-actions';
@@ -27,7 +28,7 @@ export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:Inser
  const title=draft.kind==='link'?'链接':draft.kind==='image'?'图片':'数学公式';
  return <Dialog isOpen onOpenChange={open=>{if(!open)onClose();}} purpose="form" width={480} padding={4} aria-label={(draft.existing?'编辑':'插入')+title}>
   <form className="editor-insert-form" onSubmit={event=>{event.preventDefault();if(valid)onApply(draft);}}>
-   <header className="editor-insert-heading"><span className="editor-insert-icon">{draft.kind==='link'?<IconLink size="var(--rk-icon-md)"/>:draft.kind==='image'?<IconPhoto size="var(--rk-icon-md)"/>:<IconMathFunction size="var(--rk-icon-md)"/>}</span><div><h2>{draft.existing?'编辑':'插入'}{title}</h2><p className="muted small">{draft.kind==='link'?'添加或修改 Markdown 超链接':draft.kind==='image'?'使用网络图片地址并添加替代文本':'支持行内公式和独立块级 LaTeX'}</p></div></header>
+   <header className="editor-insert-heading"><span className="editor-insert-icon">{draft.kind==='link'?<Icon name="link" size="md"/>:draft.kind==='image'?<Icon name="photo" size="md"/>:<Icon name="math" size="md"/>}</span><div><h2>{draft.existing?'编辑':'插入'}{title}</h2><p className="muted small">{draft.kind==='link'?'添加或修改 Markdown 超链接':draft.kind==='image'?'使用网络图片地址并添加替代文本':'支持行内公式和独立块级 LaTeX'}</p></div></header>
    {draft.kind==='link'&&<>
     <TextInput label="链接文字" width="100%" value={draft.text} onChange={text=>update({text})} placeholder="可选，默认使用选中文本"/>
     <TextInput label="链接地址" width="100%" value={draft.url} onChange={url=>update({url})} placeholder="https://example.com 或 /path、#anchor" hasAutoFocus/>

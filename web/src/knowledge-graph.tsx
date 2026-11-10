@@ -1,3 +1,4 @@
+import {Icon} from './icon';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Link,useNavigate,useSearch} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
-import {IconTopologyStar3,IconZoomIn,IconZoomOut,IconMaximize,IconArrowRight,IconSparkles,IconLink,IconFolder,IconRefresh} from '@tabler/icons-react';
+
 import {graphQuery} from './queries';
 import {relationLabel,semanticMessage,type KnowledgeEdge,type KnowledgeNode} from './graph-types';
 
@@ -173,20 +174,20 @@ export default function KnowledgeGraphPage(){
  };
  const zoom=(multiplier:number)=>{const view=cy.current;if(view)view.zoom({level:Math.min(2.8,Math.max(0.15,view.zoom()*multiplier)),renderedPosition:{x:view.width()/2,y:view.height()/2}});};
  return <div className="page knowledge-graph-page">
-  <header className="graph-page-heading"><div><h1><IconTopologyStar3 size="1em"/>知识关系网</h1>
+  <header className="graph-page-heading"><div><h1><Icon name="relationGraph" inline/>知识关系网</h1>
    <p className="muted">明确关系由 D1 保存；紫色虚线表示语义相似建议，不会自动建立正式关联。</p></div>
    <div className="graph-page-buttons">
     {focus&&<Button size="sm" variant="secondary" label="返回概览" onClick={()=>void focusOn()}/>}
-    <Button size="sm" variant="ghost" icon={<IconRefresh size="var(--rk-icon-sm)"/>} label="刷新" onClick={()=>void result.refetch()}/>
+    <Button size="sm" variant="ghost" icon={<Icon name="refresh" size="sm"/>} label="刷新" onClick={()=>void result.refetch()}/>
    </div>
   </header>
   <div className="graph-controls">
    <TextInput label="查找图中节点" isLabelHidden size="sm" placeholder="搜索已加载的文档" value={filter} onChange={setFilter}/>
    <CheckboxInput label={focus?'语义关联':'语义关联（聚焦后启用）'} size="sm" value={semantic} onChange={setSemantic} isDisabled={!focus}/>
    <div className="graph-zoom">
-    <Button size="sm" variant="ghost" label="缩小" icon={<IconZoomOut size="var(--rk-icon-sm)"/>} onClick={()=>zoom(0.8)}/>
-    <Button size="sm" variant="ghost" label="放大" icon={<IconZoomIn size="var(--rk-icon-sm)"/>} onClick={()=>zoom(1.25)}/>
-    <Button size="sm" variant="ghost" label="适应视图" icon={<IconMaximize size="var(--rk-icon-sm)"/>} onClick={()=>cy.current?.fit(undefined,35)}/>
+    <Button size="sm" variant="ghost" label="缩小" icon={<Icon name="zoomOut" size="sm"/>} onClick={()=>zoom(0.8)}/>
+    <Button size="sm" variant="ghost" label="放大" icon={<Icon name="zoomIn" size="sm"/>} onClick={()=>zoom(1.25)}/>
+    <Button size="sm" variant="ghost" label="适应视图" icon={<Icon name="maximize" size="sm"/>} onClick={()=>cy.current?.fit(undefined,35)}/>
    </div>
   </div>
   {result.isError&&<Banner status="error" container="section" title="关系网加载失败" description={result.error.message}/>}
@@ -206,14 +207,14 @@ export default function KnowledgeGraphPage(){
        <span className="muted small">{selectedNode.kind==='task_list'?'任务列表':'Markdown 文档'}{selectedNode.status==='archived'?' · 已归档':''}</span></div>
        <p className="muted small">{selectedNode.folderName?'目录：'+selectedNode.folderName:'知识库根目录'}</p>
        <div className="graph-inspector-actions">
-        <Link to="/records/$recordId" params={{recordId:selectedNode.id}} className="graph-open-link"><IconArrowRight size="var(--rk-icon-sm)"/>打开文档</Link>
+        <Link to="/records/$recordId" params={{recordId:selectedNode.id}} className="graph-open-link"><Icon name="arrowRight" size="sm"/>打开文档</Link>
         {selectedNode.id!==focus&&<Button size="sm" variant="secondary" label="以此为中心" onClick={()=>void focusOn(selectedNode.id)}/>}
        </div>
        <div className="relation-group-heading">直接关联 <span>{connections.length}</span></div>
        {connections.length?<div className="graph-neighbors">{connections.slice(0,24).map(e=>{
         const other=nodes.find(n=>n.id===(e.sourceId===selected?e.targetId:e.sourceId));
         return <button className="graph-neighbor" key={e.id} onClick={()=>other&&setSelected(other.id)}>
-         {e.type==='semantic'?<IconSparkles size="var(--rk-icon-sm)"/>:e.type==='folder'?<IconFolder size="var(--rk-icon-sm)"/>:<IconLink size="var(--rk-icon-sm)"/>}
+         {e.type==='semantic'?<Icon name="sparkles" size="sm"/>:e.type==='folder'?<Icon name="folder" size="sm"/>:<Icon name="link" size="sm"/>}
          <span className="truncate">{other?.name??'未知文档'}</span><small>{relationLabel(e.relation)}</small>
         </button>;
        })}</div>:<p className="muted small">当前图中暂无直接关联。可以从记录详情手动建立链接。</p>}

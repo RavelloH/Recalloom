@@ -26,7 +26,7 @@
 | features/graph.css | 关系图、图谱检查器 |
 | features/wiki.css | Wiki 专有界面 |
 | features/motion.css | 动画定义、全局运动与过渡 |
-| icons.css | 图标格、Tabler SVG 与第三方图标槽兼容 |
+| icons.css | 统一 Icon SVG 方格与 Astryx Banner 图标槽兼容；不再使用包装层 |
 
 编辑器、聊天等组件自身导入的局部 CSS（如 tiptap/editor.css、rmd-chat.css、block-handle.css）继续独立维护，不能用它们当做全局补丁。
 

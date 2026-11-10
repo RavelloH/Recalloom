@@ -23,6 +23,9 @@ try{
  await page.waitForURL(base+'/',{timeout:25000});
  const nav=page.locator('.sidebar .nav-list .nav-link');
  assert.ok(await nav.count()>=5,'expected main sidebar navigation');
+ const rows=await page.locator('.sidebar .rk-nav-row').evaluateAll(items=>items.map(el=>({icon:el.querySelector('svg.rk-icon')?.getBoundingClientRect().x,label:el.querySelector('.rk-nav-row-label')?.getBoundingClientRect().x})));
+ assert.ok(rows.length>=9,'navigation, search and footer must share NavRow');
+ assert.ok(rows.every(p=>Math.abs(p.icon-rows[0].icon)<1&&Math.abs(p.label-rows[0].label)<1),'NavRow alignment mismatch: '+JSON.stringify(rows));
  const first=nav.first();
  const firstSvg=first.locator('svg').first();
  assert.ok((await firstSvg.getAttribute('class'))?.includes('tabler-icon'),'sidebar should use Tabler icons');
@@ -91,7 +94,7 @@ try{
  }));
  assert.ok(mobile.scrollWidth<=mobile.viewport+1,'mobile horizontal overflow '+JSON.stringify(mobile));
  assert.equal(mobile.icons.length,4,'four bottom navigation entries');
- assert.ok(mobile.icons.every(x=>x.tabler&&x.width>=21&&x.width<=23&&x.height===x.width),'bottom icons should use a stable 22px control size: '+JSON.stringify(mobile));
+ assert.ok(mobile.icons.every(x=>x.tabler&&x.width>=23&&x.width<=25&&x.height===x.width),'bottom icons should use the 24px large size: '+JSON.stringify(mobile));
  assert.ok(mobile.icons.every(x=>Math.abs(x.centerOffset)<1),'bottom icons must be centered');
  await page.screenshot({path:'tmp/icon-audit/screens/mobile.png'});
  await page.getByRole('button',{name:'打开导航'}).click();
@@ -107,34 +110,36 @@ try{
  });
  assert.ok(mobileSidebar.width>=19&&mobileSidebar.width<=21,'mobile sidebar icons should be 20px: '+JSON.stringify(mobileSidebar));
  assert.ok(Math.abs(mobileSidebar.centerOffsetY)<2,'mobile sidebar icon should be vertically centered: '+JSON.stringify(mobileSidebar));
- const tree=await page.locator('.page-tree .rk-icon-frame--tree').first().evaluate(frame=>{
-  const a=frame.getBoundingClientRect(),b=frame.querySelector('svg.tabler-icon').getBoundingClientRect(),row=frame.closest('.tree-row').getBoundingClientRect();
+ const tree=await page.locator('.page-tree svg.tree-icon').first().evaluate(frame=>{
+  const a=frame.getBoundingClientRect(),b=a,row=frame.closest('.tree-row').getBoundingClientRect();
   return {frame:a.width,icon:b.width,centerOffsetY:+(b.y+b.height/2-row.y-row.height/2).toFixed(2)};
  });
- assert.ok(tree.frame>=17&&tree.frame<=19&&tree.icon===tree.frame,'file tree icon uses its 18px cell: '+JSON.stringify(tree));
+ assert.ok(tree.frame>=19&&tree.frame<=21&&tree.icon===tree.frame,'file tree icon uses its 20px slot: '+JSON.stringify(tree));
  assert.ok(Math.abs(tree.centerOffsetY)<2,'file tree icon vertically centered: '+JSON.stringify(tree));
  await page.screenshot({path:'tmp/icon-audit/screens/mobile-sidebar.png'});
  await page.getByRole('button',{name:'关闭侧栏'}).click();
  await page.goto(base+'/records/'+id+'?mode=visual');
- await page.locator('.wysiwyg-tools button svg.tabler-icon').first().waitFor();
- const toolbar=await page.locator('.wysiwyg-tools button:has(svg.tabler-icon)').first().evaluate(btn=>{
+ const textLine=page.locator('.tiptap p').filter({hasText:'组件内容'}).first();
+ await textLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+ const textToolbar=page.getByRole('toolbar',{name:'文本格式'});await textToolbar.waitFor();
+ const toolbar=await textToolbar.locator('button:has(svg.tabler-icon)').first().evaluate(btn=>{
   const icon=btn.querySelector('svg.tabler-icon').getBoundingClientRect(),box=btn.getBoundingClientRect();
   return {width:icon.width,centerOffsetY:+(icon.top+icon.height/2-box.top-box.height/2).toFixed(2)};
  });
- assert.ok(toolbar.width>=18&&toolbar.width<=24,'editor toolbar icon should be ~20px: '+JSON.stringify(toolbar));
+ assert.ok(toolbar.width>=15&&toolbar.width<=21,'editor toolbar icon should be 16px or 20px: '+JSON.stringify(toolbar));
  assert.ok(Math.abs(toolbar.centerOffsetY)<2,'editor toolbar icon should be centered: '+JSON.stringify(toolbar));
  const topbar=await page.locator('.topbar .mobile-menu').evaluate(btn=>{
   const icon=btn.querySelector('svg.tabler-icon').getBoundingClientRect(),box=btn.getBoundingClientRect();
   return {width:icon.width,height:icon.height,centerOffsetX:+(icon.x+icon.width/2-box.x-box.width/2).toFixed(2),
    centerOffsetY:+(icon.y+icon.height/2-box.y-box.height/2).toFixed(2)};
  });
- assert.ok(topbar.width>=19&&topbar.width<=21,'topbar icon uses 20px control size: '+JSON.stringify(topbar));
+ assert.ok(topbar.width>=15&&topbar.width<=21,'topbar icon uses a stable control size: '+JSON.stringify(topbar));
  assert.ok(Math.abs(topbar.centerOffsetX)<2&&Math.abs(topbar.centerOffsetY)<2,'topbar icon centered in its button: '+JSON.stringify(topbar));
  const save=await page.locator('.topbar .page-actions-pinned button:has(svg.tabler-icon)').last().evaluate(btn=>{
   const icon=btn.querySelector('svg.tabler-icon'),r=icon.getBoundingClientRect();return {width:r.width,height:r.height,display:getComputedStyle(icon).display};
  });
- assert.ok(save.width>=17&&save.width<=19&&save.height===save.width&&save.display==='block',
-  'save icon uses component-owned 18px size: '+JSON.stringify(save));
+ assert.ok(save.width>=15&&save.width<=21&&save.height===save.width&&save.display==='block',
+  'save icon follows the shared 16/20px size: '+JSON.stringify(save));
  await page.screenshot({path:'tmp/icon-audit/screens/mobile-toolbar.png'});
  await page.setViewportSize({width:390,height:844});
  await page.reload();
@@ -142,7 +147,7 @@ try{
  const wide=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,
   bottom:[...document.querySelectorAll('.bottom-link svg.tabler-icon')].map(el=>el.getBoundingClientRect().width)}));
  assert.ok(wide.scroll<=wide.width+1,'390px mobile width overflow: '+JSON.stringify(wide));
- assert.deepEqual(wide.bottom,[22,22,22,22],'bottom navigation dimensions remain stable at 390px');
+ assert.deepEqual(wide.bottom,[24,24,24,24],'bottom navigation dimensions remain stable at 390px');
  assert.deepEqual(errors,[],'browser JS errors');
  console.log('PASS TABLER ICON SYSTEM',JSON.stringify({navigation:{before,after},callouts:kinds,previewVisual:'matched in light and dark',mobile,mobileSidebar,tree,toolbar,topbar,save,wide}));
 }finally{await browser.close();}

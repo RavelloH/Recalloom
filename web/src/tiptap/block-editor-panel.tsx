@@ -1,8 +1,9 @@
+import {Icon} from '../icon';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {Button} from '@astryxdesign/core/Button';
-import {IconX,IconCode,IconEye} from '@tabler/icons-react';
+
 import {parseRmdVisual} from '../rmd-visual';
 import {serializeRmdBlock} from '../rmd-serialize';
 import {editableBlockAt} from './editor-block-actions';
@@ -144,10 +145,10 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   }}>
   <header className="rk-block-panel-header">
    <div><strong>{parentKind?'编辑子块':'编辑块'}</strong><span>{kind==='richContainer'?String(current.attrs.kind??'容器'):kind}</span></div>
-   <Button variant="ghost" size="sm" label="关闭块编辑" icon={<IconX size="var(--rk-icon-sm)"/>} onClick={requestClose}/>
+   <Button variant="ghost" size="sm" label="关闭块编辑" icon={<Icon name="x" size="sm"/>} onClick={requestClose}/>
   </header>
   <section className="rk-block-panel-preview" aria-label="当前块预览">
-   <div className="rk-block-panel-section-heading"><IconEye size="var(--rk-icon-sm)"/><span>实时预览</span></div>
+   <div className="rk-block-panel-section-heading"><Icon name="eye" size="sm"/><span>实时预览</span></div>
    <div className="rk-block-panel-preview-body record-main">
     <React.Suspense fallback={<div className="muted small">准备预览…</div>}>
      <Preview content={presentation} sourceId={recordId}/>
@@ -161,7 +162,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
    {(kind==='richLinkCard'||kind==='wikiEmbed')&&<RmdLeafAttributeFields key={kind+'-'+pos} node={current} onApply={applyLeaf}/>}
    {attributePos!==undefined&&attributePos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(attributePos)?.type.name??'')&&
     <RmdSchemaAttributeFields key={attributePos} editor={editor} pos={attributePos}/>}
-   <div className="rk-block-panel-section-heading"><IconCode size="var(--rk-icon-sm)"/><span>当前块 RMD 正文与属性</span></div>
+   <div className="rk-block-panel-section-heading"><Icon name="code" size="sm"/><span>当前块 RMD 正文与属性</span></div>
    <TextArea label="块源码" width="100%" rows={10} value={draft} onChange={commitRaw}
     placeholder="编辑当前块的 Markdown / RMD"/>
    {error&&<p className="rk-block-panel-error" role="alert">{error}</p>}

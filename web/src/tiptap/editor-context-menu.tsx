@@ -1,3 +1,4 @@
+import {Icon,type IconName} from '../icon';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
@@ -6,37 +7,32 @@ import {undo,redo,undoDepth,redoDepth} from '@tiptap/pm/history';
 import type {ReactNode} from 'react';
 import {ContextMenu,type ContextMenuOption} from '@astryxdesign/core/ContextMenu';
 import type {DropdownMenuItemData} from '@astryxdesign/core/DropdownMenu';
-import {
- IconArrowBackUp,IconArrowDown,IconArrowForwardUp,IconArrowUp,
- IconBold,IconCode,IconCopy,IconCut,IconDots,IconEdit,IconHighlight,
- IconItalic,IconNotes,IconPencil,IconPlus,IconStrikethrough,
- IconSubscript,IconSuperscript,IconTrash,IconUnderline,IconLink,IconPhoto,IconTable,IconClipboard,IconArrowBarToDown
-} from '@tabler/icons-react';
+
 import {blockMenuItems,inlineContextItems,runWithTextSelection} from './editor-command-menu';
 import {editableBlockFromDocumentPosition,isExplicitRmdBlock} from './editor-block-actions';
 import {inlineCommandsByGroup} from './editor-inline-commands';
 import {pasteFromClipboard,linkContextItems,imageContextItems,tableContextItems,codeContextItems} from './editor-context-actions';
 import './editor-context-menu.css';
 
-const icons:Record<string,React.ComponentType<{size?:string|number}>>={
- 'copy-selected-text':IconCopy,'cut-selected-text':IconCut,
- 'delete-selected-text':IconTrash,'selection-bold':IconBold,
- 'selection-italic':IconItalic,'selection-underline':IconUnderline,
- 'selection-strike':IconStrikethrough,'selection-code':IconCode,
- 'selection-superscript':IconSuperscript,'selection-subscript':IconSubscript,
- 'selection-rmd-mark':IconHighlight,
- 'rmd-inline-sketch':IconPencil,'rmd-inline-components':IconPlus,
- 'edit-block':IconEdit,'copy-block-rmd':IconCopy,'duplicate-block':IconCopy,
- 'move-block-up':IconArrowUp,'move-block-down':IconArrowDown,
-  'link-open':IconLink,'link-copy':IconCopy,'link-edit':IconEdit,'link-unset':IconTrash,
-  'image-download':IconArrowBarToDown,'image-copy':IconPhoto,
-  'table-row-before':IconTable,'table-row-after':IconTable,'table-col-before':IconTable,'table-col-after':IconTable,
-  'code-copy':IconCopy,'code-language':IconCode,'paste-clipboard':IconClipboard,'insert-here':IconPlus,
- 'remove-block':IconTrash,'undo':IconArrowBackUp,'redo':IconArrowForwardUp
+const icons:Record<string,IconName>={
+ 'copy-selected-text':"copy",'cut-selected-text':"cut",
+ 'delete-selected-text':"trash",'selection-bold':"bold",
+ 'selection-italic':"italic",'selection-underline':"underline",
+ 'selection-strike':"strikethrough",'selection-code':"code",
+ 'selection-superscript':"superscript",'selection-subscript':"subscript",
+ 'selection-rmd-mark':"highlight",
+ 'rmd-inline-sketch':"pencil",'rmd-inline-components':"plus",
+ 'edit-block':"edit",'copy-block-rmd':"copy",'duplicate-block':"copy",
+ 'move-block-up':"arrowUp",'move-block-down':"arrowDown",
+  'link-open':"link",'link-copy':"copy",'link-edit':"edit",'link-unset':"trash",
+  'image-download':"arrowBarToDown",'image-copy':"photo",
+  'table-row-before':"table",'table-row-after':"table",'table-col-before':"table",'table-col-after':"table",
+  'code-copy':"copy",'code-language':"code",'paste-clipboard':"clipboard",'insert-here':"plus",
+ 'remove-block':"trash",'undo':"undo",'redo':"redo"
 };
 function iconOption(item:DropdownMenuItemData):DropdownMenuItemData{
- const Icon=icons[item.id??'']??IconDots;
- return item.id==='selection-rmd-mark'?{...item,icon:<span className="toolbar-highlight" aria-hidden="true">H</span>}:{...item,icon:<Icon size="var(--rk-icon-sm)"/>};
+ const name=icons[item.id??'']??"dots";
+ return item.id==='selection-rmd-mark'?{...item,icon:<span className="toolbar-highlight" aria-hidden="true">H</span>}:{...item,icon:<Icon name={name} size="sm"/>};
 }
 function isAction(item:ContextMenuOption):item is DropdownMenuItemData{
  return !('type' in item);
@@ -201,14 +197,14 @@ export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,childr
   const basicIds=['selection-bold','selection-italic','selection-underline','selection-rmd-mark'];
   const basicFormats=textFormats.filter(item=>isAction(item)&&basicIds.includes(item.id??''));
   const advancedFormats=textFormats.filter(item=>isAction(item)&&!basicIds.includes(item.id??''));
-  const handDrawn:ContextMenuOption={id:'rmd-inline-sketch',label:'荧光笔与手绘标记',icon:<IconPencil size="var(--rk-icon-sm)"/>,
+  const handDrawn:ContextMenuOption={id:'rmd-inline-sketch',label:'荧光笔与手绘标记',icon:<Icon name="pencil" size="sm"/>,
    items:inlineCommandsByGroup('hand-drawn').map(cmd=>({
-    id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<IconPencil size="var(--rk-icon-sm)"/>,
+    id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<Icon name="pencil" size="sm"/>,
     onClick:()=>runWithTextSelection(editor,selection,()=>cmd.run(editor))
    }))};
   const components:DropdownMenuItemData[]=
    inlineCommandsByGroup('inline-component').map(cmd=>({
-    id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<IconNotes size="var(--rk-icon-sm)"/>,
+    id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<Icon name="footnote" size="sm"/>,
     onClick:()=>runWithTextSelection(editor,selection,()=>cmd.run(editor))
    }));
   const actions=current?blockMenuItems({editor,pos:current.pos,onEditBlock}):[];
@@ -255,7 +251,7 @@ export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,childr
     }catch{/* Ignore malformed code view. */}
    }
    const pasteAction:ContextMenuOption={id:'paste-clipboard',label:'粘贴',
-    icon:<IconClipboard size="var(--rk-icon-sm)"/>,
+    icon:<Icon name="clipboard" size="sm"/>,
     onClick:()=>{void pasteFromClipboard(editor,notify);}};
    const structure:ContextMenuOption[]=[];
   if(selected){
@@ -266,14 +262,14 @@ export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,childr
    // Related commands are a hierarchy, not a flat 15-row context menu.
    // Astryx nested items support both hover and click flyouts.
    structure.push({id:'selection-more',label:'更多文字格式',
-    icon:<IconDots size="var(--rk-icon-sm)"/>,items:[...advancedFormats.filter(isAction).map(iconOption),...components]});
+    icon:<Icon name="dots" size="sm"/>,items:[...advancedFormats.filter(isAction).map(iconOption),...components]});
    structure.push(handDrawn);
    structure.push({type:'divider'});
   }
   if(!selected)structure.push(grouped('剪贴板',[pasteAction])!);
    if(context.length){structure.push(...context);structure.push({type:'divider'});}
    if(!selected&&!link&&!image&&!tableCell&&!codeBlock&&!explicit){
-    structure.push({id:'insert-here',label:'插入',icon:<IconPlus size="var(--rk-icon-sm)"/>,
+    structure.push({id:'insert-here',label:'插入',icon:<Icon name="plus" size="sm"/>,
      onClick:()=>onInsert(position,{x:px,y:py})});
    }
    const blocks=grouped('块操作',blockActions);
