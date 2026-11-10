@@ -60,7 +60,7 @@ try{
   await select(width);
   await toolbar().getByRole('button',{name:'更多行内功能'}).click();
   const menu=page.getByRole('menu').last();
-  for(const label of ['链接','行内公式','Wiki 引用','脚注引用','弱化注释'])
+  for(const label of width===390?['链接','行内公式','Wiki 引用','脚注引用','弱化注释']:['链接','弱化注释','上标','下标'])
    assert.equal(await menu.getByRole('menuitem',{name:label}).count(),1,label);
   await menu.getByRole('menuitem',{name:'弱化注释'}).click();
   assert.match(await sourceText(),/%%alpha beta gamma%%/);

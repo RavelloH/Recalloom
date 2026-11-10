@@ -65,7 +65,7 @@ try{
  await line.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
  await page.getByRole('toolbar',{name:'文本格式'}).waitFor({state:'visible',timeout:2200});
  const toolbar=page.getByRole('toolbar',{name:'文本格式'});
- assert.equal(await toolbar.getByRole('button',{name:'语义 Mark'}).count(),1,'semantic Mark must be visible directly');
+ assert.equal(await toolbar.getByRole('button',{name:'高亮'}).count(),1,'semantic Mark must be visible directly');
  for(const group of ['手绘标记','行内组件','更多行内功能']){
   const button=toolbar.getByRole('button',{name:group});
   assert.equal(await button.count(),1);

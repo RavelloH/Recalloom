@@ -21,11 +21,20 @@
 .rk-block-grip .rk-block-drag:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:2px;}
 /* Neither a paragraph nor a free-standing image or code fence receives a
  * handle. Only explicit ::: RMD block wrappers can carry these states. */
-.record-main .tiptap :is(.rk-directive[data-rk-kind],.rk-rich-link-card,.wiki-editor-embed).rk-block-hovered{
+/* Text-only RMD wrappers (handwriting, semantic mark, comments) flow like
+ * ordinary paragraphs; a rectangular selected/hover outline suggests a
+ * separate card where none exists. Keep grips/actions, omit their frame. */
+.record-main .tiptap :is(
+ .rk-directive[data-rk-kind]:not(.rk-directive-sketch):not(.rk-directive-mark):not(.rk-directive-comment),
+ .rk-rich-link-card,.wiki-editor-embed
+).rk-block-hovered{
  outline:1px solid color-mix(in srgb,var(--color-text-link,#527cb7) 35%,transparent);
  outline-offset:4px;
 }
-.record-main .tiptap :is(.rk-directive[data-rk-kind],.rk-rich-link-card,.wiki-editor-embed).rk-block-selected{
+.record-main .tiptap :is(
+ .rk-directive[data-rk-kind]:not(.rk-directive-sketch):not(.rk-directive-mark):not(.rk-directive-comment),
+ .rk-rich-link-card,.wiki-editor-embed
+).rk-block-selected{
  outline:2px solid var(--color-text-link,#527cb7)!important;
  outline-offset:5px;
  border-radius:4px;

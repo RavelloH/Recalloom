@@ -103,7 +103,7 @@ try{
   const third=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
   await selectFixtureLine(third);
   const markToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
-  await markToolbar.getByRole('button',{name:'语义 Mark'}).click();
+  await markToolbar.getByRole('button',{name:'高亮'}).click();
   await page.locator('.tiptap mark:not([data-rk-color])').first().waitFor();
   await page.getByRole('button',{name:'源码'}).click();
   const codeMark=await page.locator('.cm-content').first().innerText();
@@ -119,7 +119,10 @@ try{
   assert.equal(quick.status,201);
   await page.goto(base+'/records/'+quick.data.id+'?mode=visual');
   const quickLine=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
-  await quickLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+  // Reuse the existing confirmed text-selection helper. On a fresh mobile
+  // navigation, the first End/Shift+Home can run before the editor finishes
+  // taking focus; testing a menu without a valid selection is meaningless.
+  await selectFixtureLine(quickLine);
   const quickToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
   await quickToolbar.getByRole('button',{name:'手绘标记'}).click();
   await page.getByRole('menu').last().getByRole('menuitem',{name:/手绘圈选/}).click();

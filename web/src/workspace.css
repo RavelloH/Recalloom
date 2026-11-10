@@ -248,6 +248,30 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
  width:10px!important;height:10px!important;flex:none;stroke-width:1.9;
 }
 .bubble-menu-inner .bubble-group > * {flex:0 0 auto;min-width:0;}
+/* Restore the original yellow H marker, not a generic monochrome pen. */
+.bubble-menu-inner .toolbar-highlight{width:auto!important;height:auto!important;padding:0 2px;}
+/* The inline flyout lives in document.body, not in the short-lived
+ * Tiptap BubbleMenu subtree. The user can cross the gap without losing it. */
+.rk-inline-popover{
+ position:fixed;z-index:1600;box-sizing:border-box;width:min(240px,calc(100vw - 16px));
+ max-height:min(336px,65vh);overflow:auto;overscroll-behavior:contain;
+ padding:5px;border:1px solid var(--color-border,rgba(128,128,128,.19));
+ border-radius:10px;background:var(--rk-popover,var(--color-background-popover,#fff));
+ color:var(--color-text-primary);box-shadow:var(--rk-pop-shadow,0 8px 28px rgba(0,0,0,.14));
+}
+.rk-inline-popover-item{
+ display:flex;flex-direction:column;gap:1px;box-sizing:border-box;
+ width:100%;min-height:36px;padding:7px 10px;border:0;border-radius:6px;
+ background:transparent;color:inherit;text-align:left;cursor:pointer;
+}
+.rk-inline-popover-item:hover:not(:disabled),
+.rk-inline-popover-item:focus-visible:not(:disabled){
+ background:var(--color-overlay-hover,rgba(128,128,128,.10));outline:none;
+}
+.rk-inline-popover-item:disabled{opacity:.45;cursor:not-allowed;}
+.rk-inline-popover-item-label{font-size:13px;font-weight:550;line-height:1.35;}
+.rk-inline-popover-item-description{font-size:11px;line-height:1.35;color:var(--color-text-secondary);white-space:normal;}
+
 .bubble-link {display:none;}
 .slash-menu {
   position: absolute;

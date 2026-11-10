@@ -36,14 +36,20 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
  // (which changes its dimensions and breaks the click-to-caret experience).
  const titleElement=useRef<HTMLSpanElement|null>(null);
  const titleEditing=useRef(false);
+ const titleAtFocus=useRef('');
  const finishTitleEdit=(save:boolean)=>{
   if(!titleEditing.current)return;
   titleEditing.current=false;
   const element=titleElement.current;
+  const displayed=richTitle(kind,title);
   const next=safeTitle(element?.textContent??'');
-  if(save&&next!==title)updateAttributes({title:next});
-  if(element&&!save)element.textContent=richTitle(kind,title);
-  if(element&&!next&&save)element.textContent=richTitle(kind,'');
+  // A Callout with no explicit title renders a default title (e.g. "警告").
+  // That default IS visible text, not a placeholder to erase on focus.
+  // Clicking and blurring without editing must not write it back as an attr.
+  if(!save){if(element)element.textContent=displayed;return;}
+  if(next===titleAtFocus.current)return;
+  if(next!==title)updateAttributes({title:next});
+  if(element&&!next)element.textContent=richTitle(kind,'');
  };
  // Use the rendered title itself as the editing surface. There is no
  // separate input, floating field, or additional editor wrapper to resize it.
@@ -57,7 +63,10 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
   title="直接在标题文字上编辑；Enter 确认、Esc 取消"
   onPointerDown={event=>event.stopPropagation()}
   onClick={event=>event.stopPropagation()}
-  onFocus={event=>{titleEditing.current=true;if(!title)event.currentTarget.textContent='';}}
+  onFocus={event=>{
+   titleEditing.current=true;
+   titleAtFocus.current=event.currentTarget.textContent??'';
+  }}
   onBlur={()=>finishTitleEdit(true)}
   onKeyDown={event=>{
    event.stopPropagation();

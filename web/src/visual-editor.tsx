@@ -6,7 +6,6 @@ import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
-import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -18,7 +17,7 @@ import {InlineMath} from '@tiptap/extension-mathematics';
 import Placeholder from '@tiptap/extension-placeholder';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor,JSONContent} from '@tiptap/core';
-import {IconLink,IconPhotoPlus,IconMathFunction,IconTable,IconTableRow,IconColumns3,IconTrash,IconAlignLeft,IconAlignCenter,IconAlignRight,IconPlus,IconMinus,IconCode,IconPencil,IconBold,IconItalic,IconUnderline,IconStrikethrough,IconHighlight,IconSuperscript,IconSubscript,IconH2,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconBrackets,IconSum,IconChevronDown,IconMessageCircle,IconDots} from '@tabler/icons-react';
+import {IconLink,IconPhotoPlus,IconMathFunction,IconTable,IconTableRow,IconColumns3,IconTrash,IconAlignLeft,IconAlignCenter,IconAlignRight,IconPlus,IconMinus,IconCode,IconPencil,IconBold,IconItalic,IconUnderline,IconStrikethrough,IconSuperscript,IconSubscript,IconH2,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconBrackets,IconSum,IconChevronDown,IconMessageCircle,IconDots} from '@tabler/icons-react';
 import {CustomHeading} from './tiptap/custom-heading';
 import {CustomParagraph} from './tiptap/custom-paragraph';
 import {UnderlineWithMarkdown,HighlightWithMarkdown,SubscriptWithMarkdown,SuperscriptWithMarkdown,TextAlignWithMarkdown} from './tiptap/markdown-extensions';
@@ -55,6 +54,8 @@ import {safeTableId,cleanTableCaption} from './table-caption';
 
 type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number};
 type WikiState=SlashState&{kind:'link'|'embed'};
+type InlinePopupItem={id:string;label:string;description?:string;disabled?:boolean;run:()=>void};
+type InlinePopup={label:string;left:number;top:number;items:InlinePopupItem[]};
 const SLASH_MENU_WIDTH=300;
 const SLASH_MENU_SPACE=280;
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
@@ -84,7 +85,27 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
  const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
- const inlineSelectionRef=useRef<{from:number;to:number}|null>(null);
+ const inlineSelectionRef=useRef<{from:number;to:number;doc:ProseMirrorNode}|null>(null);
+ const [inlinePopup,setInlinePopup]=useState<InlinePopup|null>(null);
+ const inlinePopupClose=useRef<ReturnType<typeof setTimeout>|null>(null);
+ useEffect(()=>{
+  if(!inlinePopup)return;
+  const dismiss=(event:PointerEvent)=>{
+   const target=event.target;
+   if(target instanceof Element&&target.closest('.rk-inline-popover,.rk-inline-menu-trigger'))return;
+   setInlinePopup(null);
+  };
+  const keydown=(event:KeyboardEvent)=>{
+   if(event.key==='Escape'){setInlinePopup(null);event.stopPropagation();}
+  };
+  document.addEventListener('pointerdown',dismiss,true);
+  document.addEventListener('keydown',keydown,true);
+  return()=>{
+   document.removeEventListener('pointerdown',dismiss,true);
+   document.removeEventListener('keydown',keydown,true);
+  };
+ },[inlinePopup]);
+ useEffect(()=>()=>{if(inlinePopupClose.current!==null)clearTimeout(inlinePopupClose.current);},[]);
  const lastEditorTextSelection=useRef<{from:number;to:number;doc:ProseMirrorNode}|null>(null);
  const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
  const attributeNodeRef=useRef<{pos:number;type:string}|null>(null);
@@ -467,11 +488,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!range){const {from,to}=editor.state.selection;if(from!==to)range={from,to};}
   const remembered=lastEditorTextSelection.current;
   if(!range&&remembered?.doc===editor.state.doc)range={from:remembered.from,to:remembered.to};
-  inlineSelectionRef.current=range;
+  // A menu click can call this again after focus has collapsed the native
+  // selection. Never overwrite a valid range with null on the same document.
+  if(range)inlineSelectionRef.current={...range,doc:editor.state.doc};
+  else if(inlineSelectionRef.current?.doc!==editor.state.doc)inlineSelectionRef.current=null;
  };
  const runCapturedInline=(run:()=>void)=>{
   const remembered=lastEditorTextSelection.current;
-  const range=inlineSelectionRef.current??
+  const captured=inlineSelectionRef.current;
+  const range=(captured?.doc===editor.state.doc?captured:null)??
    (remembered?.doc===editor.state.doc?{from:remembered.from,to:remembered.to}:null);
   inlineSelectionRef.current=null;
   if(range&&range.from<range.to&&range.to<=editor.state.doc.content.size)
@@ -480,10 +505,38 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  };
  const runInlineFromMenu=(command:InlineCommand)=>runCapturedInline(()=>{command.run(editor);});
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
-  <ToggleButton key={name} label={name} size="sm" isPressed={pressed}
+  <ToggleButton key={name} label={name} tooltip={name} size="sm" isPressed={pressed}
    onPointerEnter={captureInlineRange} onPointerDown={captureInlineRange} onPressedChange={()=>runCapturedInline(run)}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
-  <Button key={name} label={name} variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
+  <Button key={name} label={name} tooltip={name} variant="ghost" size="sm"
+   onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
+ const cancelPopupClose=()=>{
+  if(inlinePopupClose.current!==null)clearTimeout(inlinePopupClose.current);
+  inlinePopupClose.current=null;
+ };
+ const schedulePopupClose=()=>{
+  cancelPopupClose();
+  inlinePopupClose.current=setTimeout(()=>setInlinePopup(null),320);
+ };
+ const showInlinePopup=(anchor:HTMLElement,label:string,items:InlinePopupItem[])=>{
+  cancelPopupClose();
+  captureInlineRange();
+  const rect=anchor.getBoundingClientRect(),height=Math.min(336,items.length*38+20);
+  setInlinePopup({label,items,
+   left:Math.max(8,Math.min(rect.left,window.innerWidth-248)),
+   top:window.innerHeight-rect.bottom>height+10||rect.top<height+12
+    ?rect.bottom+6:Math.max(8,rect.top-height-6)});
+ };
+ const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[])=>
+  <Button key={label} label={label} tooltip={label} variant="ghost" size="sm"
+   className="rk-inline-menu-trigger" icon={menuIcon(child)} isIconOnly
+   aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
+   onMouseDown={event=>event.preventDefault()}
+   onPointerDown={captureInlineRange}
+   onPointerEnter={event=>{if(event.pointerType!=='touch')showInlinePopup(event.currentTarget,label,items);}}
+   onPointerLeave={schedulePopupClose}
+   onClick={event=>showInlinePopup(event.currentTarget,label,items)}/>;
+
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
  const slashGroups=slash?groupSlashCommands(slashItems):[];
  const menuIcon=(icon:React.ReactNode)=><span className="rk-inline-dropdown-icon" aria-hidden="true">
@@ -494,37 +547,40 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<IconItalic size="var(--rk-icon-sm)"/>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
-  {toggle('语义 Mark',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<IconHighlight size="var(--rk-icon-sm)"/>)}
-  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconPencil size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
-   presentation="adaptive" items={inlineCommandsByGroup('hand-drawn').map(command=>({
+  {toggle('高亮',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">H</span>)}
+  {categoryButton('手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
+   inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,description:command.description,
-    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
-   }))}/>
-  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconPlus size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
-   presentation="adaptive" items={inlineCommandsByGroup('inline-component').map(command=>({
+    disabled:!command.isAvailable(editor),run:()=>runInlineFromMenu(command)
+   })))}
+  {categoryButton('行内组件',<IconPlus size="var(--rk-icon-sm)"/>,
+   inlineCommandsByGroup('inline-component').map(command=>({
     id:command.id,label:command.title,description:command.description,
-    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
-   }))}/>
-  <DropdownMenu button={{label:'更多行内功能',variant:'ghost',size:'sm',isIconOnly:true,icon:menuIcon(<IconDots size="var(--rk-icon-sm)"/>),onPointerEnter:captureInlineRange,onPointerDown:captureInlineRange}}
-   presentation="adaptive" items={[
+    disabled:!command.isAvailable(editor),run:()=>runInlineFromMenu(command)
+   })))}
+  {categoryButton('更多行内功能',<IconDots size="var(--rk-icon-sm)"/>,[
     {id:'inline-more-link',label:'链接',description:'为选中文字添加或编辑网页链接',
-     onClick:()=>runCapturedInline(openLink)},
-    {id:'inline-more-math',label:'行内公式',description:'插入可编辑 LaTeX 公式',
-     onClick:()=>runCapturedInline(()=>openMath('inline'))},
-    {id:'inline-more-wiki',label:'Wiki 引用',description:'在光标处输入 [[ 并搜索知识库文档',
-     isDisabled:!editor.state.selection.empty,
-     onClick:()=>runCapturedInline(()=>{editor.chain().focus().insertContent('[[').run();})},
-    {id:'inline-more-footnote',label:'脚注引用',description:'在光标处插入可关联脚注定义的引用',
-     isDisabled:!editor.state.selection.empty,
-     onClick:()=>runCapturedInline(()=>{editor.chain().focus().insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run();})},
+     run:()=>runCapturedInline(openLink)},
+    // The mobile all-in-one toolbar also needs insertion commands; the
+    // selection BubbleMenu intentionally exposes formatting only.
+    ...(compact?[
+     {id:'inline-more-math',label:'行内公式',description:'插入可编辑 LaTeX 公式',
+      run:()=>runCapturedInline(()=>openMath('inline'))},
+     {id:'inline-more-wiki',label:'Wiki 引用',description:'在光标处搜索知识库文档',
+      disabled:!editor.state.selection.empty,
+      run:()=>runCapturedInline(()=>{editor.chain().focus().insertContent('[[').run();})},
+     {id:'inline-more-footnote',label:'脚注引用',description:'插入脚注引用',
+      disabled:!editor.state.selection.empty,
+      run:()=>runCapturedInline(()=>{editor.chain().focus().insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run();})}
+    ]:[]),
     {id:'inline-more-comment',label:'弱化注释',description:'把选中文字标记为可见注释',
-     isDisabled:editor.state.selection.empty,
-     onClick:()=>runCapturedInline(()=>{editor.chain().focus().setMark('visibleComment').run();})},
+     disabled:editor.state.selection.empty,
+     run:()=>runCapturedInline(()=>{editor.chain().focus().setMark('visibleComment').run();})},
     {id:'inline-more-super',label:'上标',description:'将选中文字转换为上标',
-     onClick:()=>runCapturedInline(()=>{editor.chain().focus().toggleSuperscript().run();})},
+     run:()=>runCapturedInline(()=>{editor.chain().focus().toggleSuperscript().run();})},
     {id:'inline-more-sub',label:'下标',description:'将选中文字转换为下标',
-     onClick:()=>runCapturedInline(()=>{editor.chain().focus().toggleSubscript().run();})}
-   ]}/>
+     run:()=>runCapturedInline(()=>{editor.chain().focus().toggleSubscript().run();})}
+   ])}
  </>;
  return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
   <div className="rk-editor-block-canvas">
@@ -590,7 +646,6 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
        {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
        {toggle('弱化注释',editor.isActive('visibleComment'),()=>editor.chain().focus().toggleMark('visibleComment').run(),<IconMessageCircle size="var(--rk-icon-sm)"/>)}
        {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
-       {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
       </div>}
    </div>
   </BubbleMenu>}
@@ -661,6 +716,23 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>
  </div>
+ {inlinePopup&&createPortal(
+  <div className="rk-inline-popover" role="menu" aria-label={inlinePopup.label}
+   style={{left:inlinePopup.left,top:inlinePopup.top}}
+   onPointerEnter={cancelPopupClose} onPointerLeave={schedulePopupClose}
+   onMouseDown={event=>event.preventDefault()}>
+   {inlinePopup.items.map(item=>
+    <button key={item.id} type="button" role="menuitem" className="rk-inline-popover-item"
+     disabled={item.disabled} title={item.description??item.label}
+     onClick={()=>{
+      cancelPopupClose();
+      setInlinePopup(null);
+      if(!item.disabled)item.run();
+     }}>
+     <span className="rk-inline-popover-item-label">{item.label}</span>
+     {item.description&&<span className="rk-inline-popover-item-description">{item.description}</span>}
+    </button>)}
+  </div>,document.body)}
  {blockPanelPos!==null&&createPortal(
   <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}
    onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}

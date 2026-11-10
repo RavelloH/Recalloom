@@ -66,10 +66,10 @@ try{
   const buttons=[...el.querySelectorAll('button')];
   return {count:buttons.length,buttonText:buttons.map(b=>b.textContent?.trim()??''),
    geometry:buttons.map(b=>({width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height,
-    icon:b.querySelector('svg')!==null}))};
+    icon:b.querySelector('svg,.toolbar-highlight')!==null}))};
  });
  assert.ok(toolbarStats.count>=8&&toolbarStats.count<=12,'compact toolbar should have few icon actions');
- assert.ok(toolbarStats.buttonText.every(t=>t===''),'floating toolbar must be icon-only: '+JSON.stringify(toolbarStats));
+ assert.ok(toolbarStats.buttonText.every(t=>t===''||/^H+$/.test(t)),'floating toolbar must use icons or highlighted H, not text labels: '+JSON.stringify(toolbarStats));
  assert.ok(toolbarStats.geometry.every(g=>g.width<=48&&g.height<=34&&g.icon),'icon buttons including chevrons must fit compact bounds: '+JSON.stringify(toolbarStats));
  assert.equal(toolbarStats.geometry.filter(g=>g.width>34).length,3,'only three categorized dropdowns may use wider icon-plus-chevron buttons');
  console.log('PASS compact icon-only aligned text selection toolbar',toolbarStats);
