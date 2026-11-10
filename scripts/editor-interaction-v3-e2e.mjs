@@ -43,7 +43,16 @@ try{
  const at=await body.boundingBox();assert.ok(at);
  const point={x:at.x+Math.min(92,at.width/2),y:at.y+at.height/2};
  await page.mouse.click(point.x,point.y,{button:'right'});
- const menu=page.getByRole('menu').last();await menu.waitFor();
+ const menu=page.getByRole('menu',{name:'编辑器右键菜单'});await menu.waitFor();
+ // Astryx mounts before its entry animation/position correction settles.
+ // Wait for actual viewport coordinates instead of asserting a transient
+ // pre-layout rect or sleeping for an arbitrary fixed interval.
+ await page.waitForFunction(({x,y})=>{
+  const el=document.querySelector('.rk-editor-context-popover[role="menu"]');
+  if(!el)return false;
+  const rect=el.getBoundingClientRect();
+  return Math.abs(rect.left-x)<30&&Math.abs(rect.top-y)<40;
+ },point,{timeout:2600});
  const menuRect=await menu.boundingBox();assert.ok(menuRect);
  assert.ok(Math.abs(menuRect.x-point.x)<30,'context menu should open at pointer, not at viewport left: '+JSON.stringify({point,menuRect}));
  assert.ok(Math.abs(menuRect.y-point.y)<40,'context menu vertical anchor should match pointer: '+JSON.stringify({point,menuRect}));
@@ -76,7 +85,12 @@ try{
  });assert.ok(selection);
  await page.mouse.click(selection.x,selection.y,{button:'right'});
  const textMenu=page.getByRole('menu',{name:'编辑器右键菜单'});await textMenu.waitFor();
- await page.waitForTimeout(90);
+ await page.waitForFunction(({x,y})=>{
+  const el=document.querySelector('.rk-editor-context-popover[role="menu"]');
+  if(!el)return false;
+  const rect=el.getBoundingClientRect();
+  return Math.abs(rect.left-x)<35&&Math.abs(rect.top-y)<35;
+ },selection,{timeout:2600});
  const contextDebug=await page.evaluate(()=>({
   selection:getSelection()?.toString(),
   menu:document.querySelector('.rk-editor-context-popover')?.textContent?.slice(0,350),

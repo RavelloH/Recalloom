@@ -131,9 +131,24 @@ try{
  console.error('E2E FAILED:',error instanceof Error?error.message:String(error));
 }finally{
  stopTree(worker);
+ // Windows taskkill can return before the stopped Worker releases its SQLite
+ // handles. Wait briefly for the child and retry fresh removals, not just the
+ // internal rmSync directory traversal. Cleanup failure is a real test failure.
+ for(let n=0;worker&&worker.exitCode===null&&n<24;n++)await delay(125);
  if(stateDir){
-  try{rmSync(stateDir,{recursive:true,force:true,maxRetries:12,retryDelay:250});}
-  catch(error){console.warn('E2E: cleanup of temporary database failed:',String(error));}
+  let removed=false;
+  for(let attempt=0;attempt<15;attempt++){
+   try{
+    rmSync(stateDir,{recursive:true,force:true,maxRetries:2,retryDelay:150});
+    removed=true;break;
+   }catch(error){
+    if(attempt===14){
+     failed=true;
+     console.error('E2E FAILED: could not clean isolated D1:',String(error));
+    }else await delay(250+attempt*65);
+   }
+  }
+  if(removed)console.log('E2E: temporary Worker and D1 state cleaned');
  }
  process.removeListener('SIGINT',onInterrupt);
  process.removeListener('SIGTERM',onInterrupt);
