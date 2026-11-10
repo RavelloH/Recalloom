@@ -22,7 +22,7 @@ const slash=async command=>{
  await page.keyboard.press('Control+End');
  await page.keyboard.press('Enter');
  await page.keyboard.type('/'+command);
- await page.getByRole('listbox',{name:'插入块'}).waitFor();
+ await page.getByRole('listbox',{name:'插入内容'}).waitFor();
  await page.keyboard.press('Enter');
 };
 const bubble=name=>page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name});

@@ -115,18 +115,18 @@ function blockNode(node:AstNode,source:string):JSONContent[]{
  if(node.type==='rmdBlock'){
   const p=props(node),body=node.data?.rmdBody??source;
   if(node.data?.hName==='rk-rmd-block-mark')return [{type:'richContainer',
-   attrs:{kind:node.name??'mark',title:'',color:p.dataRkColor??null},
+   attrs:{kind:node.name??'mark',title:'',color:p.dataRkColor??null,id:p.dataId??null},
    content:nonemptyChildren(body)}];
   if(node.data?.hName==='rk-sketch-block'){
    const kind=node.name??'',attrs:Record<string,string>={};
    for(const key of ['Color','Stroke','Padding','Roughness','Opacity'])if(p['dataRkSketch'+key])attrs[key.toLowerCase()]=p['dataRkSketch'+key]!;
    if(!isSketchKind(kind))return [protect(node,source)];
-   return [{type:'richContainer',attrs:{...sketchAttrs(kind,attrs),title:'',mathOnly:p.dataRkSketchMathOnly==='true'},content:nonemptyChildren(body)}];
+   return [{type:'richContainer',attrs:{...sketchAttrs(kind,attrs),title:'',id:p.dataId??null,mathOnly:p.dataRkSketchMathOnly==='true'},content:nonemptyChildren(body)}];
   }
   if(node.data?.hName==='rk-rmd-comment-block')return [{type:'richContainer',
    attrs:{kind:'comment',title:''},content:nonemptyChildren(body)}];
   if(node.data?.hName==='rk-callout')return [{type:'richContainer',
-   attrs:{kind:p.dataKind??'note',title:p.dataTitle??'',sender:p.dataSender??null},
+   attrs:{kind:p.dataKind??'note',title:p.dataTitle??'',sender:p.dataSender??null,id:p.dataId??null},
    content:nonemptyChildren(body)}];
   if(node.data?.hName==='wiki-embed')return [{type:'wikiEmbed',attrs:{
    target:p.dataTarget??'',anchor:p.dataAnchor??null}}];

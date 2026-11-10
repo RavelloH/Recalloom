@@ -1,0 +1,6 @@
+/* Astryx ContextMenu normally disables selection inside its trigger to
+ * support touch long press. This is desktop-only: restore ProseMirror's
+ * native caret, selection and input behaviour unconditionally. */
+.rk-editor-context-area{min-width:0;width:100%;}
+.rk-editor-context-area > div{min-width:0;width:100%;user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default!important;}
+.rk-editor-context-area .tiptap{user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default!important;}

@@ -1,10 +1,12 @@
 import React,{useEffect,useMemo,useRef,useState,useImperativeHandle} from 'react';
+import {createPortal} from 'react-dom';
 import {useQuery} from '@tanstack/react-query';
 import {searchQuery,type SearchHit} from './queries';
 import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
+import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -30,7 +32,7 @@ import {RmdMark} from './tiptap/rmd-mark';
 import {RmdSketchMark} from './tiptap/rmd-sketch';
 import {useSketchAnnotations} from './sketch-annotations';
 import {RmdAttrsDecorations} from './tiptap/rmd-attrs-decoration';
-import RmdAttrsEditor,{isRmdAttrsEditable} from './tiptap/rmd-attrs-editor';
+import {isRmdAttrsEditable} from './tiptap/rmd-schema-attrs-model';
 import {RawMarkdown,RawInline,rawMarkdownBlock} from './tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from './tiptap/rich-directives';
 import {RichLinkCard} from './tiptap/rich-link-card';
@@ -41,7 +43,13 @@ import Link from '@tiptap/extension-link';
 import {decorateEditorLinks} from './link-metadata-client';
 import {alignTableColumn,selectedLink} from './tiptap/editor-actions';
 import {EditorInsertDialog,type InsertDialogState} from './tiptap/insert-dialog';
-import {filterSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {filterSlashCommands,groupSlashCommands,matchSlashQuery,type SlashCommand} from './tiptap/slash-commands';
+import {BlockHandleLayer} from './tiptap/block-handle';
+import {BlockEditorPanel} from './tiptap/block-editor-panel';
+import {EditorContextMenu} from './tiptap/editor-context-menu';
+import {editableBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
+import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
+import {inlineCommandsByGroup,runInlineRmdCommand,type InlineCommand} from './tiptap/editor-inline-commands';
 import {useCompactLayout} from './use-media';
 import {safeTableId,cleanTableCaption} from './table-caption';
 
@@ -74,7 +82,11 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableIdDraft,setTableIdDraft]=useState('');
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
- const [attrsPos,setAttrsPos]=useState<number|null>(null);
+ const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
+ const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
+ const inlineSelectionRef=useRef<{from:number;to:number}|null>(null);
+ const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
+ const attributeNodeRef=useRef<{pos:number;type:string}|null>(null);
  const compact=useCompactLayout();
  const compactRef=useRef(compact);
  compactRef.current=compact;
@@ -210,7 +222,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   codeBlock:e?.isActive('codeBlock')??false,
   underline:e?.isActive('underline')??false,
   strike:e?.isActive('strike')??false,
-  highlight:e?.isActive('rmdMark')??false,
+  mark:e?.isActive('rmdMark')??false,
   superscript:e?.isActive('superscript')??false,
   subscript:e?.isActive('subscript')??false,
   link:e?.isActive('link')??false,
@@ -230,11 +242,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   applying.current=true;
   try{
    const richDocument=parseRmdVisual(value);
-   editor.commands.setContent(richDocument,{emitUpdate:false});
+   // Loading a persisted document is not an undoable user edit. Without
+   // this flag, a fast first drag can group with initialization history and
+   // Ctrl+Z may erase the entire document instead of reverting the drag.
+   editor.chain().setMeta('addToHistory',false).setContent(richDocument,{emitUpdate:false}).run();
   }catch{
    // Even when an extension fails, the user must never be trapped in a
    // source-only island. The fallback stays normal editable paragraph text.
-   editor.commands.setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false});
+   editor.chain().setMeta('addToHistory',false)
+    .setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false}).run();
   }
   finally{applying.current=false;setReady(true);}
  },[editor,value]);
@@ -249,11 +265,67 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    const position=(event as CustomEvent<{pos:number}>).detail?.pos;
    if(!Number.isInteger(position))return;
    const node=editor.state.doc.nodeAt(position);
-   if(node&&isRmdAttrsEditable(node.type.name))setAttrsPos(position);
+   if(node&&isRmdAttrsEditable(node.type.name)){
+    const owner=topLevelAtDocumentPosition(editor,position);
+    if(!owner)return;
+    blockPanelRef.current={pos:owner.pos,node:owner.node};
+    attributeNodeRef.current={pos:position,type:node.type.name};
+    setBlockPanelPos(owner.pos);
+    setAttributeNodePos(position);
+   }
+  };
+  const openDirectBlock=(event:Event)=>{
+   const pos=(event as CustomEvent<{pos:number}>).detail?.pos;
+   if(!Number.isInteger(pos))return;
+   const target=editableBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
+   setBlockPanelPos(pos);
   };
   root.addEventListener('rmd-edit-attrs',open);
-  return()=>root.removeEventListener('rmd-edit-attrs',open);
+  root.addEventListener('rmd-open-block-editor',openDirectBlock);
+  return()=>{
+   root.removeEventListener('rmd-edit-attrs',open);
+   root.removeEventListener('rmd-open-block-editor',openDirectBlock);
+  };
  },[editor,ready]);
+ // Keep the inspected top-level block anchored as unrelated edits shift its
+ // position. Close safely if an external transaction replaces/deletes it.
+ useEffect(()=>{
+  if(!editor)return;
+  const listener=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
+   if(!transaction.docChanged||!blockPanelRef.current)return;
+   const previous=blockPanelRef.current;
+   // External edits: association +1 follows the block when content is
+   // inserted at its former start. Our panel explicitly replaces its own
+   // node, which mapping marks deleted; association -1 retains that anchor.
+   const fromPanel=transaction.getMeta('rk-block-panel-edit')===true;
+   const mapped=transaction.mapping.mapResult(previous.pos,fromPanel?-1:1);
+   const current=editableBlockAt(editor,mapped.pos);
+   if(!current||current.node.type!==previous.node.type||
+    current.node.type.name==='richContainer'&&current.node.attrs.kind!==previous.node.attrs.kind||
+    (!fromPanel&&mapped.deleted)){
+    blockPanelRef.current=null;attributeNodeRef.current=null;
+    setBlockPanelPos(null);setAttributeNodePos(null);return;
+   }
+   blockPanelRef.current={pos:current.pos,node:current.node};
+   if(current.pos!==previous.pos)setBlockPanelPos(current.pos);
+   const attrs=attributeNodeRef.current;
+   if(attrs){
+    const next=transaction.mapping.mapResult(attrs.pos,fromPanel?-1:1);
+    const nextNode=editor.state.doc.nodeAt(next.pos);
+    if(!nextNode||nextNode.type.name!==attrs.type||(!fromPanel&&next.deleted)){
+     attributeNodeRef.current=null;setAttributeNodePos(null);
+    }else if(next.pos!==attrs.pos){
+     attributeNodeRef.current={pos:next.pos,type:attrs.type};setAttributeNodePos(next.pos);
+    }
+   }
+  };
+  editor.on('transaction',listener);
+  return()=>{editor.off('transaction',listener);};
+ },[editor]);
  useImperativeHandle(ref,()=>({flushEditedMarkdown:()=>{
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
@@ -281,6 +353,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   setDialog({kind:'image',src:existing?String(attrs.src??''):'',alt:existing?String(attrs.alt??''):'',title:existing?String(attrs.title??''):'',existing});
  };
  const openMath=(type:'inline'|'block')=>setDialog({kind:'math',type,latex:'',existing:false});
+ const openWikiEmbed=()=>{
+  // Reuse the existing UUID-pinned Wiki document selector.
+  editor?.chain().focus().insertContent('::: embed ').run();
+ };
  const applyDialog=(item:InsertDialogState)=>{
   if(!editor)return;
   if(item.kind==='link'){
@@ -353,22 +429,55 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!editor||!state)return;
   setSlash(null);slashDismissedAt.current=null;
   editor.chain().focus().deleteRange({from:state.from,to:state.to}).run();
-  command.run(editor,{openLink,openImage,openMath});
+  command.run(editor,{openLink,openImage,openMath,openWikiEmbed});
  };
  if(!editor||!ready)return <div className="content-loading">正在准备可视化编辑器…</div>;
+ const captureInlineRange=()=>{
+  const dom=window.getSelection();
+  let range:{from:number;to:number}|null=null;
+  if(dom&&!dom.isCollapsed&&dom.anchorNode&&dom.focusNode&&
+    editor.view.dom.contains(dom.anchorNode)&&editor.view.dom.contains(dom.focusNode)){
+   try{
+    const a=editor.view.posAtDOM(dom.anchorNode,dom.anchorOffset);
+    const b=editor.view.posAtDOM(dom.focusNode,dom.focusOffset);
+    if(a!==b)range={from:Math.min(a,b),to:Math.max(a,b)};
+   }catch{/* fall back to the last ProseMirror selection */}
+  }
+  if(!range){const {from,to}=editor.state.selection;if(from!==to)range={from,to};}
+  inlineSelectionRef.current=range;
+ };
+ const runInlineFromMenu=(command:InlineCommand)=>{
+  const range=inlineSelectionRef.current;inlineSelectionRef.current=null;
+  if(range&&range.from<range.to&&range.to<=editor.state.doc.content.size)
+   editor.commands.setTextSelection(range);
+  command.run(editor);
+ };
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
   <ToggleButton key={name} label={name} size="sm" isPressed={pressed} onPressedChange={run}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
   <Button key={name} label={name} variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
+ const slashGroups=slash?groupSlashCommands(slashItems):[];
  const inlineMarks=<>
   {toggle('粗体',active?.bold??false,()=>editor.chain().focus().toggleBold().run(),<strong>B</strong>)}
   {toggle('斜体',active?.italic??false,()=>editor.chain().focus().toggleItalic().run(),<em>I</em>)}
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<u>U</u>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<s>S</s>)}
-  {toggle('高亮',active?.highlight??false,()=>editor.chain().focus().toggleMark('rmdMark').run(),<span className="toolbar-highlight">H</span>)}
+  {toggle('语义 Mark',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">M</span>)}
+  <DropdownMenu button={{label:'手绘标记',variant:'ghost',size:'sm',icon:<IconPencil size="var(--rk-icon-sm)"/>,onPointerDown:captureInlineRange}}
+   presentation="adaptive" items={inlineCommandsByGroup('hand-drawn').map(command=>({
+    id:command.id,label:command.title,description:command.description,
+    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
+   }))}/>
+  <DropdownMenu button={{label:'行内组件',variant:'ghost',size:'sm',icon:<IconPlus size="var(--rk-icon-sm)"/>,onPointerDown:captureInlineRange}}
+   presentation="adaptive" items={inlineCommandsByGroup('inline-component').map(command=>({
+    id:command.id,label:command.title,description:command.description,
+    isDisabled:!command.isAvailable(editor),onClick:()=>{runInlineFromMenu(command);}
+   }))}/>
  </>;
- return <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
+ return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
+  <div className="rk-editor-block-canvas">
+  <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
@@ -385,6 +494,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {compact&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
    <div className="wysiwyg-tools">
     {inlineMarks}
+    {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
     {toggle('上标',active?.superscript??false,()=>editor.chain().focus().toggleSuperscript().run(),<>x<sup>2</sup></>)}
     {toggle('下标',active?.subscript??false,()=>editor.chain().focus().toggleSubscript().run(),<>x<sub>2</sub></>)}
    </div>
@@ -468,12 +578,30 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       isDisabled={Boolean(tableIdDraft.trim())!==Boolean(tableCaptionDraft.trim())||Boolean(tableIdDraft.trim())&&!safeTableId(tableIdDraft.trim().toLowerCase())}>保存</Button>
    </div>
   </div>}
-  <EditorContent editor={editor}/>
-  {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入块" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
-   <div className="slash-menu-heading">{slash.query?'匹配的块':'基础块'}</div>
-   {slashItems.map((command,index)=>{const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
-    onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
-    <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+  {compact?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={pos=>{
+   const target=editableBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
+   setBlockPanelPos(pos);
+  }}><EditorContent editor={editor}/></EditorContextMenu>}
+  <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} onEditBlock={pos=>{
+   const target=editableBlockAt(editor,pos);
+   if(!target)return;
+   blockPanelRef.current={pos,node:target.node};
+   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+   setAttributeNodePos(attributeNodeRef.current?.pos??null);
+   setBlockPanelPos(pos);
+  }}/>
+  {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入内容" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
+   <div className="slash-menu-heading">{slash.query?'匹配的命令':'插入内容'}</div>
+   {slashGroups.map(group=><div className="slash-category" key={group.id}>
+    <div className="slash-category-heading">{group.label}</div>
+    {group.commands.map(command=>{const index=slashItems.findIndex(item=>item.id===command.id);const Icon=command.icon;const selected=index===Math.min(slash.index,slashItems.length-1);return <div key={command.id} role="option" aria-selected={selected} className={'slash-item'+(selected?' is-selected':'')}
+     onMouseEnter={()=>setSlash(current=>current&&{...current,index})} onClick={()=>runSlashRef.current(command)}>
+     <span className="slash-icon"><Icon size="var(--rk-icon-md)"/></span><span className="slash-copy"><strong>{command.title}</strong><small>{command.description}</small></span></div>;})}
+   </div>)}
   </div>}
   {wiki&&<div className="slash-menu wiki-completion" role="listbox" aria-label="引用文档"
    style={{...(wiki.placement==='above'?{bottom:wiki.offset}:{top:wiki.offset}),left:wiki.left,width:SLASH_MENU_WIDTH}}
@@ -488,8 +616,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    </div>)}
    {Boolean(wiki.query)&&!wikiSearch.isFetching&&!wikiMatches.length&&<p className="muted small wiki-completion-status">没有匹配文档，请更换关键词。</p>}
   </div>}
-  {attrsPos!==null&&<RmdAttrsEditor key={attrsPos} editor={editor} pos={attrsPos} onClose={()=>setAttrsPos(null)}/>}
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
+ </div>
+ </div>
+ {blockPanelPos!==null&&(compact?createPortal(
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile
+   onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body):
+  <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId}
+   onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>)}
  </div>;
 });
 export default VisualEditor;

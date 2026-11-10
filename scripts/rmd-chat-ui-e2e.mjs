@@ -132,7 +132,7 @@ try{
  }
  await page.setViewportSize({width:1280,height:900});
  await page.goto(base+'/records/'+id+'?mode=visual');
- const editChatTitle=page.locator('.rk-chat-embed-title button').first();
+ const editChatTitle=page.locator('.rk-chat-embed-title .rk-directive-title-hit').first();
  await editChatTitle.waitFor({state:'attached'});
  await editChatTitle.click();
  const titleInput=page.getByRole('textbox',{name:'容器标题'}).first();
@@ -142,13 +142,20 @@ try{
  await page.locator('.rk-chat-embed-title').getByText('项目讨论（已编辑）').waitFor();
  assert.equal(await page.locator('.rk-chat-transcript article').count(),4,'editing chat title does not remount or drop messages');
  const assistant=page.locator('.rk-directive-message').filter({has:page.locator('article[data-sender="assistant"]')}).first();
- await assistant.locator('.rk-directive-title button').click();
+ await assistant.locator('.rk-directive-title-hit').click();
  const speakerInput=assistant.getByRole('textbox',{name:'容器标题'});
  await speakerInput.waitFor();
  await speakerInput.fill('Agent A');
  await speakerInput.press('Enter');
  await assistant.locator('[data-chat-name]').getByText('Agent A').waitFor();
+ await assistant.locator('.rk-directive-title-hit').click();
+ const cancellable=assistant.getByRole('textbox',{name:'容器标题'});
+ await cancellable.fill('不应被保存的临时名字');
+ await cancellable.press('Escape');
+ await assistant.locator('[data-chat-name]').getByText('Agent A').waitFor();
+ assert.equal(await assistant.locator('[data-chat-name]').getByText('不应被保存的临时名字').count(),0,'Escape cancels instead of persisting title edits');
  assert.match(await assistant.locator('.rk-chat-bubble').innerText(),/助手回复|回复/,'editing speaker name retains message body');
+ assert.equal(await page.locator('.rk-directive-title button').count(),0,'no pencil icon is required to edit structural titles');
  assert.deepEqual(errors,[],'no browser JS errors');
  console.log('PASS RMD CHAT UI',JSON.stringify({
   senderRoles:'4 messages, no avatars, native compact density, agent bubbles filled, names aligned',

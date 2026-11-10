@@ -63,7 +63,7 @@ try{
  // Slash menu: filter, keyboard select, dismiss with Escape.
  await page.locator('.tiptap').click();
  await page.keyboard.type('/h2');
- const menu=page.getByRole('listbox',{name:'插入块'});
+ const menu=page.getByRole('listbox',{name:'插入内容'});
  await menu.waitFor();
  assert.equal(await menu.getByRole('option',{selected:true}).innerText().then(t=>t.includes('二级标题')),true,'h2 filter selects heading');
  await page.keyboard.press('Enter');

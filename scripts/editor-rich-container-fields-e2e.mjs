@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {chromium} from 'playwright-core';
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8826';
+assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
+const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
+const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
+assert.ok(secret&&executablePath);
+const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+const page=await browser.newPage({viewport:{width:1280,height:900}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const content='# 手绘块样式编辑\n\n::: highlight\n\n默认荧光笔内容。\n\n:::\n\n::: circle | color=blue\n\n蓝色圈选内容。\n\n:::';
+fs.mkdirSync('tmp/editor-rich-screens',{recursive:true});
+const create=()=>page.evaluate(async content=>{
+ const r=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Rich block attrs '+Date.now()+'.md',kind:'document',content})});
+ return {status:r.status,data:await r.json()};
+},content);
+async function openBlock(kind,width){
+ const node=page.locator('.tiptap .rk-directive-'+kind).first();
+ await node.waitFor();
+ if(width===1280)await node.hover();
+ else await node.dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+ const grip=page.getByRole('group',{name:'块把手'});
+ await grip.waitFor();
+ await grip.getByRole('button',{name:'块操作'}).click();
+ await page.getByRole('menuitem',{name:'编辑块'}).last().click();
+ const panel=page.getByRole(width===1280?'complementary':'dialog',{name:'块编辑面板'});
+ await panel.waitFor();
+ return panel;
+}
+try{
+ await page.goto(base+'/login');
+ await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByRole('button',{name:'登录',exact:true}).click();
+ await page.waitForURL(base+'/',{timeout:30000});
+ for(const width of [1280,390]){
+  await page.setViewportSize({width,height:width===1280?900:844});
+  const rec=await create();
+  assert.equal(rec.status,201,JSON.stringify(rec).slice(0,350));
+  await page.goto(base+'/records/'+rec.data.id+'?mode=visual');
+  let panel=await openBlock('highlight',width);
+  assert.equal(await panel.getByRole('textbox',{name:'块标题'}).count(),0,'sketch has no legal title');
+  assert.equal(await panel.getByRole('region',{name:'手绘块样式'}).count(),1);
+  await panel.getByLabel('当前块预览').getByText('默认荧光笔内容。').waitFor();
+  const previewGeometry=await panel.evaluate(el=>{
+   const section=el.querySelector('.rk-block-panel-preview');
+   const article=section?.querySelector('.markdown-preview');
+   const body=section?.querySelector('.rk-block-panel-preview-body');
+   const snap=node=>node?{height:node.getBoundingClientRect().height,scrollHeight:node.scrollHeight,minHeight:getComputedStyle(node).minHeight,padding:getComputedStyle(node).padding,display:getComputedStyle(node).display}:null;
+   return {section:snap(section),body:snap(body),article:snap(article)};
+  });
+  assert.ok(previewGeometry.section.height<=120,'compact block preview must not inherit full-document min-height: '+JSON.stringify(previewGeometry));
+  console.log('PREVIEW_GEOMETRY',width,JSON.stringify(previewGeometry));
+  const raw=panel.getByRole('textbox',{name:'块源码'});
+  assert.doesNotMatch(await raw.inputValue(),/color=/,'default yellow must not serialize');
+  const color=panel.getByRole('combobox',{name:'笔迹颜色'});
+  await color.click();
+  await page.getByRole('option',{name:'green',exact:true}).last().click();
+  await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='green');
+  await page.waitForFunction(()=>[...document.querySelectorAll('textarea')].some(e=>e.value.includes('color=green')),'raw source must follow field changes');
+  const stroke=panel.getByRole('textbox',{name:/笔画宽度/});
+  await stroke.fill('0.4');
+  assert.match(await panel.getByRole('alert').first().innerText(),/0.5/);
+  assert.equal(await page.locator('.tiptap .rk-directive-highlight .rk-sketch-block[data-rk-sketch-stroke="0.4"]').count(),0);
+  await stroke.fill('2.25');
+  await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-stroke')==='2.25');
+  await panel.getByRole('textbox',{name:/荧光笔透明度/}).fill('0.6');
+  await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-opacity')==='0.6');
+  assert.match(await raw.inputValue(),/stroke=2.25/);
+  assert.match(await raw.inputValue(),/opacity=0.6/);
+  // Editing the raw block must also update the visible structured fields.
+  await raw.fill((await raw.inputValue()).replace('color=green','color=purple').replace('stroke=2.25','stroke=1.5'));
+  await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='purple');
+  await page.waitForFunction(()=>[...document.querySelectorAll('input')].some(input=>input.value==='1.5'));
+  assert.equal(await stroke.inputValue(),'1.5','raw RMD sync updates structured stroke field');
+  await color.click();await page.getByRole('option',{name:'green',exact:true}).last().click();
+  await stroke.fill('2.25');
+  await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='green');
+  assert.match(await raw.inputValue(),/stroke=2.25/);
+  await page.screenshot({path:'tmp/editor-rich-screens/highlight-'+width+'.png',fullPage:width===1280});
+  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  panel=await openBlock('circle',width);
+  assert.equal(await panel.getByRole('textbox',{name:/荧光笔透明度/}).count(),0,'circle does not support Highlight opacity');
+  assert.equal(await panel.getByRole('textbox',{name:'块标题'}).count(),0);
+  await panel.getByRole('combobox',{name:'笔迹颜色'}).click();
+  await page.getByRole('option',{name:/默认颜色/}).last().click();
+  await page.waitForFunction(()=>!document.querySelector('.tiptap .rk-directive-circle .rk-sketch-block')?.getAttribute('data-rk-sketch-color'));
+  assert.doesNotMatch(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/color=/);
+  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,rec.data.id);
+  assert.equal(persisted,content,'panel editing does not save to D1 without explicit Save');
+  await page.getByRole('button',{name:'源码'}).click();
+  await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+  await page.locator('.cm-content').first().click();
+  await page.keyboard.press('Control+A');await page.keyboard.press('Control+C');
+  const actual=await page.evaluate(()=>navigator.clipboard.readText());
+  assert.match(actual,/::: highlight \| color=green \| stroke=2.25 \| opacity=0.6/);
+  assert.match(actual,/::: circle\n/);
+  assert.doesNotMatch(actual,/::: circle \| color=/);
+  console.log('PASS Schema-driven RMD sketch block Drawer',width);
+ }
+ assert.deepEqual(errors,[],'browser errors');
+}finally{await browser.close()}

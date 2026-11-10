@@ -1,0 +1,25 @@
+/* One shared non-editable affordance; never mount this inside ProseMirror. */
+.rk-block-grip {
+ position:absolute;z-index:24;
+ display:flex;align-items:center;gap:1px;
+ padding:2px;border:1px solid var(--color-border,rgba(128,128,128,.28));
+ border-radius:9px;
+ background:var(--color-background-body,#fff);
+ box-shadow:0 3px 12px rgba(0,0,0,.11);
+ user-select:none;
+}
+.rk-block-grip button{display:inline-flex;align-items:center;justify-content:center;min-width:30px;min-height:30px;}
+.rk-block-grip .rk-block-drag{
+ border:0;border-radius:6px;padding:0;
+ color:var(--color-text-secondary,#666);
+ background:transparent;
+ cursor:grab;
+}
+.rk-block-grip .rk-block-drag:hover{background:var(--color-background-muted,rgba(128,128,128,.09));}
+.rk-block-grip .rk-block-drag:active{cursor:grabbing;}
+.rk-block-grip .rk-block-drag:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:2px;}
+/* Touch has no hover. The explicit block selection affordance for coarse
+ * pointers is introduced by P3's selection state, not a fake hover. */
+@media(pointer:coarse){
+ .rk-block-grip button{min-height:44px;min-width:44px;}
+}

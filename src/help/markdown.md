@@ -5,15 +5,18 @@ Recalloom 的**文档正文只存 Markdown**，不把渲染树、Tiptap JSON、�
 **RMD 1.0 的全部组件形式与全部 `@ attrs` 参数**不再依靠手工表格维护，而是根据唯一的 `src/rmd/registry.json` 自动生成，完整参数规格表已经附在本帮助文档末尾，并同时生成仓库的 `docs/rmd-syntax-reference.generated.md`。可直接调用：
 
 - `get_help({topic:"markdown",component:"badge"})`：只返回 Badge 的可选参数、取值、示例与回退规则。
+- `get_help({topic:"markdown",component:"highlight",kind:"inline"})`：静态手绘荧光笔行内规则，含颜色、笔触和透明度。`component:"circle"`、`"wavy"` 等也按独立名称查询；块级形式使用 `kind:"block"`。
 - `get_help({topic:"markdown",component:"mark",kind:"block"})`：只返回 Mark 的块级形式；省略 `kind` 会返回同名组件的全部形式。
 - `get_help({topic:"markdown",component:"tabs"})`：查看父子约束及完整的嵌套例子。
 - `get_help({topic:"markdown",node:"image"})`：仅返回图片 `@ attrs` 的字段说明；`node` 还支持 `heading`、`paragraph`、`math`、`table`、`code`。
+
+如果 MCP 客户端缓存的旧版工具参数暂时只有 `topic`，仍可调用 `get_help({topic:"markdown"})` 阅读本页末尾的完整、自动生成的所有组件规则；更新客户端的工具清单后再使用 `component` / `kind` / `node` 精确筛选，**不要向旧参数定义发送未公开的字段**。
 
 所有未知组件、未知节点、无效查询组合均会被拒绝，禁止 Agent 猜测不存在的属性。CodeMirror 源码编辑器从同一注册表提供 `::`、`:::`、参数名、枚举值与 `@ attrs` 候选补全，不会擅自插入不支持的组件。
 
 完整覆盖八种 Callout、九种静态手绘标记（含九色荧光笔）、行内组件、Details/Tabs/Flashcard/Glossary/Chat、注释与 CriticMarkup、图片/表格/公式/代码修饰、WikiLink/Embed 的可复制示例见仓库 `docs/rmd-1.0-syntax-showcase.md`，其内容会通过自动化测试实际解析并验证规范化保存不漂移。
 
-可视化模式中，合法的 `@ attrs … @` 显示为**可点击、可键盘聚焦的灰色斜体属性按钮**，支持直接编辑标题、段落、公式、表格、代码和图片的节点属性。点击后修改 ID、图注、尺寸、代码文件名或开关，点击「保存属性」只更新本地草稿，再点击整篇文档的「保存」才会落库；取消或非法 ID 不写入。没有必要切换到源码模式才能修改已有属性。纯公式的块级 Mark 仅包裹公式宽度并居中，含正文的 Mark 仍是普通块；表格及公式属性在两种视图中均居中。
+可视化模式中，合法的 `@ attrs … @` 显示为**可点击、可键盘聚焦的灰色斜体属性按钮**，支持直接编辑标题、段落、公式、表格、代码和图片的节点属性。点击后在统一块编辑面板中修改 ID、图注、尺寸、代码文件名或开关，**合法输入实时更新本地草稿**，非法值显示错误且不修改原文；只有点击整篇文档的「保存」才会落库。桌面在正文右侧显示非遮挡式面板，移动端从底部展开全屏编辑面板。没有必要切换到源码模式才能修改已有属性。纯公式的块级 Mark 仅包裹公式宽度并居中，含正文的 Mark 仍是普通块；表格及公式属性在两种视图中均居中。
 
 界面有可视化编辑、源码编辑和只读预览三个视图；**前两种可编辑，预览不执行编辑**。打开、切换、渲染、展开 Details、揭示 Cloze、切换 Tabs 或阅读 Wiki 嵌入均不应创建修订。只有真正修改草稿并明确保存，才会产生正文版本。
 

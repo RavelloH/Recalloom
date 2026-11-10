@@ -146,7 +146,7 @@ try{
  await page.keyboard.press('Control+End');
  await page.keyboard.press('Enter');
  await page.keyboard.type('/引用');
- const slash=page.getByRole('listbox',{name:'插入块'});
+ const slash=page.getByRole('listbox',{name:'插入内容'});
  await slash.waitFor({state:'visible'});
  await slash.getByRole('option',{name:/引用/}).first().click();
  await page.keyboard.type('使用斜杠插入的引用。');

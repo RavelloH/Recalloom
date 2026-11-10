@@ -1,4 +1,6 @@
 import type {Editor} from '@tiptap/core';
+import {runInlineRmdCommand} from './editor-inline-commands';
+import {extraBlockCommands} from './editor-block-commands';
 // Import command augmentations explicitly; the retired Markdown plugin no longer
 // supplies them transitively to the editor's TypeScript compilation.
 import type {} from '@tiptap/extension-task-list';
@@ -10,12 +12,42 @@ import type {} from '@tiptap/extension-table';
 import type {} from '@tiptap/extension-text-align';
 import {IconPilcrow,IconH1,IconH2,IconH3,IconList,IconListNumbers,IconListCheck,IconQuote,IconCodeDots,IconSeparatorHorizontal,IconTable,IconLink,IconPhotoPlus,IconMathFunction,IconSum,IconAlignLeft,IconAlignCenter,IconAlignRight,IconMessageExclamation,IconChevronsDown,IconTag,IconHighlight,IconMessageCircle,IconMessages,IconNotes,IconLayoutNavbar,IconVocabulary,IconCards,IconSchema,IconBrowser,IconEyeQuestion,IconKeyboard,type TablerIcon} from '@tabler/icons-react';
 
-export type SlashHelpers={openLink:()=>void;openImage:()=>void;openMath:(type:'inline'|'block')=>void};
+export type SlashHelpers={openLink:()=>void;openImage:()=>void;openMath:(type:'inline'|'block')=>void;openWikiEmbed?:()=>void};
 export type SlashCommand={
  id:string;title:string;description:string;keywords:string[];icon:TablerIcon;
  run:(editor:Editor,helpers:SlashHelpers)=>void;
  isAvailable?:(editor:Editor)=>boolean;
 };
+export type SlashCommandCategory='basic'|'layout'|'callout'|'sketch'|'study'|'reference'|'media'|'format'|'inline';
+export type SlashCommandGroup={id:SlashCommandCategory;label:string;commands:SlashCommand[]};
+const slashCategoryLabels:Readonly<Record<SlashCommandCategory,string>>={
+ basic:'基础',layout:'布局',callout:'提示',sketch:'手绘',study:'学习',reference:'引用',media:'媒体',format:'格式',inline:'行内'
+};
+const slashCategoryOrder:readonly SlashCommandCategory[]=['basic','layout','callout','sketch','study','reference','media','format','inline'];
+function slashCategory(id:string):SlashCommandCategory{
+ if(id.startsWith('rmd-block:')){
+  const syntax=id.slice('rmd-block:'.length);
+  const command=extraBlockCommands.find(item=>item.syntax===syntax);
+  if(command?.category==='callout')return 'callout';
+  if(command?.category==='annotation')return 'sketch';
+  if(command?.category==='child')return ['front','back','definition'].includes(syntax)?'study':'layout';
+ }
+ if(['callout'].includes(id))return 'callout';
+ if(['color-highlight'].includes(id))return 'sketch';
+ if(['details','tabs','chat','table'].includes(id))return 'layout';
+ if(['flashcard','cloze','glossary'].includes(id))return 'study';
+ if(['wiki-embed','link-card','footnote','comment','link'].includes(id))return 'reference';
+ if(['image','inline-math','block-math','mermaid'].includes(id))return 'media';
+ if(id.startsWith('align-'))return 'format';
+ if(['badge','kbd'].includes(id))return 'inline';
+ return 'basic';
+}
+export function groupSlashCommands(commands:readonly SlashCommand[]):SlashCommandGroup[]{
+ return slashCategoryOrder.flatMap(id=>{
+  const matching=commands.filter(command=>slashCategory(command.id)===id);
+  return matching.length?[{id,label:slashCategoryLabels[id],commands:matching}]:[];
+ });
+}
 
 const chain=(editor:Editor)=>editor.chain().focus();
 export const slashCommands:SlashCommand[]=[
@@ -29,10 +61,12 @@ export const slashCommands:SlashCommand[]=[
  {id:'quote',title:'引用',description:'引用或强调一段话',keywords:['quote','blockquote','yy'],icon:IconQuote,run:e=>chain(e).toggleWrap('blockquote').run()},
  {id:'code',title:'代码块',description:'等宽字体的代码片段',keywords:['code','pre','snippet','dm'],icon:IconCodeDots,run:e=>chain(e).toggleCodeBlock().run()},
  {id:'callout',title:'提示横幅',description:'插入 Astryx 风格提示容器',keywords:['callout','warning','banner','tip','alert','ts'],icon:IconMessageExclamation,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'warning',title:'注意'},content:[{type:'paragraph',content:[{type:'text',text:'请在此输入提示内容'}]}]}).run()},
+ ...extraBlockCommands.map(item=>({id:'rmd-block:'+item.syntax,title:item.title,description:item.category==='child'?'在合法父容器中添加子块':'插入 RMD '+item.syntax+' 块',keywords:[...item.keywords],icon:item.category==='annotation'?IconHighlight:IconMessageExclamation,run:(e:Editor)=>{item.run(e);},isAvailable:item.isAvailable})),
+ {id:'wiki-embed',title:'嵌入 Wiki 文档',description:'搜索并嵌入只读文档投影',keywords:['embed','wiki','嵌入','文档'],icon:IconBrowser,run:(_e,h)=>h.openWikiEmbed?.()},
  {id:'details',title:'折叠内容',description:'插入可以折叠的内容区域',keywords:['details','fold','collapse','zd'],icon:IconChevronsDown,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'details',title:'详细内容'},content:[{type:'paragraph',content:[{type:'text',text:'补充说明'}]}]}).run()},
  {id:'badge',title:'行内徽标',description:'插入状态或版本标签',keywords:['badge','tag','label','bz'],icon:IconTag,run:e=>chain(e).insertContent({type:'richBadge',attrs:{variant:'info'},content:[{type:'text',text:'状态'}]}).run()},
  {id:'comment',title:'弱化注释',description:'在所选文字上添加可见注释',keywords:['comment','note','annotation','zs'],icon:IconMessageCircle,run:e=>chain(e).setMark('visibleComment').run()},
- {id:'color-highlight',title:'手绘荧光笔',description:'为选中文字添加静态红色手绘荧光笔',keywords:['color','highlight','mark','gl'],icon:IconHighlight,run:e=>chain(e).setMark('rmdSketch',{kind:'highlight',color:'red'}).run()},
+ {id:'color-highlight',title:'手绘荧光笔',description:'使用默认黄色静态手绘荧光笔',keywords:['color','highlight','mark','gl'],icon:IconHighlight,run:e=>{runInlineRmdCommand(e,'highlight');}},
  {id:'tabs',title:'标签页',description:'插入 Astryx 标签导航与可编辑内容面板',keywords:['tabs','tab','fenye','qiehuan'],icon:IconLayoutNavbar,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'tabs'},content:[{type:'richContainer',attrs:{kind:'tab',title:'示例'},content:[{type:'paragraph',content:[{type:'text',text:'第一项内容'}]}]},{type:'richContainer',attrs:{kind:'tab',title:'说明'},content:[{type:'paragraph',content:[{type:'text',text:'第二项内容'}]}]}]}).run()},
  {id:'glossary',title:'术语定义列表',description:'插入有明确范围的术语与定义，可直接编辑',keywords:['definition','glossary','term','cibiao','shuyu'],icon:IconVocabulary,
   run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'glossary',title:'术语表'},content:[

@@ -143,7 +143,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
   'rk-sketch-block':({node:_node,...props}:Record<string,unknown>)=>{
    const get=(key:string)=>props['data-rk-sketch-'+key.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase())]??props['dataRkSketch'+key[0]!.toUpperCase()+key.slice(1)];
    const kind=String(get('kind')??'');if(!isSketchKind(kind))return <>{props.children as React.ReactNode}</>;
-   return <section className="rk-sketch-block" data-rk-sketch-kind={kind}
+   const rawId=String(props['data-id']??props.dataId??'');
+   return <section id={isRmdId(rawId)?headingAnchor(rawId):undefined} className="rk-sketch-block" data-rk-sketch-kind={kind}
     data-rk-sketch-color={String(get('color')??'')||undefined}
     data-rk-sketch-stroke={get('stroke')??undefined}
     data-rk-sketch-padding={get('padding')??undefined}
@@ -199,6 +200,8 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
   'rk-link-card':({node:_node,...props}:Record<string,unknown>)=><div className="rk-rich-link-card"><LinkCardView url={String(props['data-url']??props.dataUrl??'')} title={String(props['data-title']??props.dataTitle??'')}/></div>,
   'rk-callout':({node:_node,...props}:Record<string,unknown>)=>{
    const kind=String(props['data-kind']??props.dataKind??'info'),title=String(props['data-title']??props.dataTitle??'');
+   const rawId=String(props['data-id']??props.dataId??'');
+   const content=()=>{
    if(kind==='flashcard')return <FlashcardPreview title={title}>{props.children as React.ReactNode}</FlashcardPreview>;
    if(kind==='front')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-front">
     <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
@@ -227,8 +230,10 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0}:{conten
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
    return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false} container="card">{props.children as React.ReactNode}</Banner></div>;
+   };
+   return isRmdId(rawId)?<div id={headingAnchor(rawId)} data-rk-container-id={rawId}>{content()}</div>:content();
   },
-  'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section className={'rk-rmd-block-mark'+((props['data-rk-math-only']??props.dataRkMathOnly)==='true'?' rk-rmd-mark-math-only':'')} data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
+  'rk-rmd-block-mark':({node:_node,...props}:Record<string,unknown>)=><section id={isRmdId(String(props['data-id']??props.dataId??''))?headingAnchor(String(props['data-id']??props.dataId)):undefined} className={'rk-rmd-block-mark'+((props['data-rk-math-only']??props.dataRkMathOnly)==='true'?' rk-rmd-mark-math-only':'')} data-rk-color={props['data-rk-color']??props.dataRkColor??undefined}>{props.children as React.ReactNode}</section>,
   'rk-badge':({node:_node,...props}:Record<string,unknown>)=>{
    const raw=String(props['data-variant']??props.dataVariant??'neutral');
    return <Badge variant={asAstryBadgeVariant(raw)} label={props.children as React.ReactNode}/>;
