@@ -1,6 +1,7 @@
 import {useEffect,type RefObject} from 'react';
 import {SKETCH_DEFAULT_COLORS,SKETCH_PALETTE,isSketchKind,parseSketchNumber,sketchPaths,sketchSeed} from './sketch-geometry';
 import {measureBlockSketchLine,measureInlineSketchLines} from './sketch-measure';
+import {SKETCH_DRAG_PREVIEW_EVENT,type SketchDragPreview} from './sketch-drag-preview';
 import './sketch-annotations.css';
 
 const SVG_NS='http://www.w3.org/2000/svg';
@@ -20,6 +21,23 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
  // Observe each element only once. Disconnecting/reobserving during every
  // paint would continuously fire initial ResizeObserver entries and redraw.
  const observed=new Set<HTMLElement>();
+ // The sketch SVG layer lives outside ProseMirror; DOM sibling transforms
+ // during the block drag preview do not move it or trigger ResizeObserver.
+ // Keep a stable owner for each SVG and reuse compositor transforms instead
+ // of remeasuring hundreds of annotations on every dragover.
+ let dragPreview:SketchDragPreview|null=null;
+ const drawings=new Map<SVGSVGElement,{owner:HTMLElement;baselineY:number}>();
+ const currentShift=(owner:HTMLElement):number=>{
+  const affected=dragPreview?.shifts.find(item=>item.element===owner||item.element.contains(owner));
+  return affected?.offsetY??0;
+ };
+ const syncDragPreview=()=>{
+  for(const [svg,{owner,baselineY}] of drawings){
+   const offset=currentShift(owner)-baselineY;
+   svg.style.transform=offset?'translate3d(0,'+offset+'px,0)':'';
+   svg.style.opacity=dragPreview?.source.contains(owner)?'.07':'';
+  }
+ };
  resize.observe(root);
  const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0)=>{
   if(!isSketchKind(kind)||rect.width<1||rect.height<1)return;
@@ -59,11 +77,20 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    svg.appendChild(path);
   }
   layer.appendChild(svg);
+  // The geometry already includes any ancestor transform at draw time.
+  // Keep that offset as a baseline to avoid applying the same shift twice
+  // if a scroll/theme/font repaint occurs during an active drag.
+  drawings.set(svg,{owner:element,baselineY:currentShift(element)});
  };
  const redraw=()=>{
-  if(disposed)return;
+  // CSS-driven block transitions are compositor animations, not new glyph
+  // geometry. Replacing SVGs mid-transition captures a partial frame and
+  // causes the annotations to snap back while text continues to move.
+  if(disposed||dragPreview)return;
+  // Drop/cancel schedules a fresh geometry pass once temporary transforms
+  // have gone; while dragging we only adjust the existing SVG transforms.
   // Reuse the same outside-editor SVG layer while changing its children.
-  layer.replaceChildren();
+  drawings.clear();layer.replaceChildren();
   const currentlyVisible=new Set<HTMLElement>();
   const base=root.getBoundingClientRect();
   let count=0;
@@ -87,11 +114,22 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   for(const old of observed)if(!currentlyVisible.has(old)){
    resize.unobserve(old);observed.delete(old);
   }
+  syncDragPreview();
  };
  const schedule=()=>{
-  if(disposed||frame)return;
+  // Reuse the existing SVGs throughout a drag. Once the drag ends we do one
+  // precise re-anchor, rather than recreating drawings during each shift.
+  if(disposed||frame||dragPreview)return;
   frame=requestAnimationFrame(()=>{frame=0;redraw();});
  };
+ const onDragPreview=(event:Event)=>{
+  dragPreview=(event as CustomEvent<SketchDragPreview|null>).detail;
+  syncDragPreview();
+  // After a drop/cancel the temporary ProseMirror sibling CSS is removed.
+  // Re-anchor even when the document content did not change (cancel).
+  if(!dragPreview)schedule();
+ };
+ root.addEventListener(SKETCH_DRAG_PREVIEW_EVENT,onDragPreview);
  const mutations=new MutationObserver(records=>{
   if(records.some(item=>{
    if(layer===item.target||layer.contains(item.target))return false;
@@ -109,6 +147,8 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
  return ()=>{
   disposed=true;
   if(frame)cancelAnimationFrame(frame);
+  root.removeEventListener(SKETCH_DRAG_PREVIEW_EVENT,onDragPreview);
+  drawings.clear();dragPreview=null;
   mutations.disconnect();theme.disconnect();resize.disconnect();
   window.removeEventListener('resize',schedule);root.removeEventListener('scroll',schedule,true);
   layer.remove();

@@ -19,6 +19,16 @@
   overflow: visible;
   pointer-events: none;
 }
+/* Match the exact compositor timing of the moved ProseMirror siblings.
+ * Only the drag-preview changes SVG transforms; committed hand-drawn marks
+ * remain inert, outside contenteditable, and unaffected by this rule. */
+body.rk-block-drag-active .rk-sketch-overlay .rk-sketch-svg {
+  transition:transform .18s cubic-bezier(.2,.8,.2,1);
+  /* Avoid pre-promoting hundreds of SVGs in long documents to GPU layers. */
+}
+@media(prefers-reduced-motion:reduce){
+ body.rk-block-drag-active .rk-sketch-overlay .rk-sketch-svg {transition:none;}
+}
 .record-main .rk-sketch-inline {
   display: inline;
   padding: 0;

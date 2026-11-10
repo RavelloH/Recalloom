@@ -52,8 +52,10 @@ try{
  await page.keyboard.press('Escape');
  await toolbar.getByRole('button',{name:'标题'}).click();
  menu=page.getByRole('menu',{name:'标题'});await menu.waitFor();
- for(const label of ['正文','1 级标题','2 级标题','3 级标题','4 级标题','5 级标题','6 级标题'])
+ for(const label of ['1 级标题','2 级标题','3 级标题','4 级标题','5 级标题','6 级标题'])
   assert.equal(await menu.getByRole('menuitem',{name:label}).count(),1,'heading state missing '+label);
+ assert.equal(await menu.getByRole('menuitem',{name:'正文'}).count(),0,'paragraph reset is not a heading choice');
+ assert.equal(await menu.getByRole('menuitem',{name:'正文'}).count(),0,'paragraph must not be in heading dropdown');
  await menu.getByRole('menuitem',{name:'2 级标题'}).click();
  await page.locator('.tiptap h2').filter({hasText:'alpha beta gamma'}).first().waitFor();
  console.log('PASS desktop formatting state menu transforms paragraph to h2');
@@ -92,11 +94,15 @@ try{
  await page.getByRole('menu',{name:'对齐方式'}).getByRole('menuitem',{name:'居中对齐'}).click();
  await page.waitForFunction(()=>[...document.querySelectorAll('.tiptap p')]
   .some(el=>el.textContent?.includes('alpha beta gamma')&&getComputedStyle(el).textAlign==='center'));
+ assert.equal(await toolbar.getByRole('button',{name:'对齐方式'}).evaluate(el=>el.classList.contains('rk-toolbar-state-selected')),false,
+  'alignment control must not highlight even when center alignment is active');
  stateLine=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
  await stateLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
  await toolbar.getByRole('button',{name:'对齐方式'}).click();
  await page.getByRole('menu',{name:'对齐方式'}).getByRole('menuitem',{name:'居中对齐'}).click();
  assert.notEqual(await stateLine.evaluate(el=>getComputedStyle(el).textAlign),'center');
+ assert.equal(await toolbar.getByRole('button',{name:'对齐方式'}).evaluate(el=>el.classList.contains('rk-toolbar-state-selected')),false,
+  'alignment dropdown must never show a selected-state highlight');
  console.log('PASS center alignment state toggles back to the default');
 
  // Keep the text selection live while hovering a formatting control.
@@ -176,7 +182,9 @@ for(const [kind,width,height] of [['pad',1024,768],['phone',390,844]]){
   assert.equal(await p.locator('.rk-block-grip').count(),0,kind+' no desktop drag grip');
   assert.ok(await top.getByRole('button',{name:'插入内容'}).count()>0,kind+' plus menu');
   assert.ok(await top.getByRole('group',{name:'当前块操作'}).count()>0,kind+' top block actions');
-  const metrics=await top.evaluate(el=>([...el.querySelectorAll('button')].slice(0,12).map(b=>{
+  const metrics=await top.evaluate(el=>([...el.querySelectorAll('.wysiwyg-tools button')]
+    .filter(b=>b.getClientRects().length>0&&b.getBoundingClientRect().height>=20)
+    .slice(0,12).map(b=>{
    const rect=b.getBoundingClientRect();const svg=b.querySelector('svg,.toolbar-highlight');
    const inner=svg?.getBoundingClientRect();
    return {label:b.getAttribute('aria-label'),height:rect.height,offset:inner?Math.abs((inner.top+inner.height/2)-(rect.top+rect.height/2)):null};

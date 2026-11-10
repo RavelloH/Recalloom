@@ -124,13 +124,9 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
  }
  .wysiwyg-toolbar::-webkit-scrollbar{display:none;}
  .wysiwyg-tools{flex:0 0 auto;flex-wrap:nowrap;overflow:visible;max-width:none;align-items:center;}
- /* Keep insertion and context-specific block actions reachable when the
-  * remainder of the single toolbar scrolls on a narrow touch device. */
- .wysiwyg-tools-leading{
-  position:sticky;left:0;z-index:2;
-  background:var(--color-background-body,#fff);
-  padding-right:6px;
- }
+ /* The insert affordance and contextual block actions scroll naturally
+  * with the rest of the toolbar. No pinned/floating leading segment. */
+ .wysiwyg-tools-leading{padding-right:6px;}
  .wysiwyg-tools + .wysiwyg-tools{border-left:1px solid var(--color-border,rgba(128,128,128,.2));padding-left:9px;}
  .wysiwyg-tools button{
   box-sizing:border-box!important;flex:0 0 auto;display:inline-flex!important;

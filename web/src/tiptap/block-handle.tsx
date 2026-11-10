@@ -6,6 +6,7 @@ import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {IconGripVertical,IconDots,IconPencil} from '@tabler/icons-react';
 import {blockCanReorder,blockSiblings,editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
+import {SKETCH_DRAG_PREVIEW_EVENT,type SketchDragPreview} from '../sketch-drag-preview';
 import './block-handle.css';
 
 type HoverBlock={pos:number;x:number;y:number;element:HTMLElement};
@@ -153,12 +154,26 @@ function paintDrag(session:DragSession,index:number,clientX:number,clientY:numbe
  session.slot.style.width=source.rect.width+'px';
  session.slot.style.height=Math.max(24,source.rect.height)+'px';
  session.slot.dataset.moved=String(index!==session.sourceIndex);
+ // The hand-drawn SVGs live in a separate layer outside ProseMirror.
+ // Notify it only when the preview destination changes; the layer follows
+ // the same compositor shifts without remeasuring/repainting every glyph.
+ session.source.element.dispatchEvent(new CustomEvent<SketchDragPreview>(
+  SKETCH_DRAG_PREVIEW_EVENT,{bubbles:true,detail:{
+   source:session.source.element,
+   shifts:session.entries.map((entry,i)=>({element:entry.element,offsetY:session.shiftValues[i]??0}))
+  }}
+ ));
 }
 function clearDrag(session:DragSession|null){
  if(!session)return;
  session.css.remove();
  session.floating.remove();session.slot.remove();
  document.body.classList.remove('rk-block-drag-active');
+ // An aborted drag does not cause an editor document update; explicitly
+ // reset and re-anchor SVGs for both cancel and successful drop.
+ session.source.element.dispatchEvent(new CustomEvent<null>(
+  SKETCH_DRAG_PREVIEW_EVENT,{bubbles:true,detail:null}
+ ));
 }
 
 export function BlockHandleLayer({editor,surfaceRef,onEditBlock,enabled}:{

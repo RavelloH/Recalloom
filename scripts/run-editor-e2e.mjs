@@ -13,9 +13,9 @@ const suite=[
  'rmd-chat-ui-e2e.mjs','editor-inline-menu-e2e.mjs','editor-extra-inline-e2e.mjs',
  'editor-direct-title-e2e.mjs','editor-code-direct-title-e2e.mjs',
  'editor-block-menu-e2e.mjs','editor-child-block-e2e.mjs',
- 'editor-block-handle-e2e.mjs','editor-block-drag-e2e.mjs',
+ 'editor-block-handle-e2e.mjs','editor-block-drag-e2e.mjs','editor-sketch-drag-preview-e2e.mjs',
  'editor-context-menu-e2e.mjs','editor-interaction-v2-e2e.mjs',
- 'editor-interaction-v3-e2e.mjs','editor-toolbar-v4-e2e.mjs','editor-responsive-v5-e2e.mjs','editor-toolbar-selection-v6-e2e.mjs','editor-context-v5-actions-e2e.mjs','editor-rmd-attrs-drawer-e2e.mjs',
+ 'editor-interaction-v3-e2e.mjs','editor-toolbar-v4-e2e.mjs','editor-responsive-v5-e2e.mjs','editor-toolbar-selection-v6-e2e.mjs','editor-sketch-drag-sync-v7-e2e.mjs','editor-context-v5-actions-e2e.mjs','editor-rmd-attrs-drawer-e2e.mjs',
  'editor-direct-visible-text-e2e.mjs','editor-rich-container-fields-e2e.mjs',
  'editor-rich-leaf-fields-e2e.mjs','editor-nested-block-handle-e2e.mjs',
  'editor-nested-block-drag-e2e.mjs','editor-container-id-e2e.mjs'

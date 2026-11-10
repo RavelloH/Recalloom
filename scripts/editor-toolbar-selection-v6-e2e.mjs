@@ -149,16 +149,16 @@ try{
     el.scrollLeft=el.scrollWidth;
     const bar=el.getBoundingClientRect(),lead=el.querySelector('.wysiwyg-tools-leading').getBoundingClientRect();
     return {scrollLeft:el.scrollLeft,barLeft:bar.left,leadLeft:lead.left,
-     sticky:getComputedStyle(el.querySelector('.wysiwyg-tools-leading')).position};
+     position:getComputedStyle(el.querySelector('.wysiwyg-tools-leading')).position};
    });
-   assert.equal(viewport.sticky,'sticky');
-   assert.ok(Math.abs(viewport.leadLeft-viewport.barLeft)<15,
-    kind+' insertion button must remain in view while scrolling: '+JSON.stringify(viewport));
+   assert.notEqual(viewport.position,'sticky','insert button should not remain fixed');
+   assert.ok(viewport.scrollLeft>30&&viewport.leadLeft<viewport.barLeft-30,
+    kind+' insert button must scroll away with formatting: '+JSON.stringify(viewport));
    await touch.locator('.tiptap .rk-directive-warning').first().tap();
    assert.deepEqual(await toolbarNames(top.locator('.wysiwyg-tools-leading')),
     ['插入内容','编辑当前块','更多块操作']);
    assert.deepEqual(await toolbarNames(primary),expected);
-   log.push('PASS '+kind+' same order; pinned insertion; nearby contextual block actions');
+   log.push('PASS '+kind+' same order; naturally scrolling insertion; nearby contextual block actions');
   }finally{await ctx.close();}
  }
  console.log(log.join('\n'));

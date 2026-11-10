@@ -66,11 +66,12 @@ for(const spec of RMD_REGISTRY.nodes){
  const matching=nodeEntries[spec.node];
  assert.ok(matching,'node family not audited: '+spec.node);
  if(spec.node==='heading'){
-  assert.ok(toolbar.includes("categoryButton('标题'")&&toolbar.includes('toggleHeading({level})')&&
-   toolbar.includes('setParagraph()'),'headings and paragraph must be stateful toolbar controls');
+  assert.ok(toolbar.includes("categoryButton('标题'")&&toolbar.includes('toggleHeading({level})'),
+   'headings must be reversible toolbar states: selecting the active level resets to paragraph');
   assert.ok(!slash.has('h1')&&!slash.has('text'),'format-state actions must not pollute slash insertion');
  }else if(spec.node==='paragraph'){
-  assert.ok(toolbar.includes("id:'heading-paragraph'"),'paragraph reset belongs to the heading state dropdown');
+  assert.ok(!toolbar.includes("id:'heading-paragraph'"),
+   'paragraph must not be a heading-menu item; active heading toggles back to paragraph');
  }else for(const id of matching)
   assert.ok(slash.has(id),'missing insertion action '+spec.node+': '+id);
  const mapping=Object.entries(rmdAttrNodeMapping).find(([,value])=>value.node===spec.node);

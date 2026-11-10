@@ -542,9 +542,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    top:window.innerHeight-rect.bottom>height+10||rect.top<height+12
     ?rect.bottom+6:Math.max(8,rect.top-height-6)});
  };
- const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[])=>
+ const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[],highlightActive=true)=>
   <Button key={label} label={label} tooltip={label} variant="ghost" size="sm"
-   className={'rk-inline-menu-trigger'+(items.some(item=>item.active)?' rk-toolbar-state-selected':'')} icon={menuIcon(child)} isIconOnly
+   className={'rk-inline-menu-trigger'+(highlightActive&&items.some(item=>item.active)?' rk-toolbar-state-selected':'')} icon={menuIcon(child)} isIconOnly
    aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
    onMouseDown={event=>event.preventDefault()}
    onPointerDown={captureInlineRange}
@@ -576,9 +576,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  // screenful on narrow touch devices; secondary formatting scrolls to the right.
  const sharedFormattingToolbar=<>
   {categoryButton('标题',<IconH2 size="var(--rk-icon-sm)"/>,[
-   {id:'heading-paragraph',label:'正文',active:!editor.isActive('heading'),
-    run:()=>runCapturedInline(()=>editor.chain().focus().setParagraph().run())},
-   ...([1,2,3,4,5,6] as const).map(level=>({
+      ...([1,2,3,4,5,6] as const).map(level=>({
     id:'heading-'+level,label:level+' 级标题',active:editor.isActive('heading',{level}),
     run:()=>runCapturedInline(()=>editor.chain().focus().toggleHeading({level}).run())
    }))
@@ -611,7 +609,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
      const chain=editor.chain().focus();
      if(active?.alignRight)chain.unsetTextAlign().run();else chain.setTextAlign('right').run();
     })}
-  ])}
+  ],false)}
   {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
   {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
   {categoryButton('荧光笔与手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
