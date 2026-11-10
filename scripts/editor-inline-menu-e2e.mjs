@@ -105,6 +105,22 @@ try{
   assert.match(codeMark,/:: mark alpha beta gamma ::/);
   assert.doesNotMatch(codeMark,/:: highlight/);
   console.log('PASS semantic Mark command',size.name);
+  if(size.name==='mobile'){
+   const fresh=await page.evaluate(async content=>{
+    const r=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Mobile inline code '+Date.now()+'.md',kind:'document',content})});
+    return {status:r.status,data:await r.json()};
+   },source);
+   assert.equal(fresh.status,201);
+   await page.goto(base+'/records/'+fresh.data.id+'?mode=visual');
+   const line=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
+   await selectFixtureLine(line);
+   await page.getByRole('toolbar',{name:'格式工具栏'}).getByRole('button',{name:'行内代码'}).click();
+   await page.locator('.tiptap p code').filter({hasText:'alpha beta gamma'}).first().waitFor();
+   await page.getByRole('button',{name:'源码'}).click();
+   const code=await page.locator('.cm-content').first().innerText();
+   assert.ok(code.includes('`alpha beta gamma`'),'mobile inline code must preserve selected text and serialize to Markdown');
+   console.log('PASS mobile inline-code button, selection and Markdown source');
+  }
  }
  assert.deepEqual(errors,[],'no browser errors');
 }finally{await browser.close();}
