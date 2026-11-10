@@ -20,8 +20,8 @@ export type InlineCommand={
  run:(editor:Editor)=>boolean;
 };
 const names:Record<string,{title:string;description:string;keywords:string[];group:InlineCommandGroup}>={
- mark:{title:'语义 Mark',description:'规整背景强调（非手绘荧光笔）',keywords:['mark','重点','语义'],group:'semantic'},
- highlight:{title:'手绘荧光笔',description:'默认黄色，静态手绘涂抹',keywords:['highlight','荧光笔'],group:'hand-drawn'},
+ mark:{title:'高亮',description:'语义背景高亮（RMD Mark，非手绘荧光笔）',keywords:['mark','重点','语义'],group:'semantic'},
+ highlight:{title:'荧光笔',description:'默认黄色手绘荧光笔（RMD highlight）',keywords:['highlight','荧光笔'],group:'hand-drawn'},
  circle:{title:'手绘圈选',description:'用不规则笔迹圈出选中内容',keywords:['circle','圈选'],group:'hand-drawn'},
  box:{title:'手绘方框',description:'在选中内容周围绘制方框',keywords:['box','方框'],group:'hand-drawn'},
  bracket:{title:'手绘括号',description:'用左右括号强调关联内容',keywords:['bracket','括号'],group:'hand-drawn'},

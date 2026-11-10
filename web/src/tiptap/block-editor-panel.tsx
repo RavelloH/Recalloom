@@ -20,6 +20,15 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
  editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;mobile?:boolean;
 }){
  const [version,setVersion]=useState(0);
+ const [closing,setClosing]=useState(false);
+ const closeTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const requestClose=()=>{
+  if(closing)return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){onClose();return;}
+  setClosing(true);
+  closeTimer.current=setTimeout(onClose,240);
+ };
+ useEffect(()=>()=>{if(closeTimer.current!==null)clearTimeout(closeTimer.current);},[]);
  const [draft,setDraft]=useState(()=>serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'}));
  const [error,setError]=useState('');
  const canonicalRef=useRef(draft);
@@ -128,13 +137,14 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   }
  };
  return <aside className="rk-block-editor-panel" role={mobile?'dialog':'complementary'}
+  data-closing={closing?'true':undefined}
   aria-modal={mobile?true:undefined} aria-label="块编辑面板" data-block-kind={kind}
   onKeyDown={e=>{
-   if(e.key==='Escape'&&!e.nativeEvent.isComposing){e.stopPropagation();onClose();}
+   if(e.key==='Escape'&&!e.nativeEvent.isComposing){e.stopPropagation();requestClose();}
   }}>
   <header className="rk-block-panel-header">
    <div><strong>{parentKind?'编辑子块':'编辑块'}</strong><span>{kind==='richContainer'?String(current.attrs.kind??'容器'):kind}</span></div>
-   <Button variant="ghost" size="sm" label="关闭块编辑" icon={<IconX size="var(--rk-icon-sm)"/>} onClick={onClose}/>
+   <Button variant="ghost" size="sm" label="关闭块编辑" icon={<IconX size="var(--rk-icon-sm)"/>} onClick={requestClose}/>
   </header>
   <section className="rk-block-panel-preview" aria-label="当前块预览">
    <div className="rk-block-panel-section-heading"><IconEye size="var(--rk-icon-sm)"/><span>实时预览</span></div>

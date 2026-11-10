@@ -40,9 +40,10 @@ describe('RMD block entry registry',()=>{
  });
  it('groups slash commands into discoverable syntax families without changing flat keyboard order',()=>{
   const groups=groupSlashCommands(slashCommands);
-  assert.deepEqual(groups.map(group=>group.id),['basic','layout','callout','sketch','study','reference','media','format','inline']);
+  assert.deepEqual(groups.map(group=>group.id),['basic','layout','callout','sketch','study','reference','media','inline']);
   assert.ok(groups.find(group=>group.id==='callout')?.commands.some(command=>command.id==='rmd-block:warning'));
   assert.ok(groups.find(group=>group.id==='sketch')?.commands.some(command=>command.id==='rmd-block:highlight'));
+  assert.ok(!groups.some(group=>group.id==='format'),'Formatting state changes belong in the toolbar, not the slash insertion palette');
   assert.ok(groups.find(group=>group.id==='study')?.commands.some(command=>command.id==='flashcard'));
   const filtered=groupSlashCommands(filterSlashCommands(mock().editor,'危险'));
   assert.deepEqual(filtered.map(group=>group.id),['callout']);

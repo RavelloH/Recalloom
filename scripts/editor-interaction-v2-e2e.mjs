@@ -68,10 +68,10 @@ try{
    geometry:buttons.map(b=>({width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height,
     icon:b.querySelector('svg,.toolbar-highlight')!==null}))};
  });
- assert.ok(toolbarStats.count>=8&&toolbarStats.count<=12,'compact toolbar should have few icon actions');
+ assert.ok(toolbarStats.count>=13&&toolbarStats.count<=22,'compact toolbar should have few icon actions');
  assert.ok(toolbarStats.buttonText.every(t=>t===''||/^H+$/.test(t)),'floating toolbar must use icons or highlighted H, not text labels: '+JSON.stringify(toolbarStats));
  assert.ok(toolbarStats.geometry.every(g=>g.width<=48&&g.height<=34&&g.icon),'icon buttons including chevrons must fit compact bounds: '+JSON.stringify(toolbarStats));
- assert.equal(toolbarStats.geometry.filter(g=>g.width>34).length,3,'only three categorized dropdowns may use wider icon-plus-chevron buttons');
+ assert.equal(toolbarStats.geometry.filter(g=>g.width>34).length,5,'five categorized dropdowns may use wider icon-plus-chevron buttons');
  console.log('PASS compact icon-only aligned text selection toolbar',toolbarStats);
 
  await first.click({button:'right'});
@@ -115,7 +115,7 @@ try{
 
  await page.setViewportSize({width:390,height:844});
  const mobile=page.locator('.tiptap .rk-directive-warning').first();
- await mobile.dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+ await mobile.hover(); // Narrow viewport alone must not force touch mode.
  const touchGrip=page.getByRole('group',{name:'块把手'});
  await touchGrip.waitFor();
  const touchBounds=await touchGrip.boundingBox();
@@ -126,5 +126,5 @@ try{
  const mobileGeom=await mobilePanel.boundingBox();
  assert.ok(mobileGeom&&Math.abs(mobileGeom.width-390)<1&&Math.abs(mobileGeom.height-844)<2);
  assert.deepEqual(errors,[]);
- console.log('PASS reachable touch grip and bottom-fullscreen Drawer');
+ console.log('PASS narrow fine-pointer grip and bottom-fullscreen Drawer');
 }finally{await browser.close();}

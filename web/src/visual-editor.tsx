@@ -6,6 +6,7 @@ import './tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
+import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {useEditor,useEditorState,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
@@ -46,15 +47,16 @@ import {filterSlashCommands,groupSlashCommands,matchSlashQuery,type SlashCommand
 import {BlockHandleLayer} from './tiptap/block-handle';
 import {BlockEditorPanel} from './tiptap/block-editor-panel';
 import {EditorContextMenu} from './tiptap/editor-context-menu';
-import {editableBlockAt,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
+import {editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,topLevelAtDocumentPosition} from './tiptap/editor-block-actions';
+import {blockMenuItems} from './tiptap/editor-command-menu';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {inlineCommandsByGroup,runInlineRmdCommand,type InlineCommand} from './tiptap/editor-inline-commands';
-import {useCompactLayout} from './use-media';
+import {useCompactLayout,useFinePointer} from './use-media';
 import {safeTableId,cleanTableCaption} from './table-caption';
 
-type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number};
+type SlashState={from:number;to:number;query:string;index:number;placement:'above'|'below';offset:number;left:number;insertOnly?:boolean};
 type WikiState=SlashState&{kind:'link'|'embed'};
-type InlinePopupItem={id:string;label:string;description?:string;disabled?:boolean;run:()=>void};
+type InlinePopupItem={id:string;label:string;description?:string;disabled?:boolean;active?:boolean;run:()=>void};
 type InlinePopup={label:string;left:number;top:number;items:InlinePopupItem[]};
 const SLASH_MENU_WIDTH=300;
 const SLASH_MENU_SPACE=280;
@@ -84,6 +86,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
  const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
+ const [panelOpenCycle,setPanelOpenCycle]=useState(0);
  const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
  const inlineSelectionRef=useRef<{from:number;to:number;doc:ProseMirrorNode}|null>(null);
  const [inlinePopup,setInlinePopup]=useState<InlinePopup|null>(null);
@@ -110,6 +113,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const blockPanelRef=useRef<{pos:number;node:ProseMirrorNode}|null>(null);
  const attributeNodeRef=useRef<{pos:number;type:string}|null>(null);
  const compact=useCompactLayout();
+ const finePointer=useFinePointer();
+ const touchToolbar=!finePointer;
  const compactRef=useRef(compact);
  compactRef.current=compact;
  const surfaceRef=useRef<HTMLDivElement>(null);
@@ -232,10 +237,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  },[]);
  editorRef.current=editor;
  const active=useEditorState({editor,selector:({editor:e})=>({
+  position:e?.state.selection.from??-1,
   bold:e?.isActive('bold')??false,italic:e?.isActive('italic')??false,
   heading1:e?.isActive('heading',{level:1})??false,
   heading2:e?.isActive('heading',{level:2})??false,
   heading3:e?.isActive('heading',{level:3})??false,
+  heading4:e?.isActive('heading',{level:4})??false,
+  heading5:e?.isActive('heading',{level:5})??false,
+  heading6:e?.isActive('heading',{level:6})??false,
   code:e?.isActive('code')??false,
   bulletList:e?.isActive('bulletList')??false,
   orderedList:e?.isActive('orderedList')??false,
@@ -292,6 +301,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     if(!owner)return;
     blockPanelRef.current={pos:owner.pos,node:owner.node};
     attributeNodeRef.current={pos:position,type:node.type.name};
+    setPanelOpenCycle(n=>n+1);
     setBlockPanelPos(owner.pos);
     setAttributeNodePos(position);
    }
@@ -304,6 +314,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    blockPanelRef.current={pos,node:target.node};
    attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
    setAttributeNodePos(attributeNodeRef.current?.pos??null);
+   setPanelOpenCycle(n=>n+1);
    setBlockPanelPos(pos);
   };
   root.addEventListener('rmd-edit-attrs',open);
@@ -470,7 +481,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const state=slashRef.current;
   if(!editor||!state)return;
   setSlash(null);slashDismissedAt.current=null;
-  editor.chain().focus().deleteRange({from:state.from,to:state.to}).run();
+  if(state.insertOnly)editor.chain().focus().setTextSelection(state.from).run();
+  else editor.chain().focus().deleteRange({from:state.from,to:state.to}).run();
   command.run(editor,{openLink,openImage,openMath,openWikiEmbed});
  };
  if(!editor||!ready)return <div className="content-loading">正在准备可视化编辑器…</div>;
@@ -529,7 +541,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  };
  const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[])=>
   <Button key={label} label={label} tooltip={label} variant="ghost" size="sm"
-   className="rk-inline-menu-trigger" icon={menuIcon(child)} isIconOnly
+   className={'rk-inline-menu-trigger'+(items.some(item=>item.active)?' rk-toolbar-state-selected':'')} icon={menuIcon(child)} isIconOnly
    aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
    onMouseDown={event=>event.preventDefault()}
    onPointerDown={captureInlineRange}
@@ -548,40 +560,96 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {toggle('下划线',active?.underline??false,()=>editor.chain().focus().toggleUnderline().run(),<IconUnderline size="var(--rk-icon-sm)"/>)}
   {toggle('删除线',active?.strike??false,()=>editor.chain().focus().toggleStrike().run(),<IconStrikethrough size="var(--rk-icon-sm)"/>)}
   {toggle('高亮',active?.mark??false,()=>runInlineRmdCommand(editor,'mark'),<span className="toolbar-highlight">H</span>)}
-  {categoryButton('手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
+  {categoryButton('荧光笔与手绘标记',<IconPencil size="var(--rk-icon-sm)"/>,
    inlineCommandsByGroup('hand-drawn').map(command=>({
     id:command.id,label:command.title,description:command.description,
-    disabled:!command.isAvailable(editor),run:()=>runInlineFromMenu(command)
+    active:command.isActive(editor),disabled:!command.isAvailable(editor),
+    run:()=>runInlineFromMenu(command)
    })))}
-  {categoryButton('行内组件',<IconPlus size="var(--rk-icon-sm)"/>,
-   inlineCommandsByGroup('inline-component').map(command=>({
-    id:command.id,label:command.title,description:command.description,
-    disabled:!command.isAvailable(editor),run:()=>runInlineFromMenu(command)
-   })))}
-  {categoryButton('更多行内功能',<IconDots size="var(--rk-icon-sm)"/>,[
-    {id:'inline-more-link',label:'链接',description:'为选中文字添加或编辑网页链接',
-     run:()=>runCapturedInline(openLink)},
-    // The mobile all-in-one toolbar also needs insertion commands; the
-    // selection BubbleMenu intentionally exposes formatting only.
-    ...(compact?[
-     {id:'inline-more-math',label:'行内公式',description:'插入可编辑 LaTeX 公式',
-      run:()=>runCapturedInline(()=>openMath('inline'))},
-     {id:'inline-more-wiki',label:'Wiki 引用',description:'在光标处搜索知识库文档',
-      disabled:!editor.state.selection.empty,
-      run:()=>runCapturedInline(()=>{editor.chain().focus().insertContent('[[').run();})},
-     {id:'inline-more-footnote',label:'脚注引用',description:'插入脚注引用',
-      disabled:!editor.state.selection.empty,
-      run:()=>runCapturedInline(()=>{editor.chain().focus().insertContent({type:'richFootnoteRef',attrs:{id:'note'}}).run();})}
-    ]:[]),
-    {id:'inline-more-comment',label:'弱化注释',description:'把选中文字标记为可见注释',
-     disabled:editor.state.selection.empty,
-     run:()=>runCapturedInline(()=>{editor.chain().focus().setMark('visibleComment').run();})},
-    {id:'inline-more-super',label:'上标',description:'将选中文字转换为上标',
-     run:()=>runCapturedInline(()=>{editor.chain().focus().toggleSuperscript().run();})},
-    {id:'inline-more-sub',label:'下标',description:'将选中文字转换为下标',
-     run:()=>runCapturedInline(()=>{editor.chain().focus().toggleSubscript().run();})}
-   ])}
  </>;
+ const moreInlineItems:InlinePopupItem[]=[
+  ...inlineCommandsByGroup('inline-component').map(command=>({
+   id:command.id,label:command.title,description:command.description,
+   disabled:!command.isAvailable(editor),active:command.isActive(editor),
+   run:()=>runInlineFromMenu(command)
+  })),
+  {id:'inline-more-super',label:'上标',active:Boolean(active?.superscript),
+   run:()=>runCapturedInline(()=>editor.chain().focus().toggleSuperscript().run())},
+  {id:'inline-more-sub',label:'下标',active:Boolean(active?.subscript),
+   run:()=>runCapturedInline(()=>editor.chain().focus().toggleSubscript().run())},
+  {id:'inline-more-comment',label:'注释',description:'将选中文字标为可见注释',
+   active:editor.isActive('visibleComment'),
+   run:()=>runCapturedInline(()=>editor.chain().focus().toggleMark('visibleComment').run())}
+ ];
+ const formatStateMenus=<>
+  {categoryButton('标题',<IconH2 size="var(--rk-icon-sm)"/>,[
+   {id:'heading-paragraph',label:'正文',active:!editor.isActive('heading'),
+    run:()=>runCapturedInline(()=>editor.chain().focus().setParagraph().run())},
+   ...([1,2,3,4,5,6] as const).map(level=>({
+    id:'heading-'+level,label:level+' 级标题',active:editor.isActive('heading',{level}),
+    run:()=>runCapturedInline(()=>editor.chain().focus().toggleHeading({level}).run())
+   }))
+  ])}
+  {categoryButton('列表',<IconList size="var(--rk-icon-sm)"/>,[
+   {id:'list-bullet',label:'项目列表',active:Boolean(active?.bulletList),
+    run:()=>runCapturedInline(()=>editor.chain().focus().toggleBulletList().run())},
+   {id:'list-ordered',label:'编号列表',active:Boolean(active?.orderedList),
+    run:()=>runCapturedInline(()=>editor.chain().focus().toggleOrderedList().run())},
+   {id:'list-todo',label:'任务清单',active:Boolean(active?.taskList),
+    run:()=>runCapturedInline(()=>editor.chain().focus().toggleTaskList().run())}
+  ])}
+  {categoryButton('对齐方式',<IconAlignLeft size="var(--rk-icon-sm)"/>,[
+   {id:'align-left',label:'左对齐',active:!active?.alignCenter&&!active?.alignRight,
+    run:()=>runCapturedInline(()=>editor.chain().focus().unsetTextAlign().run())},
+   {id:'align-center',label:'居中对齐',active:Boolean(active?.alignCenter),
+    run:()=>runCapturedInline(()=>{
+     const chain=editor.chain().focus();
+     if(active?.alignCenter)chain.unsetTextAlign().run();else chain.setTextAlign('center').run();
+    })},
+   {id:'align-right',label:'右对齐',active:Boolean(active?.alignRight),
+    run:()=>runCapturedInline(()=>{
+     const chain=editor.chain().focus();
+     if(active?.alignRight)chain.unsetTextAlign().run();else chain.setTextAlign('right').run();
+    })}
+  ])}
+  {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<IconQuote size="var(--rk-icon-sm)"/>)}
+ </>;
+ const inlineActions=<>
+  {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
+  {action('插入行内公式',()=>runCapturedInline(()=>openMath('inline')),<IconMathFunction size="var(--rk-icon-sm)"/>)}
+  {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
+  {categoryButton('更多',<IconDots size="var(--rk-icon-sm)"/>,moreInlineItems)}
+ </>;
+ const editBlock=(pos:number)=>{
+  const target=editableBlockAt(editor,pos);
+  if(!target)return;
+  blockPanelRef.current={pos,node:target.node};
+  attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
+  setAttributeNodePos(attributeNodeRef.current?.pos??null);
+  setPanelOpenCycle(n=>n+1);
+  setBlockPanelPos(pos);
+ };
+ const touchBlock=touchToolbar?editableBlockFromDocumentPosition(editor,active?.position??editor.state.selection.from):null;
+ const touchBlockPos=touchBlock&&isExplicitRmdBlock(editor,touchBlock.pos)?touchBlock.pos:null;
+ const openInsertMenu=(targetPos?:number,point?:{x:number;y:number})=>{
+  setInlinePopup(null);
+  const surface=surfaceRef.current;
+  if(!surface)return;
+  let pos=targetPos??editor.state.selection.from;
+  if(point)pos=editor.view.posAtCoords({left:point.x,top:point.y})?.pos??pos;
+  pos=Math.max(0,Math.min(pos,editor.state.doc.content.size));
+  const bounds=surface.getBoundingClientRect();
+  const rect=editor.view.coordsAtPos(pos);
+  const y=point?.y??(touchToolbar?
+   surface.querySelector('.wysiwyg-toolbar')?.getBoundingClientRect().bottom??rect.bottom:rect.bottom);
+  const x=point?.x??(touchToolbar?bounds.left+12:rect.left);
+  const above=innerHeight-y<SLASH_MENU_SPACE&&y>SLASH_MENU_SPACE;
+  editor.commands.setTextSelection(pos);
+  setSlash({from:pos,to:pos,query:'',index:0,insertOnly:true,
+   placement:above?'above':'below',
+   offset:above?bounds.bottom-y+8:y-bounds.top+8,
+   left:Math.max(0,Math.min(x-bounds.left,bounds.width-SLASH_MENU_WIDTH))});
+ };
  return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
   <div className="rk-editor-block-canvas">
   <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
@@ -598,37 +666,21 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
-  {compact&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
-   <div className="wysiwyg-tools">
+  {touchToolbar&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
+   <div className="wysiwyg-tools wysiwyg-tools-primary">
+    {action('插入内容',()=>openInsertMenu(),<IconPlus size="var(--rk-icon-sm)"/>)}
     {inlineMarks}
-    {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
-    {toggle('上标',active?.superscript??false,()=>editor.chain().focus().toggleSuperscript().run(),<IconSuperscript size="var(--rk-icon-sm)"/>)}
-    {toggle('下标',active?.subscript??false,()=>editor.chain().focus().toggleSubscript().run(),<IconSubscript size="var(--rk-icon-sm)"/>)}
+    {inlineActions}
+    {formatStateMenus}
    </div>
-   <div className="wysiwyg-tools">
-    {toggle('二级标题',active?.heading2??false,()=>editor.chain().focus().toggleHeading({level:2}).run(),<IconH2 size="var(--rk-icon-sm)"/>)}
-    {toggle('项目列表',active?.bulletList??false,()=>editor.chain().focus().toggleBulletList().run(),<IconList size="var(--rk-icon-sm)"/>)}
-    {toggle('编号列表',active?.orderedList??false,()=>editor.chain().focus().toggleOrderedList().run(),<IconListNumbers size="var(--rk-icon-sm)"/>)}
-    {toggle('任务清单',active?.taskList??false,()=>editor.chain().focus().toggleTaskList().run(),<IconListCheck size="var(--rk-icon-sm)"/>)}
-    {toggle('引用',active?.blockquote??false,()=>editor.chain().focus().toggleBlockquote().run(),<IconQuote size="var(--rk-icon-sm)"/>)}
-    {toggle('代码块',active?.codeBlock??false,()=>editor.chain().focus().toggleCodeBlock().run(),<IconCodeDots size="var(--rk-icon-sm)"/>)}
-    {action('插入表格',()=>editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run(),<IconTable size="var(--rk-icon-sm)"/>)}
-   </div>
-   <div className="wysiwyg-tools">
-    {toggle('居中对齐',active?.alignCenter??false,()=>editor.chain().focus().setTextAlign('center').run(),<IconAlignCenter size="var(--rk-icon-sm)"/>)}
-    {toggle('右对齐',active?.alignRight??false,()=>editor.chain().focus().setTextAlign('right').run(),<IconAlignRight size="var(--rk-icon-sm)"/>)}
-    {action('左对齐',()=>editor.chain().focus().setTextAlign('left').run(),<IconAlignLeft size="var(--rk-icon-sm)"/>)}
-   </div>
-   <div className="wysiwyg-tools">
-    {action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)}
-    {action('引用 Wiki 文档',()=>editor.chain().focus().insertContent('[[').run(),<IconBrackets size="var(--rk-icon-sm)"/>)}
-    {action('嵌入 Wiki 文档',()=>editor.chain().focus().insertContent({type:'paragraph',content:[{type:'text',text:'::: embed '}]}).run(),<IconCodeDots size="var(--rk-icon-sm)"/>)}
-    {action('插入或编辑图片',openImage,<IconPhotoPlus size="var(--rk-icon-sm)"/>)}
-    {action('插入行内公式',()=>openMath('inline'),<IconMathFunction size="var(--rk-icon-sm)"/>)}
-    {action('插入块级公式',()=>openMath('block'),<IconSum size="var(--rk-icon-sm)"/>)}
-   </div>
+   {touchBlockPos!==null&&<div className="wysiwyg-tools wysiwyg-tools-block" role="group" aria-label="当前块操作">
+    {action('编辑当前块',()=>editBlock(touchBlockPos),<IconPencil size="var(--rk-icon-sm)"/>)}
+    <MoreMenu label="更多块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
+     variant="ghost" size="sm" presentation="adaptive"
+     items={blockMenuItems({editor,pos:touchBlockPos,onEditBlock:editBlock})}/>
+   </div>}
   </div>}
-  {!compact&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
+  {finePointer&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
    shouldShow={({editor:e,state,from,to})=>{
     if(!e.isEditable)return false;
     const selection=state.selection;
@@ -643,9 +695,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       ?action('插入或编辑链接',openLink,<IconLink size="var(--rk-icon-sm)"/>)
       :<div className="bubble-group">
        {inlineMarks}
-       {toggle('行内代码',active?.code??false,()=>editor.chain().focus().toggleCode().run(),<IconCode size="var(--rk-icon-sm)"/>)}
-       {toggle('弱化注释',editor.isActive('visibleComment'),()=>editor.chain().focus().toggleMark('visibleComment').run(),<IconMessageCircle size="var(--rk-icon-sm)"/>)}
-       {action('插入或编辑链接',()=>runCapturedInline(openLink),<IconLink size="var(--rk-icon-sm)"/>)}
+       {formatStateMenus}
+       {inlineActions}
       </div>}
    </div>
   </BubbleMenu>}
@@ -675,22 +726,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       isDisabled={Boolean(tableIdDraft.trim())!==Boolean(tableCaptionDraft.trim())||Boolean(tableIdDraft.trim())&&!safeTableId(tableIdDraft.trim().toLowerCase())}>保存</Button>
    </div>
   </div>}
-  {compact?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={pos=>{
-   const target=editableBlockAt(editor,pos);
-   if(!target)return;
-   blockPanelRef.current={pos,node:target.node};
-   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
-   setAttributeNodePos(attributeNodeRef.current?.pos??null);
-   setBlockPanelPos(pos);
-  }}><EditorContent editor={editor}/></EditorContextMenu>}
-  <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} onEditBlock={pos=>{
-   const target=editableBlockAt(editor,pos);
-   if(!target)return;
-   blockPanelRef.current={pos,node:target.node};
-   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
-   setAttributeNodePos(attributeNodeRef.current?.pos??null);
-   setBlockPanelPos(pos);
-  }}/>
+  {!finePointer?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={editBlock}
+   onEditLink={openLink} onInsert={(pos,point)=>openInsertMenu(pos,point)}><EditorContent editor={editor}/></EditorContextMenu>}
+  <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} enabled={finePointer} onEditBlock={editBlock}/>
   {slash&&slashItems.length>0&&<div className="slash-menu" ref={slashListRef} role="listbox" aria-label="插入内容" style={{...(slash.placement==='above'?{bottom:slash.offset}:{top:slash.offset}),left:slash.left,width:SLASH_MENU_WIDTH}} onMouseDown={event=>event.preventDefault()}>
    <div className="slash-menu-heading">{slash.query?'匹配的命令':'插入内容'}</div>
    {slashGroups.map(group=><div className="slash-category" key={group.id}>
@@ -723,18 +761,19 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    onMouseDown={event=>event.preventDefault()}>
    {inlinePopup.items.map(item=>
     <button key={item.id} type="button" role="menuitem" className="rk-inline-popover-item"
+     data-active={item.active?'true':undefined}
      disabled={item.disabled} title={item.description??item.label}
      onClick={()=>{
       cancelPopupClose();
       setInlinePopup(null);
       if(!item.disabled)item.run();
      }}>
-     <span className="rk-inline-popover-item-label">{item.label}</span>
+     <span className="rk-inline-popover-item-label">{item.label}{item.active&&<span aria-hidden="true" className="rk-menu-item-check">✓</span>}</span>
      {item.description&&<span className="rk-inline-popover-item-description">{item.description}</span>}
     </button>)}
   </div>,document.body)}
  {blockPanelPos!==null&&createPortal(
-  <BlockEditorPanel editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}
+  <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}
    onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}
  </div>;
 });

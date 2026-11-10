@@ -3,7 +3,7 @@ import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
 import type {RefObject} from 'react';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
-import {IconGripVertical,IconDots} from '@tabler/icons-react';
+import {IconGripVertical,IconDots,IconPencil} from '@tabler/icons-react';
 import {blockCanReorder,blockSiblings,editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
 import './block-handle.css';
@@ -19,15 +19,12 @@ type DragSession={
 const explicitSelector='.rk-directive[data-rk-kind], .rk-rich-link-card[data-rk-link-card], .wiki-editor-embed';
 function gripPosition(element:HTMLElement){
  const r=element.getBoundingClientRect();
- const width=matchMedia('(pointer:coarse)').matches?98:70;
- const height=matchMedia('(pointer:coarse)').matches?48:36;
- // A handle is always OUTSIDE the RMD block. If the right gutter is too
- // narrow, put it in the left gutter or above the block, never on the text.
- const rightFits=r.right+9+width<=innerWidth-6;
- const leftFits=r.left-width-9>=6;
- const x=rightFits?r.right+9:leftFits?r.left-width-9:
-  Math.max(6,Math.min(r.right-width,innerWidth-width-6));
- const top=rightFits||leftFits?r.top+4:r.top-height-5;
+ const width=38;
+ const height=112;
+ // The vertical handle belongs on the right. On narrow desktops clamp it
+ // rather than jumping to the left edge of a wide paragraph.
+ const x=Math.max(6,Math.min(r.right+8,innerWidth-width-6));
+ const top=r.top+4;
  // Programmatic selection of an offscreen block (or virtual keyboard resize)
  // must not strand the grip in an unreachable viewport coordinate.
  const y=Math.max(6,Math.min(innerHeight-height-6,top));
@@ -164,8 +161,8 @@ function clearDrag(session:DragSession|null){
  document.body.classList.remove('rk-block-drag-active');
 }
 
-export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
- editor:Editor;surfaceRef:RefObject<HTMLDivElement|null>;
+export function BlockHandleLayer({editor,surfaceRef,onEditBlock,enabled}:{
+ editor:Editor;surfaceRef:RefObject<HTMLDivElement|null>;enabled:boolean;
  onEditBlock:(pos:number)=>void;
 }){
  const [hover,setHover]=useState<HoverBlock|null>(null);
@@ -186,7 +183,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
  const selectRef=useRef(select);selectRef.current=select;
  useEffect(()=>{
   const surface=surfaceRef.current;
-  if(!surface)return;
+  if(!surface||!enabled)return;
   const place=(block:HoverBlock)=>{
    const next={...block,...gripPosition(block.element)};
    setHover(last=>last?.pos===next.pos&&last.element===next.element&&
@@ -218,8 +215,8 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
    if(target instanceof Node&&surface.contains(target))return;
    if(target instanceof Element&&target.closest('.rk-block-grip'))return;
    const block=current.element.getBoundingClientRect();
-   const gWidth=matchMedia('(pointer:coarse)').matches?98:70;
-   const gHeight=matchMedia('(pointer:coarse)').matches?48:36;
+   const gWidth=38;
+   const gHeight=112;
    const left=Math.min(block.left,current.x)-13;
    const right=Math.max(block.right,current.x+gWidth)+13;
    const top=Math.min(block.top,current.y)-13;
@@ -295,7 +292,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
    clearDrag(dragRef.current);dragRef.current=null;
    selectedElement.current?.classList.remove('rk-block-selected');
   };
- },[editor,surfaceRef]);
+ },[editor,surfaceRef,enabled]);
  useEffect(()=>{
   const element=hover?.element;
   if(!element)return;
@@ -321,7 +318,7 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
   clearDrag(dragRef.current);dragRef.current=null;
   selectRef.current(null,null);setHover(null);
  };
- return <>{hover&&createPortal(<div className="rk-block-grip" role="group" aria-label="块把手"
+ return <>{enabled&&hover&&createPortal(<div className="rk-block-grip" role="group" aria-label="块把手"
   style={{left:hover.x,top:hover.y}} onPointerDown={event=>event.stopPropagation()}>
   <button type="button" className="rk-block-drag" aria-label="拖动块"
    title={blockCanReorder(editor,hover.pos)?'拖动调整块顺序；点击打开块操作':'点击打开子块操作（此类块不可拖动）'}
@@ -330,7 +327,11 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock}:{
    onDragStart={startDrag} onDragEnd={finishDrag}>
    <IconGripVertical size="var(--rk-icon-md)"/>
   </button>
-  <MoreMenu label="块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
+  <button type="button" className="rk-block-edit" aria-label="编辑块" title="编辑当前块"
+    onClick={()=>{selectRef.current(hover.pos,hover.element);onEditBlock(hover.pos);setMenuOpen(false);}}>
+    <IconPencil size="var(--rk-icon-sm)"/>
+   </button>
+   <MoreMenu label="块操作" icon={<IconDots size="var(--rk-icon-sm)"/>}
    variant="ghost" size="sm" presentation="adaptive"
    isMenuOpen={menuOpen} onOpenChange={setMenuOpen}
    items={blockMenuItems({editor,pos:hover.pos,onEditBlock,onAction:()=>{setMenuOpen(false);setHover(null);}})}/>

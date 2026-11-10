@@ -26,8 +26,7 @@ try{
   await paragraph.hover();
   assert.equal(await page.getByRole('group',{name:'块把手'}).count(),0,'plain paragraphs should have no grip');
   const callout=page.locator('.tiptap .rk-directive-warning').first();
-  if(width===1280)await callout.hover();
-  else await callout.dispatchEvent('pointerdown',{pointerType:'touch',bubbles:true});
+  await callout.hover(); // This browser context has a fine pointer even at 390px.
   const grip=page.getByRole('group',{name:'块把手'});await grip.waitFor();
   await grip.getByRole('button',{name:'块操作'}).click();
   await page.getByRole('menuitem',{name:'编辑块'}).last().click();

@@ -95,11 +95,12 @@ try{
  assert.ok((await page.locator('.cm-content').innerText()).includes(embed));
  assert.equal((await api('/records/'+host.id)).body.content,hostMarkdown);
  const picker=created(await api('/records','POST',{kind:'document',name:'RMD Picker '+suffix+'.md',content:''}),'picker');
- // Wiki toolbar actions are intentionally mounted only in compact mode.
+ // Wiki embedding is insertion, so it belongs to the slash/plus picker rather than an inline formatting toolbar.
  await page.setViewportSize({width:580,height:870});
  await page.goto(base+'/records/'+picker.id+'?mode=visual',{waitUntil:'domcontentloaded'});
  const editor=page.locator('.tiptap');await editor.waitFor();
- await page.getByRole('button',{name:'嵌入 Wiki 文档'}).click();
+ await editor.click();await page.keyboard.type('/嵌入');
+  await page.getByRole('listbox',{name:'插入内容'}).getByRole('option',{name:/嵌入 Wiki 文档/}).first().click();
  await page.keyboard.type(targetName.slice(0,-3));
  await page.getByRole('listbox',{name:'引用文档'}).waitFor({state:'visible',timeout:20000});
  const option=page.getByRole('option',{name:new RegExp('RMD 章节源 '+suffix)});

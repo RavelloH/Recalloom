@@ -51,25 +51,12 @@ export function groupSlashCommands(commands:readonly SlashCommand[]):SlashComman
 
 const chain=(editor:Editor)=>editor.chain().focus();
 export const slashCommands:SlashCommand[]=[
- {id:'text',title:'正文',description:'普通段落文本',keywords:['text','paragraph','p','zw'],icon:IconPilcrow,run:e=>chain(e).setParagraph().run()},
- {id:'h1',title:'一级标题',description:'大号章节标题',keywords:['h1','heading','title','bt'],icon:IconH1,run:e=>chain(e).setHeading({level:1}).run()},
- {id:'h2',title:'二级标题',description:'中号章节标题',keywords:['h2','heading','subtitle','bt'],icon:IconH2,run:e=>chain(e).setHeading({level:2}).run()},
- {id:'h3',title:'三级标题',description:'小号章节标题',keywords:['h3','heading','bt'],icon:IconH3,run:e=>chain(e).setHeading({level:3}).run()},
- {id:'h4',title:'四级标题',description:'更小的章节标题',keywords:['h4','heading','bt'],icon:IconH4,run:e=>chain(e).setHeading({level:4}).run()},
- {id:'h5',title:'五级标题',description:'第五级章节标题',keywords:['h5','heading','bt'],icon:IconH5,run:e=>chain(e).setHeading({level:5}).run()},
- {id:'h6',title:'六级标题',description:'第六级章节标题',keywords:['h6','heading','bt'],icon:IconH6,run:e=>chain(e).setHeading({level:6}).run()},
- {id:'bullet',title:'项目列表',description:'无序的要点列表',keywords:['ul','bullet','list','lb'],icon:IconList,run:e=>chain(e).toggleBulletList().run()},
- {id:'ordered',title:'编号列表',description:'带序号的步骤列表',keywords:['ol','number','ordered','list','bh'],icon:IconListNumbers,run:e=>chain(e).toggleOrderedList().run()},
- {id:'todo',title:'待办清单',description:'可勾选的任务项',keywords:['todo','task','check','checkbox','db'],icon:IconListCheck,run:e=>chain(e).toggleTaskList().run()},
- {id:'quote',title:'引用',description:'引用或强调一段话',keywords:['quote','blockquote','yy'],icon:IconQuote,run:e=>chain(e).toggleWrap('blockquote').run()},
  {id:'code',title:'代码块',description:'等宽字体的代码片段',keywords:['code','pre','snippet','dm'],icon:IconCodeDots,run:e=>chain(e).toggleCodeBlock().run()},
  {id:'callout',title:'提示横幅',description:'插入 Astryx 风格提示容器',keywords:['callout','warning','banner','tip','alert','ts'],icon:IconMessageExclamation,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'warning',title:'注意'},content:[{type:'paragraph',content:[{type:'text',text:'请在此输入提示内容'}]}]}).run()},
  ...extraBlockCommands.map(item=>({id:'rmd-block:'+item.syntax,title:item.title,description:item.category==='child'?'在合法父容器中添加子块':'插入 RMD '+item.syntax+' 块',keywords:[...item.keywords],icon:item.category==='annotation'?IconHighlight:IconMessageExclamation,run:(e:Editor)=>{item.run(e);},isAvailable:item.isAvailable})),
  {id:'wiki-embed',title:'嵌入 Wiki 文档',description:'搜索并嵌入只读文档投影',keywords:['embed','wiki','嵌入','文档'],icon:IconBrowser,run:(_e,h)=>h.openWikiEmbed?.()},
  {id:'details',title:'折叠内容',description:'插入可以折叠的内容区域',keywords:['details','fold','collapse','zd'],icon:IconChevronsDown,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'details',title:'详细内容'},content:[{type:'paragraph',content:[{type:'text',text:'补充说明'}]}]}).run()},
  {id:'badge',title:'行内徽标',description:'插入状态或版本标签',keywords:['badge','tag','label','bz'],icon:IconTag,run:e=>chain(e).insertContent({type:'richBadge',attrs:{variant:'info'},content:[{type:'text',text:'状态'}]}).run()},
- {id:'comment',title:'弱化注释',description:'在所选文字上添加可见注释',keywords:['comment','note','annotation','zs'],icon:IconMessageCircle,run:e=>chain(e).setMark('visibleComment').run()},
- {id:'color-highlight',title:'手绘荧光笔',description:'使用默认黄色静态手绘荧光笔',keywords:['color','highlight','mark','gl'],icon:IconHighlight,run:e=>{runInlineRmdCommand(e,'highlight');}},
  {id:'tabs',title:'标签页',description:'插入 Astryx 标签导航与可编辑内容面板',keywords:['tabs','tab','fenye','qiehuan'],icon:IconLayoutNavbar,run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'tabs'},content:[{type:'richContainer',attrs:{kind:'tab',title:'示例'},content:[{type:'paragraph',content:[{type:'text',text:'第一项内容'}]}]},{type:'richContainer',attrs:{kind:'tab',title:'说明'},content:[{type:'paragraph',content:[{type:'text',text:'第二项内容'}]}]}]}).run()},
  {id:'glossary',title:'术语定义列表',description:'插入有明确范围的术语与定义，可直接编辑',keywords:['definition','glossary','term','cibiao','shuyu'],icon:IconVocabulary,
   run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'glossary',title:'术语表'},content:[
@@ -100,9 +87,6 @@ export const slashCommands:SlashCommand[]=[
  {id:'image',title:'图片',description:'通过地址插入外部图片',keywords:['image','img','picture','photo','tp'],icon:IconPhotoPlus,run:(_e,h)=>h.openImage()},
  {id:'inline-math',title:'行内公式',description:'在文字中插入 LaTeX 公式',keywords:['math','inline','latex','formula','gs'],icon:IconMathFunction,run:(_e,h)=>h.openMath('inline')},
  {id:'block-math',title:'块级公式',description:'独占一行的 LaTeX 公式',keywords:['math','block','latex','formula','equation','gs'],icon:IconSum,run:(_e,h)=>h.openMath('block')},
- {id:'align-left',title:'左对齐',description:'将当前段落左对齐',keywords:['align','left','dq'],icon:IconAlignLeft,run:e=>chain(e).setTextAlign('left').run(),isAvailable:e=>!e.isActive('codeBlock')},
- {id:'align-center',title:'居中对齐',description:'将当前段落居中',keywords:['align','center','dq'],icon:IconAlignCenter,run:e=>chain(e).setTextAlign('center').run(),isAvailable:e=>!e.isActive('codeBlock')},
- {id:'align-right',title:'右对齐',description:'将当前段落右对齐',keywords:['align','right','dq'],icon:IconAlignRight,run:e=>chain(e).setTextAlign('right').run(),isAvailable:e=>!e.isActive('codeBlock')}
 ];
 
 export function filterSlashCommands(editor:Editor,query:string){

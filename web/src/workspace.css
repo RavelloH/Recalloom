@@ -248,6 +248,7 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
  width:10px!important;height:10px!important;flex:none;stroke-width:1.9;
 }
 .bubble-menu-inner .bubble-group > * {flex:0 0 auto;min-width:0;}
+.rk-toolbar-state-selected{background:color-mix(in srgb,var(--color-primary,#527cb7) 14%,transparent)!important;color:var(--color-text-primary)!important;}
 /* Restore the original yellow H marker, not a generic monochrome pen. */
 .bubble-menu-inner .toolbar-highlight{width:auto!important;height:auto!important;padding:0 2px;}
 /* The inline flyout lives in document.body, not in the short-lived
@@ -258,6 +259,7 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
  padding:5px;border:1px solid var(--color-border,rgba(128,128,128,.19));
  border-radius:10px;background:var(--rk-popover,var(--color-background-popover,#fff));
  color:var(--color-text-primary);box-shadow:var(--rk-pop-shadow,0 8px 28px rgba(0,0,0,.14));
+ animation:rk-popover-appear .16s cubic-bezier(.2,.8,.2,1) both;
 }
 .rk-inline-popover-item{
  display:flex;flex-direction:column;gap:1px;box-sizing:border-box;
@@ -269,9 +271,26 @@ a.crumb:hover { background: var(--rk-hover); color: var(--color-text-primary, in
  background:var(--color-overlay-hover,rgba(128,128,128,.10));outline:none;
 }
 .rk-inline-popover-item:disabled{opacity:.45;cursor:not-allowed;}
+.rk-inline-popover-item[data-active="true"]{color:var(--color-text-link,#527cb7);background:color-mix(in srgb,var(--color-text-link,#527cb7) 8%,transparent);}
+.rk-inline-popover-item-label{display:flex;align-items:center;justify-content:space-between;}
+.rk-menu-item-check{font-weight:800;margin-inline-start:8px;font-size:14px;}
 .rk-inline-popover-item-label{font-size:13px;font-weight:550;line-height:1.35;}
 .rk-inline-popover-item-description{font-size:11px;line-height:1.35;color:var(--color-text-secondary);white-space:normal;}
 
+/* Keep placement transforms owned by Floating UI; animate only opacity and
+ * a tiny blur so a tooltip or bubble never jumps away from its anchor. */
+@keyframes rk-popover-appear{
+ from{opacity:0;filter:blur(2px)}
+ to{opacity:1;filter:blur(0)}
+}
+@media (hover:hover) and (pointer:fine){
+ [role="tooltip"],.bubble-menu-inner{animation:rk-popover-appear .17s ease-out both;}
+}
+@media (prefers-reduced-motion:reduce){
+ .rk-inline-popover,[role="tooltip"],.bubble-menu-inner{
+  animation:none!important;transition:none!important;
+ }
+}
 .bubble-link {display:none;}
 .slash-menu {
   position: absolute;

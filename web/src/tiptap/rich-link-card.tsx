@@ -77,7 +77,7 @@ function LinkCardEditorView({node,updateAttributes}:NodeViewProps){
  </NodeViewWrapper>;
 }
 export const RichLinkCard=Node.create({
- name:'richLinkCard',group:'block',atom:true,draggable:true,selectable:true,priority:195,
+ name:'richLinkCard',group:'block',atom:true,draggable:false,selectable:true,priority:195,
  addAttributes(){return {url:{default:''},title:{default:''}};},
  parseHTML(){return [{tag:'div[data-rk-link-card]'}];},
  renderHTML({HTMLAttributes}){return ['div',mergeAttributes(HTMLAttributes,{'data-rk-link-card':''})];},

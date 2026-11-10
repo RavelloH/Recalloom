@@ -83,7 +83,7 @@ export const extraBlockCommands:readonly RmdBlockInsertion[]=[
   category:'callout',isAvailable:canInsertBlock,run:editor=>insertRmdBlock(editor,syntax)
  })),
  ...['mark',...SKETCH_BLOCK_KINDS].map((syntax):RmdBlockInsertion=>({
-  syntax,title:syntax==='mark'?'块级语义 Mark':'块级手绘 '+({
+  syntax,title:syntax==='mark'?'块级高亮':'块级手绘 '+({
    highlight:'荧光笔',circle:'圈选',box:'方框',bracket:'括号',underline:'下划线',
    'double-underline':'双下划线'
   } as Record<string,string>)[syntax],

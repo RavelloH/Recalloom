@@ -30,7 +30,7 @@ async function select(width){
   if(selected!=='alpha beta gamma'){await page.waitForTimeout(120);continue;}
   if(width===390){await page.waitForTimeout(250);return;}
   try{
-   await page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'更多行内功能'}).waitFor({state:'visible',timeout:1400});
+   await page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'更多'}).waitFor({state:'visible',timeout:1400});
    return;
   }catch{/* BubbleMenu is debounced and may have missed a focus transition; reselect. */}
  }
@@ -55,20 +55,19 @@ try{
  await page.waitForURL(base+'/',{timeout:30000});
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:width===1280?900:844});
-  const toolbar=()=>page.getByRole('toolbar',{name:width===1280?'文本格式':'格式工具栏'}).first();
+  const toolbar=()=>page.getByRole('toolbar',{name:'文本格式'}).first();
   await create();
   await select(width);
-  await toolbar().getByRole('button',{name:'更多行内功能'}).click();
+  await toolbar().getByRole('button',{name:'更多'}).click();
   const menu=page.getByRole('menu').last();
-  for(const label of width===390?['链接','行内公式','Wiki 引用','脚注引用','弱化注释']:['链接','弱化注释','上标','下标'])
+  for(const label of ['注释','上标','下标','徽标 Badge','提示 Tooltip','缩写 Abbr','键帽 Kbd','挖空 Cloze'])
    assert.equal(await menu.getByRole('menuitem',{name:label}).count(),1,label);
-  await menu.getByRole('menuitem',{name:'弱化注释'}).click();
+  await menu.getByRole('menuitem',{name:'注释'}).click();
   assert.match(await sourceText(),/%%alpha beta gamma%%/);
   console.log('PASS inline comment source via shared menu',width);
 
   await create();await select(width);
-  await toolbar().getByRole('button',{name:'更多行内功能'}).click();
-  await page.getByRole('menu').last().getByRole('menuitem',{name:'链接'}).click();
+  await toolbar().getByRole('button',{name:'插入或编辑链接'}).click();
   const dialog=page.getByRole('dialog',{name:/链接/});
   await dialog.waitFor();
   assert.equal(await dialog.getByRole('textbox',{name:'链接文字'}).inputValue(),'alpha beta gamma');
@@ -80,8 +79,8 @@ try{
    await create();
    const line=page.locator('.tiptap p').filter({hasText:'another paragraph'}).first();
    await line.click();await page.keyboard.press('End');
-   await toolbar().getByRole('button',{name:'更多行内功能'}).click();
-   await page.getByRole('menu').last().getByRole('menuitem',{name:'脚注引用'}).click();
+   await page.keyboard.type(' /脚注');
+   await page.getByRole('listbox',{name:'插入内容'}).getByRole('option',{name:/脚注引用/}).first().click();
    assert.match(await sourceText(),/\[\^note\]/);
    console.log('PASS inline footnote at caret on mobile');
   }

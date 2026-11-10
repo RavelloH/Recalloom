@@ -24,10 +24,10 @@ const selectFixtureLine=async locator=>{
    // Source text selection can race the debounced desktop BubbleMenu when
    // switching RMD documents. Require the real action to be visible, not
    // merely a non-empty browser selection.
-   const name=page.viewportSize()?.width>720?'文本格式':'格式工具栏';
+   const name='文本格式';
    try{
     await page.getByRole('toolbar',{name}).first()
-     .getByRole('button',{name:'行内组件'}).waitFor({state:'visible',timeout:1700});
+     .getByRole('button',{name:'更多'}).waitFor({state:'visible',timeout:1700});
     return;
    }catch{/* A missed toolbar update should trigger one fresh selection. */}
   }
@@ -53,14 +53,14 @@ try{
   await page.locator('.tiptap p').first().waitFor();
   const paragraph=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
   await selectFixtureLine(paragraph);
-  const toolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
-  await toolbar.getByRole('button',{name:'手绘标记'}).waitFor().catch(async error=>{
+  const toolbar=page.getByRole('toolbar',{name:'文本格式'}).first();
+  await toolbar.getByRole('button',{name:'荧光笔与手绘标记'}).waitFor().catch(async error=>{
    const diagnostic=await page.evaluate(()=>({selected:window.getSelection()?.toString(),active:document.activeElement?.outerHTML.slice(0,180),toolbars:[...document.querySelectorAll('[role="toolbar"]')].map(x=>({name:x.getAttribute('aria-label'),text:x.textContent?.slice(0,100),display:getComputedStyle(x).display})),text:document.querySelector('.tiptap')?.textContent?.slice(0,160),viewport:innerWidth}));
    console.error('SELECTION_TOOLBAR_MISSING',JSON.stringify(diagnostic));
    await page.screenshot({path:'tmp/editor-interaction-screens/selection-failed.png',fullPage:true});
    throw error;
   });
-  await toolbar.getByRole('button',{name:'手绘标记'}).click();
+  await toolbar.getByRole('button',{name:'荧光笔与手绘标记'}).click();
   const menu=page.getByRole('menu').last();
   assert.equal(await menu.getByRole('menuitem').count(),9,'all nine hand-drawn variants visible');
   await menu.getByRole('menuitem',{name:/手绘圈选/}).click();
@@ -82,10 +82,10 @@ try{
   await page.goto(base+'/records/'+created.data.id+'?mode=visual');
   const second=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
   await selectFixtureLine(second);
-  const nodeToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
-  await nodeToolbar.getByRole('button',{name:'行内组件'}).click();
+  const nodeToolbar=page.getByRole('toolbar',{name:'文本格式'}).first();
+  await nodeToolbar.getByRole('button',{name:'更多'}).click();
   const nodeMenu=page.getByRole('menu').last();
-  assert.equal(await nodeMenu.getByRole('menuitem').count(),5,'all five inline RMD nodes available');
+  assert.ok(await nodeMenu.getByRole('menuitem').count()>=5,'all five inline RMD nodes remain in More');
   await nodeMenu.getByRole('menuitem',{name:/徽标 Badge/}).click();
   const badge=page.locator('.tiptap .rk-inline-badge').first();await badge.waitFor();
   assert.match(await badge.innerText(),/alpha beta gamma/);
@@ -102,7 +102,7 @@ try{
   await page.goto(base+'/records/'+semantic.data.id+'?mode=visual');
   const third=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
   await selectFixtureLine(third);
-  const markToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
+  const markToolbar=page.getByRole('toolbar',{name:'文本格式'}).first();
   await markToolbar.getByRole('button',{name:'高亮'}).click();
   await page.locator('.tiptap mark:not([data-rk-color])').first().waitFor();
   await page.getByRole('button',{name:'源码'}).click();
@@ -123,8 +123,8 @@ try{
   // navigation, the first End/Shift+Home can run before the editor finishes
   // taking focus; testing a menu without a valid selection is meaningless.
   await selectFixtureLine(quickLine);
-  const quickToolbar=page.getByRole('toolbar',{name:size.name==='desktop'?'文本格式':'格式工具栏'}).first();
-  await quickToolbar.getByRole('button',{name:'手绘标记'}).click();
+  const quickToolbar=page.getByRole('toolbar',{name:'文本格式'}).first();
+  await quickToolbar.getByRole('button',{name:'荧光笔与手绘标记'}).click();
   await page.getByRole('menu').last().getByRole('menuitem',{name:/手绘圈选/}).click();
   const quickMark=page.locator('.tiptap .rk-sketch-inline[data-rk-sketch-kind="circle"]').last();
   await quickMark.waitFor();
@@ -139,7 +139,7 @@ try{
    await page.goto(base+'/records/'+fresh.data.id+'?mode=visual');
    const line=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
    await selectFixtureLine(line);
-   await page.getByRole('toolbar',{name:'格式工具栏'}).getByRole('button',{name:'行内代码'}).click();
+   await page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'行内代码'}).click();
    await page.locator('.tiptap p code').filter({hasText:'alpha beta gamma'}).first().waitFor();
    await page.getByRole('button',{name:'源码'}).click();
    const code=await page.locator('.cm-content').first().innerText();

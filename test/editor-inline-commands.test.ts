@@ -70,11 +70,12 @@ describe('shared RMD inline command registry',()=>{
   assert.equal(runInlineRmdCommand(code.editor,'highlight'),false);
   assert.equal(code.calls.length,0);
  });
- it('uses the same command executor for the existing slash Highlight action',()=>{
-  const command=slashCommands.find(c=>c.id==='color-highlight');
+ it('keeps fluorescent highlight in the inline toolbar, not in slash insertion',()=>{
+  const command=inlineCommandsByGroup('hand-drawn').find(c=>c.syntax==='highlight');
+  assert.ok(!slashCommands.some(c=>c.id==='color-highlight'),'inline formatting is not a slash insertion');
   assert.ok(command);
   const m=mockEditor({selection:'内容'});
-  command.run(m.editor,{openLink(){},openImage(){},openMath(){}} as any);
+  command.run(m.editor);
   assert.deepEqual(m.calls.find(x=>x.name==='toggleMark')?.args,['rmdSketch',{kind:'highlight'}]);
  });
 });

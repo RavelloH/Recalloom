@@ -73,7 +73,7 @@ try{
   text:el.textContent,background:getComputedStyle(el).backgroundColor}));
  assert.equal(yellow.text,'H');
  assert.equal(yellow.background,'rgb(247, 220, 111)');
- assert.equal(await toolbar.getByRole('button',{name:'插入行内公式'}).count(),0);
+ assert.equal(await toolbar.getByRole('button',{name:'插入行内公式'}).count(),1,'V5 requires direct inline math in formatting toolbar');
  for(const button of await toolbar.getByRole('button').all()){
   const label=await button.getAttribute('aria-label');
   assert.ok(label,'toolbar icon must have an accessible label');
@@ -83,9 +83,9 @@ try{
  assert.ok(await tooltip.count()>0,'hovering highlighter must show an actual tooltip');
  console.log('PASS yellow H and tooltips and inline-only BubbleMenu',yellow);
 
- const category=toolbar.getByRole('button',{name:'手绘标记'});
+ const category=toolbar.getByRole('button',{name:'荧光笔与手绘标记'});
  await category.hover();
- const menu=page.getByRole('menu',{name:'手绘标记'});await menu.waitFor({state:'visible'});
+ const menu=page.getByRole('menu',{name:'荧光笔与手绘标记'});await menu.waitFor({state:'visible'});
  assert.equal(await menu.getByRole('menuitem').count(),9);
  await menu.getByRole('menuitem',{name:/手绘圈选/}).hover();
  await menu.waitFor({state:'visible'});

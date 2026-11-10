@@ -51,11 +51,12 @@ try{
   const el=document.querySelector('.rk-editor-context-popover[role="menu"]');
   if(!el)return false;
   const rect=el.getBoundingClientRect();
-  return Math.abs(rect.left-x)<30&&Math.abs(rect.top-y)<40;
+  const targetY=Math.max(8,Math.min(y,innerHeight-rect.height-8));
+  return Math.abs(rect.left-x)<30&&Math.abs(rect.top-targetY)<40;
  },point,{timeout:2600});
  const menuRect=await menu.boundingBox();assert.ok(menuRect);
  assert.ok(Math.abs(menuRect.x-point.x)<30,'context menu should open at pointer, not at viewport left: '+JSON.stringify({point,menuRect}));
- assert.ok(Math.abs(menuRect.y-point.y)<40,'context menu vertical anchor should match pointer: '+JSON.stringify({point,menuRect}));
+ assert.ok(Math.abs(menuRect.y-Math.max(8,Math.min(point.y,900-menuRect.height-8)))<40,'context menu must clamp vertically to viewport: '+JSON.stringify({point,menuRect}));
  assert.equal(await menu.getByRole('menuitem',{name:'加粗'}).count(),0,'bare block context must not show text tools');
  assert.ok(await menu.getByRole('group',{name:'块操作'}).count()>0);
  console.log('PASS pointer-anchored block context menu',point,menuRect.x,menuRect.y);
@@ -66,12 +67,12 @@ try{
  await page.getByRole('toolbar',{name:'文本格式'}).waitFor({state:'visible',timeout:2200});
  const toolbar=page.getByRole('toolbar',{name:'文本格式'});
  assert.equal(await toolbar.getByRole('button',{name:'高亮'}).count(),1,'semantic Mark must be visible directly');
- for(const group of ['手绘标记','行内组件','更多行内功能']){
+ for(const group of ['荧光笔与手绘标记','标题','列表','对齐方式','更多']){
   const button=toolbar.getByRole('button',{name:group});
   assert.equal(await button.count(),1);
   assert.equal(await button.locator('.rk-inline-dropdown-chevron').count(),1,'icon and arrow must be visible in '+group);
  }
- await toolbar.getByRole('button',{name:'手绘标记'}).click();
+ await toolbar.getByRole('button',{name:'荧光笔与手绘标记'}).click();
  const submenu=page.getByRole('menu').last();await submenu.getByRole('menuitem',{name:/圈选/}).first().waitFor();
  await page.keyboard.press('Escape');
  console.log('PASS Mark direct, collapsible icon-plus-chevron categories');
@@ -89,7 +90,8 @@ try{
   const el=document.querySelector('.rk-editor-context-popover[role="menu"]');
   if(!el)return false;
   const rect=el.getBoundingClientRect();
-  return Math.abs(rect.left-x)<35&&Math.abs(rect.top-y)<35;
+  const targetY=Math.max(8,Math.min(y,innerHeight-rect.height-8));
+  return Math.abs(rect.left-x)<35&&Math.abs(rect.top-targetY)<40;
  },selection,{timeout:2600});
  const contextDebug=await page.evaluate(()=>({
   selection:getSelection()?.toString(),
@@ -97,10 +99,10 @@ try{
   groups:[...document.querySelectorAll('.rk-editor-context-popover [role="group"]')].map(el=>el.getAttribute('aria-label'))
  }));
  const textRect=await textMenu.boundingBox();assert.ok(textRect);
- assert.ok(Math.abs(textRect.x-selection.x)<35&&Math.abs(textRect.y-selection.y)<35,
+ assert.ok(Math.abs(textRect.x-selection.x)<35&&Math.abs(textRect.y-Math.max(8,Math.min(selection.y,900-textRect.height-8)))<40,
   'selection context must remain at pointer: '+JSON.stringify({selection,textRect}));
  assert.ok(await textMenu.getByRole('group',{name:'常用文字格式'}).count()>0,'context missing text tools: '+JSON.stringify(contextDebug));
- assert.ok(await textMenu.getByRole('menuitem',{name:'语义 Mark'}).count()>0);
+ assert.ok(await textMenu.getByRole('menuitem',{name:'高亮'}).count()>0);
  assert.ok(await textMenu.getByRole('menuitem',{name:'更多文字格式'}).count()>0);
  const more=textMenu.getByRole('menuitem',{name:'更多文字格式'});
  await more.hover();

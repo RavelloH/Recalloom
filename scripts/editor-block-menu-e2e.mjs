@@ -37,7 +37,7 @@ try{
   await page.goto(base+'/records/'+created.data.id+'?mode=visual');
   const gallery=await selectMenu('');
   const categories=await gallery.locator('.slash-category-heading').allTextContents();
-  assert.deepEqual(categories,['基础','布局','提示','手绘','学习','引用','媒体','格式','行内'],'all syntax families must be discoverable');
+  assert.deepEqual(categories,['基础','布局','提示','手绘','学习','引用','媒体','行内'],'all syntax families must be discoverable');
   const first=gallery;
   await first.getByRole('option',{name:/危险 Callout/}).click();
   await page.locator('.tiptap .rk-directive-danger').first().waitFor();

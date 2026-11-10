@@ -59,34 +59,42 @@ for(const spec of leaf){
  rows.push({syntax:spec.name,type:'leaf',surface:'slash',command:id});
 }
 const nodeEntries:Readonly<Record<string,readonly string[]>>={
- heading:['h1','h2','h3'],paragraph:['text'],image:['image'],math:['block-math','inline-math'],table:['table'],code:['code']
+ heading:[],paragraph:[],image:['image'],math:['block-math','inline-math'],table:['table'],code:['code']
 };
 assert.ok(panel.includes('<RmdSchemaAttributeFields'),'shared block panel must render schema-driven @ attrs');
 for(const spec of RMD_REGISTRY.nodes){
  const matching=nodeEntries[spec.node];
  assert.ok(matching,'node family not audited: '+spec.node);
- for(const id of matching)assert.ok(slash.has(id),'missing standard block action '+spec.node+': '+id);
+ if(spec.node==='heading'){
+  assert.ok(toolbar.includes("categoryButton('标题'")&&toolbar.includes('toggleHeading({level})')&&
+   toolbar.includes('setParagraph()'),'headings and paragraph must be stateful toolbar controls');
+  assert.ok(!slash.has('h1')&&!slash.has('text'),'format-state actions must not pollute slash insertion');
+ }else if(spec.node==='paragraph'){
+  assert.ok(toolbar.includes("id:'heading-paragraph'"),'paragraph reset belongs to the heading state dropdown');
+ }else for(const id of matching)
+  assert.ok(slash.has(id),'missing insertion action '+spec.node+': '+id);
  const mapping=Object.entries(rmdAttrNodeMapping).find(([,value])=>value.node===spec.node);
  assert.ok(mapping,'missing schema attribute mapping for '+spec.node);
  assert.ok(isRmdAttrsEditable(mapping[0]),'node attributes not reachable: '+spec.node);
 }
-const compact=toolbar.split('{compact&&<div className="wysiwyg-toolbar"')[1]?.split('{!compact&&<BubbleMenu')[0]??'';
-const desktop=toolbar.split('{!compact&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
+const touch=toolbar.split('{touchToolbar&&<div className="wysiwyg-toolbar"')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
+const desktop=toolbar.split('{finePointer&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
 const standard=['粗体','斜体','下划线','删除线','行内代码','上标','下标'];
 const shared=toolbar.split('const inlineMarks=<>')[1]?.split('</>;')[0]??'';
-const sharedMarks=new Set(['粗体','斜体','下划线','删除线']);
-for(const title of standard){
- const symbol="toggle('"+title+"'";
- const sharedEntry=sharedMarks.has(title);
- assert.ok(sharedEntry?compact.includes('{inlineMarks}')&&shared.includes(symbol):compact.includes(symbol),
-  'mobile toolbar missing standard inline mark '+title);
- const desktopMoreEntry=title==='上标'?"id:'inline-more-super'":title==='下标'?"id:'inline-more-sub'":null;
- assert.ok(sharedEntry?desktop.includes('{inlineMarks}')&&shared.includes(symbol):
-  desktop.includes(symbol)||!!desktopMoreEntry&&desktop.includes('{inlineMarks}')&&shared.includes(desktopMoreEntry),
-  'desktop selection toolbar missing '+title);
+const actions=toolbar.split('const inlineActions=<>')[1]?.split('</>;')[0]??'';
+for(const title of ['粗体','斜体','下划线','删除线']){
+ assert.ok(shared.includes("toggle('"+title+"'"),'shared formatting toolbar missing '+title);
 }
-for(const action of ['插入或编辑链接','引用 Wiki 文档','插入行内公式'])
- assert.ok(compact.includes("action('"+action+"'"),'mobile toolbar missing core action '+action);
+assert.ok(actions.includes("toggle('行内代码'"),'inline code must be directly visible');
+for(const title of ['上标','下标'])
+ assert.ok(toolbar.includes("label:'"+title+"'"),'more menu missing '+title);
+assert.ok(touch.includes('{inlineMarks}')&&touch.includes('{inlineActions}')&&
+ touch.includes('{formatStateMenus}'),'touch toolbar must expose inline and state actions');
+assert.ok(desktop.includes('{inlineMarks}')&&desktop.includes('{inlineActions}')&&
+ desktop.includes('{formatStateMenus}'),'desktop selection toolbar must expose inline and state actions');
+for(const action of ['插入或编辑链接','插入行内公式'])
+ assert.ok(actions.includes("action('"+action+"'"),'toolbar missing direct action '+action);
+assert.ok(touch.includes("action('插入内容'"),'touch toolbar must open slash insertion picker');
 assert.ok(slash.has('footnote'),'GFM footnote reference must retain an insertion entry');
 const summary={
  schema:{inline:inline.length,block:blocks.length,leaf:leaf.length,total:rows.length,nodes:RMD_REGISTRY.nodes.length},

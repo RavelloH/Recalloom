@@ -76,6 +76,6 @@ export function inlineContextItems(editor:Editor):DropdownMenuOption[]{
   {id:'selection-code',label:'行内代码',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('code').run())},
   {id:'selection-superscript',label:'上标',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('superscript').run())},
   {id:'selection-subscript',label:'下标',isDisabled:empty,onClick:action(()=>editor.chain().focus().toggleMark('subscript').run())},
-  {id:'selection-rmd-mark',label:'语义 Mark',isDisabled:empty,onClick:action(()=>runInlineRmdCommand(editor,'mark'))}
+  {id:'selection-rmd-mark',label:'高亮',isDisabled:empty,onClick:action(()=>runInlineRmdCommand(editor,'mark'))}
  ];
 }

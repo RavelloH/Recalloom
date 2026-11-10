@@ -145,13 +145,13 @@ try{
  await visual.locator('p').last().click();
  await page.keyboard.press('Control+End');
  await page.keyboard.press('Enter');
- await page.keyboard.type('/引用');
+ await page.keyboard.type('/分割线');
  const slash=page.getByRole('listbox',{name:'插入内容'});
  await slash.waitFor({state:'visible'});
- await slash.getByRole('option',{name:/引用/}).first().click();
- await page.keyboard.type('使用斜杠插入的引用。');
- assert.ok(await visual.locator('blockquote').getByText('使用斜杠插入的引用。').count()>=1,
-  'blockquote slash action must remain functional without legacy tokenizer');
+ await slash.getByRole('option',{name:/分割线/}).first().click();
+
+ assert.ok(await visual.locator('hr').count()>=1,
+  'slash structural insertion must remain functional; quotation is now a toolbar state');
  assert.deepEqual(errors,[],'client page errors');
  console.log('PASS RMD visual/preview/source unsaved edit, safe save/reload, Mark color, comments, table, math, slash action');
 }finally{await browser.close().catch(()=>{});}

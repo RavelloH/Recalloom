@@ -38,6 +38,20 @@
 .rk-editor-context-popover [role="menuitem"] svg{
  width:16px;height:16px;flex:none;stroke-width:1.8;
 }
+.rk-editor-context-popover [role="menuitem"] .toolbar-highlight{
+ font-weight:700;font-size:13px;line-height:1.15;display:inline-flex;
+ justify-content:center;align-items:center;width:16px;min-height:16px;
+}
+.rk-editor-context-feedback{
+ position:fixed;z-index:2500;max-width:min(320px,calc(100vw - 16px));
+ background:var(--color-background-popover,var(--rk-popover,#fff));
+ color:var(--color-text-primary,#222);border:1px solid var(--color-border,#ddd);
+ border-radius:9px;padding:9px 12px;font-size:12px;line-height:1.5;
+ box-shadow:0 8px 24px rgba(0,0,0,.13);pointer-events:none;
+ animation:rk-context-feedback-enter .15s ease-out both;
+}
+@keyframes rk-context-feedback-enter{from{opacity:0;filter:blur(2px)}to{opacity:1;filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.rk-editor-context-feedback{animation:none!important;}}
 
 /* Astryx's animated layer wraps the menu in a transformed positioning root.
  * A transformed ancestor becomes the containing block of position:fixed
