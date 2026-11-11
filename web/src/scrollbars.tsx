@@ -1,4 +1,4 @@
-import React,{useEffect,useLayoutEffect,useRef} from 'react';
+import React,{useEffect,useLayoutEffect,useRef,useSyncExternalStore} from 'react';
 import type {PartialOptions} from 'overlayscrollbars';
 
 // The static UI policy is lightweight. Load the scrollbar engine only where
@@ -7,8 +7,11 @@ type ScrollbarEngine=typeof import('overlayscrollbars')['OverlayScrollbars'];
 type ScrollbarInstance=ReturnType<ScrollbarEngine>;
 let enginePromise:Promise<ScrollbarEngine>|undefined;
 let loadedEngine:ScrollbarEngine|undefined;
+const readyListeners=new Set<()=>void>();
+const notifyReady=()=>{for(const listener of readyListeners)listener();};
 const loadEngine=()=>enginePromise??=import('overlayscrollbars').then(m=>{
  loadedEngine=m.OverlayScrollbars;
+ notifyReady();
  return loadedEngine;
 }).catch(error=>{enginePromise=undefined;throw error;});
 import 'overlayscrollbars/overlayscrollbars.css';
@@ -34,12 +37,38 @@ export function applyScrollbarPolicy(){
 }
 export const usesNativeScrollbars=()=>document.documentElement.dataset.scrollbarMode==='native';
 
-/** Prime the browser-only overlay engine before React mounts its scroll
- * viewports. OverlayScrollbars re-parents a viewport on initialization;
- * doing that after list rows have painted replays their CSS entry animation.
- * Native Apple WebKit needs no download. Import failure keeps native scroll. */
-export async function prepareScrollbars(){
- if(!usesNativeScrollbars())await loadEngine().catch(()=>undefined);
+/** OverlayScrollbars changes viewport DOM on first attachment. Allow React
+ * and the login/connection UI to render while its chunk loads, but gate the
+ * authenticated shell until the engine is ready for synchronous layout-effect
+ * initialization. This preserves the original one-shot row entrance animation. */
+const subscribeReady=(listener:()=>void)=>{
+ readyListeners.add(listener);
+ return()=>{readyListeners.delete(listener);};
+};
+const scrollbarsReady=()=>usesNativeScrollbars()||Boolean(loadedEngine);
+export const useScrollbarsReady=()=>useSyncExternalStore(subscribeReady,scrollbarsReady,()=>false);
+
+/** Native Apple WebKit skips the import. Failed or stalled downloads
+ * settle on native scrollbars for this page lifetime: upgrading after paint
+ * would re-parent the viewport and repeat all row entrance animations. */
+const SCROLLBAR_BOOT_TIMEOUT_MS=3000;
+let bootstrapPromise:Promise<void>|undefined;
+export function prepareScrollbars():Promise<void>{
+ if(scrollbarsReady())return Promise.resolve();
+ return bootstrapPromise??=(async()=>{
+  let timeout:ReturnType<typeof setTimeout>|undefined;
+  try{
+   await Promise.race([
+    loadEngine(),
+    new Promise<void>(resolve=>{timeout=setTimeout(resolve,SCROLLBAR_BOOT_TIMEOUT_MS);})
+   ]);
+  }catch{ /* Dynamic import failed; native scrolling remains available. */ }
+  finally{if(timeout!==undefined)clearTimeout(timeout);}
+  if(!loadedEngine&&!usesNativeScrollbars()){
+   document.documentElement.dataset.scrollbarMode='native';
+   notifyReady();
+  }
+ })();
 }
 
 /** Edge fades tell readers that a horizontal block continues beyond the column. */

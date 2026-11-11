@@ -23,9 +23,8 @@ installAdaptiveFavicon();
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';
 window.CAP_CUSTOM_HASHWX_URL='/cap-wasm/hashwx.wasm';
 function App(){const {mode}=useAppearance();return <InternationalizationProvider locale="zh-CN" messages={{'zh-CN':zhCN}}><Theme theme={recalloomTheme} mode={mode}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></Theme></InternationalizationProvider>;}
-// Prime the deferred overlay scrollbar module before mounting route content.
-// It restructures scroll viewport DOM; mounting it after the first paint
-// otherwise restarts staggered row animations and causes a second flicker.
-void prepareScrollbars().then(()=>{
- createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);
-});
+// Start the overlay engine fetch alongside the auth query, not ahead of the
+// entire React app. The route root gates only the authenticated scroll shell;
+// login and the initial connection UI never wait for this optional chunk.
+if(location.pathname!=='/login')void prepareScrollbars();
+createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);

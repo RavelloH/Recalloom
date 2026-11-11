@@ -335,11 +335,20 @@ try{
    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',monitor,{once:true});
    else monitor();
   });
+  let overlayChunkDelivered=false;
   if(engine==='chromium')await page.route('**/assets/overlayscrollbars-*.js',async route=>{
-   await new Promise(resolve=>setTimeout(resolve,900));
+   await new Promise(resolve=>setTimeout(resolve,1500));
+   overlayChunkDelivered=true;
    await route.continue();
   });
-  await page.reload();
+  await page.reload({waitUntil:'domcontentloaded'});
+  if(engine==='chromium'){
+   // Authentication / connection UI paints before the optional module arrives,
+   // but scroll viewports must not mount until their engine is ready.
+   await page.locator('.center-screen').waitFor({state:'visible'});
+   assert.equal(overlayChunkDelivered,false,'React must paint before the scrollbar chunk resolves');
+   assert.equal(await page.locator('.shell').count(),0,'scroll shell must wait for the engine');
+  }
   await page.locator('.page > .task-list .task-item').first().waitFor();
   await page.waitForTimeout(800);
   const startup=await page.evaluate(()=>({
@@ -464,6 +473,53 @@ try{
   return [old.animationDuration,newer.animationDuration];
  });
  assert.ok(durations.every(duration=>parseFloat(duration)<=0.001),'reduce motion animation durations '+JSON.stringify(durations));
+ if(engine==='chromium'){
+  // The login page is interactive without fetching the optional scrollbar
+  // chunk at all. Its first render must not be held by scroll initialization.
+  const loginContext=await browser.newContext();
+  try{
+   const loginPage=await loginContext.newPage();
+   const loginChunkRequests=[];
+   loginPage.on('request',request=>{
+    if(new URL(request.url()).pathname.includes('/assets/overlayscrollbars-'))loginChunkRequests.push(request.url());
+   });
+   await loginPage.goto(base+'/login',{waitUntil:'domcontentloaded'});
+   await loginPage.getByPlaceholder('输入 MCP_AUTH_SECRET').waitFor();
+   await loginPage.waitForTimeout(200);
+   assert.deepEqual(loginChunkRequests,[],'login must not download or await the scrollbar engine');
+  }finally{await loginContext.close();}
+
+  // An optional scrollbar chunk must never be a single point of failure.
+  // If it cannot download, render the authenticated page using native bars.
+  const fallbackContext=await browser.newContext();
+  await fallbackContext.addCookies(await page.context().cookies(base));
+  const failurePage=await fallbackContext.newPage();
+  try{
+   await failurePage.route('**/assets/overlayscrollbars-*.js',route=>route.abort('failed'));
+   await failurePage.goto(base+'/tasks',{waitUntil:'domcontentloaded'});
+   await failurePage.locator('.page > .task-list .task-item').first().waitFor();
+   const fallback=await failurePage.evaluate(()=>({
+    mode:document.documentElement.dataset.scrollbarMode,
+    width:getComputedStyle(document.querySelector('.main-scroll')).scrollbarWidth,
+    hasShell:Boolean(document.querySelector('.shell'))
+   }));
+   assert.equal(fallback.mode,'native','failed overlay module must fall back to native scrollbars');
+   assert.equal(fallback.hasShell,true,'authenticated app must remain usable on chunk failure');
+   assert.notEqual(fallback.width,'none','native scrollbar must not be hidden by the overlay CSS policy');
+
+   // A stalled resource must also become usable after the bounded bootstrap
+   // timeout, even if the optional overlay chunk is never delivered.
+   const stalledPage=await fallbackContext.newPage();
+   await stalledPage.route('**/assets/overlayscrollbars-*.js',async route=>{
+    await new Promise(resolve=>setTimeout(resolve,5000));
+    await route.continue().catch(()=>undefined);
+   });
+   await stalledPage.goto(base+'/tasks',{waitUntil:'domcontentloaded'});
+   await stalledPage.locator('.page > .task-list .task-item').first().waitFor({timeout:6500});
+   const mode=await stalledPage.evaluate(()=>document.documentElement.dataset.scrollbarMode);
+   assert.equal(mode,'native','stalled overlay module must fall back to native scrollbars');
+  }finally{await fallbackContext.close();}
+ }
  assert.deepEqual(faults,[],'no browser runtime faults');
  console.log('PASS atomic route View Transitions ('+engine+'): forward/back, live shell, text, slow data, mobile and reduced-motion');
 }finally{await browser.close();}

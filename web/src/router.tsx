@@ -4,6 +4,7 @@ import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation,laz
 import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
 import {Shell} from './shell';
+import {prepareScrollbars,useScrollbarsReady} from './scrollbars';
 // Route modules load only when visited/preloaded, rather than entering the
 // initial shell bundle. TanStack preloads these on navigation intent.
 const importLogin=()=>import('./pages/login');
@@ -34,9 +35,14 @@ const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="statu
 const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
+ const scrollbarReady=useScrollbarsReady();
+ React.useEffect(()=>{if(!onLogin&&!scrollbarReady)void prepareScrollbars();},[onLogin,scrollbarReady]);
  if(onLogin)return <React.Suspense fallback={<div className="center-screen" role="status">正在加载登录页面…</div>}><Outlet/></React.Suspense>;
  if(state.isPending)return <div className="center-screen"><span className="spin"/>正在连接…</div>;
  if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
+ // The shell's scroll viewports must initialize before they paint; do not
+ // withhold the login page or auth request while the engine chunk downloads.
+ if(!scrollbarReady)return <div className="center-screen" role="status"><span className="spin"/>正在准备界面…</div>;
  return <Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell>;
 }
 // Wait for critical page data AND lazy component code before committing the
