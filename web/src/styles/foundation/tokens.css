@@ -1,6 +1,8 @@
 /* Recalloom styles — Theme-level and application design tokens. One owning module per selector; do not reintroduce cross-file overrides. */
 
 :root {
+  /* Never snapshot the entire application: the live shell must not flash. */
+  view-transition-name: none;
   font-synthesis: none;
   --rk-page-max: 1192px;
   --rk-radius: 12px;

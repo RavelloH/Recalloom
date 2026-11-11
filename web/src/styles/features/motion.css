@@ -151,21 +151,17 @@ to {
 }
 }
 
-/* The root snapshot includes only the persistent shell/background.
-   Do not crossfade it: that would make the header and bottom nav blink.
-   The fixed-size main scroll viewport owns the content transition. */
-::view-transition-group(root),
-::view-transition-group(rk-route-content) {
-  animation: none;
+/* The root is excluded from the transition in foundation/tokens.css.
+   The live sidebar, topbar and bottom nav never become old/new snapshots. */
+/* The route viewport is the only named snapshot. Keep text, headings,
+   icons and list rows inside this SAME crossfade; do not extract unmatched
+   text into independent ghosts or hide it before the old page exits. */
+::view-transition {
+  pointer-events: none;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  /* Both persistent shell snapshots remain fully opaque. Keeping the old
-     shell visible until the new one is captured prevents WebKit blank frames
-     during async navigation. Only rk-route-content fades. */
+::view-transition-group(rk-route-content) {
   animation: none;
-  opacity: 1;
 }
 
 ::view-transition-old(rk-route-content) {
@@ -174,32 +170,6 @@ to {
 
 ::view-transition-new(rk-route-content) {
   animation: 175ms 105ms ease-out both rk-view-enter;
-}
-
-/* Stable resource identities can exist in a list without a match on the
-   other page. Remove orphaned snapshots immediately to prevent ghost text.
-   A matched pair still gets the native geometry morph and split fade. */
-::view-transition-group(*) {
-  animation-duration: 300ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-::view-transition-old(*),
-::view-transition-new(*) {
-  animation: 140ms ease-in both rk-view-exit;
-}
-
-::view-transition-new(*) {
-  animation: 160ms 125ms ease-out both rk-view-enter;
-}
-
-::view-transition-old(*):only-child {
-  animation: none;
-  opacity: 0;
-}
-
-::view-transition-new(*):only-child {
-  animation: 130ms ease-out both rk-view-enter;
 }
 
 @keyframes rk-view-exit {

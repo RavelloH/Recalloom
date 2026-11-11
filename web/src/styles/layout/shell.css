@@ -581,8 +581,8 @@ html[data-effective-theme="dark"] .topbar {
   flex: 1 1 0;
   height: 100%;
   width: 100%;
-  /* A stable viewport snapshot prevents tall pages from scaling to each
-     other's height. The browser's root snapshot keeps navigation visible. */
+  /* Capture ONLY this fixed viewport during navigation. The surrounding
+     shell stays live and is never duplicated in the root transition. */
   view-transition-name: rk-route-content;
 }
 
