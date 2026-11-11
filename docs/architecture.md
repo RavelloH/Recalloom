@@ -30,9 +30,9 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 | `web/src/` | React 前端、编辑器、关系网、组件与路由入口 |
 | `web/src/pages.tsx` | 页面组件兼容导出入口，供非路由调用方继续使用 |
 | `web/src/pages/` | 登录、概览、知识库、归档、记录、任务、搜索、活动和设置页面；`router.tsx` 通过 `lazyRouteComponent` 按需加载，`shared.tsx` 提供通用页面反馈组件 |
-| `web/src/record-workbench.tsx` | Markdown 文档工作台顶部：带圆角底色的标签行、更新时间/编辑者/字数信息行，以及信息/目录/关联/版本统一检查器；详情中可编辑文件名（任务列表不受影响） |
-| `web/src/document-heading.ts` | 首个顶层 Markdown H1 的纯函数识别、标题与正文拼接、字数统计；H1 只在重新打开文档或切换编辑模式时提升，保存时保留当前会话显示策略 |
-| `web/src/record-editor.tsx` | 源码、预览、可视化三种模式共享完整 Markdown 草稿，首个 H1 作为独立可编辑标题展示但仍存在于存储正文中；版本列表通过 Portal 进入检查器 |
+| `web/src/record-workbench.tsx` | Markdown 文档工作台顶部：文件名（显示时隐藏 `.md`）、更新时间/编辑者/字数信息、信息/目录/关联/版本统一检查器；文件名仅在顶部编辑（任务列表不受影响） |
+| `web/src/document-heading.ts`、`web/src/document-filename.ts` | Markdown 字数统计与文档文件名显示/重命名规则；所有 H1 均属于正文，不再提升到标题栏 |
+| `web/src/record-editor.tsx` | 源码、预览、可视化三种模式均显示与编辑完整 Markdown 草稿（包括首个 H1）；版本列表通过 Portal 进入检查器 |
 | `web/src/visual-editor.tsx` | 可视化编辑器稳定入口，保持默认组件导出与 `VisualEditorHandle` 类型导出 |
 | `web/src/visual-editor/` | 可视化编辑器装配、Tiptap 扩展组合、选区状态、共享格式工具栏、表格操作、斜杠/引用补全与弹出菜单 |
 | `web/src/tiptap/` | Tiptap 节点、命令、插件与编辑器交互原语，不包含页面级工具栏布局 |
@@ -49,7 +49,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 - **路由层：** TanStack Router 统一使用 `defaultViewTransition: true`，覆盖点击、程序导航与前进/后退。`:root { view-transition-name: none }` 明确禁止全屏快照：侧栏、顶栏和底栏保持为实时 DOM，而不是两个重叠的旧/新截图。固定尺寸的 `.main-scroll-host` 是唯一的命名快照 `rk-route-content`，仍使用原有的 130ms 淡出与延迟 105ms 的 175ms 淡入。**桌面顶栏由路由页面通过 Portal 填充，必须绝对定位，不参与 `.workspace` 的 flex 高度计算；所有桌面 `.page`（无论是否有面包屑）统一预留顶部内容间距，留白属于可滚动的页面内容，不是固定空顶栏。** 否则从概览进入详情时 `:empty` 导致顶栏由 `display:none` 变为 `flex`，会把仍在淡出的旧页面整体推移，造成闪动。不要把过渡名称赋给页面内容节点，也不要对 `root` 恢复截图。
 - **文字与共享元素：** 当前默认关闭文本级共享快照。即使资源 ID 稳定，跨列表/详情/搜索时单独捕获文字仍会出现孤立快照，导致文字提前消失、漂浮鬼影，或与主页面淡化不同步。`web/src/shared-view-transition.ts` 暂保留稳定 ID 的命名算法作为未来受控、成对共享过渡的入口，但默认返回 `undefined`，保证标题、行和图标跟随整个页面一起渐变；不再使用 `::view-transition-old(*):only-child` 隐藏孤立文字。只有确认两端匹配、可控制裁切/层叠和连续导航中断时才能重新启用。
 - **文件名与 H1：** Markdown 首块 H1 独立于数据库文件名。当前不单独捕获文件名/H1；二者都在同一个页面视口快照内按整体渐变，避免从列表到编辑器时文字被拉伸成鬼影。参考 `web/src/record-workbench.tsx`。
-- **页面就绪：** `router.tsx` 不再使用旧的 600ms 预热截止时间。关键路由 loader 必须在提交前准备好首屏查询和懒加载组件；文档额外预加载编辑器，任务列表额外加载任务项。慢网络时保留旧页面及导航进度，不得把 Skeleton / Suspense fallback 捕获到新页面快照中；加载失败仍由原有页面错误组件处理。**局部效果：** 检查器 Tab 用 Motion Layout，编辑器模式、侧栏折叠、块拖动继续使用专用动画，所有效果遵守 `prefers-reduced-motion`。
+- **页面就绪：** `router.tsx` 不再使用旧的 600ms 预热截止时间。文档/任务等内容路由的 loader 在提交前准备关键首屏查询和懒加载组件，避免 Skeleton 进入新页面快照。**搜索例外：** 搜索页路由只预加载页面模块，不等待搜索 API；点击搜索或切换搜索方式要立即更新 URL、展示加载提示和按钮反馈，再以原有 `Swap` 和结果行渐入呈现结果。命令面板首次点击若需下载资源会没有可见动画，因此 Shell 空闲时预热命令面板并保留加载反馈，真实弹窗交由 Astryx Dialog 执行过渡。登录页不提前下载该模块。慢网络时其他路由保留旧页面及导航进度；加载失败由页面错误组件处理。**局部效果：** 检查器 Tab 用 Motion Layout，编辑器模式、侧栏折叠、块拖动继续使用专用动画，所有效果遵守 `prefers-reduced-motion`。
 - **刷新加载稳定性：** 首页的未完成事项与近期活动、任务页与活动页在异步数据首次就绪时直接渲染最终结果，不叠加 `Swap → AutoTransition → AutoResizer` 的先退出后进入与高度补间；归档的直接渲染方式是基线。数据仍由共享 TanStack Query 缓存管理。**保留数据行 `data-row-fade-in` 的错峰动画，不要通过删除动画掩盖重复播放。** `OverlayScrollbars` 初始化会重新挂接已存在的滚动容器，导致里面所有 CSS 入场动画重新启动；在非 Apple WebKit 浏览器里，`prepareScrollbars()` 与 React/认证请求**并行**启动；只延迟已认证主界面的 `Shell` 挂载，登录界面和连接提示无需等待滚动条。`OverlayScroll` 在 layout effect 使用已预热的引擎同步初始化，使 DOM 重组发生在首帧绘制前。若引擎下载失败或超过 3 秒仍未就绪，本次页面生命周期固定退回原生滚动条，绝不能在内容已经入场后再升级重组 DOM。Apple WebKit 默认使用原生滚动条而不下载该模块。E2E 将滚动条 chunk 人为延迟 1.5 秒验证连接提示及时显示、列表动画只执行一次，并测试资源错误与超时的原生回退。侧栏文件夹通过按需查询等待实际子项加载，先将真实子树挂载在折叠容器内，随后于独立动画帧展开；关闭时保留 DOM 到收起动画完成，缩减动态效果和动画被打断时有兜底卸载。不要在展开时先显示短暂的“加载中…”子行，导致内容二次撑开。
 - **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check`、`node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs`。E2E 使用隔离的本地 Worker/D1，核对旧/新快照都仅有 `rk-route-content`、文本不被独立捕获、外壳保持实时、双向历史、手机视口与 1.7 秒延迟 API。WebKit 可用 `RECALLOOM_TEST_ENGINE=webkit`，独立手机会话再设置 `RECALLOOM_TEST_MOBILE=1`；本地 HTTP 不支持生产的 `__Host-` 安全 Cookie，测试脚本仅在回环地址转发本地会话，请勿将此处理加入线上代码。
 
@@ -57,7 +57,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 1. **业务逻辑不依赖 React。** 记录身份、版本、归档、安全性和搜索准则优先在 Worker/共享纯模块实现；UI 不应重写安全校验。
 2. **服务器 API 是唯一权威入口。** 前端只能通过 API 读取/修改持久状态，不直接访问 D1、KV 或 Vectorize。
-3. **编辑器输入和持久层分离。** 源码、预览、可视化三种模式要保持语义一致，编辑器中间态可延迟保存但不能丢失修订冲突检查。文档页面采用 Knowledge Workbench：标题与文件名是不同身份。没有首块 H1 时顶部标题编辑文件名；存在首块顶层 H1 时，顶部标题编辑 Markdown 中的 H1，文件名显示于类型标识和详情检查器；正文不重复呈现已提升的 H1。编辑过程中新增的首块 H1 仍保留在正文，直到明确切换编辑模式或重新打开文档（保存不算重新打开）；非首块 H1 不提升。标签独占可选行，更新时间/去重编辑者/可见字数与详情按钮共用下一行。完整属性、目录、关联和历史在一个检查器中按需展示。块拖动把手继续沿用现有统一交互，不随页面布局调整。
+3. **编辑器输入和持久层分离。** 源码、预览、可视化三种模式要保持语义一致，编辑器中间态可延迟保存但不能丢失修订冲突检查。文档页面采用文件名与正文标题分离的模式：顶部大标题始终显示文件名（隐藏末尾 `.md`），在此编辑只更新文件名元数据，不修改 Markdown；首个与其他位置的 H1 一律作为正常正文，在源码、预览和可视化中完整显示，字号小于顶部文件名。类型标识不重复显示文件名，详情检查器不提供第二个文件名编辑入口。标签独占可选行，更新时间/去重编辑者/可见字数与详情按钮共用下一行。完整属性、目录、关联和历史在一个检查器中按需展示。块拖动把手继续沿用现有统一交互，不随页面布局调整。
 4. **数据库变更可回放。** 新增 migrations 文件，不对历史迁移做破坏性重写；复杂升级必须在本地 D1 的多个旧状态上回归。
 5. **组件和 CSS 有明确归属。** 页面模块使用 `web/src/pages/`，可视化编辑器装配使用 `web/src/visual-editor/`，通用 Tiptap 插件使用 `web/src/tiptap/`，服务端存储使用 `src/storage/`。CSS 由 `web/src/styles/` 的单一所有权规则管理，避免全局补丁文件。
 6. **公共入口稳定，内部依赖无环。** `pages.tsx`、`visual-editor.tsx`、`storage.ts` 是兼容导出入口，内部模块不得反向引用这些入口或形成循环。`pnpm modules:check` 自动验证三个领域的导出及依赖图。编辑器源码审计分别检查 `visual-editor/formatting-toolbar.tsx` 与 `visual-editor/editor.tsx`，保证桌面和触屏格式菜单共用同一顺序。

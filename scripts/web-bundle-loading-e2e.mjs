@@ -40,13 +40,17 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  await page.getByRole('heading',{name:'概览'}).waitFor();
- await page.waitForTimeout(450);
- assert.ok(!has(urls,'command-palette'),'Command palette downloaded before opening');
+ // Prewarm the command palette after first paint so the first click doesn't
+ // block on its JS chunk. Login remains lean and editors still stay deferred.
+ await page.waitForFunction(()=>performance.getEntriesByType('resource').some(e=>e.name.includes('/command-palette-')),{timeout:5000});
+ assert.ok(has(urls,'command-palette'),'Palette must prewarm after the authenticated shell paints');
  assert.ok(!has(urls,'visual-editor'),'Visual editor downloaded on overview');
+ const paletteRequests=urls.filter(url=>url.includes('/command-palette-')).length;
  await page.keyboard.press('Control+k');
  const dialog=page.getByRole('dialog',{name:'快速导航'});
  await dialog.waitFor();
- assert.ok(has(urls,'command-palette'),'Palette chunk not requested on first keyboard shortcut');
+ assert.equal(urls.filter(url=>url.includes('/command-palette-')).length,paletteRequests,
+  'Opening the palette must not initiate a cold chunk download');
  await page.keyboard.press('Escape');
  await page.waitForTimeout(240);
  await page.keyboard.press('Control+k');

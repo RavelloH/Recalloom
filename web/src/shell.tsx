@@ -16,7 +16,8 @@ import {menu} from './navigation';
 import {PageTree} from './page-tree';
 // Load the sizeable command palette only on first use; retain it after closing
 // so its dismissal animation and in-memory search state still behave normally.
-const QuickSwitcher=React.lazy(()=>import('./command-palette').then(module=>({default:module.QuickSwitcher})));
+const loadQuickSwitcher=()=>import('./command-palette');
+const QuickSwitcher=React.lazy(()=>loadQuickSwitcher().then(module=>({default:module.QuickSwitcher})));
 import {TopbarSlotProvider} from './topbar-slot';
 import {clearRecentPages} from './recent-pages';
 import {OverlayScroll} from './scrollbars';
@@ -41,6 +42,16 @@ export function Shell({children}:{children:React.ReactNode}){
  const cycleTheme=()=>setMode(mode==='system'?'light':mode==='light'?'dark':'system');
  const themeName=mode==='system'?'跟随系统':mode==='light'?'浅色':'深色';
  const closeMobile=()=>setMobileOpen(false);
+ // Prewarm the sizeable palette after the shell has painted. On first click
+ // the Dialog's built-in open animation then runs without a cold chunk delay.
+ useEffect(()=>{
+  if(typeof window.requestIdleCallback==='function'){
+   const handle=window.requestIdleCallback(()=>{void loadQuickSwitcher();},{timeout:1800});
+   return()=>window.cancelIdleCallback(handle);
+  }
+  const handle=window.setTimeout(()=>{void loadQuickSwitcher();},500);
+  return()=>window.clearTimeout(handle);
+ },[]);
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{
   const mod=event.ctrlKey||event.metaKey;
   if(mod&&event.key.toLowerCase()==='k'){event.preventDefault();setPaletteActivated(true);setCommands(v=>!v);}
@@ -62,7 +73,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
-    <NavRow icon="search" label="搜索" className="nav-search" trailing={<kbd className="nav-kbd">{shortcut}</kbd>} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
+    <NavRow icon="search" label="搜索" className="nav-search" trailing={<kbd className="nav-kbd">{shortcut}</kbd>} onPointerEnter={()=>{void loadQuickSwitcher();}} onFocus={()=>{void loadQuickSwitcher();}} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
     <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon})=><NavRow key={to} to={to} icon={icon} label={name} onClick={closeMobile} exact={to==='/'}/>)}</nav>
    </div>
    <PageTree onNavigate={closeMobile}/>
@@ -85,7 +96,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </OverlayScroll>
  </main></div>
  <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
- {paletteActivated&&<React.Suspense fallback={null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
+ {paletteActivated&&<React.Suspense fallback={commands?<div className="palette-loading" role="status"><span className="spin"/>正在打开搜索…</div>:null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
  {confirmation}
  </div>;
 }

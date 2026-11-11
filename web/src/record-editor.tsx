@@ -20,11 +20,11 @@ import type {RecordDetail} from './types';
 import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor,PreviewEditorChunk as PreviewEditor,type EditorMode} from './editor-chunks';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import {observeMathHorizontalOverflow} from './math-scroll';
-import {leadingDocumentHeading,displayedDocumentBody,withDocumentBody,renameDocumentHeading,markdownCharacterCount,type PromotedHeading} from './document-heading';
+import {markdownCharacterCount} from './document-heading';
 import type {DocumentPresentation} from './record-workbench';
 
 
-export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,historyTarget,onRegisterTitleEditor,onDocumentPresentation,deferInitialPromotion}:{item:RecordDetail;onSaved:(content?:string,headingWasPromoted?:boolean)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onRegisterTitleEditor:(handler:((name:string)=>Promise<void>)|null)=>void;onDocumentPresentation:(value:DocumentPresentation)=>void;deferInitialPromotion?:boolean}){
+export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,historyTarget,onDocumentPresentation}:{item:RecordDetail;onSaved:(content?:string)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onDocumentPresentation:(value:DocumentPresentation)=>void}){
  const initialMode=new URLSearchParams(location.search).get('mode');
  const visualRef=useRef<VisualEditorHandle>(null);
  const editorSectionRef=useRef<HTMLDivElement>(null);
@@ -41,16 +41,11 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
  const [mode,setMode]=useState<EditorMode>(initialMode==='source'||initialMode==='preview'?initialMode:'visual');
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [draft,setDraft]=useState(usableRecovery?stored.content:item.content);
- // Promotion is frozen for the current editing session: newly inserted H1
- // remains a body block until the next explicit mode change or document open.
- const [promoted,setPromoted]=useState<PromotedHeading|null>(()=>deferInitialPromotion?null:leadingDocumentHeading(usableRecovery?stored.content:item.content));
- const promotedRef=useRef(promoted);
  const deferredDraft=React.useDeferredValue(draft);
  const characters=React.useMemo(()=>markdownCharacterCount(deferredDraft),[deferredDraft]);
- const visibleDraft=displayedDocumentBody(draft,promoted);
- const hiddenHeadingLines=promoted?(promoted.before+promoted.headingSource+promoted.separator).split('\n').length-1:0;
- const visibleFocusLine=jumpToLine?.line===undefined?undefined:Math.max(1,jumpToLine.line-hiddenHeadingLines);
- useEffect(()=>onDocumentPresentation({id:item.id,revision:item.revision,headingTitle:promoted?.title??null,characters}),[item.id,item.revision,promoted,characters]);
+ const visibleDraft=draft;
+ const visibleFocusLine=jumpToLine?.line;
+ useEffect(()=>onDocumentPresentation({id:item.id,revision:item.revision,characters}),[item.id,item.revision,characters]);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[diff,setDiff]=useState('');
  const [editorKey,setEditorKey]=useState(0);
  const latestDraft=useRef(draft);
@@ -63,26 +58,8 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
   // current revision instead of the older recovery candidate.
   if(staleRecovery)setRecoveryNotice(false);
  };
- const changeVisibleDraft=(value:string)=>changeDraft(withDocumentBody(promotedRef.current,value));
- const latestVisibleFromEditor=()=>{
-  const visible=visualRef.current?.flushEditedMarkdown();
-  return visible===null||visible===undefined?latestDraft.current:withDocumentBody(promotedRef.current,visible);
- };
- const titleEditorRegisterRef=useRef(onRegisterTitleEditor);
- titleEditorRegisterRef.current=onRegisterTitleEditor;
- useEffect(()=>{
-  const editHeading=async(title:string)=>{
-   const previous=promotedRef.current;
-   if(!previous)throw new Error('文档没有可提升的 H1 标题');
-   const body=displayedDocumentBody(latestDraft.current,previous);
-   const next=renameDocumentHeading(previous,title);
-   promotedRef.current=next;
-   setPromoted(next);
-   changeDraft(withDocumentBody(next,body));
-  };
-  titleEditorRegisterRef.current(editHeading);
-  return()=>titleEditorRegisterRef.current(null);
- },[item.id,item.revision]);
+ const changeVisibleDraft=changeDraft;
+ const latestVisibleFromEditor=()=>visualRef.current?.flushEditedMarkdown()??latestDraft.current;
  useEffect(()=>{if(!jumpToLine)return;setMode('source');const url=new URL(location.href);url.searchParams.set('mode','source');historyReplace(url);},[jumpToLine]);
  useEffect(()=>{
   if(changed&&!busy)writeSessionDraft(sessionId,item.id,item.revision,draft);
@@ -114,12 +91,6 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
    if(latest!==null&&latest!==undefined)changeVisibleDraft(latest);
   }
   setWarning('');
-  // A newly inserted first-block H1 stays in the body during editing and is
-  // promoted only after this mode switch.
-  if(!promotedRef.current){
-   const heading=leadingDocumentHeading(latestDraft.current);
-   if(heading){promotedRef.current=heading;setPromoted(heading);}
-  }
   // Commit the requested mode to the URL before awaiting the lazy chunk.
   // A concurrent save increments the revision and remounts RecordEditor;
   // the replacement must read the requested mode, not the previous one.
@@ -145,7 +116,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
     // Further edits made during save must survive the record query refresh.
     writeSessionDraft(sessionId,item.id,item.revision,latestDraft.current);
    }
-   onSaved(latest,Boolean(promotedRef.current));
+   onSaved(latest);
   }catch(e){setError(e);}
   finally{setBusy(false);}
  };
@@ -163,7 +134,6 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
  const restore=async(rev:number)=>{if(changed||!(await askConfirm({title:'恢复历史版本？',description:'这会将所选版本的内容创建为一个新的当前 Revision，不会覆盖已有历史。',actionLabel:'恢复该版本'})))return;setBusy(true);try{await mutate('/records/'+item.id+'/restore',{targetRevision:rev,expectedRevision:item.revision});onSaved();}catch(e){setError(e);}finally{setBusy(false);}};
  const discardRecovered=()=>{
   clearSessionDraft(sessionId,item.id);latestDraft.current=item.content;setDraft(item.content);
-  const initial=leadingDocumentHeading(item.content);promotedRef.current=initial;setPromoted(initial);
   setEditorKey(key=>key+1);setRecoveryNotice(false);
  };
  return <div ref={editorSectionRef} className="editor-section">{confirmation}

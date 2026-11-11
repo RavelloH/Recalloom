@@ -213,13 +213,13 @@ try{
   await assertRouteTransition(before);
  }
 
- // A promoted Markdown H1 has a different identity from the filename.
+ // Document filenames remain the header identity; the H1 stays in the body.
  before=await count();
  await page.locator('.file-row').filter({hasText:promoted.name}).click();
  await recordPage(promoted);
- await page.locator('.workbench-file-identity').waitFor();
+ await page.locator('.workbench-header h1.page-title').waitFor();
  await assertRouteTransition(before);
- await assertTextInPage(page.locator('.workbench-file-identity'));
+
  await assertTextInPage(page.locator('.workbench-header h1.page-title'));
  await assertUnique();
 
@@ -288,6 +288,44 @@ try{
  await page.waitForURL(/\/search\?/);
  await hit.waitFor();
  await assertRouteTransition(before);
+
+
+ // Search submit must commit immediately and display loading feedback while
+ // the API is deliberately slow. Route loader must not await search results.
+ if(engine==='chromium'&&!mobileRun){
+  await page.goto(base+'/search?mode=literal');
+  await page.locator('.search-page').waitFor();
+  const slowTerm='latency-probe-'+suffix;
+  await page.evaluate(term=>{
+   const original=window.fetch.bind(window);
+   window.__searchRequestFinished=false;
+   window.__restoreSearchFetch=()=>{window.fetch=original;};
+   window.fetch=async(input,init)=>{
+    const url=typeof input==='string'?input:input instanceof Request?input.url:String(input);
+    if(url.includes('/api/search?')&&url.includes(encodeURIComponent(term))){
+     await new Promise(resolve=>setTimeout(resolve,1250));
+     const response=await original(input,init);
+     window.__searchRequestFinished=true;
+     return response;
+    }
+    return original(input,init);
+   };
+  },slowTerm);
+  await page.getByRole('textbox',{name:'搜索关键字'}).fill(slowTerm);
+  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await page.waitForURL(url=>new URL(url).searchParams.get('q')===slowTerm);
+  assert.equal(await page.evaluate(()=>window.__searchRequestFinished),false,
+   'URL must update before the slow search request completes');
+  await page.locator('.content-loading').waitFor({state:'visible',timeout:1000});
+  await page.locator('.content-loading').waitFor({state:'hidden',timeout:10000});
+  assert.equal(await page.evaluate(()=>window.__searchRequestFinished),true);
+  await page.evaluate(()=>window.__restoreSearchFetch());
+  // A completed search still animates the result rows, not just the spinner.
+  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
+  await page.locator('.search-result').first().waitFor();
+  assert.equal(await page.locator('.search-result').first().evaluate(el=>getComputedStyle(el).animationName),
+   'data-row-fade-in','search results retain their staggered entrance animation');
+ }
 
  // Cold refreshes should not animate data-loading states as a second page
  // swap: the final rows must be direct children, as on the archive route.

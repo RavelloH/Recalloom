@@ -48,148 +48,90 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
 
- const pure=await create('Only filename','A paragraph.\n\n# Later H1');
- await open(pure.id);
+ // A file name with .md is displayed without that suffix in the page title.
+ const plain=await create('Only filename.md','A paragraph.\n\n# Later H1');
+ await open(plain.id);
  await topTitle().getByText('Only filename',{exact:true}).waitFor();
- assert.equal(await header().locator('.workbench-document-filename').count(),0);
- assert.equal(await header().locator('.workbench-tag-line').count(),0,'Empty tags do not render a row');
+ assert.equal((await topTitle().innerText()).trim(),'Only filename');
+ assert.equal(await header().locator('.workbench-document-filename').count(),0,
+  'the metadata strip must not repeat the filename');
  await page.locator('.cm-content').getByText('Later H1').waitFor();
  await editTop('Renamed file');
- await until(async()=>(await read(pure.id)).name==='Renamed file','top filename rename persisted');
- assert.equal((await read(pure.id)).content,'A paragraph.\n\n# Later H1','Renaming filename must not change body');
+ await until(async()=>(await read(plain.id)).name==='Renamed file.md','inline rename preserves .md suffix');
+ assert.equal((await read(plain.id)).content,'A paragraph.\n\n# Later H1',
+  'renaming the file must never change Markdown content');
  await header().getByRole('button',{name:'详细信息'}).click();
  const inspector=page.getByRole('dialog',{name:'文档检查器'});
  await inspector.waitFor();
- const filename=inspector.getByRole('textbox',{name:'文件名'});
- const filenameStyle=await filename.evaluate(el=>({tag:el.tagName,background:getComputedStyle(el).backgroundColor,border:parseFloat(getComputedStyle(el).borderTopWidth)}));
- assert.equal(filenameStyle.tag,'INPUT','Filename must be a real text input');
- assert.ok(filenameStyle.border>=1&&filenameStyle.background!=='rgba(0, 0, 0, 0)','Filename must look like an input even when idle');
- await filename.fill('Cancelled filename');
- await filename.press('Escape');
- assert.equal(await filename.inputValue(),'Renamed file');
- assert.equal((await read(pure.id)).name,'Renamed file','Escape must not rename the document');
- await filename.fill('New name from details');
- await filename.press('Enter');
- await filename.waitFor({state:'visible'});
- await page.waitForFunction(()=>document.querySelector('.workbench-header .page-title')?.textContent==='New name from details');
- await until(async()=>(await read(pure.id)).name==='New name from details','inspector filename rename persisted');
+ assert.equal(await inspector.getByRole('textbox',{name:'文件名'}).count(),0,
+  'filename editing lives in the top title, not in the metadata inspector');
+ await inspector.getByText('Markdown 文档',{exact:true}).waitFor();
  await inspector.getByRole('button',{name:'关闭'}).click();
- console.log('PASS filename-only document, late H1 stays in body, renaming in top and details');
+ console.log('PASS filename title without extension, metadata inspector without duplicate rename input');
 
- const withH1=await create('sample-entry','# Original H1\n\nBody text.\n\n## Other');
- await open(withH1.id);
- await topTitle().getByText('Original H1',{exact:true}).waitFor();
- await header().getByText('sample-entry.md').waitFor();
- const source=page.locator('.cm-content');
- await source.getByText('Body text.').waitFor();
- assert.equal(await source.getByText('Original H1').count(),0,'Promoted heading must not duplicate in source');
- await header().getByText('编辑者：本人（Web）',{exact:true}).waitFor();
- assert.ok((await header().locator('.workbench-summary').innerText()).includes('字') ,'Character count must render');
- await editTop('Changed / 中文 H1');
- await page.getByText('未保存',{exact:true}).first().waitFor();
- assert.equal((await read(withH1.id)).content,'# Original H1\n\nBody text.\n\n## Other','Unsaved title must not write a new revision');
- await save();
- await topTitle().getByText('Changed / 中文 H1',{exact:true}).waitFor();
- assert.equal((await read(withH1.id)).content,'# Changed / 中文 H1\n\nBody text.\n\n## Other');
- assert.equal((await read(withH1.id)).name,'sample-entry','Editing H1 must not rename the file');
- await header().getByRole('button',{name:'详细信息'}).click();
- const h1Name=inspector.getByRole('textbox',{name:'文件名'});
- await h1Name.fill('renamed-entry');
- await h1Name.press('Enter');
- await page.waitForFunction(()=>document.querySelector('.workbench-document-filename')?.textContent?.includes('renamed-entry'));
- await until(async()=>(await read(withH1.id)).name==='renamed-entry','H1 inspector filename rename persisted');
- assert.equal((await read(withH1.id)).content,'# Changed / 中文 H1\n\nBody text.\n\n## Other');
- await inspector.getByRole('button',{name:'关闭'}).click();
+ // A first-block H1 is always actual Markdown content. Source, preview and
+ // visual editor must all show it instead of promoting it to the page header.
+ const sourceText='# Original H1\n\nBody text.\n\n## Other';
+ const first=await create('sample-entry',sourceText);
+ await open(first.id);
+ await topTitle().getByText('sample-entry',{exact:true}).waitFor();
+ assert.ok((await page.locator('.cm-content').innerText()).includes('Original H1'),
+  'source editor must include the first H1');
+ await editTop('renamed-entry');
+ await until(async()=>(await read(first.id)).name==='renamed-entry','header rename persists independently');
+ assert.equal((await read(first.id)).content,sourceText,'filename rename must not rewrite H1');
  await page.getByRole('button',{name:'预览',exact:true}).click();
- await topTitle().getByText('Changed / 中文 H1',{exact:true}).waitFor();
- assert.equal(await page.locator('.editor-body h1').count(),0,'Promoted H1 should not be in preview');
+ const previewHeading=page.locator('.editor-body .markdown-preview h1').first();
+ await previewHeading.getByText('Original H1',{exact:true}).waitFor();
+ const sizes=await page.evaluate(()=>{
+  const title=document.querySelector('.workbench-header h1.page-title');
+  const heading=document.querySelector('.editor-body .markdown-preview h1');
+  return {file:parseFloat(getComputedStyle(title).fontSize),body:parseFloat(getComputedStyle(heading).fontSize)};
+ });
+ assert.ok(sizes.body<sizes.file,'body H1 must be smaller than the filename title: '+JSON.stringify(sizes));
  await page.getByRole('button',{name:'可视化',exact:true}).click();
- try{await page.locator('.tiptap').waitFor();}catch(err){
-  console.error('VISUAL DEBUG',JSON.stringify({faults,mode:await page.locator('.editor-body').getAttribute('data-mode'),text:(await page.locator('.editor-body').innerText()).slice(0,600)}));
-  throw err;
- }
- assert.equal(await page.locator('.tiptap h1').count(),0,'Promoted H1 should not appear in visual editor');
- console.log('PASS opening H1, no duplication in three modes, H1 source edits and filename independent');
+ await page.locator('.tiptap h1').getByText('Original H1',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
+ assert.ok((await page.locator('.cm-content').innerText()).includes('# Original H1'),
+  'source mode must preserve the actual heading markup');
+ await page.locator('.cm-content').fill('# Edited H1\n\nBody text.\n\n## Other');
+ await save();
+ assert.equal((await read(first.id)).name,'renamed-entry',
+  'editing a body H1 must not change filename');
+ assert.equal((await read(first.id)).content,'# Edited H1\n\nBody text.\n\n## Other');
+ await page.reload();
+ await topTitle().getByText('renamed-entry',{exact:true}).waitFor();
+ assert.ok((await page.locator('.cm-content').innerText()).includes('Edited H1'),
+  'saved first H1 must remain visible on reopen');
+ console.log('PASS first H1 in source, preview and visual; typography and filename independence');
 
- const attributed=await create('h1-with-attrs','# 顶部标题 @ attrs stable-heading @\n\n正文段落');
+ // Rich Markdown attributes must stay in the body and survive mode switches.
+ const attributedText='# Visible H1 @ attrs stable-heading @\n\n正文段落';
+ const attributed=await create('RMD-title.md',attributedText);
  await open(attributed.id);
- await topTitle().getByText('顶部标题',{exact:true}).waitFor();
- assert.equal((await topTitle().innerText()).trim(),'顶部标题','H1 RMD control syntax must not appear in header');
- assert.equal(await page.locator('.cm-content').getByText('stable-heading').count(),0,'Promoted attribute syntax remains out of the body');
- await editTop('已修改的 H1');
- await save();
- assert.equal((await read(attributed.id)).content,'# 已修改的 H1 @ attrs stable-heading @\n\n正文段落','Title edit must preserve H1 attribute metadata in Markdown');
- assert.equal((await read(attributed.id)).name,'h1-with-attrs');
- console.log('PASS H1 attributes hidden from title and retained in saved Markdown');
-
- const delayed=await create('first-block-delayed','Body original');
- await open(delayed.id);
- await topTitle().getByText('first-block-delayed',{exact:true}).waitFor();
- await page.locator('.cm-content').fill('# Added heading\n\nBody original');
- await topTitle().getByText('first-block-delayed',{exact:true}).waitFor();
- assert.ok((await page.locator('.cm-content').innerText()).includes('Added heading'),'H1 remains in body during same editing session');
+ await topTitle().getByText('RMD-title',{exact:true}).waitFor();
+ assert.ok((await page.locator('.cm-content').innerText()).includes('stable-heading'));
  await page.getByRole('button',{name:'预览',exact:true}).click();
- await topTitle().getByText('Added heading',{exact:true}).waitFor();
- assert.equal(await page.locator('.editor-body h1').count(),0,'Leading H1 promoted only at mode boundary');
- await save();
- assert.equal((await read(delayed.id)).content,'# Added heading\n\nBody original');
- await page.reload();
- await topTitle().getByText('Added heading',{exact:true}).waitFor();
+ await page.locator('.editor-body h1').getByText('Visible H1',{exact:true}).waitFor();
  await page.getByRole('button',{name:'源码',exact:true}).click();
- assert.equal(await page.locator('.cm-content').getByText('Added heading').count(),0);
- console.log('PASS first-block H1 stays in body until mode switch, then persists across reopen');
+ assert.ok((await page.locator('.cm-content').innerText()).includes('stable-heading'));
+ assert.equal((await read(attributed.id)).content,attributedText);
+ console.log('PASS RMD H1 attributes remain in Markdown and visible as ordinary headings');
 
- const savedWithoutSwitch=await create('save-first-heading-later','');
- await open(savedWithoutSwitch.id);
- await page.locator('.cm-content').fill('# Saved but not promoted\n\nBody');
+ // Creating and saving a first heading must not ever promote it on mode
+ // switch, save, or reload. Non-first H1 behaves identically.
+ const newHeading=await create('new-heading','');
+ await open(newHeading.id);
+ await page.locator('.cm-content').fill('# New body heading\n\nBody');
  await save();
- await topTitle().getByText('save-first-heading-later',{exact:true}).waitFor();
- assert.ok((await page.locator('.cm-content').innerText()).includes('Saved but not promoted'),
-  'Saving should not count as reopening the document');
- assert.equal((await read(savedWithoutSwitch.id)).content,'# Saved but not promoted\n\nBody');
+ await topTitle().getByText('new-heading',{exact:true}).waitFor();
  await page.getByRole('button',{name:'预览',exact:true}).click();
- await topTitle().getByText('Saved but not promoted',{exact:true}).waitFor();
- assert.equal(await page.locator('.editor-body h1').count(),0);
- console.log('PASS save without mode switch preserves the same-session unpromoted H1');
-
- const reopenAfterSave=await create('reopen-to-promote','');
- await open(reopenAfterSave.id);
- await page.locator('.cm-content').fill('# Appears after reopen\n\nBody');
- await save();
- await topTitle().getByText('reopen-to-promote',{exact:true}).waitFor();
+ await page.locator('.editor-body h1').getByText('New body heading',{exact:true}).waitFor();
  await page.reload();
- await topTitle().getByText('Appears after reopen',{exact:true}).waitFor();
- assert.equal(await page.locator('.cm-content').getByText('Appears after reopen').count(),0);
- console.log('PASS reopening after save promotes the stored first-block H1');
-
- const visualInserted=await create('visual-first-heading','');
- await open(visualInserted.id,'visual');
- await page.locator('.tiptap p').first().click();
- await page.keyboard.press('Control+Alt+1');
- await page.keyboard.type('Visual heading');
- await page.keyboard.press('Enter');
- await page.keyboard.type('Visual body');
- await topTitle().getByText('visual-first-heading',{exact:true}).waitFor();
- await page.locator('.tiptap h1').getByText('Visual heading').waitFor();
- await page.getByRole('button',{name:'源码',exact:true}).click();
- await topTitle().getByText('Visual heading',{exact:true}).waitFor();
- assert.equal(await page.locator('.cm-content').getByText('Visual heading').count(),0);
- await save();
- assert.ok((await read(visualInserted.id)).content.startsWith('# Visual heading'));
- console.log('PASS visual-mode first H1 remains a body block until source-mode switch');
-
- const later=await create('later-heading','First body paragraph');
- await open(later.id);
- await page.locator('.cm-content').fill('First body paragraph\n\n# Later heading');
- await page.getByRole('button',{name:'预览',exact:true}).click();
- await topTitle().getByText('later-heading',{exact:true}).waitFor();
- await page.locator('.editor-body h1').filter({hasText:'Later heading'}).waitFor();
- assert.equal(await page.locator('.editor-body h1').count(),1,'H1 after another block never promotes');
- await save();
- await page.reload();
- await topTitle().getByText('later-heading',{exact:true}).waitFor();
- assert.equal((await read(later.id)).content,'First body paragraph\n\n# Later heading');
- console.log('PASS non-first H1 remains ordinary content after mode switch and reopen');
+ await topTitle().getByText('new-heading',{exact:true}).waitFor();
+ await page.locator('.editor-body h1').getByText('New body heading',{exact:true}).waitFor();
+ assert.equal((await read(newHeading.id)).content,'# New body heading\n\nBody');
+ console.log('PASS save/reload and mode changes never extract the first H1');
 
  assert.deepEqual(faults,[]);
 }finally{await browser.close();}

@@ -25,7 +25,7 @@ const TasksPage=lazyRouteComponent(importTasks,'TasksPage');
 const SearchPage=lazyRouteComponent(importSearch,'SearchPage');
 const ActivityPage=lazyRouteComponent(importActivity,'ActivityPage');
 const SettingsPage=lazyRouteComponent(importSettings,'SettingsPage');
-import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
+import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 const importGraph=()=>import('./knowledge-graph');
 const importHelp=()=>import('./rmd-help-page');
@@ -79,7 +79,9 @@ const list=[
    ...(isSearchMode(search.mode)&&search.mode!=='auto'?{mode:search.mode}:{})
   }),
   loaderDeps:({search})=>({q:search.q,mode:search.mode}),
-  loader:({deps})=>ready(importSearch(),...(deps.q?[queryClient.ensureQueryData(searchQuery(deps.q,deps.mode??'auto'))]:[]))}),
+  // Search is interactive: commit query/mode changes immediately and let the
+  // page's React Query state show progress instead of blocking navigation.
+  loader:()=>ready(importSearch())}),
  createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>ready(importActivity(),queryClient.ensureInfiniteQueryData(activityPagesQuery()))}),
  createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute,loader:()=>ready(importHelp())}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage,loader:()=>ready(importSettings())}),

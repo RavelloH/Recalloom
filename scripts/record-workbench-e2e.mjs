@@ -47,13 +47,14 @@ try{
    }))
   }));
   assert.equal(layout.display,'flex','Every property must receive its own row');
-  assert.equal(layout.rows.length,10,'Expected editable filename, author and character count in the metadata inspector');
+  assert.equal(layout.rows.length,9,'The filename is edited at the page title, not duplicated in the inspector');
   assert.ok(layout.rows.every(({label,value})=>label&&value&&label.right<=value.left+2),
    'Property values must not overlap labels: '+JSON.stringify(layout));
   return layout;
  };
  await verifyPropertyLayout();
  assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
+ assert.equal(await inspector.getByRole('textbox',{name:'文件名'}).count(),0,'Inspector must not duplicate the filename editor');
  await inspector.getByRole('button',{name:'添加标签'}).click();
  await inspector.getByRole('textbox',{name:'新标签'}).fill('Workbench');
  await page.keyboard.press('Enter');

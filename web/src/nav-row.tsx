@@ -11,15 +11,17 @@ type RowProps={
  title?:string;
  trailing?:React.ReactNode;
  onClick?:()=>void;
+ onPointerEnter?:()=>void;
+ onFocus?:()=>void;
  to?:NavigationPath;
  exact?:boolean;
 };
 
 /** Link and button share the same icon/text/trailing slots and geometry.
  * Avoid Astryx Button internal wrappers in sidebar navigation. */
-export function NavRow({icon,label,className='',title,trailing,onClick,to,exact}:RowProps){
+export function NavRow({icon,label,className='',title,trailing,onClick,onPointerEnter,onFocus,to,exact}:RowProps){
  const classes=['nav-link','rk-nav-row',className].filter(Boolean).join(' ');
  const content=<><Icon name={icon} size="md"/><span className="rk-nav-row-label">{label}</span>{trailing&&<span className="rk-nav-row-trailing">{trailing}</span>}</>;
- if(to!==undefined) return <Link to={to} className={classes} activeProps={{className:classes+' active'}} activeOptions={{exact}} title={title} onClick={onClick}>{content}</Link>;
- return <button type="button" className={classes} title={title} onClick={onClick}>{content}</button>;
+ if(to!==undefined) return <Link to={to} className={classes} activeProps={{className:classes+' active'}} activeOptions={{exact}} title={title} onPointerEnter={onPointerEnter} onFocus={onFocus} onClick={onClick}>{content}</Link>;
+ return <button type="button" className={classes} title={title} onPointerEnter={onPointerEnter} onFocus={onFocus} onClick={onClick}>{content}</button>;
 }

@@ -111,6 +111,22 @@
   will-change: auto;
 }
 
+/* First-use fallback when the command palette chunk is not yet cached.
+   The actual Astryx Dialog owns its standard open/close animation. */
+.palette-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--rk-canvas) 60%, transparent);
+  color: var(--rk-ink-soft);
+  font-size: var(--rk-font-body);
+  animation: rk-fade-in 160ms ease both;
+}
+
 .palette-item {
   display: flex;
   align-items: center;

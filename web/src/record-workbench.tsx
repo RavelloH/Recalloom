@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {motion,useReducedMotion} from 'motion/react';
@@ -9,6 +9,7 @@ import {RecordRelations} from './record-relations';
 import {ago,statusNames} from './pages/shared';
 import type {RecordDetail} from './types';
 import {sharedViewTransitionName} from './shared-view-transition';
+import {documentDisplayName} from './document-filename';
 
 export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
 
@@ -27,43 +28,11 @@ type OutlineResult={
 export type DocumentPresentation={
  id:string;
  revision:number;
- headingTitle:string|null;
  characters:number;
 };
 
-const displayFileName=(name:string)=>/\.md$/i.test(name)?name:name+'.md';
-
-function FilenameField({name,onRename}:{name:string;onRename:(value:string)=>Promise<void>}){
- const [value,setValue]=useState(name),[error,setError]=useState(''),[pending,setPending]=useState(false);
- const cancelOnBlur=useRef(false);
- useEffect(()=>setValue(name),[name]);
- const commit=async()=>{
-  if(cancelOnBlur.current){cancelOnBlur.current=false;return;}
-  const next=value.trim();
-  if(next===name)return;
-  if(!next||next.length>180||/[\\/]/.test(next)){
-   setError('文件名需为 1–180 个字符，且不能包含 / 或 \\。');setValue(name);return;
-  }
-  setPending(true);setError('');
-  try{await onRename(next);}catch(e){setError(e instanceof Error?e.message:'重命名失败');setValue(name);}
-  finally{setPending(false);}
- };
- return <div className="workbench-filename-field">
-  <input type="text" aria-label="文件名" className="workbench-filename-input" value={value} disabled={pending} spellCheck={false}
-   onChange={event=>setValue(event.target.value)}
-   onBlur={()=>void commit()} onKeyDown={event=>{
-    if(event.nativeEvent.isComposing)return;
-    if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}
-    if(event.key==='Escape'){event.preventDefault();cancelOnBlur.current=true;setError('');setValue(name);event.currentTarget.blur();}
-   }}/>
-  {error&&<span role="alert" className="page-title-error">{error}</span>}
- </div>;
-}
-
-export function DocumentWorkbenchHeader({item,title,usesHeading,characters,editors,focusTitle,onRename,onDetails}:{
+export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename,onDetails}:{
  item:RecordDetail;
- title:string;
- usesHeading:boolean;
  characters:number;
  editors:string[];
  focusTitle:boolean;
@@ -73,13 +42,11 @@ export function DocumentWorkbenchHeader({item,title,usesHeading,characters,edito
  const sharedName=sharedViewTransitionName('record',item.id);
  return <header className="doc-header workbench-header">
   <div className="workbench-identity">
-   <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档
-    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · <span className="workbench-file-identity" style={sharedName?{viewTransitionName:sharedName}:undefined}>{displayFileName(item.name)}</span></span>}
-   </span>
+   <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档</span>
    <span className="workbench-revision" title={'当前正文版本 R'+item.revision}>R{item.revision}</span>
   </div>
-  <InlineTitle key={usesHeading?'heading':'filename'} value={title} onRename={onRename}
-   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading} transitionName={usesHeading?undefined:sharedName}/>
+  <InlineTitle value={documentDisplayName(item.name)} onRename={onRename}
+   placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
    {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
   </div>}
@@ -98,7 +65,7 @@ export function DocumentWorkbenchHeader({item,title,usesHeading,characters,edito
  </header>;
 }
 
-export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,outline,onJump,onChangeTag,onRenameFilename,onHistoryTarget,characters,editors}:{
+export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,outline,onJump,onChangeTag,onHistoryTarget,characters,editors}:{
  open:boolean;
  tab:DocumentInspectorTab;
  onChangeTab:(tab:DocumentInspectorTab)=>void;
@@ -107,7 +74,6 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
  outline:{isPending:boolean;isError:boolean;data?:OutlineResult};
  onJump:(line:number)=>void;
  onChangeTag:(tag:string,action:'add'|'remove')=>Promise<void>;
- onRenameFilename:(name:string)=>Promise<void>;
  onHistoryTarget:React.Dispatch<React.SetStateAction<HTMLDivElement|null>>;
  characters:number;
  editors:string[];
@@ -138,7 +104,6 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
     aria-labelledby={'workbench-tab-'+sections[currentIndex].id}>
     {tab==='details'&&<div className="workbench-inspector-details">
      <Properties>
-      <Property label="文件名"><FilenameField name={item.name} onRename={onRenameFilename}/></Property>
       <Property label="类型">Markdown 文档</Property>
       <Property label="标签"><TagEditor tags={item.tags??[]} onChange={onChangeTag}/></Property>
       <Property label="更新时间"><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></Property>

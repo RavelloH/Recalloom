@@ -430,12 +430,6 @@
   overflow: hidden;
   white-space: nowrap;
 }
-.workbench-document .workbench-document-filename {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .workbench-document .workbench-tag-line {
   display: flex;
   flex-wrap: wrap;
@@ -488,31 +482,6 @@
 }
 .workbench-document .workbench-character-count {
   white-space: nowrap;
-}
-
-.workbench-inspector .workbench-filename-field { min-width: 0; }
-.workbench-inspector .workbench-filename-input {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--rk-border-soft);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-text-primary, #222) 4%, var(--rk-canvas));
-  color: var(--color-text-primary);
-  padding: 7px 9px;
-  appearance: none;
-  font: inherit;
-  line-height: 1.5;
-}
-@media (hover: hover) and (pointer: fine) {
-  .workbench-inspector .workbench-filename-input:hover {
-    border-color: var(--rk-border-soft);
-    background: var(--color-background-muted, rgba(128,128,128,.06));
-  }
-}
-.workbench-inspector .workbench-filename-input:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
 }
 
 .workbench-document .workbench-details-trigger {
