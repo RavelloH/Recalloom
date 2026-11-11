@@ -1,5 +1,6 @@
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useRouterState} from '@tanstack/react-router';
+import {hasPendingSharedTransition} from './shared-view-transition';
 
 /** Route presentation never blocks navigation, loaders or unsaved-draft guards.
  * A brief enter animation begins only after the destination is committed.
@@ -19,9 +20,9 @@ export function PageTransition({children,scrollTarget}:{children:React.ReactNode
   lastPath.current=pathname;
   scrollTarget()?.scrollTo({top:0,left:0});
   clearTimeout(timer.current);
-  // The native router transition already animates the destination snapshot.
-  // Never translate the entire page underneath a shared-element morph.
-  if(reduced()||typeof document.startViewTransition==='function'){setPhase('idle');return;}
+  // The native snapshot is now restricted to selected shared-resource links.
+  // Other routes keep the original subtle enter animation.
+  if(reduced()||hasPendingSharedTransition()){setPhase('idle');return;}
   setPhase('enter');
   timer.current=setTimeout(()=>setPhase('idle'),ENTER_MS);
  },[pathname,scrollTarget]);

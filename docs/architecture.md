@@ -46,8 +46,8 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 ## 页面导航与动效
 
-- **路由层：** TanStack Router 使用 `defaultViewTransition: true` 协调浏览器原生 View Transitions；不再单独调用 `document.startViewTransition()`，也不与 React `<ViewTransition>` 同时包裹一次导航。旧浏览器由 Router 自动降级，旧整页入场动画仅在不支持原生过渡时启用。
-- **共享元素：** `web/src/shared-view-transition.ts` 根据资源类型和不可变 ID 生成唯一 CSS 名称。文件列表、搜索、最近访问、归档、面包屑与详情共享对应身份；搜索重复命中仅给首条结果命名。不要用用户可编辑的标题当 ID，更不要在仍挂载的侧栏和页面正文中给同一资源设置两个相同名称。
+- **路由层：** TanStack Router 仅在有共享资源的 `Link` 上启用 `viewTransition`，其他页面走普通路由与既有轻量入场动画。不使用全局 `defaultViewTransition`，也不与 React `<ViewTransition>` 同时包裹一次导航。旧浏览器由 Router 自动降级。原生过渡时禁用整个根页面的新旧交叉淡入，防止持久导航和内容双层重影。
+- **共享元素：** `web/src/shared-view-transition.ts` 根据资源类型和不可变 ID 生成唯一 CSS 名称。文件列表、侧栏文件树、搜索、最近访问、归档、面包屑与详情共享对应身份；只有本次**实际点击**的源元素临时命名，目标详情由订阅选择状态的组件命名，并在导航后超时清理。不能为列表所有行永久设置 `view-transition-name`：它会使未匹配的文件名独立形成残留快照和严重重影。不要用用户可编辑的标题当 ID。
 - **文件名与 H1：** Markdown 首块 H1 独立于数据库文件名。当正文存在提升后的 H1，列表文件名只过渡到工作台顶部的文件标识；没有提升后的 H1 时才过渡到编辑标题。参考 `web/src/record-workbench.tsx`。
 - **局部效果：** 检查器 Tab 指示条采用 Motion Layout，编辑器视图切换、侧栏折叠与块拖拽继续使用原有专用动画，避免整个编辑器反复截图。样式位于所属模块；所有动画遵守 `prefers-reduced-motion`。
 - **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check` 和 `node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs`（后者只运行在隔离本地 Worker/D1）。

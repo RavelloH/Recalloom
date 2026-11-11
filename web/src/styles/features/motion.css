@@ -151,20 +151,36 @@ to {
 }
 }
 
-/* Shared navigation elements are coordinated by TanStack Router's native
-   View Transition support. Keep the root crossfade restrained so file titles
-   can travel between list and document positions without a full-page slide. */
+/* Only the explicitly selected resource participates in a native snapshot.
+   The root never crossfades: overlapping full-page snapshots ghost on iOS Safari,
+   especially when the sidebar and mobile navigation persist across routes. */
 ::view-transition-group(*) {
-  animation-duration: 320ms;
+  animation-duration: 260ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* The old label leaves before the larger new label becomes legible.
+   This prevents two differently scaled copies of the same text blending. */
+::view-transition-old(*) {
+  animation: 75ms ease-out both rk-view-exit;
+}
+
+::view-transition-new(*) {
+  animation: 145ms 60ms ease-out both rk-view-enter;
+}
+
 ::view-transition-old(root) {
-  animation: 130ms ease-in both rk-view-exit;
+  animation: none;
+  opacity: 0;
 }
 
 ::view-transition-new(root) {
-  animation: 220ms ease-out both rk-view-enter;
+  /* A subtle new-only reveal keeps the persistent header/navigation legible. */
+  animation: 150ms ease-out both rk-root-reveal;
+}
+
+@keyframes rk-root-reveal {
+  from { opacity: .88; }
 }
 
 @keyframes rk-view-exit {
