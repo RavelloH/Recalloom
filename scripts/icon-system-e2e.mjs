@@ -95,8 +95,8 @@ try{
    width:rect?.width,height:rect?.height,display:style?.display,visibility:style?.visibility};
  }));
  assert.equal(viewModes.length,3,'all content view mode buttons should exist on phones');
- assert.ok(viewModes.every(item=>item.present&&item.width>=16&&item.height>=16&&item.display!=='none'&&item.visibility!=='hidden'),
-  'visual/source/preview icons must be visible on phones: '+JSON.stringify(viewModes));
+ assert.ok(viewModes.every(item=>item.present&&item.width>=14&&item.height>=14&&item.display!=='none'&&item.visibility!=='hidden'),
+  'visual/source/preview icons must stay visible at >=14px on 320px phones: '+JSON.stringify(viewModes));
  const mobile=await page.evaluate(()=>({
   viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
   icons:[...document.querySelectorAll('.bottom-link svg')].map(el=>{

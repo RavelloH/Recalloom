@@ -36,6 +36,7 @@ import {tableToolbarOffset,SLASH_MENU_WIDTH,SLASH_MENU_SPACE} from './geometry';
 import {EditorTableControls} from './table-controls';
 import {EditorCompletions} from './completions';
 import {EditorInlinePopup} from './inline-popup';
+import {OverlayScroll} from '../scrollbars';
 import type {SlashState,WikiState,InlinePopupItem,InlinePopup,VisualEditorHandle} from './types';
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
 const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
@@ -458,7 +459,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   captureInlineRange();
   const rect=anchor.getBoundingClientRect(),height=Math.min(336,items.length*38+20);
   setInlinePopup({label,items,
-   left:Math.max(8,Math.min(rect.left,window.innerWidth-248)),
+   left:Math.max(8,Math.min(rect.left,window.innerWidth-226)),
    top:window.innerHeight-rect.bottom>height+10||rect.top<height+12
     ?rect.bottom+6:Math.max(8,rect.top-height-6)});
  };
@@ -468,9 +469,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
    onMouseDown={event=>event.preventDefault()}
    onPointerDown={captureInlineRange}
-   onPointerEnter={event=>{if(event.pointerType!=='touch')showInlinePopup(event.currentTarget,label,items);}}
-   onPointerLeave={schedulePopupClose}
-   onClick={event=>showInlinePopup(event.currentTarget,label,items)}/>;
+   onPointerEnter={event=>{if(finePointer&&event.pointerType==='mouse')showInlinePopup(event.currentTarget,label,items);}}
+   onPointerLeave={finePointer?schedulePopupClose:undefined}
+   onClick={event=>{
+    if(!finePointer&&inlinePopup?.label===label){cancelPopupClose();setInlinePopup(null);}
+    else showInlinePopup(event.currentTarget,label,items);
+   }}/>;
 
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
  const slashGroups=slash?groupSlashCommands(slashItems):[];
@@ -481,7 +485,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  // Shared ordered toolbar: touch and desktop MUST render the very same
  // controls in DOM/tab order. Put the highest-frequency actions in the first
  // screenful on narrow touch devices; secondary formatting scrolls to the right.
- const sharedFormattingToolbar=buildFormattingToolbar({editor,active,categoryButton,toggle,action,runCapturedInline,runInlineFromMenu,openLink,openMath,moreInlineItems});
+ const sharedFormattingToolbar=buildFormattingToolbar({editor,active,categoryButton,toggle,action,runCapturedInline,runInlineFromMenu,openLink,openMath,moreInlineItems,touchToolbar});
  const editBlock=(pos:number)=>{
   const target=editableBlockAt(editor,pos);
   if(!target)return;
@@ -528,7 +532,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   // Delay layout-changing toolbar visibility until pointer selection has settled.
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
-  {touchToolbar&&<div className="wysiwyg-toolbar" role="toolbar" aria-label="格式工具栏">
+  {touchToolbar&&<OverlayScroll axis="x" edges className="rk-hscroll rk-editor-format-scroll"
+   viewportClassName="wysiwyg-toolbar" viewportProps={{role:'toolbar','aria-label':'格式工具栏'}}>
    <div className="wysiwyg-tools wysiwyg-tools-leading">
     {action('插入内容',()=>openInsertMenu(),<Icon name="plus" size="sm"/>)}
     {touchBlockPos!==null&&<span className="wysiwyg-block-leading" role="group" aria-label="当前块操作">
@@ -539,7 +544,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     </span>}
    </div>
    <div className="wysiwyg-tools wysiwyg-tools-primary">{sharedFormattingToolbar}</div>
-  </div>}
+  </OverlayScroll>}
   {finePointer&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
    shouldShow={({editor:e,state,from,to})=>{
     if(!e.isEditable)return false;
@@ -572,7 +577,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
  </div>
  </div>
- <EditorInlinePopup popup={inlinePopup} onEnter={cancelPopupClose} onLeave={schedulePopupClose}
+ <EditorInlinePopup popup={inlinePopup} onEnter={finePointer?cancelPopupClose:()=>{}} onLeave={finePointer?schedulePopupClose:()=>{}}
   onChoose={item=>{cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
  {blockPanelPos!==null&&createPortal(
   <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}

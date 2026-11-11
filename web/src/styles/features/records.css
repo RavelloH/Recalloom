@@ -360,13 +360,12 @@
 }
 
 .record-page .record-main .page-actions-bar {
-  margin: 8px 0 0;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-  padding: 0 0 4px;
-  justify-content: space-between;
+  margin:8px 0 0;
+  flex-wrap:nowrap;
+  overflow:visible;
+  padding:0 0 4px;
+  width:100%;
+  justify-content:space-between;
 }
 
 .record-page .record-main .page-actions-bar .save-status {

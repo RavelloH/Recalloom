@@ -8,6 +8,8 @@ const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^MCP_AUTH_SE
 assert.ok(executablePath&&line);
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const source=[
+'RMD 完整属性验收：以下 H1 位于正文中，用于检查标题属性和 Drawer。',
+'',
 '# 视觉一致性 @ attrs parity-heading @',
 '',
 '属性所在段落。 @ attrs parity-paragraph @',

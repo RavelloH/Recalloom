@@ -8,7 +8,7 @@ assert.ok(secret&&executablePath);
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 page.setDefaultTimeout(16000);
-const input=['# Stable container anchors @ attrs shared-anchor @','',
+const input=['RMD 容器 ID 唯一性验收：以下标题保留在正文，以验证与容器锚点冲突。','','# Stable container anchors @ attrs shared-anchor @','',
 '::: warning Caution','','Original warning.','',':::','',
 '::: highlight','','Important highlight.','',':::','',
 ':::: chat Discussion | id=conversation-one','','::: message Alice | sender=user','','A message.','',':::','','::: message Agent | sender=assistant','','An answer.','',':::','','::::','',

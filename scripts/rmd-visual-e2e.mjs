@@ -9,6 +9,8 @@ const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(v=>/^MCP_AUTH_SE
 assert.ok(browserPath&&line);
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const input=[
+ 'RMD 可视化语法测试：先插入正文，确保下面的 H1 作为可引用的正文锚点保留。',
+ '',
  '# Visual RMD QA @ attrs visual-rmd @',
  '',
  '文中 :: mark **重点** :: 和 :: highlight 彩色 | yellow ::。',

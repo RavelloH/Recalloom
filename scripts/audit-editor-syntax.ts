@@ -79,12 +79,12 @@ for(const spec of RMD_REGISTRY.nodes){
  assert.ok(mapping,'missing schema attribute mapping for '+spec.node);
  assert.ok(isRmdAttrsEditable(mapping[0]),'node attributes not reachable: '+spec.node);
 }
-const touch=editorUI.split('{touchToolbar&&<div className="wysiwyg-toolbar"')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
+const touch=editorUI.split('{touchToolbar&&<OverlayScroll')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
 const desktop=editorUI.split('{finePointer&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
 const standard=['粗体','斜体','下划线','删除线','行内代码','上标','下标'];
 const shared=toolbar.split('export function buildFormattingToolbar(')[1]?.split('return <>')[1]?.split('</>;')[0]??'';
-const ordered=['标题','粗体','斜体','列表','引用','插入或编辑链接','下划线',
- '高亮','删除线','对齐方式','行内代码','插入行内公式','荧光笔与手绘标记','更多'];
+const ordered=['标题','粗体','斜体','删除线','下划线','高亮','荧光笔与手绘标记',
+ '对齐方式','列表','引用','行内代码','插入行内公式','插入或编辑链接','更多','撤销','重做'];
 let prior=-1;
 for(const title of ordered){
  const candidate=shared.matchAll(/(?:toggle|action|categoryButton)\('([^']+)'/g);
@@ -98,8 +98,13 @@ for(const title of ['上标','下标'])
 assert.ok(editorUI.includes('buildFormattingToolbar({editor,active,'),
  'VisualEditor must compose the shared formatting controls from the dedicated module');
 assert.ok(touch.includes('{sharedFormattingToolbar}')&&desktop.includes('{sharedFormattingToolbar}'),
- 'desktop and touch must render exactly the same ordered formatting toolbar');
+ 'desktop and touch must share the same ordered formatting groups');
+assert.ok(toolbar.includes('touchToolbar&&<span className="rk-format-group" data-format-group="history">'),
+ 'undo and redo are touch-only and must follow more actions');
+for(const group of ['heading','text','layout','insert-inline','more','history'])
+ assert.ok(toolbar.includes('data-format-group="'+group+'"'),'missing format group: '+group);
 assert.ok(touch.includes("action('插入内容'"),'touch toolbar must open slash insertion picker');
+assert.ok(touch.includes('axis="x" edges'),'touch formatting must use shared JS horizontal scroll with edge hints');
 assert.ok(touch.indexOf('wysiwyg-tools-leading')<touch.indexOf('{sharedFormattingToolbar}'),
  'insertion and context block actions should precede scrollable formatting');
 assert.ok(slash.has('footnote'),'GFM footnote reference must retain an insertion entry');

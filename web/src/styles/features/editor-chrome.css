@@ -6,22 +6,69 @@
 }
 
 .editor-topline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
 }
+.editor-view-switcher {
+  flex:0 1 auto;
+  min-width:0;
+  border:1px solid var(--rk-border-soft);
+  border-radius:10px;
+  padding:2px;
+  background:var(--color-background-muted,rgba(128,128,128,.08));
+}
+.editor-view-switcher [role="group"] {min-width:0;}
+.editor-view-actions {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:2px;
+  flex:0 0 auto;
+  margin-inline-start:2px;
+}
+.editor-view-actions > * {flex:none;}
 
 .wysiwyg-toolbar {
-  display: flex;
-  border-bottom: 1px solid var(--color-border,#ddd);
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 10px 14px;
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--color-background-body, white) 95%, transparent);
-  transition: background-color 200ms ease;
+  display:flex;
+  border-bottom:1px solid var(--rk-border-soft);
+  flex-wrap:nowrap;
+  gap:8px;
+  padding:8px 12px;
+  background:var(--rk-canvas);
+  transition:background-color 200ms ease;
 }
+/* The shared horizontal OverlayScroll owns the viewport and the hidden
+   JavaScript scrollbar. Edge masks are only shown when more tools remain. */
+.rk-editor-format-scroll {
+  position:relative;
+  max-width:100%;
+}
+.rk-editor-format-scroll::before,
+.rk-editor-format-scroll::after {
+  content:"";
+  position:absolute;
+  z-index:3;
+  top:0;
+  bottom:0;
+  width:25px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 170ms ease;
+}
+.rk-editor-format-scroll::before {
+  left:0;
+  background:linear-gradient(to right,var(--rk-canvas),transparent);
+  box-shadow:inset 9px 0 10px -12px var(--rk-ink-soft);
+}
+.rk-editor-format-scroll::after {
+  right:0;
+  background:linear-gradient(to left,var(--rk-canvas),transparent);
+  box-shadow:inset -9px 0 10px -12px var(--rk-ink-soft);
+}
+.rk-editor-format-scroll[data-edge-start]::before,
+.rk-editor-format-scroll[data-edge-end]::after {opacity:1;}
 
 html[data-effective-theme="dark"] .wysiwyg-toolbar {
   background: color-mix(in srgb, var(--color-background-body, #1a1a1a) 95%, transparent);
@@ -50,10 +97,35 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 }
 
 .bubble-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  min-width:0;
+}
+.rk-format-group {
+  display:inline-flex;
+  align-items:center;
+  align-self:stretch;
+  gap:2px;
+  flex:0 0 auto;
+  position:relative;
+}
+.bubble-menu-inner .rk-format-group + .rk-format-group {
+  margin-inline-start:13px;
+}
+.bubble-menu-inner .rk-format-group + .rk-format-group::before {
+  content:"";
+  position:absolute;
+  top:-4px;
+  bottom:-4px;
+  left:-7px;
+  width:1px;
+  background:var(--rk-border-soft);
+}
+.wysiwyg-tools-primary > .rk-format-group + .rk-format-group {
+  margin-inline-start:5px;
+  padding-inline-start:9px;
+  border-inline-start:1px solid var(--rk-border-soft);
 }
 
 .bubble-menu-inner button {
@@ -80,10 +152,15 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 }
 
 .bubble-menu-inner button svg {
-  width: var(--rk-icon-sm) !important;
-  height: var(--rk-icon-sm) !important;
-  flex: none;
-  stroke-width: 1.85;
+  width:var(--rk-icon-sm) !important;
+  height:var(--rk-icon-sm) !important;
+  flex:none;
+  stroke-width:1.85;
+}
+/* Astryx ToggleButton adds a hidden duplicate SVG for its pressed animation.
+   Its visible glyph is otherwise 1px higher than regular Button glyphs. */
+.bubble-menu-inner .astryx-toggle-button svg:not([style*="display: none"]) {
+  transform:translateY(1px);
 }
 
 .bubble-menu-inner button:has(.rk-inline-dropdown-icon) {
@@ -105,9 +182,9 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 }
 
 .bubble-menu-inner .toolbar-highlight {
-  width: auto !important;
-  height: auto !important;
-  padding: 0 2px;
+  width:18px;
+  height:18px;
+  padding:0;
 }
 
 .bubble-link {
@@ -159,8 +236,38 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 @media (max-width: 720px) {
 
 .editor-topline {
-  align-items: stretch;
-  flex-wrap: wrap;
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:4px;
+}
+.record-page .record-main .editor-topline .editor-view-switcher {
+  flex:1 1 auto;
+  min-width:0;
+}
+.editor-topline .editor-view-switcher [role="group"] {
+  display:flex;
+  width:100%;
+  justify-content:stretch;
+}
+.editor-topline .editor-view-switcher [role="group"] button {
+  flex:1 1 0;
+  min-width:0;
+  padding-inline:5px;
+  min-height:38px;
+  height:38px;
+  gap:3px;
+}
+.record-page .record-main .editor-topline .editor-view-actions {
+  display:flex;
+  margin-inline-start:auto;
+  gap:0;
+  flex:0 0 auto;
+}
+.editor-topline .editor-view-actions button {
+  min-width:32px;
+  min-height:38px;
+  height:38px;
+  padding-inline:6px;
 }
 
 .editor-body {
@@ -181,16 +288,12 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
   -webkit-backdrop-filter: none;
 }
 
-.wysiwyg-toolbar {
-  position: sticky;
-  background: var(--rk-canvas);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  top: 0;
-  z-index: 8;
-  margin-inline: calc(-1 * var(--rk-gutter));
-  padding-inline: var(--rk-gutter);
-  border-bottom: 1px solid var(--rk-border-soft);
+.rk-editor-format-scroll {
+  margin-inline:calc(-1 * var(--rk-gutter));
+}
+.rk-editor-format-scroll > .wysiwyg-toolbar {
+  padding-inline:var(--rk-gutter);
+  background:var(--rk-canvas);
 }
 
 .source-editor .cm-editor {
@@ -202,6 +305,26 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+}
+
+/* Narrow-phone geometry only. Input modality still comes from pointer media. */
+@media (max-width: 350px) {
+ .record-main .editor-view-switcher [role="group"] button {
+  font-size:12px;
+  padding-inline:2px;
+  gap:1px;
+ }
+ .record-main .editor-view-switcher [role="group"] button:first-child {
+  flex:1.35 1 0;
+ }
+ .record-main .editor-view-switcher [role="group"] button svg {
+  width:14px;
+  height:14px;
+ }
+ .record-main .editor-view-actions button {
+  min-width:29px;
+  padding-inline:3px;
+ }
 }
 
 @media (hover: hover) and (pointer: fine) {

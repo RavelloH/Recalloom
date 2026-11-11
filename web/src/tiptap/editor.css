@@ -1,20 +1,31 @@
 /* NeutralPress-derived Tiptap formatting, presented with Astryx controls. */
 .wysiwyg-toolbar {
- display: flex;
- flex-wrap: wrap;
- align-items: center;
- gap: 5px 12px;
- padding: 10px 12px;
- background: var(--color-background-body,inherit);
+ display:flex;
+ flex-wrap:nowrap;
+ align-items:center;
+ gap:8px;
+ padding:8px 12px;
+ background:var(--color-background-body,inherit);
 }
-.wysiwyg-tools {display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-width:0;}
-.wysiwyg-block-leading{display:inline-flex;align-items:center;gap:3px;}
+.wysiwyg-tools {display:flex;align-items:center;gap:3px;flex-wrap:nowrap;min-width:0;}
+.wysiwyg-block-leading{display:inline-flex;align-items:center;gap:3px;flex:none;}
 .wysiwyg-tools + .wysiwyg-tools {
- padding-left:10px;
- border-left:1px solid var(--color-border,rgba(128,128,128,.22));
+ padding-left:8px;
+ border-left:1px solid var(--rk-border-soft);
 }
 .wysiwyg-tools button {min-width:34px;min-height:34px;}
-.toolbar-highlight {background:#f7dc6f;color:#242424;border-radius:2px;padding:0 2px;}
+.toolbar-highlight {
+ display:inline-flex;
+ justify-content:center;
+ align-items:center;
+ width:18px;
+ height:18px;
+ background:#f7dc6f;
+ color:#242424;
+ border-radius:3px;
+ font:700 13px/1 ui-sans-serif,system-ui,sans-serif;
+ letter-spacing:-.04em;
+}
 
 /* Selected glyphs and the drag insertion caret use the same restrained
  * theme accent as the source editor. This is intentionally scoped to the
@@ -74,11 +85,9 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
 .tiptap mark {padding:0 .1em;background:#f5d870;color:#251e0e;border-radius:2px;}
 .tiptap table th[style*="text-align:center"],.tiptap table td[style*="text-align:center"]{text-align:center;}
 .tiptap table th[style*="text-align:right"],.tiptap table td[style*="text-align:right"]{text-align:right;}
-@media(max-width:720px){
- .wysiwyg-toolbar {padding:9px;gap:7px;}
- .wysiwyg-tools + .wysiwyg-tools {border-left:0;padding-left:0;}
- .wysiwyg-tools {flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;}
- .wysiwyg-tools::-webkit-scrollbar {display:none;}
+/* Geometry is controlled by pointer capability, not a tablet-width cutoff. */
+@media (hover:none), (pointer:coarse) {
+ .wysiwyg-tools {flex-wrap:nowrap;overflow:visible;max-width:none;}
 }
 
 /* Contextual table controls and low-density Astryx insert dialogs. */
@@ -115,19 +124,33 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
  * single scrollable line. Icon geometry must NOT depend on Astryx text/label
  * wrappers or on max-width:720px. Screen width only controls page geometry. */
 @media (hover:none), (pointer:coarse){
- .wysiwyg-toolbar{
-  position:sticky;top:0;z-index:31;flex-wrap:nowrap;
-  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
-  overscroll-behavior-x:contain;touch-action:pan-x;
-  padding:7px 9px;gap:8px;min-height:55px;box-sizing:border-box;
-  border-bottom:1px solid var(--color-border,rgba(128,128,128,.16));
+ .rk-editor-format-scroll {
+  position:sticky;
+  top:0;
+  z-index:31;
+  min-width:0;
+  max-width:100%;
+  background:var(--rk-canvas);
+  border-bottom:1px solid var(--rk-border-soft);
  }
- .wysiwyg-toolbar::-webkit-scrollbar{display:none;}
+ .rk-editor-format-scroll > .wysiwyg-toolbar {
+  display:flex;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  overscroll-behavior-x:contain;
+  touch-action:pan-x;
+  min-height:55px;
+  box-sizing:border-box;
+  padding:6px 9px;
+  gap:8px;
+  background:var(--rk-canvas);
+ }
+ .rk-editor-format-scroll > .wysiwyg-toolbar::-webkit-scrollbar {display:none;}
  .wysiwyg-tools{flex:0 0 auto;flex-wrap:nowrap;overflow:visible;max-width:none;align-items:center;}
- /* The insert affordance and contextual block actions scroll naturally
-  * with the rest of the toolbar. No pinned/floating leading segment. */
- .wysiwyg-tools-leading{padding-right:6px;}
- .wysiwyg-tools + .wysiwyg-tools{border-left:1px solid var(--color-border,rgba(128,128,128,.2));padding-left:9px;}
+ .wysiwyg-tools-leading{padding-right:5px;}
+ .wysiwyg-tools + .wysiwyg-tools{border-left:1px solid var(--rk-border-soft);padding-left:8px;}
  .wysiwyg-tools button{
   box-sizing:border-box!important;flex:0 0 auto;display:inline-flex!important;
   align-items:center!important;justify-content:center!important;

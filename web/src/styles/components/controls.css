@@ -418,7 +418,9 @@
   position: fixed;
   z-index: 1600;
   box-sizing: border-box;
-  width: min(240px,calc(100vw - 16px));
+  width: max-content;
+  min-width: min(156px,calc(100vw - 16px));
+  max-width: min(218px,calc(100vw - 16px));
   max-height: min(336px,65vh);
   overflow: auto;
   overscroll-behavior: contain;

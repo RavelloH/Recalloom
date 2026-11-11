@@ -11,6 +11,7 @@ const page=await browser.newPage({viewport:{width:390,height:844}});
 page.setDefaultTimeout(16000);
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const source=[
+ '移动 RMD 属性 Drawer 测试：此段在 H1 之前，避免页面标题提升隐藏正文标题节点。','',
  '# 移动属性测试 @ attrs mobile-heading @','','这是段落。 @ attrs mobile-paragraph @','',
  '~~~typescript','const answer = 42;','~~~','@ attrs code-mobile | file=before.ts | wrap=true @','',
  '![实验装置](/examples/device.svg "图片") @ attrs fig-mobile | width=420 | caption=原图说明 @'

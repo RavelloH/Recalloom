@@ -11,8 +11,9 @@ const executablePath=[
 ].find(fs.existsSync);
 assert.ok(secret&&executablePath);
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
-const expected=['标题','粗体','斜体','列表','引用','插入或编辑链接',
- '下划线','高亮','删除线','对齐方式','行内代码','插入行内公式','荧光笔与手绘标记','更多'];
+const expected=['标题','粗体','斜体','删除线','下划线','高亮','荧光笔与手绘标记',
+ '对齐方式','列表','引用','行内代码','插入行内公式','插入或编辑链接','更多'];
+const expectedTouch=[...expected,'撤销','重做'];
 const sample=[
  '# 光标与工具栏验收','','普通文字拖动测试，用于观察文本选区和插入光标。','',
  '下方段落用于放置拖动内容。','','::: warning 块移动提示','','这是可拖动的 Callout。','',':::',
@@ -143,7 +144,7 @@ try{
    const top=touch.getByRole('toolbar',{name:'格式工具栏'});
    await top.waitFor();
    const primary=top.locator('.wysiwyg-tools-primary');
-   assert.deepEqual(await toolbarNames(primary),expected,kind+' must reuse exact desktop format order');
+   assert.deepEqual(await toolbarNames(primary),expectedTouch,kind+' must use desktop groups followed by undo/redo');
    assert.deepEqual(await toolbarNames(top.locator('.wysiwyg-tools-leading')),['插入内容']);
    const viewport=await top.evaluate(el=>{
     el.scrollLeft=el.scrollWidth;
@@ -157,7 +158,7 @@ try{
    await touch.locator('.tiptap .rk-directive-warning').first().tap();
    assert.deepEqual(await toolbarNames(top.locator('.wysiwyg-tools-leading')),
     ['插入内容','编辑当前块','更多块操作']);
-   assert.deepEqual(await toolbarNames(primary),expected);
+   assert.deepEqual(await toolbarNames(primary),expectedTouch);
    log.push('PASS '+kind+' same order; naturally scrolling insertion; nearby contextual block actions');
   }finally{await ctx.close();}
  }
