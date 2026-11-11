@@ -6,7 +6,11 @@ import type {PartialOptions} from 'overlayscrollbars';
 type ScrollbarEngine=typeof import('overlayscrollbars')['OverlayScrollbars'];
 type ScrollbarInstance=ReturnType<ScrollbarEngine>;
 let enginePromise:Promise<ScrollbarEngine>|undefined;
-const loadEngine=()=>enginePromise??=import('overlayscrollbars').then(m=>m.OverlayScrollbars).catch(error=>{enginePromise=undefined;throw error;});
+let loadedEngine:ScrollbarEngine|undefined;
+const loadEngine=()=>enginePromise??=import('overlayscrollbars').then(m=>{
+ loadedEngine=m.OverlayScrollbars;
+ return loadedEngine;
+}).catch(error=>{enginePromise=undefined;throw error;});
 import 'overlayscrollbars/overlayscrollbars.css';
 
 /* JS overlay scrollbars everywhere except Apple WebKit, where native
@@ -30,6 +34,14 @@ export function applyScrollbarPolicy(){
 }
 export const usesNativeScrollbars=()=>document.documentElement.dataset.scrollbarMode==='native';
 
+/** Prime the browser-only overlay engine before React mounts its scroll
+ * viewports. OverlayScrollbars re-parents a viewport on initialization;
+ * doing that after list rows have painted replays their CSS entry animation.
+ * Native Apple WebKit needs no download. Import failure keeps native scroll. */
+export async function prepareScrollbars(){
+ if(!usesNativeScrollbars())await loadEngine().catch(()=>undefined);
+}
+
 /** Edge fades tell readers that a horizontal block continues beyond the column. */
 function trackEdges(host:HTMLElement,viewport:HTMLElement){
  const sync=()=>{
@@ -48,10 +60,14 @@ function trackEdges(host:HTMLElement,viewport:HTMLElement){
 /** Imperative attachment for DOM owned by ProseMirror node views. */
 export function attachScrollbars(host:HTMLElement,viewport:HTMLElement,axis:ScrollAxis,{edges=false}:{edges?:boolean}={}){
  let instance:ScrollbarInstance|undefined,disposed=false;
- if(!usesNativeScrollbars())void loadEngine().then(engine=>{
-  if(!disposed&&host.isConnected&&viewport.isConnected)
-   instance=engine({target:host,elements:{viewport,content:false,padding:false}},optionsFor(axis));
- }).catch(()=>undefined);
+ if(!usesNativeScrollbars()){
+  const initialize=(engine:ScrollbarEngine)=>{
+   if(!disposed&&host.isConnected&&viewport.isConnected)
+    instance=engine({target:host,elements:{viewport,content:false,padding:false}},optionsFor(axis));
+  };
+  if(loadedEngine)initialize(loadedEngine);
+  else void loadEngine().then(initialize).catch(()=>undefined);
+ }
  const untrack=edges?trackEdges(host,viewport):undefined;
  return()=>{disposed=true;untrack?.();instance?.destroy();};
 }
@@ -69,10 +85,14 @@ export function OverlayScroll({axis='y',children,className='',viewportClassName=
   const h=host.current,v=viewport.current;
   if(!h||!v||usesNativeScrollbars())return;
   let instance:ScrollbarInstance|undefined,disposed=false;
-  void loadEngine().then(engine=>{
+  const initialize=(engine:ScrollbarEngine)=>{
    if(!disposed&&h.isConnected&&v.isConnected)
     instance=engine({target:h,elements:{viewport:v,content:false,padding:false}},optionsFor(axis,persistent));
-  }).catch(()=>undefined);
+  };
+  // A primed engine initializes synchronously in layout effect, before the
+  // browser paints and starts child-row CSS animations for the first time.
+  if(loadedEngine)initialize(loadedEngine);
+  else void loadEngine().then(initialize).catch(()=>undefined);
   return()=>{disposed=true;instance?.destroy();};
  },[axis,persistent]);
  useEffect(()=>{const h=host.current,v=viewport.current;if(edges&&h&&v)return trackEdges(h,v);},[edges]);

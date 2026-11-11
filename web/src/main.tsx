@@ -11,7 +11,7 @@ import {recalloomTheme} from './icon-theme';
 import {router} from './router';
 import {queryClient} from './queries';
 import {ThemeProvider,useAppearance} from './theme';
-import {applyScrollbarPolicy} from './scrollbars';
+import {applyScrollbarPolicy,prepareScrollbars} from './scrollbars';
 import {installAdaptiveFavicon} from './favicon';
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
@@ -23,4 +23,9 @@ installAdaptiveFavicon();
 window.CAP_CUSTOM_WASM_URL='/cap-wasm/cap_wasm_bg.wasm';
 window.CAP_CUSTOM_HASHWX_URL='/cap-wasm/hashwx.wasm';
 function App(){const {mode}=useAppearance();return <InternationalizationProvider locale="zh-CN" messages={{'zh-CN':zhCN}}><Theme theme={recalloomTheme} mode={mode}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></Theme></InternationalizationProvider>;}
-createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);
+// Prime the deferred overlay scrollbar module before mounting route content.
+// It restructures scroll viewport DOM; mounting it after the first paint
+// otherwise restarts staggered row animations and causes a second flicker.
+void prepareScrollbars().then(()=>{
+ createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);
+});

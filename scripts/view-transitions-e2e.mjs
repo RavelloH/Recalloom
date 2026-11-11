@@ -315,9 +315,45 @@ try{
    if(new URL(request.url()).pathname==='/api/tasks')taskRequests.push(request.url());
   };
   page.on('request',spyTasks);
+  // Lazy OverlayScrollbars used to re-parent the viewport after CSS row
+  // animations had already run. Delay its import and prove one animation.
+  await page.addInitScript(()=>{
+   window.__rkRowStartup={starts:[],viewportMoves:[]};
+   document.addEventListener('animationstart',event=>{
+    if(event.target.matches?.('.task-list .task-item')&&event.animationName==='data-row-fade-in')
+     window.__rkRowStartup.starts.push(Math.round(performance.now()));
+   },true);
+   const monitor=()=>{
+    const observer=new MutationObserver(records=>{
+     for(const record of records)for(const node of record.removedNodes){
+      if(node.nodeType===1&&(node.matches?.('.main-scroll')||node.querySelector?.('.main-scroll')))
+       window.__rkRowStartup.viewportMoves.push(Math.round(performance.now()));
+     }
+    });
+    observer.observe(document,{childList:true,subtree:true});
+   };
+   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',monitor,{once:true});
+   else monitor();
+  });
+  if(engine==='chromium')await page.route('**/assets/overlayscrollbars-*.js',async route=>{
+   await new Promise(resolve=>setTimeout(resolve,900));
+   await route.continue();
+  });
   await page.reload();
   await page.locator('.page > .task-list .task-item').first().waitFor();
-  await page.waitForTimeout(350);
+  await page.waitForTimeout(800);
+  const startup=await page.evaluate(()=>({
+   ...window.__rkRowStartup,
+   animation:getComputedStyle(document.querySelector('.page .task-list .task-item')).animationName
+  }));
+  assert.equal(startup.animation,'data-row-fade-in','the staggered entrance animation must remain enabled');
+  assert.equal(startup.starts.length,1,'each task row must animate only once: '+JSON.stringify(startup));
+  if(engine==='chromium'){
+   assert.ok(startup.viewportMoves.length>0,'overlay scrollbars must initialize the scroll viewport');
+   assert.ok(startup.viewportMoves.every(t=>t<=startup.starts[0]),
+    'scrollbars must re-parent BEFORE row animations: '+JSON.stringify(startup));
+   await page.unroute('**/assets/overlayscrollbars-*.js');
+  }
   page.off('request',spyTasks);
   assert.equal(taskRequests.length,1,'task page refresh must request its items only once');
 
@@ -388,6 +424,9 @@ try{
    const button=[...document.querySelectorAll('.tree-toggle')].find(el=>el.getAttribute('aria-label')==='收起 '+name);
    return button?.parentElement?.nextElementSibling?.getAttribute('data-visible')==='true';
   },animationFolder.name);
+  // End the artificial API delay before full navigation; WebKit otherwise
+  // reports an aborted intercepted fetch as an access-control pageerror.
+  await page.unroute('**/api/folders?*');
   await page.reload();
   await page.getByRole('button',{name:'收起 '+animationFolder.name}).waitFor();
   await page.waitForFunction(name=>{
@@ -395,7 +434,6 @@ try{
    return button?.parentElement?.nextElementSibling?.getAttribute('data-visible')==='true';
   },animationFolder.name);
   await branch.locator('ul.tree-list').first().waitFor();
-  await page.unroute('**/api/folders?*');
  }
 
  // Mobile top/bottom shell stays live, outside the route snapshot, on WebKit.
