@@ -22,12 +22,11 @@ import {AutoResizer} from '../motion-primitives';
 import {RecordEditorChunk} from '../editor-chunks';
 import {setFullWidth,useFullWidth} from '../preferences';
 import {recordQuery} from '../queries';
-import {useSharedTransitionTarget} from '../shared-view-transition';
+import {sharedViewTransitionName} from '../shared-view-transition';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
- const sharedRecordName=useSharedTransitionTarget('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const titleEditorRef=useRef<((title:string)=>Promise<void>)|null>(null);
  // A save remounts the editor at a new revision, but must not count as
@@ -114,7 +113,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
     onDetails={()=>openInspector('details')}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
-    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedRecordName}/>
+    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedViewTransitionName('record',item.id)}/>
     <Properties>
      <Property label="类型">任务列表</Property>
      <Property label="标签"><TagEditor tags={item.tags??[]} onChange={changeTag}/></Property>

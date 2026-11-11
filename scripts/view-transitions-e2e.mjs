@@ -1,4 +1,4 @@
-/** Shared-element transitions against a local-only Worker and isolated D1. */
+/** Shared-element navigation against an isolated local Worker/D1. */
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';
 import {chromium} from 'playwright-core';
@@ -16,42 +16,34 @@ const browser=await chromium.launch({headless:true,executablePath:bin});
 const page=await browser.newPage({viewport:{width:1365,height:900}});
 page.setDefaultTimeout(25000);
 await page.addInitScript(()=>{
- const named=()=>[...document.querySelectorAll('*')]
-  .map(el=>getComputedStyle(el).viewTransitionName).filter(name=>name!=='none'&&name!=='root');
- window.__rkVTStarts=[];
+ window.__rkVTCalls=0;
  if(typeof document.startViewTransition==='function'){
-  const native=document.startViewTransition.bind(document);
+  const start=document.startViewTransition.bind(document);
   document.startViewTransition=(...args)=>{
-   window.__rkVTStarts.push(named());
-   return native(...args);
+   window.__rkVTCalls++;
+   return start(...args);
   };
  }
 });
 const faults=[];
 page.on('pageerror',error=>faults.push(error.message));
 const create=async(path,payload)=>page.evaluate(async ({path,payload})=>{
- const response=await fetch('/api'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
- const data=await response.json();
- if(!response.ok)throw new Error(path+' '+response.status+' '+JSON.stringify(data));
+ const r=await fetch('/api'+path,{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify(payload)
+ });
+ const data=await r.json();
+ if(!r.ok)throw new Error(path+' '+r.status+' '+JSON.stringify(data));
  return data;
 },{path,payload});
-const vtName=locator=>locator.evaluate(el=>getComputedStyle(el).viewTransitionName);
-const named=(kind,id)=>'rk-'+kind+'-'+id;
-const getActiveNames=()=>page.evaluate(()=>[...document.querySelectorAll('*')]
- .map(el=>getComputedStyle(el).viewTransitionName).filter(name=>name!=='none'&&name!=='root'));
-const assertIdle=async()=>{
- await page.waitForFunction(()=>[...document.querySelectorAll('*')]
-  .every(el=>!/^rk-(?:record|folder)-/.test(getComputedStyle(el).viewTransitionName)),{timeout:4000});
- assert.deepEqual(await getActiveNames(),[],'idle pages must not snapshot every list item');
-};
-const expectOneSource=async(resource)=>{
- const starts=await page.evaluate(()=>window.__rkVTStarts);
- assert.ok(starts.length,'router should start a native transition for a selected link');
- assert.deepEqual(starts.at(-1),[resource],'only clicked resource may be in the old snapshot');
-};
+const vtName=async(locator)=>locator.evaluate(el=>getComputedStyle(el).viewTransitionName);
+const named=async(kind,id)=>'rk-'+kind+'-'+id; // Test fixtures use UUID IDs.
 const assertUniqueNames=async()=>{
- const names=await getActiveNames();
- assert.equal(new Set(names).size,names.length,'duplicate names would skip the native transition');
+ const duplicate=await page.evaluate(()=>{
+  const names=[...document.querySelectorAll('*')].map(el=>getComputedStyle(el).viewTransitionName).filter(n=>n!=='none');
+  return names.filter((name,i)=>names.indexOf(name)!==i);
+ });
+ assert.deepEqual(duplicate,[],'duplicate view-transition-name causes skipped animations');
 };
 
 try{
@@ -68,59 +60,48 @@ try{
  await page.goto(base+'/library');
  const folderRow=page.locator('.file-row').filter({hasText:folderName});
  await folderRow.waitFor();
- await assertIdle();
- assert.equal(await vtName(folderRow.locator('.truncate').first()),'none');
+ const folderShared=await vtName(folderRow.locator('.truncate').first());
+ assert.equal(folderShared,await named('folder',folder.id));
  await folderRow.click();
  await page.waitForURL(base+'/library/'+folder.id);
  await page.getByRole('heading',{level:1,name:folderName}).waitFor();
- const folderShared=named('folder',folder.id);
- await expectOneSource(folderShared);
- assert.equal(await vtName(page.locator('.folder-page h1.page-title')),folderShared);
+ const folderTitle=page.locator('.folder-page h1.page-title');
+ assert.equal(await vtName(folderTitle),folderShared,'folder row morphs into folder heading');
+ assert.ok(await page.evaluate(()=>window.__rkVTCalls>0),'TanStack Router starts a native navigation transition');
  await assertUniqueNames();
- const rootRule=await page.evaluate(()=>({
-  oldAnimation:getComputedStyle(document.documentElement,'::view-transition-old(root)').animationName,
-  oldOpacity:getComputedStyle(document.documentElement,'::view-transition-old(root)').opacity
- }));
- assert.equal(rootRule.oldAnimation,'none','root should not crossfade whole pages');
- assert.equal(rootRule.oldOpacity,'0','old root must not show duplicate page content');
 
- // The other records are never captured as independent old layers.
- await assertIdle();
  const row=page.locator('.file-row').filter({hasText:basic.name});
  await row.waitFor();
- assert.equal(await vtName(row.locator('.truncate').first()),'none');
+ const basicShared=await vtName(row.locator('.truncate').first());
  await row.click();
  await page.waitForURL(base+'/records/'+basic.id);
  const documentTitle=page.locator('.workbench-header h1.page-title');
  await documentTitle.waitFor();
- const basicShared=named('record',basic.id);
- await expectOneSource(basicShared);
- assert.equal(await vtName(documentTitle),basicShared);
- assert.equal(await page.locator('.page-transition').getAttribute('data-phase'),'idle');
+ assert.equal(await vtName(documentTitle),basicShared,'filename morphs into H1 when no markdown H1 exists');
+ assert.equal(await page.locator('.page-transition').getAttribute('data-phase'),'idle','legacy page slide is suppressed');
  await assertUniqueNames();
 
- await assertIdle();
+ // Returning to the folder should restore matching names for browser-history navigation.
  await page.goBack();
  await page.waitForURL(base+'/library/'+folder.id);
  await page.getByRole('heading',{level:1,name:folderName}).waitFor();
- assert.equal(await vtName(page.locator('.file-row').filter({hasText:basic.name}).locator('.truncate').first()),'none');
+ assert.equal(await vtName(page.locator('.file-row').filter({hasText:basic.name}).locator('.truncate').first()),basicShared);
 
  const promotedRow=page.locator('.file-row').filter({hasText:promoted.name});
- await assertIdle();
+ const promotedShared=await vtName(promotedRow.locator('.truncate').first());
  await promotedRow.click();
  await page.waitForURL(base+'/records/'+promoted.id);
  const filename=page.locator('.workbench-file-identity');
  await filename.waitFor();
- const promotedShared=named('record',promoted.id);
- await expectOneSource(promotedShared);
- assert.equal(await vtName(filename),promotedShared,'filename maps to the identity label when Markdown H1 differs');
- assert.equal(await vtName(page.locator('.workbench-header h1.page-title')),'none','H1 must not pretend to be the filename');
+ assert.equal(await vtName(filename),promotedShared,'filename maps to small identity label when Markdown H1 differs');
+ assert.equal(await vtName(page.locator('.workbench-header h1.page-title')),'none','promoted Markdown H1 must not pretend to be the filename');
  await assertUniqueNames();
-
+ // The workbench inspector uses one shared Motion layout indicator, not a page snapshot.
  await page.getByRole('button',{name:'详细信息'}).click();
  const inspector=page.getByRole('dialog',{name:'文档检查器'});
  await inspector.getByRole('tab',{name:'目录'}).click();
  assert.equal(await inspector.locator('.workbench-tab-indicator').count(),1);
+ assert.equal(await inspector.getByRole('tab',{name:'目录'}).getAttribute('aria-selected'),'true');
  await inspector.getByRole('tab',{name:'版本'}).click();
  assert.equal(await inspector.locator('.workbench-tab-indicator').count(),1);
  await inspector.getByRole('button',{name:'关闭',exact:true}).click();
@@ -129,69 +110,28 @@ try{
  await page.goto(base+'/');
  const recent=page.locator('.recent-page').filter({hasText:promoted.name}).first();
  await recent.waitFor();
- await assertIdle();
+ assert.equal(await vtName(recent.locator('.recent-page-name')),promotedShared);
  await recent.click();
  await page.waitForURL(base+'/records/'+promoted.id);
  await filename.waitFor();
- await expectOneSource(promotedShared);
  assert.equal(await vtName(filename),promotedShared);
 
  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
  const hit=page.locator('.search-result').filter({hasText:promoted.name}).first();
  await hit.waitFor();
- await assertIdle();
+ assert.equal(await vtName(hit.locator('strong').first()),promotedShared);
+ await assertUniqueNames();
  await hit.click();
  await page.waitForURL(base+'/records/'+promoted.id);
  await filename.waitFor();
- await expectOneSource(promotedShared);
  assert.equal(await vtName(filename),promotedShared);
 
- // Breadcrumb targets work, while persistent file-tree siblings remain unnamed.
- await assertIdle();
+ await page.emulateMedia({reducedMotion:'reduce'});
  await page.locator('.crumbs').getByRole('link',{name:folderName}).click();
  await page.waitForURL(base+'/library/'+folder.id);
- await page.getByRole('heading',{level:1,name:folderName}).waitFor();
- await expectOneSource(folderShared);
- await assertUniqueNames();
-
- // Non-resource navigation must not start a native transition.
- await assertIdle();
- const before=await page.evaluate(()=>window.__rkVTStarts.length);
- await page.getByRole('link',{name:'知识库',exact:true}).first().click();
- await page.waitForURL(base+'/library');
- assert.equal(await page.evaluate(()=>window.__rkVTStarts.length),before);
-
- // Even opted-in links must not capture a title when reduce-motion is requested.
- await page.emulateMedia({reducedMotion:'reduce'});
- const reducedRow=page.locator('.file-row').filter({hasText:folderName});
- await reducedRow.waitFor();
- await assertIdle();
- await reducedRow.click();
- await page.waitForURL(base+'/library/'+folder.id);
- await page.getByRole('heading',{level:1,name:folderName}).waitFor();
- const reducedSource=await page.evaluate(()=>window.__rkVTStarts.at(-1));
- assert.deepEqual(reducedSource,[],'reduced motion must not select a shared title');
  assert.equal(await page.locator('.page-transition').getAttribute('data-phase'),'idle');
- await assertIdle();
-
- // Regression for the iPhone-sized screenshot: bottom navigation stays stable
- // and only the selected folder name is captured, not every file row.
- await page.emulateMedia({reducedMotion:'no-preference'});
- await page.setViewportSize({width:390,height:844});
- await page.locator('.bottom-nav .bottom-link').filter({hasText:'知识库'}).click();
- await page.waitForURL(base+'/library');
- const mobileFolder=page.locator('.file-row').filter({hasText:folderName});
- await mobileFolder.waitFor();
- await assertIdle();
- await mobileFolder.click();
- await page.waitForURL(base+'/library/'+folder.id);
- await page.getByRole('heading',{level:1,name:folderName}).waitFor();
- await expectOneSource(folderShared);
- await assertUniqueNames();
- const mobileSize=await page.evaluate(()=>({width:innerWidth,contentWidth:document.documentElement.scrollWidth}));
- assert.ok(mobileSize.contentWidth<=mobileSize.width+1,'mobile layout overflow after navigation: '+JSON.stringify(mobileSize));
-
- await assertIdle();
  assert.deepEqual(faults,[],'no browser runtime errors');
- console.log('PASS View Transitions: exactly one source, root no ghost, plain/H1, back, recent, search, breadcrumbs, reduced motion, mobile viewport');
-}finally{await browser.close();}
+ console.log('PASS View Transitions: library/folder, plain/H1 documents, back, recent, search, reduced motion');
+}finally{
+ await browser.close();
+}

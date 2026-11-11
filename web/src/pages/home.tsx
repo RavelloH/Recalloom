@@ -3,7 +3,7 @@ import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {ActivityEntry} from '../activity-entry';
 import {useRecentPages} from '../recent-pages';
-import {selectSharedTransition} from '../shared-view-transition';
+import {sharedViewTransitionName} from '../shared-view-transition';
 import {activityQuery,tasksQuery} from '../queries';
 import {PageTitle,LoadingRows,Empty,Swap,stateOf,ago,greeting} from './shared';
 
@@ -11,7 +11,7 @@ export function HomePage(){const {data:todo,isPending,isError}=useQuery(tasksQue
  const shortcut=/Mac|iPhone|iPad/.test(navigator.platform)?'⌘ K':'Ctrl K';
  return <div className="page home-page"><PageTitle title="概览" description={greeting()+'。从最近的页面继续，或查看待办与近期变化。'}/>
  <section className="home-section" aria-labelledby="home-recent"><h2 id="home-recent" className="section-heading"><Icon name="clock" size="sm"/>最近访问</h2>
-  {recent.length?<div className="recent-pages">{recent.slice(0,8).map(page=><Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page" viewTransition onClickCapture={event=>selectSharedTransition(event,'record',page.id,'.recent-page-name')}><span className="recent-page-cover" aria-hidden="true"/><span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span><strong className="recent-page-name">{page.name}</strong><small className="recent-page-meta truncate">{ago(page.visitedAt)}</small></Link>)}</div>
+  {recent.length?<div className="recent-pages">{recent.slice(0,8).map(page=><Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page"><span className="recent-page-cover" aria-hidden="true"/><span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span><strong className="recent-page-name" style={{viewTransitionName:sharedViewTransitionName('record',page.id)}}>{page.name}</strong><small className="recent-page-meta truncate">{ago(page.visitedAt)}</small></Link>)}</div>
   :<div className="recent-empty"><p className="muted small">最近打开的页面会显示在这里。按 <kbd>{shortcut}</kbd> 可随时搜索。</p><Link to="/library" className="small text-link">浏览知识库</Link></div>}
  </section>
  <div className="dashboard-grid">

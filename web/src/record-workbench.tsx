@@ -8,7 +8,7 @@ import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
 import {RecordRelations} from './record-relations';
 import {ago,statusNames} from './pages/shared';
 import type {RecordDetail} from './types';
-import {useSharedTransitionTarget} from './shared-view-transition';
+import {sharedViewTransitionName} from './shared-view-transition';
 
 export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
 
@@ -70,16 +70,15 @@ export function DocumentWorkbenchHeader({item,title,usesHeading,characters,edito
  onRename:(name:string)=>Promise<void>;
  onDetails:()=>void;
 }){
- const sharedName=useSharedTransitionTarget('record',item.id);
  return <header className="doc-header workbench-header">
   <div className="workbench-identity">
    <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档
-    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · <span className="workbench-file-identity" style={sharedName?{viewTransitionName:sharedName}:undefined}>{displayFileName(item.name)}</span></span>}
+    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · <span className="workbench-file-identity" style={{viewTransitionName:sharedViewTransitionName('record',item.id)}}>{displayFileName(item.name)}</span></span>}
    </span>
    <span className="workbench-revision" title={'当前正文版本 R'+item.revision}>R{item.revision}</span>
   </div>
   <InlineTitle key={usesHeading?'heading':'filename'} value={title} onRename={onRename}
-   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading} transitionName={usesHeading?undefined:sharedName}/>
+   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading} transitionName={usesHeading?undefined:sharedViewTransitionName('record',item.id)}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
    {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
   </div>}

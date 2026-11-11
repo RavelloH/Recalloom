@@ -1,5 +1,5 @@
 import {Icon} from './icon';
-import {selectSharedTransition} from './shared-view-transition';
+import {sharedViewTransitionName} from './shared-view-transition';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -51,7 +51,7 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
  const folders=trail.data??[];
  return <nav className="crumbs" aria-label="页面路径">
   <Link to="/library" className="crumb">知识库</Link>
-  {folders.map(folder=><React.Fragment key={folder.id}><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate" viewTransition onClickCapture={event=>selectSharedTransition(event,'folder',folder.id)}>{folder.name}</Link></React.Fragment>)}
+  {folders.map(folder=><React.Fragment key={folder.id}><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate" style={{viewTransitionName:sharedViewTransitionName('folder',folder.id)}}>{folder.name}</Link></React.Fragment>)}
   {folderId&&trail.isPending&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb muted">…</span></>}
   {current&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb crumb-current truncate" aria-current="page">{current}</span></>}
  </nav>;
