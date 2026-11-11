@@ -7,7 +7,7 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {ApiError,api,mutate,queryString} from '../api';
 import {useConfirmDialog} from '../confirm-dialog';
 import {archivedRecordsQuery} from '../queries';
-import {sharedViewTransitionName} from '../shared-view-transition';
+import {selectSharedTransition} from '../shared-view-transition';
 import {PageTitle,ErrorText,LoadingRows,Empty,fmt} from './shared';
 
 export function ArchivePage(){
@@ -68,9 +68,9 @@ export function ArchivePage(){
   <div className="archive-filter"><TextInput label="搜索归档" placeholder="搜索归档名称或原路径" width="100%" value={filter} onChange={setFilter}/></div>
   {q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:
    items.length?<div className="archive-list">{items.map(item=><div className="archive-item" key={item.id}>
-    <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link">
+    <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link" viewTransition onClickCapture={event=>selectSharedTransition(event,'record',item.id,'.archive-item-text strong')}>
      {item.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}
-     <span className="archive-item-text"><strong className="truncate" style={{viewTransitionName:sharedViewTransitionName('record',item.id)}}>{item.name}</strong>
+     <span className="archive-item-text"><strong className="truncate">{item.name}</strong>
       <small className="muted truncate">{item.archivedFromPath?'原路径 '+item.archivedFromPath+' · ':''}{fmt(item.archivedAt??item.updatedAt)} · R{item.revision??'—'}</small>
      </span>
     </Link>

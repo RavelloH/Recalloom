@@ -145,6 +145,8 @@
 
 .page-transition {
   min-height: 100%;
+  /* Browser snapshots only the routed content; header and nav stay live. */
+  view-transition-name: root;
 }
 
 .page-transition[data-phase="enter"] {

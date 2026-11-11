@@ -151,20 +151,35 @@ to {
 }
 }
 
-/* Shared navigation elements are coordinated by TanStack Router's native
-   View Transition support. Keep the root crossfade restrained so file titles
-   can travel between list and document positions without a full-page slide. */
+/* The browser's "root" image is reassigned to .page-transition.
+   Thus persistent navigation never double-renders. Only the clicked label
+   has a separate shared image; all other content stays in the route frame. */
 ::view-transition-group(*) {
   animation-duration: 320ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* The frame does not change geometry: document heights differ greatly. */
+::view-transition-group(root) {
+  animation: none;
+}
+
+/* Never show readable old and new copies of the same text simultaneously. */
+::view-transition-old(*) {
+  animation: 145ms ease-in both rk-view-exit;
+}
+
+::view-transition-new(*) {
+  animation: 165ms 140ms ease-out both rk-view-enter;
+}
+
+/* Route body crossfade only (not page title/hero, and not persistent shell). */
 ::view-transition-old(root) {
-  animation: 130ms ease-in both rk-view-exit;
+  animation: 110ms ease-in both rk-view-exit;
 }
 
 ::view-transition-new(root) {
-  animation: 220ms ease-out both rk-view-enter;
+  animation: 175ms 95ms ease-out both rk-view-enter;
 }
 
 @keyframes rk-view-exit {

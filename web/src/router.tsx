@@ -67,7 +67,8 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage})
 ];
 // Loaders read through the shared query cache; the router itself never caches stale data.
-// TanStack Router coordinates native navigation snapshots and falls back on older browsers.
-// Do not also wrap these navigations in React <ViewTransition> or startViewTransition().
+// Every route keeps the subtle content transition. The root snapshot is scoped
+// by CSS to .page-transition, leaving the persistent shell untouched. Only
+// the clicked resource receives a separate shared-element name.
 export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,defaultViewTransition:true});
 declare module '@tanstack/react-router'{interface Register{router:typeof router;}}

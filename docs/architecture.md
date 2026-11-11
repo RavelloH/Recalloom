@@ -46,8 +46,8 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 ## 页面导航与动效
 
-- **路由层：** TanStack Router 使用 `defaultViewTransition: true` 协调浏览器原生 View Transitions；不再单独调用 `document.startViewTransition()`，也不与 React `<ViewTransition>` 同时包裹一次导航。旧浏览器由 Router 自动降级，旧整页入场动画仅在不支持原生过渡时启用。
-- **共享元素：** `web/src/shared-view-transition.ts` 根据资源类型和不可变 ID 生成唯一 CSS 名称。文件列表、搜索、最近访问、归档、面包屑与详情共享对应身份；搜索重复命中仅给首条结果命名。不要用用户可编辑的标题当 ID，更不要在仍挂载的侧栏和页面正文中给同一资源设置两个相同名称。
+- **路由层：** TanStack Router 统一使用 `defaultViewTransition: true`，但在 `foundation/base.css` 把 `html` 的原生 `view-transition-name` 设为 `none`，并在 `layout/pages.css` 把 `.page-transition` 设为 `root`，从而只截取路由正文，而不截取不变的顶部栏、侧栏或移动端底栏。页面内容采用短促、非对称淡入淡出，并关闭整个路由容器的几何缩放；正常浏览器仍有连续导航反馈。旧浏览器由 Router 降级，绝不叠加 React `<ViewTransition>`。
+- **共享元素：** `web/src/shared-view-transition.ts` 按资源类型和不可变 ID 命名。文件列表、侧栏文件树、搜索、最近访问、归档、面包屑与详情共享对应身份；只有本次**实际点击**的源元素临时命名，目标详情组件按匹配资源命名，路由提交后清理。不能给整张列表的所有标题永久命名：那样会生成大量旧快照。回归测试必须在 `ViewTransition.updateCallbackDone` 阶段核对旧/新快照中确实有同一个 ID，并比较边界框位置；单纯检查最终 DOM 不等于真正发生了共享元素动画。
 - **文件名与 H1：** Markdown 首块 H1 独立于数据库文件名。当正文存在提升后的 H1，列表文件名只过渡到工作台顶部的文件标识；没有提升后的 H1 时才过渡到编辑标题。参考 `web/src/record-workbench.tsx`。
 - **局部效果：** 检查器 Tab 指示条采用 Motion Layout，编辑器视图切换、侧栏折叠与块拖拽继续使用原有专用动画，避免整个编辑器反复截图。样式位于所属模块；所有动画遵守 `prefers-reduced-motion`。
 - **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check` 和 `node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs`（后者只运行在隔离本地 Worker/D1）。
