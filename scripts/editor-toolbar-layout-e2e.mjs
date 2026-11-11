@@ -147,10 +147,11 @@ try{
     group:document.querySelector('.record-main .editor-view-switcher')?.getBoundingClientRect().toJSON(),
     icons:document.querySelector('.record-main .editor-view-actions')?.getBoundingClientRect().toJSON(),
     switcherStyle:(()=>{const el=document.querySelector('.record-main .editor-view-switcher');if(!el)return null;
-     const s=getComputedStyle(el);return {padding:s.paddingTop,border:s.borderTopWidth};})()
+     const group=el.querySelector('[role="group"]');const s=getComputedStyle(group??el);
+     return {padding:s.paddingTop,border:s.borderTopWidth,outline:s.outlineWidth,offset:s.outlineOffset};})()
    }));
-   if(width<=390)assert.ok(metrics.switcherStyle?.border==='1px'&&metrics.switcherStyle.padding==='0px',
-    'Mode switcher must have a direct outer border without extra padding '+JSON.stringify(metrics));
+   if(width<=390)assert.ok(metrics.switcherStyle?.outline==='1px'&&metrics.switcherStyle?.offset==='0px'&&metrics.switcherStyle.padding==='0px',
+    'Mode switcher must ring the actual button group with no internal gap '+JSON.stringify(metrics));
    assert.ok(metrics.scrollWidth<=metrics.viewport+1,'Mobile root overflow '+JSON.stringify(metrics));
    if(width<=390){
     assert.ok(metrics.group&&metrics.icons&&metrics.group.right<=metrics.icons.left+2,

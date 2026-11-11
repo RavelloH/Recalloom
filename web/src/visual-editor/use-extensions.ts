@@ -16,6 +16,7 @@ import {ScrollCodeBlock,CaptionedScrollTableView} from '../tiptap/scroll-blocks'
 import {RmdMark} from '../tiptap/rmd-mark';
 import {RmdSketchMark} from '../tiptap/rmd-sketch';
 import {RmdAttrsDecorations} from '../tiptap/rmd-attrs-decoration';
+import {FormatHoverPreview} from '../tiptap/format-hover-preview';
 import {RawMarkdown,RawInline} from '../tiptap/raw-markdown';
 import {RichContainer,RichBadge,RichAbbr,RichTooltip,RichKbd,RichCloze} from '../tiptap/rich-directives';
 import {RichLinkCard} from '../tiptap/rich-link-card';
@@ -34,7 +35,7 @@ return useMemo(()=>[
   ScrollCodeBlock.configure({defaultTheme:'github-light-high-contrast',themes:{light:'github-light-high-contrast',dark:'github-dark-high-contrast'}}),
   CustomHeading.configure({levels:[1,2,3,4,5,6]}),
   CustomParagraph,
-  RawMarkdown,RawInline,RmdAttrsDecorations,
+  RawMarkdown,RawInline,RmdAttrsDecorations,FormatHoverPreview,
   WikiLinkNode.configure({sourceId:recordId}),WikiEmbedNode.configure({sourceId:recordId}),CrossReferenceNode,
   RichImage.configure({allowBase64:false}),
   TableWithMarkdown.configure({resizable:false,View:CaptionedScrollTableView}),TableRowWithMarkdown,TableHeaderWithMarkdown,TableCellWithMarkdown,

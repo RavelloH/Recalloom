@@ -31,6 +31,7 @@ import {useCompactLayout,useFinePointer} from '../use-media';
 import {safeTableId,cleanTableCaption} from '../table-caption';
 import {useVisualEditorExtensions} from './use-extensions';
 import {useVisualEditorSelection} from './use-selection';
+import {setFormatHoverPreview,type FormatHoverKind} from '../tiptap/format-hover-preview';
 import {buildMoreInlineItems,buildFormattingToolbar} from './formatting-toolbar';
 import {tableToolbarOffset,SLASH_MENU_WIDTH,SLASH_MENU_SPACE} from './geometry';
 import {EditorTableControls} from './table-controls';
@@ -440,12 +441,33 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   run();
  };
  const runInlineFromMenu=(command:InlineCommand)=>runCapturedInline(()=>{command.run(editor);});
+ // Preview is a ProseMirror decoration only: never runs the formatting command.
+ const applyHoverPreview=(kind:FormatHoverKind|null)=>{
+  if(!finePointer||!kind){setFormatHoverPreview(editor,null);return;}
+  captureInlineRange();
+  const captured=inlineSelectionRef.current;
+  const range=captured?.doc===editor.state.doc?captured:null;
+  const from=range?.from??editor.state.selection.from;
+  const to=range?.to??editor.state.selection.to;
+  setFormatHoverPreview(editor,kind,from,to);
+ };
+ const previewForToggle=(name:string,pressed=false):FormatHoverKind|null=>{
+  const kind=({
+   '粗体':'bold','斜体':'italic','删除线':'strike','下划线':'underline',
+   '高亮':'mark','引用':'blockquote','行内代码':'code'
+  } as Record<string,FormatHoverKind>)[name];
+  return !kind?null:pressed?('remove:'+kind) as FormatHoverKind:kind;
+ };
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
   <ToggleButton key={name} label={name} tooltip={name} size="sm" isPressed={pressed}
-   onPointerEnter={captureInlineRange} onPointerDown={captureInlineRange} onPressedChange={()=>runCapturedInline(run)}>{child}</ToggleButton>;
+   onPointerEnter={event=>{captureInlineRange();if(finePointer&&event.pointerType==='mouse')applyHoverPreview(previewForToggle(name,pressed));}}
+   onPointerLeave={()=>applyHoverPreview(null)} onPointerDown={captureInlineRange}
+   onPressedChange={()=>{applyHoverPreview(null);runCapturedInline(run);}}>{child}</ToggleButton>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
   <Button key={name} label={name} tooltip={name} variant="ghost" size="sm"
-   onMouseDown={event=>event.preventDefault()} onClick={run} isDisabled={disabled}>{child}</Button>;
+   onMouseDown={event=>event.preventDefault()}
+   onPointerEnter={event=>{if(finePointer&&event.pointerType==='mouse')applyHoverPreview(previewForToggle(name));}}
+   onPointerLeave={()=>applyHoverPreview(null)} onClick={()=>{applyHoverPreview(null);run();}} isDisabled={disabled}>{child}</Button>;
  const cancelPopupClose=()=>{
   if(inlinePopupClose.current!==null)clearTimeout(inlinePopupClose.current);
   inlinePopupClose.current=null;
@@ -456,6 +478,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  };
  const showInlinePopup=(anchor:HTMLElement,label:string,items:InlinePopupItem[])=>{
   cancelPopupClose();
+  applyHoverPreview(null);
   captureInlineRange();
   const rect=anchor.getBoundingClientRect(),height=Math.min(336,items.length*38+20);
   setInlinePopup({label,items,
@@ -464,14 +487,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     ?rect.bottom+6:Math.max(8,rect.top-height-6)});
  };
  const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[],highlightActive=true)=>
-  <Button key={label} label={label} tooltip={label} variant="ghost" size="sm"
+  <Button key={label} label={label} variant="ghost" size="sm"
    className={'rk-inline-menu-trigger'+(highlightActive&&items.some(item=>item.active)?' rk-toolbar-state-selected':'')} icon={menuIcon(child)} isIconOnly
    aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
    onMouseDown={event=>event.preventDefault()}
    onPointerDown={captureInlineRange}
    onPointerEnter={event=>{if(finePointer&&event.pointerType==='mouse')showInlinePopup(event.currentTarget,label,items);}}
-   onPointerLeave={finePointer?schedulePopupClose:undefined}
+   onPointerLeave={finePointer?()=>{applyHoverPreview(null);schedulePopupClose();}:undefined}
    onClick={event=>{
+    applyHoverPreview(null);
     if(!finePointer&&inlinePopup?.label===label){cancelPopupClose();setInlinePopup(null);}
     else showInlinePopup(event.currentTarget,label,items);
    }}/>;
@@ -578,7 +602,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  </div>
  </div>
  <EditorInlinePopup popup={inlinePopup} onEnter={finePointer?cancelPopupClose:()=>{}} onLeave={finePointer?schedulePopupClose:()=>{}}
-  onChoose={item=>{cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
+  onPreview={kind=>applyHoverPreview(kind)}
+  onChoose={item=>{applyHoverPreview(null);cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
  {blockPanelPos!==null&&createPortal(
   <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}
    onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}

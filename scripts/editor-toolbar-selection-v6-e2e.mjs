@@ -156,6 +156,7 @@ try{
    assert.ok(viewport.scrollLeft>30&&viewport.leadLeft<viewport.barLeft-30,
     kind+' insert button must scroll away with formatting: '+JSON.stringify(viewport));
    await touch.locator('.tiptap .rk-directive-warning').first().tap();
+   await top.locator('.wysiwyg-tools-leading').getByRole('button',{name:'编辑当前块'}).waitFor();
    assert.deepEqual(await toolbarNames(top.locator('.wysiwyg-tools-leading')),
     ['插入内容','编辑当前块','更多块操作']);
    assert.deepEqual(await toolbarNames(primary),expectedTouch);

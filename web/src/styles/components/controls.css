@@ -410,8 +410,8 @@
 }
 
 .rk-toolbar-state-selected {
-  background: color-mix(in srgb,var(--color-primary,#527cb7) 14%,transparent) !important;
-  color: var(--color-text-primary) !important;
+  background:var(--rk-active) !important;
+  color:var(--color-text-primary) !important;
 }
 
 .rk-inline-popover {
@@ -435,7 +435,12 @@
 }
 .rk-inline-popover[data-state="closing"] {
   pointer-events:none;
-  animation:rk-inline-menu-exit 150ms ease-in both;
+  animation:rk-inline-menu-exit 160ms ease-in both;
+}
+/* A hover handoff displays the outgoing menu beneath the incoming one,
+   allowing two menus to crossfade rather than hard-switch their content. */
+.rk-inline-popover[data-switching="true"] {
+  animation:rk-inline-menu-enter 170ms var(--rk-ease-out) both;
 }
 
 .rk-inline-popover-item {
@@ -470,8 +475,8 @@
 }
 
 .rk-inline-popover-item[data-active="true"] {
-  color: var(--color-text-link,#527cb7);
-  background: color-mix(in srgb,var(--color-text-link,#527cb7) 8%,transparent);
+  color:var(--color-text-primary);
+  background:var(--rk-active);
 }
 
 .rk-menu-item-check {

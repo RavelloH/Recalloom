@@ -1,0 +1,114 @@
+/* Temporary hover-only formatting: decorations never modify the Markdown AST.
+ * The sketch overlays below are rendered by the existing SVG geometry engine. */
+@keyframes rk-format-preview-breathe {
+  0%,100% {opacity:.96;}
+  50% {opacity:.80;}
+}
+@keyframes rk-sketch-preview-breathe {
+  0%,100% {opacity:.82;}
+  50% {opacity:.34;}
+}
+.record-main .tiptap .rk-hover-format:not(.rk-hover-format--sketch) {
+  animation:rk-format-preview-breathe 1.65s ease-in-out infinite;
+}
+.record-main .tiptap .rk-hover-format--bold {font-weight:700;}
+/* Hovering a format that is already active previews toggling it OFF. */
+.record-main .tiptap .rk-hover-format--remove-bold {font-weight:400 !important;}
+.record-main .tiptap .rk-hover-format--remove-italic {font-style:normal !important;}
+.record-main .tiptap .rk-hover-format--remove-code {font-family:inherit !important;background:transparent !important;}
+.record-main .tiptap :is(s,del):has(.rk-hover-format--remove-strike) {text-decoration:none !important;}
+.record-main .tiptap :is(u,ins):has(.rk-hover-format--remove-underline) {text-decoration:none !important;}
+.record-main .tiptap :is(mark,.rk-rmd-mark):has(.rk-hover-format--remove-mark) {background:transparent !important;}
+.record-main .tiptap blockquote:has(.rk-hover-format--remove-blockquote) {
+  border-inline-start-color:transparent !important;
+  background:transparent;
+}
+.record-main .tiptap :is(ul,ol):has(.rk-hover-format--remove-list-bullet,.rk-hover-format--remove-list-ordered,.rk-hover-format--remove-list-task) {list-style:none;}
+.record-main .tiptap .rk-hover-format--italic {font-style:italic;}
+.record-main .tiptap .rk-hover-format--strike {text-decoration:line-through;}
+.record-main .tiptap .rk-hover-format--underline {text-decoration:underline;text-underline-offset:.17em;}
+.record-main .tiptap .rk-hover-format--code {
+  font-family:var(--rk-font-mono);
+  background:var(--rk-active);
+  border-radius:3px;
+  padding-inline:.12em;
+}
+.record-main .tiptap .rk-hover-format--mark {
+  background:var(--rk-mark-background);
+  color:var(--rk-mark-foreground);
+  border-radius:2px;
+}
+.record-main .tiptap .rk-hover-format--superscript {font-size:.76em;vertical-align:super;}
+.record-main .tiptap .rk-hover-format--subscript {font-size:.76em;vertical-align:sub;}
+.record-main .tiptap .rk-hover-format--comment {
+  color:var(--rk-ink-soft);
+  font-style:italic;
+}
+/* Inline components replace the selected content when committed; on hover,
+   only demonstrate the component's visual treatment, never insert nodes. */
+.record-main .tiptap .rk-hover-format--rich-badge,
+.record-main .tiptap .rk-hover-format--rich-kbd {
+  display:inline;
+  border:1px solid var(--rk-border-soft);
+  border-radius:5px;
+  background:var(--rk-active);
+  padding:.05em .35em;
+}
+.record-main .tiptap .rk-hover-format--rich-kbd {font-family:var(--rk-font-mono);}
+.record-main .tiptap .rk-hover-format--rich-tooltip,
+.record-main .tiptap .rk-hover-format--rich-abbr {text-decoration:underline dotted;text-underline-offset:.19em;}
+.record-main .tiptap .rk-hover-format--rich-cloze {
+  background:var(--rk-active);
+  border-bottom:1px dashed var(--rk-ink-soft);
+  color:transparent;
+  text-shadow:0 0 5px var(--rk-ink-soft);
+}
+.record-main .tiptap .rk-hover-format--heading {
+  font-weight:700;
+  line-height:1.28;
+  letter-spacing:-.025em;
+}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="0"] {font-size:1em;font-weight:400;line-height:1.6;letter-spacing:normal;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="1"] {font-size:2em;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="2"] {font-size:1.65em;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="3"] {font-size:1.42em;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="4"] {font-size:1.24em;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="5"] {font-size:1.1em;}
+.record-main .tiptap .rk-hover-format--heading[data-rk-preview-level="6"] {font-size:1em;}
+.record-main .tiptap .rk-hover-format--align-left {text-align:left;}
+.record-main .tiptap .rk-hover-format--align-center {text-align:center;}
+.record-main .tiptap .rk-hover-format--align-right {text-align:right;}
+.record-main .tiptap .rk-hover-format--blockquote {
+  border-inline-start:3px solid var(--rk-ink-soft);
+  padding-inline-start:14px;
+  color:var(--rk-ink-soft);
+  font-style:italic;
+}
+.record-main .tiptap .rk-hover-format--list-bullet,
+.record-main .tiptap .rk-hover-format--list-ordered,
+.record-main .tiptap .rk-hover-format--list-task {
+  position:relative;
+  padding-inline-start:24px;
+}
+.record-main .tiptap .rk-hover-format--list-bullet::before,
+.record-main .tiptap .rk-hover-format--list-ordered::before,
+.record-main .tiptap .rk-hover-format--list-task::before {
+  position:absolute;
+  inset-inline-start:4px;
+  top:0;
+  font-weight:600;
+  color:var(--rk-ink-soft);
+}
+.record-main .tiptap .rk-hover-format--list-bullet::before {content:"•";}
+.record-main .tiptap .rk-hover-format--list-ordered::before {content:"1.";}
+.record-main .tiptap .rk-hover-format--list-task::before {content:"☐";}
+/* Keep the text absolutely unchanged during a sketch preview. Only the
+ * outside-editor SVG strokes breathe, including wrapped lines and KaTeX. */
+.rk-sketch-preview-svg {
+  animation:rk-sketch-preview-breathe 1.65s ease-in-out infinite;
+  pointer-events:none;
+}
+@media (prefers-reduced-motion:reduce){
+  .record-main .tiptap .rk-hover-format:not(.rk-hover-format--sketch),
+  .rk-sketch-preview-svg {animation:none;}
+}

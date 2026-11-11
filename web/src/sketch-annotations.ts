@@ -53,7 +53,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   const seed=sketchSeed(kind+':'+(element.textContent??'')+':'+index);
   const paths=sketchPaths(kind,width,height,seed,roughness,hasMath);
   const svg=document.createElementNS(SVG_NS,'svg');
-  svg.setAttribute('class','rk-sketch-svg');
+  svg.setAttribute('class',element.dataset.rkPreviewSketch==='true'?'rk-sketch-svg rk-sketch-preview-svg':'rk-sketch-svg');
   svg.setAttribute('data-sketch-drawing',kind);
   svg.setAttribute('width',String(width));
   svg.setAttribute('height',String(height));

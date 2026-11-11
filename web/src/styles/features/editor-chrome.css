@@ -14,12 +14,32 @@
 .editor-view-switcher {
   flex:0 1 auto;
   min-width:0;
-  border:1px solid var(--rk-border-soft);
-  border-radius:10px;
   padding:0;
   background:transparent;
 }
-.editor-view-switcher [role="group"] {min-width:0;}
+/* The ring belongs to the actual ButtonGroup, not an outer wrapper:
+   otherwise its own layout spacing leaves an unwanted inner moat. */
+.editor-view-switcher [role="group"] {
+  min-width:0;
+  padding:0;
+  gap:0;
+  border-radius:10px;
+  outline:1px solid var(--rk-border-soft);
+  outline-offset:0;
+  overflow:hidden;
+}
+.editor-view-switcher [role="group"] > button {border-radius:0;}
+/* Astryx pressed toggles default to the global accent; editor formatting
+   uses the same quiet neutral selection as underline and strikethrough. */
+.bubble-menu-inner .rk-format-group button[aria-pressed="true"],
+.wysiwyg-toolbar .rk-format-group button[aria-pressed="true"],
+.bubble-menu-inner .rk-format-group button[data-state="on"],
+.wysiwyg-toolbar .rk-format-group button[data-state="on"] {
+  background:var(--rk-active) !important;
+  color:var(--color-text-primary) !important;
+  box-shadow:none !important;
+}
+
 .editor-view-actions {
   display:flex;
   align-items:center;
