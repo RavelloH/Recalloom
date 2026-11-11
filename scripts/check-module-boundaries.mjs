@@ -5,7 +5,8 @@ import ts from 'typescript';
 const errors=[];
 const modules=[
  {entry:'web/src/pages.tsx',directory:'web/src/pages',public:['PageTitle','LoginPage','HomePage','LibraryPage','ArchivePage','RecordPage','TasksPage','SearchPage','ActivityPage','SettingsPage']},
- {entry:'src/storage.ts',directory:'src/storage',public:['getRecord','revisionContent','createFolder','browse','archivedRecords','createRecord','readRecord','editRecord','restoreRecord','listVersions','updateMeta','tagRecord','taskOperation','getTasks','changesSince','manageFolder','resolvePath']}
+ {entry:'src/storage.ts',directory:'src/storage',public:['getRecord','revisionContent','createFolder','browse','archivedRecords','createRecord','readRecord','editRecord','restoreRecord','listVersions','updateMeta','tagRecord','taskOperation','getTasks','changesSince','manageFolder','resolvePath']},
+ {entry:'web/src/visual-editor.tsx',directory:'web/src/visual-editor',public:['default','VisualEditorHandle']}
 ];
 const sf=(filename)=>ts.createSourceFile(filename,readFileSync(filename,'utf8'),ts.ScriptTarget.Latest,true,filename.endsWith('.tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS);
 const locate=(origin,relative)=>{
@@ -36,7 +37,7 @@ for(const {entry,directory,public:expected} of modules){
    const m=node.moduleSpecifier;
    if(!m||!ts.isStringLiteral(m))continue;
    const source=m.text;
-   const legacy=entry.startsWith('web/')?'../pages':'../storage';
+   const legacy='../'+entry.split('/').at(-1).replace(/\.(?:tsx?|jsx?)$/,'');
    if(source===legacy||source===legacy+'.js'||source===legacy+'.tsx')errors.push(file+': do not import compatibility entry '+entry);
    if(!source.startsWith('.'))continue;
    const target=locate(file,source);

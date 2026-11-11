@@ -11,7 +11,8 @@ import {slashCommands} from '../web/src/tiptap/slash-commands';
 import {isRmdAttrsEditable,rmdAttrNodeMapping} from '../web/src/tiptap/rmd-schema-attrs-model';
 
 type Row={syntax:string;type:string;surface:string;command:string;context?:string};
-const toolbar=fs.readFileSync('web/src/visual-editor.tsx','utf8');
+const toolbar=fs.readFileSync('web/src/visual-editor/formatting-toolbar.tsx','utf8');
+const editorUI=fs.readFileSync('web/src/visual-editor/editor.tsx','utf8');
 const panel=fs.readFileSync('web/src/tiptap/block-editor-panel.tsx','utf8');
 const ids=slashCommands.map(c=>c.id);
 assert.equal(new Set(ids).size,ids.length,'duplicate slash command IDs');
@@ -78,10 +79,10 @@ for(const spec of RMD_REGISTRY.nodes){
  assert.ok(mapping,'missing schema attribute mapping for '+spec.node);
  assert.ok(isRmdAttrsEditable(mapping[0]),'node attributes not reachable: '+spec.node);
 }
-const touch=toolbar.split('{touchToolbar&&<div className="wysiwyg-toolbar"')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
-const desktop=toolbar.split('{finePointer&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
+const touch=editorUI.split('{touchToolbar&&<div className="wysiwyg-toolbar"')[1]?.split('{finePointer&&<BubbleMenu')[0]??'';
+const desktop=editorUI.split('{finePointer&&<BubbleMenu')[1]?.split('<div hidden={!((active?.table')[0]??'';
 const standard=['粗体','斜体','下划线','删除线','行内代码','上标','下标'];
-const shared=toolbar.split('const sharedFormattingToolbar=<>')[1]?.split('</>;')[0]??'';
+const shared=toolbar.split('export function buildFormattingToolbar(')[1]?.split('return <>')[1]?.split('</>;')[0]??'';
 const ordered=['标题','粗体','斜体','列表','引用','插入或编辑链接','下划线',
  '高亮','删除线','对齐方式','行内代码','插入行内公式','荧光笔与手绘标记','更多'];
 let prior=-1;
@@ -94,6 +95,8 @@ for(const title of ordered){
 }
 for(const title of ['上标','下标'])
  assert.ok(toolbar.includes("label:'"+title+"'"),'more menu missing '+title);
+assert.ok(editorUI.includes('buildFormattingToolbar({editor,active,'),
+ 'VisualEditor must compose the shared formatting controls from the dedicated module');
 assert.ok(touch.includes('{sharedFormattingToolbar}')&&desktop.includes('{sharedFormattingToolbar}'),
  'desktop and touch must render exactly the same ordered formatting toolbar');
 assert.ok(touch.includes("action('插入内容'"),'touch toolbar must open slash insertion picker');
