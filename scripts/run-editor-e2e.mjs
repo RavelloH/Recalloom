@@ -21,10 +21,13 @@ const suite=[
  'editor-rich-leaf-fields-e2e.mjs','editor-nested-block-handle-e2e.mjs',
  'editor-nested-block-drag-e2e.mjs','editor-container-id-e2e.mjs'
 ];
+// Destructive lifecycle tests are opt-in and only run against the local,
+// temporary Worker/D1 created by this harness.
+const optionalSuites=['archive-management-e2e.mjs'];
 const requested=process.argv.slice(2);
 const chosen=requested.length?requested.map(name=>name.replace(/^scripts[\\/]/,'')):suite;
 for(const name of chosen)
- assert.ok(suite.includes(name),'Unknown E2E suite: '+name);
+ assert.ok(suite.includes(name)||optionalSuites.includes(name),'Unknown E2E suite: '+name);
 assert.ok(existsSync(wrangler),'Install dependencies before running E2E tests');
 assert.ok(existsSync(join(root,'.dev.vars')),'Provide a local .dev.vars with MCP_AUTH_SECRET');
 assert.ok(existsSync(join(root,'dist','web','index.html')),'Build the web assets first: pnpm build:web');

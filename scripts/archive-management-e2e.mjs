@@ -8,7 +8,9 @@ const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.
 const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(executablePath&&line,'local browser and .dev.vars are needed');
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
-const base='http://127.0.0.1:8897',browser=await chromium.launch({headless:true,executablePath});
+const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
+assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Destructive lifecycle tests must only use a loopback Worker');
+const browser=await chromium.launch({headless:true,executablePath});
 const page=await browser.newPage({viewport:{width:1360,height:860}});
 async function api(path,method='GET',value){
  return page.evaluate(async({path,method,value})=>{

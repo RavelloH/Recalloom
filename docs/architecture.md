@@ -22,10 +22,14 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 | 路径 | 责任与边界 |
 | --- | --- |
-| `src/` | Worker 服务端、OAuth、MCP、Web API、存储、搜索与生命周期 |
+| `src/` | Worker 服务端、OAuth、MCP、Web API、搜索与生命周期 |
+| `src/storage.ts` | 存储层稳定 API 兼容出口；业务调用方不应直接依赖内部实现 |
+| `src/storage/` | 文件夹与目录、记录读取、修订历史、元数据、任务、归档、审计事件和私有工具 |
 | `src/help/` | 可供 MCP 查询的帮助文档及生成源 |
 | `src/rmd/` | RMD 语法/组件注册元数据与共享契约 |
-| `web/src/` | 前端路由、知识库、记录编辑器、任务、关系图谱及视图组件 |
+| `web/src/` | React 前端、编辑器、关系网、组件与路由入口 |
+| `web/src/pages.tsx` | 页面组件兼容导出；由 `router.tsx` 继续引用，保留公开接口 |
+| `web/src/pages/` | 登录、概览、知识库、归档、记录、任务、搜索、活动和设置页面，`shared.tsx` 提供通用页面反馈组件 |
 | `web/src/tiptap/` | Tiptap 扩展和编辑器交互 |
 | `web/src/styles/` | 已模块化的样式所有权与设计令牌，详见该目录 README |
 | `migrations/` | 顺序执行的 D1 SQL schema 迁移；禁止修改已上线迁移内容 |
@@ -39,8 +43,9 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 2. **服务器 API 是唯一权威入口。** 前端只能通过 API 读取/修改持久状态，不直接访问 D1、KV 或 Vectorize。
 3. **编辑器输入和持久层分离。** 源码、预览、可视化三种模式要保持语义一致，编辑器中间态可延迟保存但不能丢失修订冲突检查。
 4. **数据库变更可回放。** 新增 migrations 文件，不对历史迁移做破坏性重写；复杂升级必须在本地 D1 的多个旧状态上回归。
-5. **组件和 CSS 有明确归属。** 功能组件遵循现有职责边界；共享 CSS 使用 `web/src/styles/` 的单一所有权规则，避免全局补丁文件。
-6. **文档与代码同步。** 帮助源位于 `src/help/`，修改后运行 `pnpm help:generate` 并通过 `pnpm help:check`；RMD 组件与编辑器命令的入口由语法审计覆盖。
+5. **组件和 CSS 有明确归属。** 功能组件遵循现有职责边界；页面模块通过 `web/src/pages/` 管理，存储模块通过 `src/storage/` 管理；共享 CSS 使用 `web/src/styles/` 的单一所有权规则，避免全局补丁文件。
+6. **公共入口稳定，内部依赖无环。** 原有 `pages.tsx` 和 `storage.ts` 是显式 re-export 出口，应用调用方使用这些稳定路径。内部模块不反向导入兼容入口，也不形成循环引用；通过 `pnpm modules:check` 自动验证。
+7. **文档与代码同步。** 帮助源位于 `src/help/`，修改后运行 `pnpm help:generate` 并通过 `pnpm help:check`；RMD 组件与编辑器命令的入口由语法审计覆盖。
 
 ## 测试金字塔
 
