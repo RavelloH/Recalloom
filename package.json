@@ -56,6 +56,7 @@
   "dependencies": {
     "@astryxdesign/core": "^0.7.4",
     "@astryxdesign/theme-neutral": "^0.7.4",
+    "@babel/runtime": "^7.29.13",
     "@cap.js/wasm": "^0.0.8",
     "@cloudflare/workers-oauth-provider": "^1.2.4",
     "@codemirror/autocomplete": "^6.20.4",
