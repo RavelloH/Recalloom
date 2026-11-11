@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile
 
+      - name: Check installed CodeMirror/Babel package links
+        run: pnpm deps:check
+
       - name: Architecture, generated docs and type checks
         run: pnpm check
 

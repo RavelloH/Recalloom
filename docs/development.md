@@ -30,18 +30,27 @@ pnpm test:editor:quick
 
 如果要从本地手动部署，请先通过环境变量配置 `RECALLOOM_KV_ID` 和 `RECALLOOM_D1_ID`，再运行 `pnpm deploy`。部署脚本会执行所需的 D1 迁移。不要提交 `.dev.vars` 或本地生成的部署配置。
 
+## Cloudflare Builds 依赖修复
+
+Cloudflare 构建环境曾出现已声明依赖在 pnpm 隔离目录中无法解析的问题，包括 `@uiw/react-codemirror` 对 Babel helper 和 `@codemirror/autocomplete` 对 `@codemirror/state` 的导入。本地及 GitHub Linux CI 的锁文件安装可以正常解析，说明不能仅根据 Vite 的 unresolved import 日志判断是代码忘记声明依赖。
+
+`pnpm build:web` 首先运行 `scripts/ensure-build-deps.mjs --repair`：从实际引用包的位置验证 CodeMirror 与 Babel Runtime 7 的解析链；若有缺失，则执行 `pnpm install --frozen-lockfile --force --prod=false` 重新建立完整依赖树，再次验证后才构建。正常安装不触发重装。`pnpm deps:check` 只验证、不修改安装目录。
+
+如重建后依然失败，检查 Cloudflare Workers 项目的 **Settings → Build → Build cache → Clear Cache** 并重试；必须查看构建日志中预检列出的具体依赖链接。不要把出错模块加进 Rollup `external` 来绕过问题，否则浏览器运行时仍可能缺包。
+
 ## 工程检查与测试分层
 
 | 命令 | 验证范围 | 环境要求 |
 | --- | --- | --- |
 | `pnpm check` | CSS 归属、图标、帮助文档、语法覆盖、前后端类型 | 无远端凭证 |
 | `pnpm test` | 使用受控并发运行 Node 单元测试 | 无远端凭证 |
-| `pnpm build:web` | Vite 前端构建、静态资源打包 | 无远端凭证 |
+| `pnpm deps:check` | 从实际引用者验证 CodeMirror 与 Babel Runtime 7 的依赖解析链接，捕捉 pnpm 依赖树缺失 | 需要已执行 `pnpm install` |
+| `pnpm build:web` | 先检测依赖链接，必要时通过冻结锁文件强制重建，再执行 Vite 前端构建 | 无远端凭证 |
 | `pnpm bundle:check` | 检查主入口 JS gzip 不超过 250KiB、全局 CSS gzip 不超过 56KiB，并验证路由/编辑器/RMD 的按需 chunk | 需要先执行 `pnpm build:web` |
 | `pnpm test:migrations` | 临时本地 D1 数据迁移回放 | 不接触生产，但可能较慢 |
 | `pnpm test:editor` | 使用隔离 Worker/D1 的核心编辑器浏览器 E2E | 本地 `.dev.vars` + 浏览器 |
 
-- `.github/workflows/quality.yml` 在 Push/PR 上运行静态检查、单元测试、构建及包体预算检查，不执行远端 D1 迁移。
+- `.github/workflows/quality.yml` 在 Push/PR 上先检查 CodeMirror/Babel 依赖链接，再运行静态检查、单元测试、构建及包体预算检查，不执行远端 D1 迁移。
 - `scripts/` 中的 E2E 可能属于核心套件或单独的可重复回归测试；单次开发任务的临时脚本应放在被 Git 忽略的 `.agents/`。
 - UI 回归不仅验证 SVG 或 DOM 是否存在，还应验证 Computed Style、可见性、尺寸和实际交互。`web-bundle-loading-e2e.mjs` 通过隔离浏览器请求记录确认路由、命令面板与原生滚动条策略不会提前下载功能脚本。
 - OAuth、归档/永久删除、关系网和迁移必须在隔离环境进行专项测试，不能用单元测试代替。
