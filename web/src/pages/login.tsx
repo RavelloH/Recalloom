@@ -1,4 +1,5 @@
 import {Icon} from '../icon';
+import {BrandMark} from '../brand-mark';
 import React,{useState} from 'react';
 import {useNavigate} from '@tanstack/react-router';
 import {useQueryClient} from '@tanstack/react-query';
@@ -15,5 +16,5 @@ export function LoginPage(){const [secret,setSecret]=useState(''),[busy,setBusy]
   const proof=await widget.solve();if(!proof.success||!proof.token)throw new Error('无法完成人机验证，请重试。');
   await mutate('/auth/login',{secret,capToken:proof.token});setSecret('');await qc.invalidateQueries({queryKey:['auth-session']});navigate({to:'/'});
  }catch(e){setError(e instanceof Error?e.message:'登录失败');}finally{setBusy(false);}};
- return <div className="login-page"><Card className="login-panel" padding={6}><div className="login-logo">R</div><h1>登录 Recalloom</h1><p className="muted">使用现有 OAuth 授权密钥访问管理控制台。</p><form onSubmit={submit} className="login-form"><TextInput label="授权密钥" type="password" value={secret} onChange={setSecret} isRequired autoComplete="off" placeholder="输入 MCP_AUTH_SECRET"/>{error&&<Banner status="error" container="section" title="登录失败" description={error}/>}<Button label={busy?'验证中…':'登录'} variant="primary" type="submit" width="100%" isDisabled={!secret||busy} isLoading={busy}/>{busy&&<p className="muted small">人机验证 {progress?progress+'%':'进行中'}，请勿关闭页面。</p>}</form><p className="login-foot"><Icon name="shield" size="sm"/>密钥仅用于登录，不会保存在浏览器中。登录后通过安全会话访问 API。</p></Card></div>;
+ return <div className="login-page"><Card className="login-panel" padding={6}><BrandMark className="login-logo"/><h1>登录 Recalloom</h1><p className="muted">使用现有 OAuth 授权密钥访问管理控制台。</p><form onSubmit={submit} className="login-form"><TextInput label="授权密钥" type="password" value={secret} onChange={setSecret} isRequired autoComplete="off" placeholder="输入 MCP_AUTH_SECRET"/>{error&&<Banner status="error" container="section" title="登录失败" description={error}/>}<Button label={busy?'验证中…':'登录'} variant="primary" type="submit" width="100%" isDisabled={!secret||busy} isLoading={busy}/>{busy&&<p className="muted small">人机验证 {progress?progress+'%':'进行中'}，请勿关闭页面。</p>}</form><p className="login-foot"><Icon name="shield" size="sm"/>密钥仅用于登录，不会保存在浏览器中。登录后通过安全会话访问 API。</p></Card></div>;
 }

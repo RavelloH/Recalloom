@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="110 110 804 804" width="512" height="512">
+<title>Recalloom</title>
+<style>@media (prefers-color-scheme: dark) { .ink { stroke: #f5f5f5; } }</style>
+<defs>
+<path id="a" d="M390.0 819.4 L390.0 400.2 A223.5 223.5 0 1 1 660.0 618.9"/>
+<path id="b" d="M660.0 618.9 L353.8 684.0 A138.2 138.2 0 0 1 186.9 548.8"/>
+<path id="c" d="M186.9 548.8 A138.2 138.2 0 0 1 420.6 449.0"/>
+<path id="d" d="M420.6 449.0 L807.9 819.4"/>
+<path id="oa" d="M227.4 451.1 A138.2 138.2 0 0 1 420.6 449.0 L501.4 526.2"/>
+<path id="ob" d="M390.0 819.4 L390.0 400.2"/>
+<path id="od" d="M837.0 400.2 A223.5 223.5 0 0 1 660.0 618.9 L353.8 684.0"/>
+<mask id="ma" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/><use href="#oa" fill="none" stroke="#000" stroke-width="125.4" stroke-linecap="butt" stroke-linejoin="round"/></mask>
+<mask id="mb" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/><use href="#ob" fill="none" stroke="#000" stroke-width="125.4" stroke-linecap="butt" stroke-linejoin="round"/></mask>
+<mask id="md" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/><use href="#od" fill="none" stroke="#000" stroke-width="125.4" stroke-linecap="butt" stroke-linejoin="round"/></mask>
+</defs>
+<g class="ink" fill="none" stroke="#141414" stroke-width="89.4" stroke-linecap="round" stroke-linejoin="round">
+<use href="#a" mask="url(#ma)"/>
+<use href="#b" mask="url(#mb)"/>
+<use href="#c"/>
+<use href="#d" mask="url(#md)"/>
+</g>
+</svg>

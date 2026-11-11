@@ -1,4 +1,5 @@
 import {Icon} from './icon';
+import {BrandMark} from './brand-mark';
 import {NavRow} from './nav-row';
 import React,{useEffect,useRef,useState} from 'react';
 import {Link,useNavigate,useRouterState} from '@tanstack/react-router';
@@ -51,7 +52,7 @@ export function Shell({children}:{children:React.ReactNode}){
  const logout=async()=>{if((hasSessionDrafts()||hasActiveEditorDirty())&&!(await askConfirm({title:'退出并清除草稿？',description:'本标签页仍有未保存草稿。退出登录将删除这些草稿，此操作无法撤销。',actionLabel:'退出并清除',destructive:true})))return;approveLogoutNavigation(true);try{await api('/auth/logout',{method:'POST'});clearAllSessionDrafts();clearRecentPages();qc.clear();await navigate({to:'/login'});}finally{approveLogoutNavigation(false);}};
  return <div className={'shell'+(collapsed?' sidebar-collapsed':'')} data-scrolled={scrolled||undefined} data-width={fullWidth?'full':undefined}>
  <SideNav className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏"
-  header={<div className="brand"><div className="brand-mark">R</div><span className="brand-name">Recalloom</span>
+  header={<div className="brand"><BrandMark className="brand-mark"/><span className="brand-name">Recalloom</span>
    <IconButton className="sidebar-collapse" variant="ghost" size="sm" label="折叠侧边栏" icon={<Icon name="chevronsLeft"/>} onClick={()=>setCollapsed(true)}/>
    <IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<Icon name="x"/>} onClick={closeMobile}/></div>}
   footer={<div className="sidebar-footer">

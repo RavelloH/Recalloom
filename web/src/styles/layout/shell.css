@@ -214,15 +214,11 @@ html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hove
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
-  color: var(--color-background-body,#fff);
-  font-weight: 700;
-  background: var(--color-text-primary, #1a1a1a);
-  border-radius: 6px;
-  width: 24px;
-  height: 24px;
-  font-size: var(--rk-font-label);
+  display: block;
+  flex: none;
+  width: 27px;
+  height: 27px;
+  color: var(--color-text-primary, #1a1a1a);
 }
 
 .brand-name {
