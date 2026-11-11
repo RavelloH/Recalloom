@@ -296,11 +296,13 @@
 }
 }
 
-/* The desktop topbar is an overlay, not a flex row. Only page types
-   which render a breadcrumb portal need to reserve its 46px in content.
-   This keeps the scroll viewport fixed on home <-> document transitions. */
+/* Keep a consistent top rhythm on desktop, even when no page-owned
+   breadcrumb portal exists. The space belongs to scrollable page content,
+   NOT to a fixed/empty topbar, so it scrolls away naturally.
+   Record/folder pages already reserve the same area for their overlay topbar. */
 @media (min-width: 721px) {
 
+.page,
 .page:is(.record-page, .folder-page) {
   padding-top: 74px;
 }
@@ -308,6 +310,7 @@
 
 @media (min-width: 721px) and (max-width: 1000px) {
 
+.page,
 .page:is(.record-page, .folder-page) {
   padding-top: 70px;
 }

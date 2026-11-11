@@ -226,6 +226,26 @@ try{
  const recent=page.locator('.recent-page').filter({hasText:promoted.name}).first();
  await recent.waitFor();
  await assertTextInPage(recent.locator('.recent-page-name'));
+ if(!mobileRun){
+  // A page without a topbar still owns a full-height spacing region INSIDE
+  // the scrollable content. It must not be a fixed empty header.
+  const spacing=await page.locator('.home-page').evaluate(async el=>{
+   const viewport=document.querySelector('.main-scroll');
+   const top=parseFloat(getComputedStyle(el).paddingTop);
+   const originalHeight=el.style.minHeight;
+   const beforeY=el.getBoundingClientRect().y;
+   el.style.minHeight='1600px';
+   viewport.scrollTop=80;
+   await new Promise(requestAnimationFrame);
+   const moved=beforeY-el.getBoundingClientRect().y;
+   viewport.scrollTop=0;
+   el.style.minHeight=originalHeight;
+   await new Promise(requestAnimationFrame);
+   return {top,moved};
+  });
+  assert.equal(spacing.top,74,'home without a breadcrumb must reserve the same 46px header area');
+  assert.ok(Math.abs(spacing.moved-80)<=2,'home top spacing must scroll away with the content');
+ }
  const viewportBox=async()=>page.locator('.main-scroll-host').evaluate(el=>{
   const {x,y,width,height}=el.getBoundingClientRect();
   return {x,y,width,height};
