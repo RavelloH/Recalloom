@@ -1,4 +1,5 @@
 import {Icon} from './icon';
+import {sharedViewTransitionName} from './shared-view-transition';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -50,14 +51,14 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
  const folders=trail.data??[];
  return <nav className="crumbs" aria-label="页面路径">
   <Link to="/library" className="crumb">知识库</Link>
-  {folders.map(folder=><React.Fragment key={folder.id}><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate">{folder.name}</Link></React.Fragment>)}
+  {folders.map(folder=><React.Fragment key={folder.id}><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate" style={{viewTransitionName:sharedViewTransitionName('folder',folder.id)}}>{folder.name}</Link></React.Fragment>)}
   {folderId&&trail.isPending&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb muted">…</span></>}
   {current&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb crumb-current truncate" aria-current="page">{current}</span></>}
  </nav>;
 }
 
 /** Editable document title: Enter or blur commits a rename, Escape reverts. */
-export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false,allowSlash=false}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean;allowSlash?:boolean}){
+export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false,allowSlash=false,transitionName}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean;allowSlash?:boolean;transitionName?:string}){
  const ref=useRef<HTMLHeadingElement>(null);
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
@@ -81,7 +82,7 @@ export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=fa
   finally{setSaving(false);}
  };
  return <div className="page-title-block">
-  <h1 ref={ref} className={'page-title'+(onRename?' is-editable':'')} data-placeholder={placeholder}
+  <h1 ref={ref} className={'page-title'+(onRename?' is-editable':'')} style={transitionName?{viewTransitionName:transitionName}:undefined} data-placeholder={placeholder}
    contentEditable={onRename&&!saving?'plaintext-only':false} suppressContentEditableWarning spellCheck={false}
    onKeyDown={event=>{
     if(event.nativeEvent.isComposing)return;

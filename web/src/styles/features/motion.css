@@ -151,6 +151,39 @@ to {
 }
 }
 
+/* Shared navigation elements are coordinated by TanStack Router's native
+   View Transition support. Keep the root crossfade restrained so file titles
+   can travel between list and document positions without a full-page slide. */
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(root) {
+  animation: 130ms ease-in both rk-view-exit;
+}
+
+::view-transition-new(root) {
+  animation: 220ms ease-out both rk-view-enter;
+}
+
+@keyframes rk-view-exit {
+  to { opacity: 0; }
+}
+
+@keyframes rk-view-enter {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
 @keyframes rk-pop-in {
 
 from {

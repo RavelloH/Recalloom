@@ -7,6 +7,7 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {ApiError,api,mutate,queryString} from '../api';
 import {useConfirmDialog} from '../confirm-dialog';
 import {archivedRecordsQuery} from '../queries';
+import {sharedViewTransitionName} from '../shared-view-transition';
 import {PageTitle,ErrorText,LoadingRows,Empty,fmt} from './shared';
 
 export function ArchivePage(){
@@ -69,7 +70,7 @@ export function ArchivePage(){
    items.length?<div className="archive-list">{items.map(item=><div className="archive-item" key={item.id}>
     <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link">
      {item.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}
-     <span className="archive-item-text"><strong className="truncate">{item.name}</strong>
+     <span className="archive-item-text"><strong className="truncate" style={{viewTransitionName:sharedViewTransitionName('record',item.id)}}>{item.name}</strong>
       <small className="muted truncate">{item.archivedFromPath?'原路径 '+item.archivedFromPath+' · ':''}{fmt(item.archivedAt??item.updatedAt)} · R{item.revision??'—'}</small>
      </span>
     </Link>

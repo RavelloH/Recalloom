@@ -19,7 +19,9 @@ export function PageTransition({children,scrollTarget}:{children:React.ReactNode
   lastPath.current=pathname;
   scrollTarget()?.scrollTo({top:0,left:0});
   clearTimeout(timer.current);
-  if(reduced()){setPhase('idle');return;}
+  // The native router transition already animates the destination snapshot.
+  // Never translate the entire page underneath a shared-element morph.
+  if(reduced()||typeof document.startViewTransition==='function'){setPhase('idle');return;}
   setPhase('enter');
   timer.current=setTimeout(()=>setPhase('idle'),ENTER_MS);
  },[pathname,scrollTarget]);

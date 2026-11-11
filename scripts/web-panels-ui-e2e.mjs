@@ -39,7 +39,7 @@ try{
  await di.waitFor();
  assert.ok(await di.getByText('类型',{exact:true}).count());
  // Renaming lives in the inline title; the panel shows facts only, without duplicate controls.
- assert.ok((await di.locator('.workbench-inspector-path').innerText()).includes(recordName),'detail shows the record path');
+ assert.ok((await di.locator('.workbench-inspector-path').last().innerText()).includes(recordName),'detail shows the record path');
  assert.equal(await di.getByRole('textbox',{name:'名称'}).count(),0,'no duplicate rename field');
  assert.ok(await di.getByText('Markdown 文档').count());
  await di.getByRole('button',{name:'关闭',exact:true}).click();

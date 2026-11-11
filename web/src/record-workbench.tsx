@@ -1,12 +1,14 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {motion,useReducedMotion} from 'motion/react';
 import {Button} from '@astryxdesign/core/Button';
 import {ContextPanel} from './context-panel';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
 import {RecordRelations} from './record-relations';
 import {ago,statusNames} from './pages/shared';
 import type {RecordDetail} from './types';
+import {sharedViewTransitionName} from './shared-view-transition';
 
 export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
 
@@ -71,12 +73,12 @@ export function DocumentWorkbenchHeader({item,title,usesHeading,characters,edito
  return <header className="doc-header workbench-header">
   <div className="workbench-identity">
    <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档
-    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · {displayFileName(item.name)}</span>}
+    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · <span className="workbench-file-identity" style={{viewTransitionName:sharedViewTransitionName('record',item.id)}}>{displayFileName(item.name)}</span></span>}
    </span>
    <span className="workbench-revision" title={'当前正文版本 R'+item.revision}>R{item.revision}</span>
   </div>
   <InlineTitle key={usesHeading?'heading':'filename'} value={title} onRename={onRename}
-   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading}/>
+   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading} transitionName={usesHeading?undefined:sharedViewTransitionName('record',item.id)}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
    {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
   </div>}
@@ -110,6 +112,7 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
  editors:string[];
 }){
  const currentIndex=sections.findIndex(section=>section.id===tab);
+ const reduceMotion=useReducedMotion();
  return <ContextPanel open={open} onOpenChange={next=>{if(!next)onClose();}} label="文档检查器">
   <div className="record-inspector workbench-inspector">
    <div className="panel-heading">
@@ -128,7 +131,7 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
       else if(event.key==='Home')next=0;
       else if(event.key==='End')next=sections.length-1;
       if(next>=0){event.preventDefault();onChangeTab(sections[next].id);const id=sections[next].id;requestAnimationFrame(()=>document.getElementById('workbench-tab-'+id)?.focus());}
-     }}>{section.label}</button>)}
+     }}>{tab===section.id&&<motion.span className="workbench-tab-indicator" layoutId="rk-workbench-selected-tab" aria-hidden="true" transition={reduceMotion?{duration:0}:{type:'spring',stiffness:430,damping:38}}/>}<span className="workbench-tab-label">{section.label}</span></button>)}
    </div>
    <section className="workbench-inspector-content" id="workbench-inspector-panel" role="tabpanel"
     aria-labelledby={'workbench-tab-'+sections[currentIndex].id}>

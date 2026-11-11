@@ -561,6 +561,7 @@
 }
 
 .workbench-inspector-tabs > button {
+  position: relative;
   min-height: 36px;
   min-width: 0;
   border: 0;
@@ -575,9 +576,22 @@
 
 .workbench-inspector-tabs > button[aria-selected="true"] {
   color: var(--color-text-primary);
-  background: var(--color-background);
   font-weight: 600;
+}
+
+.workbench-tab-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--color-background);
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+.workbench-tab-label {
+  position: relative;
+  z-index: 1;
 }
 
 .workbench-inspector-content {

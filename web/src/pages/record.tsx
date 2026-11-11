@@ -22,6 +22,7 @@ import {AutoResizer} from '../motion-primitives';
 import {RecordEditorChunk} from '../editor-chunks';
 import {setFullWidth,useFullWidth} from '../preferences';
 import {recordQuery} from '../queries';
+import {sharedViewTransitionName} from '../shared-view-transition';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
@@ -112,7 +113,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
     onDetails={()=>openInspector('details')}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
-    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle}/>
+    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedViewTransitionName('record',item.id)}/>
     <Properties>
      <Property label="类型">任务列表</Property>
      <Property label="标签"><TagEditor tags={item.tags??[]} onChange={changeTag}/></Property>
