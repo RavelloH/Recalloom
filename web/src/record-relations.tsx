@@ -1,3 +1,4 @@
+import './styles/features/relations.css';
 import {Icon} from './icon';
 import React,{useState} from 'react';
 import {Link} from '@tanstack/react-router';

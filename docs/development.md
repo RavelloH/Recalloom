@@ -37,7 +37,7 @@ pnpm test:editor:quick
 | `pnpm check` | CSS 归属、图标、帮助文档、语法覆盖、前后端类型 | 无远端凭证 |
 | `pnpm test` | 使用受控并发运行 Node 单元测试 | 无远端凭证 |
 | `pnpm build:web` | Vite 前端构建、静态资源打包 | 无远端凭证 |
-| `pnpm bundle:check` | 检查构建后主入口 gzip 不超过 275KiB，关键页面与功能保持独立 chunk | 需要先执行 `pnpm build:web` |
+| `pnpm bundle:check` | 检查主入口 JS gzip 不超过 250KiB、全局 CSS gzip 不超过 56KiB，并验证路由/编辑器/RMD 的按需 chunk | 需要先执行 `pnpm build:web` |
 | `pnpm test:migrations` | 临时本地 D1 数据迁移回放 | 不接触生产，但可能较慢 |
 | `pnpm test:editor` | 使用隔离 Worker/D1 的核心编辑器浏览器 E2E | 本地 `.dev.vars` + 浏览器 |
 

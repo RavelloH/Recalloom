@@ -16,7 +16,9 @@ assert.match(base,/^http:\/\/127\.0\.0\.1:/,'never run destructive fixtures on r
 const browser=await chromium.launch({headless:true,executablePath:bin});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];
+const cssRequests=[];
 page.on('pageerror',e=>errors.push(e.message));
+page.on('request',request=>{const path=new URL(request.url()).pathname;if(path.startsWith('/assets/')&&path.endsWith('.css'))cssRequests.push(path);});
 async function api(path,method='GET',body){
  const response=await page.evaluate(async ({path,method,body})=>{
   const r=await fetch('/api'+path,{method,headers:body===undefined?{}:{'content-type':'application/json'},
@@ -77,6 +79,9 @@ try{
  await page.goto(base+'/graph?focus='+A.id,{waitUntil:'networkidle'});
  await visible(page.getByRole('heading',{name:'知识关系网'}));
  await visible(page.getByRole('img',{name:/交互式文档关系图/}));
+ const graphLayout=await page.locator('.graph-workspace').evaluate(el=>({display:getComputedStyle(el).display,columns:getComputedStyle(el).gridTemplateColumns}));
+ assert.equal(graphLayout.display,'grid','On-demand graph CSS must apply to the graph workspace');
+ assert.ok(cssRequests.some(path=>path.includes('/knowledge-graph-')),'Graph route must request its own CSS asset');
  const canvas=page.locator('.knowledge-graph-canvas');
  const dims=await canvas.boundingBox();
  assert.ok(dims&&dims.width>400&&dims.height>200,'graph canvas occupies usable area '+JSON.stringify(dims));
@@ -99,6 +104,9 @@ try{
  await visible(inspector);
  await visible(inspector.getByText(B.name,{exact:true}));
  await visible(inspector.getByText(C.name,{exact:true}));
+ const relationLayout=await inspector.evaluate(el=>({display:getComputedStyle(el).display,gap:getComputedStyle(el).rowGap}));
+ assert.equal(relationLayout.display,'grid','Record relation styles must load with its component');
+ assert.equal(relationLayout.gap,'13px','Record relation spacing must remain intact');
  // A references B, but another relation type to B must still be possible.
  await inspector.getByRole('textbox',{name:'查找文档'}).fill('Graph Beta '+stamp);
  await visible(inspector.locator('.relation-search-item').filter({hasText:B.name}));

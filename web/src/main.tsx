@@ -4,7 +4,9 @@ import {QueryClientProvider} from '@tanstack/react-query';
 import {RouterProvider} from '@tanstack/react-router';
 import {Theme} from '@astryxdesign/core/theme';
 import {InternationalizationProvider} from '@astryxdesign/core/i18n';
-import zhCN from '@astryxdesign/core/locales/zh-CN.json';
+// Astryx's generated catalog omits translator-only descriptions while
+// preserving all ICU messages, avoiding authoring metadata in the app bundle.
+import zhCN from '@astryxdesign/core/locales/zh-CN.generated.js';
 import {recalloomTheme} from './icon-theme';
 import {router} from './router';
 import {queryClient} from './queries';

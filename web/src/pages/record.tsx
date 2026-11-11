@@ -1,3 +1,4 @@
+import '../styles/features/records.css';
 import {Icon} from '../icon';
 import React,{useEffect,useRef,useState} from 'react';
 import {useNavigate,useParams} from '@tanstack/react-router';

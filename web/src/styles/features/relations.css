@@ -1,0 +1,168 @@
+/* Shared by record relations and the knowledge graph, both route-loaded. */
+
+
+.relation-panel {
+  border-top: 1px solid var(--kg-border);
+  padding-top: 17px;
+  margin-top: 16px;
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+}
+
+.relation-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.relation-panel-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  margin: 0;
+  font-weight: 650;
+}
+
+.relation-graph-link {
+  font-size: 12px;
+  color: var(--color-text-link,#477bc8);
+  text-decoration: none;
+}
+
+.relation-graph-link:hover {
+  text-decoration: underline;
+}
+
+.relation-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 670;
+  color: var(--kg-muted);
+}
+
+.relation-group-heading span {
+  font-size: 11px;
+  border-radius: 10px;
+  padding: 1px 6px;
+  background: var(--kg-wash);
+}
+
+.relation-items {
+  display: grid;
+  gap: 4px;
+}
+
+.relation-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--kg-border);
+  border-radius: 9px;
+  min-width: 0;
+}
+
+.relation-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.relation-copy small {
+  font-size: 11px;
+}
+
+.relation-name {
+  display: block;
+  font-size: 12.8px;
+  font-weight: 610;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.relation-name:hover {
+  text-decoration: underline;
+}
+
+.relation-excerpt {
+  margin: 2px 0 0;
+  color: var(--kg-muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.relation-row > button {
+  align-self: flex-start;
+  flex: none;
+}
+
+.relation-placeholder {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--kg-muted);
+}
+
+.relation-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--kg-muted);
+}
+
+.relation-add {
+  display: grid;
+  gap: 9px;
+  padding-top: 13px;
+  border-top: 1px solid var(--kg-border);
+}
+
+.relation-add h4 {
+  font-size: 13px;
+  font-weight: 640;
+  margin: 0;
+}
+
+.relation-search-results {
+  display: grid;
+  gap: 2px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.relation-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 7px;
+  border-radius: 6px;
+}
+
+.relation-search-item:nth-child(odd) {
+  background: var(--kg-wash);
+}
+
+.relation-search-item > span {
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+.relation-panel * {
+  scroll-behavior: auto;
+}
+}

@@ -2,6 +2,7 @@ import React,{useMemo,useRef} from 'react';
 // Preview is a lazily loaded route. The shared RMD component stylesheet must
 // also be loaded here; importing it only from VisualEditor loses highlight
 // colors, interactive rich component styling and layout on direct preview.
+import './styles/features/rmd.css';
 import './tiptap/editor.css';
 import ReactMarkdown,{type Components} from 'react-markdown';
 import remarkGfm from 'remark-gfm';

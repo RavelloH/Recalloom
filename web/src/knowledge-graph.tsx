@@ -1,3 +1,5 @@
+import './styles/features/relations.css';
+import './styles/features/graph.css';
 import {Icon} from './icon';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {Link,useNavigate,useSearch} from '@tanstack/react-router';

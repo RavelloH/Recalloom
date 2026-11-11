@@ -12,10 +12,6 @@
 @import "./components/status.css";
 @import "./components/controls.css";
 @import "./components/overlays.css";
-@import "./features/rmd.css";
-@import "./features/editor-chrome.css";
-@import "./features/records.css";
-@import "./features/graph.css";
 @import "./features/wiki.css";
 @import "./features/document.css";
 @import "./features/motion.css";

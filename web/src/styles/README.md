@@ -1,6 +1,6 @@
 # Recalloom 样式架构
 
-本目录是应用界面的唯一全局 CSS 入口。web/src/main.tsx 只导入 styles/index.css；Astryx reset / 组件 / neutral-theme CSS 在此入口之前导入。项目不使用 Tailwind，不再用后置覆盖文件叠加修补。
+本目录维护应用统一的 CSS 所有权。`web/src/main.tsx` 只加载全局 `styles/index.css`；关系网、文档关联、记录、RMD 和编辑器功能样式由具体路由/组件按需加载。Astryx reset / 组件 / neutral-theme CSS 仍在全局入口之前导入。项目不使用 Tailwind，不再用后置覆盖文件叠加修补。
 
 ## 模块所有权
 
@@ -19,11 +19,12 @@
 | components/status.css | 错误、警告、成功与进度状态 |
 | components/controls.css | 通用按钮、标签、卡片等控件 |
 | components/overlays.css | 对话框、弹窗、命令面板、登录与遮罩 |
-| features/rmd.css | RMD 块、标注、扩展语法的显示行为 |
-| features/editor-chrome.css | 可视化编辑器工具栏与浮动操作 |
-| features/records.css | Record 页面与其余编辑器外围样式 |
+| features/rmd.css | RMD 块、标注、扩展语法的显示行为（由记录编辑器和 Markdown 预览加载） |
+| features/editor-chrome.css | 可视化编辑器工具栏与浮动操作（由记录编辑器加载） |
+| features/records.css | Record 页面与其余编辑器外围样式（随记录页面加载） |
 | features/document.css | Markdown、文档排版与内容呈现 |
-| features/graph.css | 关系图、图谱检查器 |
+| features/graph.css | 关系图、图谱检查器（随关系网页面加载） |
+| features/relations.css | 文档关系面板（由关系网页面与记录关联组件加载） |
 | features/wiki.css | Wiki 专有界面 |
 | features/motion.css | 动画定义、全局运动与过渡 |
 | icons.css | 统一 Icon SVG 方格与 Astryx Banner 图标槽兼容；不再使用包装层 |
@@ -56,7 +57,8 @@ Astryx 样式在全局入口之前导入，保持组件原有交互、可访问�
 
 ## 验证
 
-- pnpm styles:check：模块注册、重复所有权、交互特征查询、必要 tokens、!important 基线检查。
+- pnpm styles:check：全局或按需模块注册、指定组件入口、重复所有权、交互特征查询、必要 tokens、!important 基线检查。
+- pnpm bundle:check：生产构建后验证全局 CSS gzip 预算，以及图谱、记录和编辑器 CSS 未误并入全局入口。
 - pnpm check：集成样式、图标、帮助、语法与 TypeScript 检查。
 - pnpm build:web：Vite 样式与资源打包。
 - node scripts/run-editor-e2e.mjs editor-responsive-v5-e2e.mjs editor-toolbar-v4-e2e.mjs editor-block-handle-e2e.mjs：验证编辑器、触屏 iPad 与手机交互。导航和按钮改动需继续加对应布局 E2E。

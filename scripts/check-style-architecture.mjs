@@ -23,9 +23,32 @@ function walk(dir){
 walk(directory);
 const importedFiles=imports.map(name=>resolve(dirname(index),name));
 const importedSet=new Set(importedFiles);
+// These feature styles are shipped with their route/component chunk instead of
+// the global CSS, but still participate in the same single-owner audit.
+const routeStyles=new Map([
+ ['features/graph.css',['web/src/knowledge-graph.tsx']],
+ ['features/relations.css',['web/src/knowledge-graph.tsx','web/src/record-relations.tsx']],
+ ['features/rmd.css',['web/src/record-editor.tsx','web/src/markdown-preview.tsx']],
+ ['features/editor-chrome.css',['web/src/record-editor.tsx']],
+ ['features/records.css',['web/src/pages/record.tsx']]
+]);
 if(importedSet.size!==imports.length)errors.push('styles/index.css imports a stylesheet more than once');
-for(const file of all)if(!importedSet.has(resolve(file)))errors.push('unregistered stylesheet: '+file);
+for(const file of all){
+ const target=resolve(file),relativeName=relative(directory,file).replaceAll('\\','/');
+ if(!importedSet.has(target)&&!routeStyles.has(relativeName))errors.push('unregistered stylesheet: '+file);
+ if(importedSet.has(target)&&routeStyles.has(relativeName))errors.push('route CSS must not also be globally imported: '+relativeName);
+}
 for(const file of importedFiles)if(!existsSync(file))errors.push('missing import: '+relative(directory,file));
+for(const [css,owners] of routeStyles){
+ const file=join(directory,css);
+ if(!existsSync(file))errors.push('missing on-demand CSS: '+css);
+ for(const consumer of owners){
+  const spec=relative(dirname(consumer),file).replaceAll('\\','/');
+  const importPath=spec.startsWith('.')?spec:'./'+spec;
+  if(!existsSync(consumer)||!readFileSync(consumer,'utf8').includes("import '"+importPath+"';"))
+   errors.push('route CSS '+css+' must be imported by '+consumer);
+ }
+}
 const main=readFileSync('web/src/main.tsx','utf8');
 if(!main.includes("import './styles/index.css';"))errors.push('main.tsx must import styles/index.css');
 const legacy=['style','design-system','motion','ui-enhancements','content-layout','document-typography','graph','wiki','workspace','polish','icon-layout'];
