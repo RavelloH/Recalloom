@@ -192,22 +192,23 @@ try{
  await page.getByRole('button',{name:'源码'}).click();
  await page.locator('.cm-content').fill('# UI e2e\n\nDocument updated from source editor.');
  await page.getByRole('button',{name:'保存'}).click();
- await page.getByText('R2').waitFor({timeout:15000});
- await page.getByRole('button',{name:'详情'}).click();
+ await page.locator('.workbench-header .workbench-revision').getByText('R2',{exact:true}).waitFor({timeout:15000});
+ await page.getByRole('button',{name:'详情与关联'}).click();
+ await page.getByRole('dialog',{name:'文档检查器'}).getByRole('tab',{name:'目录'}).click();
  await page.locator('.outline-item').first().waitFor();
  assert.ok((await page.locator('.outline-item').first().innerText()).includes('UI e2e'),'outline has Markdown heading');
  await page.locator('.outline-item').first().click();
  await page.locator('.cm-content').waitFor();
- await page.getByRole('dialog',{name:'记录信息'}).waitFor({state:'hidden'});
+ await page.getByRole('dialog',{name:'文档检查器'}).waitFor({state:'hidden'});
  await page.getByRole('button',{name:'历史'}).click();
  await page.getByText('Revision 2').first().waitFor();
- await page.getByRole('dialog',{name:'版本历史'}).getByRole('button',{name:'关闭历史'}).click();
+ await page.getByRole('dialog',{name:'文档检查器'}).getByRole('button',{name:'关闭'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
  await page.locator('.tiptap').waitFor({timeout:14000});
  await page.locator('.tiptap').click();
  await page.keyboard.press('End');
  await page.keyboard.type(' Additional visual edit.');
- // Desktop formatting lives in the selection bubble menu, as in Notion.
+ // Desktop formatting uses a contextual text toolbar shared with touch mode.
  await page.keyboard.press('Shift+Home');
  const boldButton=page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'粗体'});
  await boldButton.waitFor();
@@ -287,8 +288,10 @@ try{
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.locator('.doc-header').getByRole('heading',{name:'Phase summary'}).waitFor();
- await page.getByRole('button',{name:'详情'}).click();
- await page.locator('.page-properties .tag-editor').getByText('checkpoint',{exact:true}).waitFor(); // tags are edited in the page properties
+ await page.getByRole('button',{name:'详情与关联'}).click();
+ const workbench=page.getByRole('dialog',{name:'文档检查器'});
+ await workbench.locator('.page-properties .tag-editor').getByText('checkpoint',{exact:true}).waitFor();
+ await workbench.getByRole('tab',{name:'目录'}).click();
  await page.locator('.outline-item').first().waitFor();
  await page.locator('.outline-item').nth(1).click();
  await page.locator('.cm-content').waitFor();

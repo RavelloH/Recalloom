@@ -100,6 +100,7 @@ try{
  // Direct inspector: actual incoming/outgoing links, then a new outgoing link.
  await page.goto(base+'/records/'+A.id,{waitUntil:'networkidle'});
  await page.getByRole('button',{name:'详情与关联'}).click();
+ await page.getByRole('dialog',{name:'文档检查器'}).getByRole('tab',{name:'关联'}).click();
  const inspector=page.getByRole('region',{name:'文档关联'});
  await visible(inspector);
  await visible(inspector.getByText(B.name,{exact:true}));

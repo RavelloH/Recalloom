@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const wrangler=join(root,'node_modules','wrangler','bin','wrangler.js');
 const suite=[
- 'web-bundle-loading-e2e.mjs','css-layout-e2e.mjs','icon-system-e2e.mjs',
+ 'record-workbench-e2e.mjs','web-bundle-loading-e2e.mjs','css-layout-e2e.mjs','icon-system-e2e.mjs',
  'rmd-v1-e2e.mjs','rmd-visual-e2e.mjs','rmd-wiki-e2e.mjs',
  'rmd-security-e2e.mjs','rmd-ui-polish-e2e.mjs','rmd-parity-e2e.mjs',
  'rmd-chat-ui-e2e.mjs','editor-inline-menu-e2e.mjs','editor-extra-inline-e2e.mjs',
@@ -23,7 +23,8 @@ const suite=[
 ];
 // Destructive lifecycle tests are opt-in and only run against the local,
 // temporary Worker/D1 created by this harness.
-const optionalSuites=['archive-management-e2e.mjs','knowledge-graph-e2e.mjs','rmd-help-web-e2e.mjs'];
+const optionalSuites=['archive-management-e2e.mjs','knowledge-graph-e2e.mjs','rmd-help-web-e2e.mjs',
+ 'web-panels-ui-e2e.mjs','alert-dialog-e2e.mjs','web-ui-e2e.mjs','record-workspace-e2e.mjs'];
 const requested=process.argv.slice(2);
 const chosen=requested.length?requested.map(name=>name.replace(/^scripts[\\/]/,'')):suite;
 for(const name of chosen)

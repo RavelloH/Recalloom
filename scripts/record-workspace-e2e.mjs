@@ -1,4 +1,4 @@
-/** Notion-style workspace flows against an isolated local Worker. */
+/** Recalloom document workspace flows against an isolated local Worker. */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import {existsSync,readFileSync} from 'node:fs';
@@ -28,7 +28,7 @@ try{
  const folderName='0 Workspace E2E '+Date.now();
  const folder=await page.evaluate(async name=>{const r=await fetch('/api/folders',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name})});return r.json();},folderName);
 
- // Instant page creation lands on a focused, selected title, like Notion.
+ // Newly created records focus the editable document title.
  await page.goto(base+'/library/'+folder.id,{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  await page.locator('.file-table').getByRole('button',{name:'新建页面'}).click();
@@ -51,27 +51,28 @@ try{
  await page.getByRole('alert').filter({hasText:'不能包含'}).waitFor();
  assert.equal(await title.innerText(),'Workspace note','invalid title reverts');
 
- // Tags are editable from the property row.
- await page.getByRole('button',{name:'添加标签'}).click();
- await page.getByRole('textbox',{name:'新标签'}).fill('Alpha');
+ // Tags are edited in the unified document inspector, not always visible under the title.
+ await page.getByRole('button',{name:'详细信息'}).click();
+ const inspector=page.getByRole('dialog',{name:'文档检查器'});
+ await inspector.getByRole('button',{name:'添加标签'}).click();
+ await inspector.getByRole('textbox',{name:'新标签'}).fill('Alpha');
  await page.keyboard.press('Enter');
  await until(async()=>(await json('/records/'+recordId)).tags.includes('alpha'),'tag added');
- await page.locator('.tag-editor').getByText('alpha',{exact:true}).waitFor();
- await page.locator('.tag-editor').getByRole('button',{name:/alpha/}).click();
+ await inspector.locator('.tag-editor').getByText('alpha',{exact:true}).waitFor();
+ await inspector.locator('.tag-editor').getByRole('button',{name:/alpha/}).click();
  await until(async()=>!(await json('/records/'+recordId)).tags.includes('alpha'),'tag removed');
+ await inspector.getByRole('button',{name:'关闭'}).click();
+ await inspector.waitFor({state:'hidden'});
 
- // Slash menu: filter, keyboard select, dismiss with Escape.
- await page.locator('.tiptap').click();
- await page.keyboard.type('/h2');
- const menu=page.getByRole('listbox',{name:'插入内容'});
- await menu.waitFor();
- assert.equal(await menu.getByRole('option',{selected:true}).innerText().then(t=>t.includes('二级标题')),true,'h2 filter selects heading');
- await page.keyboard.press('Enter');
- await menu.waitFor({state:'hidden'});
+ // Heading shortcuts remain supported; /h2 is no longer a registered slash command.
+ await page.locator('.tiptap p').first().click();
+ await page.keyboard.press('Control+Alt+2');
  await page.keyboard.type('Section title');
  await page.keyboard.press('Enter');
  await page.keyboard.type('/');
+ const menu=page.getByRole('listbox',{name:'插入内容'});
  await menu.waitFor();
+ assert.ok(await menu.getByRole('option',{name:/代码块/}).count(),'current slash commands remain discoverable');
  await page.keyboard.press('Escape');
  await menu.waitFor({state:'hidden'});
  await page.keyboard.press('Backspace');
@@ -131,10 +132,10 @@ try{
  assert.equal(list.folderId,folder.id);
  await page.getByRole('heading',{name:'未命名任务列表',level:1}).waitFor();
 
- // One column: title, properties and the document body share the same edges.
+ // One column: document title and editable body retain aligned measures.
  await page.goto(base+'/records/'+recordId,{waitUntil:'networkidle'});
  await page.locator('.tiptap').waitFor();
- const edges=await page.evaluate(()=>[...document.querySelectorAll('.page-title, .page-properties, .tiptap')].map(e=>{const b=e.getBoundingClientRect();return Math.round(b.left)+':'+Math.round(b.width);}));
+ const edges=await page.evaluate(()=>[...document.querySelectorAll('.workbench-header .page-title, .record-main .tiptap')].map(e=>{const b=e.getBoundingClientRect();return Math.round(b.left)+':'+Math.round(b.width);}));
  assert.equal(new Set(edges).size,1,'shared measure: '+edges);
  // Native bars are hidden outside Apple WebKit; the page scrolls with the JS scrollbar.
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.scrollbarMode),'overlay');
@@ -165,6 +166,6 @@ try{
  await phone.close();
 
  assert.equal(faults.length,0,'browser errors: '+faults.join('\n'));
- console.log('PASS Notion workspace: instant pages, inline titles, tags, slash/bubble menus, Ctrl+S, quick switcher, page tree, mobile');
+ console.log('PASS Recalloom workspace: inline titles, inspector tags, slash menus, Ctrl+S, quick switcher, page tree, mobile');
 }catch(e){console.error('Workspace E2E failed',e);console.error('page=',page.url());await page.screenshot({path:'tmp/workspace-failed.png'}).catch(()=>{});process.exitCode=1;}
 finally{await browser.close();}

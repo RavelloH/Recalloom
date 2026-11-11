@@ -56,7 +56,7 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
  </nav>;
 }
 
-/** Notion-style title: edit in place, Enter or blur renames, Escape reverts. */
+/** Editable document title: Enter or blur commits a rename, Escape reverts. */
 export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean}){
  const ref=useRef<HTMLHeadingElement>(null);
  const [saving,setSaving]=useState(false);

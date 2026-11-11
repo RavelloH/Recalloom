@@ -42,7 +42,7 @@
     "test:confirm": "node scripts/alert-dialog-e2e.mjs",
     "test:drafts": "node scripts/web-draft-ui-e2e.mjs",
     "test:panels": "node scripts/web-panels-ui-e2e.mjs",
-    "test:workspace": "node scripts/notion-workspace-e2e.mjs",
+    "test:workspace": "node scripts/record-workspace-e2e.mjs",
     "test:archive": "pnpm build:web && node scripts/run-editor-e2e.mjs archive-management-e2e.mjs",
     "test:graph": "pnpm build:web && node scripts/run-editor-e2e.mjs knowledge-graph-e2e.mjs",
     "test:graph-theme": "node scripts/graph-theme-e2e.mjs",

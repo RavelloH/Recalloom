@@ -26,6 +26,16 @@ async function rightClickSelectedGlyphs(line){
  }
  throw Error('right-click needs a stable glyph selection after four retries');
 }
+async function selectLineText(line,expected){
+ for(let attempt=0;attempt<4;attempt++){
+  await line.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Home');
+  if((await page.evaluate(()=>window.getSelection()?.toString()))===expected)return;
+  await page.waitForTimeout(100);
+ }
+ assert.equal(await page.evaluate(()=>window.getSelection()?.toString()),expected,'Text selection must become active after context menu dismissal');
+}
 const input='# Editor context actions\n\nFirst line.\n\nSecond line.\n\n::: warning 右键块\n\n可选择的块内容。\n\n:::';
 try{
  await page.goto(base+'/login');
@@ -69,16 +79,14 @@ try{
  await page.waitForFunction(()=>[...document.querySelectorAll('.tiptap p')].filter(p=>p.textContent?.includes('First line.')).length===2);
  console.log('PASS context menu undo/redo of block operations');
  const another=page.locator('.tiptap p').filter({hasText:'Second line.'}).first();
- await another.click();
- await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
- assert.equal(await page.evaluate(()=>window.getSelection()?.toString()),'Second line.');
+ await selectLineText(another,'Second line.');
  await rightClickSelectedGlyphs(another);
  const selectionMenu=page.getByRole('menu',{name:'编辑器右键菜单'});await selectionMenu.waitFor();
  await selectionMenu.getByRole('menuitem',{name:'荧光笔与手绘标记'}).click();
  await page.getByRole('menuitem',{name:'手绘圈选'}).last().click();
  await page.locator('.tiptap .rk-sketch-inline[data-rk-sketch-kind="circle"]').first().waitFor();
  console.log('PASS desktop context menu: select, duplicate, handdrawn mark');
- await another.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+ await selectLineText(another,'Second line.');
  await rightClickSelectedGlyphs(another);
  const formatMenu=page.getByRole('menu',{name:'编辑器右键菜单'});await formatMenu.waitFor();
  await formatMenu.getByRole('menuitem',{name:'普通下划线'}).click();
@@ -106,9 +114,7 @@ try{
  assert.equal(await page.evaluate(()=>matchMedia('(hover: hover) and (pointer: fine)').matches),true);
  assert.equal(await page.locator('.rk-editor-context-area').count(),1,
   'narrow fine-pointer windows retain the desktop context menu');
- await page.locator('.tiptap p').filter({hasText:'Second line.'}).first().click();
- await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
- assert.equal(await page.evaluate(()=>window.getSelection()?.toString()),'Second line.','mobile editing selection remains native');
+ await selectLineText(page.locator('.tiptap p').filter({hasText:'Second line.'}).first(),'Second line.');
  console.log('PASS narrow fine-pointer viewport retains editable selection and desktop context support');
  assert.deepEqual(errors,[]);
 }finally{await browser.close()}

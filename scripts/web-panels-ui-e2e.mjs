@@ -27,19 +27,19 @@ try{
  await page.locator('.tiptap').waitFor();
  const scrollBefore=await page.evaluate(()=>scrollY);
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const dh=page.getByRole('dialog',{name:'版本历史'});
+ const dh=page.getByRole('dialog',{name:'文档检查器'});
  await dh.waitFor();
  await dh.getByText(/Revision \d+/).first().waitFor({timeout:15000});
  assert.ok((await dh.boundingBox()).x>850,'desktop history opens at inline end');
- await dh.getByRole('button',{name:'关闭历史'}).click();
+ await dh.getByRole('button',{name:'关闭'}).click();
  await dh.waitFor({state:'hidden'});
  assert.equal(await page.evaluate(()=>scrollY),scrollBefore,'history should not jump main document');
  await page.getByRole('button',{name:'详情与关联',exact:true}).click();
- const di=page.getByRole('dialog',{name:'记录信息'});
+ const di=page.getByRole('dialog',{name:'文档检查器'});
  await di.waitFor();
- assert.ok(await di.getByText('记录类型').count());
+ assert.ok(await di.getByText('类型',{exact:true}).count());
  // Renaming lives in the inline title; the panel shows facts only, without duplicate controls.
- assert.ok((await di.locator('dd.break-word').innerText()).includes(recordName),'detail shows the record path');
+ assert.ok((await di.locator('.workbench-inspector-path').innerText()).includes(recordName),'detail shows the record path');
  assert.equal(await di.getByRole('textbox',{name:'名称'}).count(),0,'no duplicate rename field');
  assert.ok(await di.getByText('Markdown 文档').count());
  await di.getByRole('button',{name:'关闭',exact:true}).click();
@@ -47,7 +47,7 @@ try{
  await page.setViewportSize({width:390,height:844});
  await page.reload();
  await page.getByRole('button',{name:'详情与关联',exact:true}).click();
- const mi=page.getByRole('dialog',{name:'记录信息'});
+ const mi=page.getByRole('dialog',{name:'文档检查器'});
  await mi.waitFor();
  let bounds=await mi.boundingBox();
  assert.ok(bounds&&bounds.width>=385,'mobile detail uses bottom sheet width: '+JSON.stringify(bounds));
@@ -55,8 +55,9 @@ try{
  await mi.getByRole('button',{name:'关闭',exact:true}).click();
  await mi.waitFor({state:'hidden'});
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const mh=page.getByRole('dialog',{name:'版本历史'});
+ const mh=page.getByRole('dialog',{name:'文档检查器'});
  await mh.waitFor();
+ await mh.getByRole('tab',{name:'版本'}).waitFor();
  bounds=await mh.boundingBox();
  assert.ok(bounds&&bounds.width>=385,'mobile history uses bottom sheet width');
  await page.screenshot({path:'tmp/ux-mobile-history.png'});

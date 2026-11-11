@@ -30,13 +30,13 @@ try {
   await page.locator('.cm-content').fill(content);
   await page.getByRole('button',{name:'保存',exact:true}).click();
   await page.waitForFunction(async ({id,expected})=>{const r=await fetch('/api/records/'+id);return r.ok&&(await r.json()).revision>=expected;},{id:recordId,expected},{timeout:12000});
-  await page.waitForFunction(expected=>document.querySelector('.editor-topline')?.textContent?.includes('R'+expected),expected,{timeout:12000});
+  await page.waitForFunction(expected=>document.querySelector('.workbench-header .workbench-revision')?.textContent?.includes('R'+expected),expected,{timeout:12000});
  }
  await write('# First version',2);
  await write('# Second version',3);
  assert.equal((await revision()).revision,3);
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const panel=page.getByRole('dialog',{name:'版本历史'});
+ const panel=page.getByRole('dialog',{name:'文档检查器'});
  await panel.waitFor();
  const target=panel.locator('.history-row').filter({hasText:'Revision 2'});
  await target.getByRole('button',{name:'恢复'}).click();
