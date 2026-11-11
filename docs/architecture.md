@@ -30,8 +30,9 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 | `web/src/` | React 前端、编辑器、关系网、组件与路由入口 |
 | `web/src/pages.tsx` | 页面组件兼容导出入口，供非路由调用方继续使用 |
 | `web/src/pages/` | 登录、概览、知识库、归档、记录、任务、搜索、活动和设置页面；`router.tsx` 通过 `lazyRouteComponent` 按需加载，`shared.tsx` 提供通用页面反馈组件 |
-| `web/src/record-workbench.tsx` | Markdown 文档专用工作台头部与统一检查器；类型/版本/标签摘要，以及信息、目录、关联、版本四个视图（任务列表不受影响） |
-| `web/src/record-editor.tsx` | 正文三种模式、保存/恢复、版本查询与比较；版本列表通过 Portal 交给同一文档检查器显示 |
+| `web/src/record-workbench.tsx` | Markdown 文档工作台顶部：带圆角底色的标签行、更新时间/编辑者/字数信息行，以及信息/目录/关联/版本统一检查器；详情中可编辑文件名（任务列表不受影响） |
+| `web/src/document-heading.ts` | 首个顶层 Markdown H1 的纯函数识别、标题与正文拼接、字数统计；H1 只在重新打开文档或切换编辑模式时提升，保存时保留当前会话显示策略 |
+| `web/src/record-editor.tsx` | 源码、预览、可视化三种模式共享完整 Markdown 草稿，首个 H1 作为独立可编辑标题展示但仍存在于存储正文中；版本列表通过 Portal 进入检查器 |
 | `web/src/visual-editor.tsx` | 可视化编辑器稳定入口，保持默认组件导出与 `VisualEditorHandle` 类型导出 |
 | `web/src/visual-editor/` | 可视化编辑器装配、Tiptap 扩展组合、选区状态、共享格式工具栏、表格操作、斜杠/引用补全与弹出菜单 |
 | `web/src/tiptap/` | Tiptap 节点、命令、插件与编辑器交互原语，不包含页面级工具栏布局 |
@@ -47,7 +48,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 1. **业务逻辑不依赖 React。** 记录身份、版本、归档、安全性和搜索准则优先在 Worker/共享纯模块实现；UI 不应重写安全校验。
 2. **服务器 API 是唯一权威入口。** 前端只能通过 API 读取/修改持久状态，不直接访问 D1、KV 或 Vectorize。
-3. **编辑器输入和持久层分离。** 源码、预览、可视化三种模式要保持语义一致，编辑器中间态可延迟保存但不能丢失修订冲突检查。文档页面采用 Knowledge Workbench：全局面包屑表示位置，正文头部仅显示文档类型、版本、标题和紧凑元数据摘要；完整属性、目录、关联和历史在一个检查器中按需展示。块拖动把手继续沿用现有统一交互，不随页面布局调整。
+3. **编辑器输入和持久层分离。** 源码、预览、可视化三种模式要保持语义一致，编辑器中间态可延迟保存但不能丢失修订冲突检查。文档页面采用 Knowledge Workbench：标题与文件名是不同身份。没有首块 H1 时顶部标题编辑文件名；存在首块顶层 H1 时，顶部标题编辑 Markdown 中的 H1，文件名显示于类型标识和详情检查器；正文不重复呈现已提升的 H1。编辑过程中新增的首块 H1 仍保留在正文，直到明确切换编辑模式或重新打开文档（保存不算重新打开）；非首块 H1 不提升。标签独占可选行，更新时间/去重编辑者/可见字数与详情按钮共用下一行。完整属性、目录、关联和历史在一个检查器中按需展示。块拖动把手继续沿用现有统一交互，不随页面布局调整。
 4. **数据库变更可回放。** 新增 migrations 文件，不对历史迁移做破坏性重写；复杂升级必须在本地 D1 的多个旧状态上回归。
 5. **组件和 CSS 有明确归属。** 页面模块使用 `web/src/pages/`，可视化编辑器装配使用 `web/src/visual-editor/`，通用 Tiptap 插件使用 `web/src/tiptap/`，服务端存储使用 `src/storage/`。CSS 由 `web/src/styles/` 的单一所有权规则管理，避免全局补丁文件。
 6. **公共入口稳定，内部依赖无环。** `pages.tsx`、`visual-editor.tsx`、`storage.ts` 是兼容导出入口，内部模块不得反向引用这些入口或形成循环。`pnpm modules:check` 自动验证三个领域的导出及依赖图。编辑器源码审计分别检查 `visual-editor/formatting-toolbar.tsx` 与 `visual-editor/editor.tsx`，保证桌面和触屏格式菜单共用同一顺序。

@@ -9,6 +9,8 @@ const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(v=>/^MCP_AUTH_SE
 assert.ok(browserPath&&line);
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const source=[
+ 'RMD 锚点及语法回归：这一段先于 H1，确保后续标题属于正文。',
+ '',
  '# RMD QA @ attrs stable-heading @',
  '',
  '正文 :: mark **重要** ::，彩色 :: highlight 注意 | yellow ::，状态 :: badge 完成 | success ::。',

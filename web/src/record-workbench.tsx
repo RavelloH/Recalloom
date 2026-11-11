@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useEffect,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
@@ -22,26 +22,70 @@ type OutlineResult={
  totalHeadings:number
 };
 
-export function DocumentWorkbenchHeader({item,focusTitle,onRename,onDetails}:{
+export type DocumentPresentation={
+ id:string;
+ revision:number;
+ headingTitle:string|null;
+ characters:number;
+};
+
+const displayFileName=(name:string)=>/\.md$/i.test(name)?name:name+'.md';
+
+function FilenameField({name,onRename}:{name:string;onRename:(value:string)=>Promise<void>}){
+ const [value,setValue]=useState(name),[error,setError]=useState(''),[pending,setPending]=useState(false);
+ useEffect(()=>setValue(name),[name]);
+ const commit=async()=>{
+  const next=value.trim();
+  if(next===name)return;
+  if(!next||next.length>180||/[\\/]/.test(next)){
+   setError('文件名需为 1–180 个字符，且不能包含 / 或 \\。');setValue(name);return;
+  }
+  setPending(true);setError('');
+  try{await onRename(next);}catch(e){setError(e instanceof Error?e.message:'重命名失败');setValue(name);}
+  finally{setPending(false);}
+ };
+ return <div className="workbench-filename-field">
+  <input aria-label="文件名" className="workbench-filename-input" value={value} disabled={pending}
+   onChange={event=>setValue(event.target.value)}
+   onBlur={()=>void commit()} onKeyDown={event=>{
+    if(event.nativeEvent.isComposing)return;
+    if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}
+    if(event.key==='Escape'){setValue(name);event.currentTarget.blur();}
+   }}/>
+  {error&&<span role="alert" className="page-title-error">{error}</span>}
+ </div>;
+}
+
+export function DocumentWorkbenchHeader({item,title,usesHeading,characters,editors,focusTitle,onRename,onDetails}:{
  item:RecordDetail;
+ title:string;
+ usesHeading:boolean;
+ characters:number;
+ editors:string[];
  focusTitle:boolean;
  onRename:(name:string)=>Promise<void>;
  onDetails:()=>void;
 }){
  return <header className="doc-header workbench-header">
   <div className="workbench-identity">
-   <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档</span>
+   <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档
+    {usesHeading&&<span className="workbench-document-filename" title={item.name}> · {displayFileName(item.name)}</span>}
+   </span>
    <span className="workbench-revision" title={'当前正文版本 R'+item.revision}>R{item.revision}</span>
   </div>
-  <InlineTitle value={item.name} onRename={onRename} autoFocus={focusTitle}/>
+  <InlineTitle key={usesHeading?'heading':'filename'} value={title} onRename={onRename}
+   placeholder={usesHeading?'未命名标题':'未命名'} autoFocus={focusTitle&&!usesHeading} allowSlash={usesHeading}/>
+  {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
+   {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
+  </div>}
   <div className="workbench-summary">
-   <span className="workbench-summary-tags" title={item.tags?.join(' · ')||'暂无标签'}>
-    {item.tags?.length?item.tags.slice(0,3).map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>):<span>未添加标签</span>}
-    {item.tags.length>3&&<span>+{item.tags.length-3}</span>}
-   </span>
-   <span className="workbench-summary-separator" aria-hidden="true">·</span>
-   <time dateTime={item.updatedAt} title={item.updatedAt}>更新于 {ago(item.updatedAt)||'刚刚'}</time>
-   {item.status!=='active'&&<span className="workbench-summary-status">{statusNames[item.status??'']??item.status}</span>}
+   <div className="workbench-summary-details">
+    <time dateTime={item.updatedAt} title={item.updatedAt}>更新于 {ago(item.updatedAt)||'刚刚'}</time>
+    <span className="workbench-meta-separator" aria-hidden="true">·</span>
+    <span className="workbench-editors" title={editors.join('，')}>编辑者：{editors.length?editors.join('，'):'—'}</span>
+    <span className="workbench-meta-separator" aria-hidden="true">·</span>
+    <span className="workbench-character-count" aria-label={'字数 '+characters}>{characters.toLocaleString('zh-CN')} 字</span>
+   </div>
    <button type="button" className="workbench-details-trigger" onClick={onDetails}>
     详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
    </button>
@@ -49,7 +93,7 @@ export function DocumentWorkbenchHeader({item,focusTitle,onRename,onDetails}:{
  </header>;
 }
 
-export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,outline,onJump,onChangeTag,onHistoryTarget}:{
+export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,outline,onJump,onChangeTag,onRenameFilename,onHistoryTarget,characters,editors}:{
  open:boolean;
  tab:DocumentInspectorTab;
  onChangeTab:(tab:DocumentInspectorTab)=>void;
@@ -58,7 +102,10 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
  outline:{isPending:boolean;isError:boolean;data?:OutlineResult};
  onJump:(line:number)=>void;
  onChangeTag:(tag:string,action:'add'|'remove')=>Promise<void>;
+ onRenameFilename:(name:string)=>Promise<void>;
  onHistoryTarget:React.Dispatch<React.SetStateAction<HTMLDivElement|null>>;
+ characters:number;
+ editors:string[];
 }){
  const currentIndex=sections.findIndex(section=>section.id===tab);
  return <ContextPanel open={open} onOpenChange={next=>{if(!next)onClose();}} label="文档检查器">
@@ -85,9 +132,12 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
     aria-labelledby={'workbench-tab-'+sections[currentIndex].id}>
     {tab==='details'&&<div className="workbench-inspector-details">
      <Properties>
+      <Property label="文件名"><FilenameField name={item.name} onRename={onRenameFilename}/></Property>
       <Property label="类型">Markdown 文档</Property>
       <Property label="标签"><TagEditor tags={item.tags??[]} onChange={onChangeTag}/></Property>
       <Property label="更新时间"><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></Property>
+      <Property label="编辑者"><span className="workbench-inspector-path">{editors.length?editors.join('，'):'—'}</span></Property>
+      <Property label="字数">{characters.toLocaleString('zh-CN')} 字</Property>
       <Property label="版本">R{item.revision}</Property>
       <Property label="状态">{statusNames[item.status??'']??item.status}</Property>
       <Property label="路径"><span className="workbench-inspector-path">{item.path}</span></Property>

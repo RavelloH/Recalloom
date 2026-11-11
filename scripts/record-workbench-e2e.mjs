@@ -47,7 +47,7 @@ try{
    }))
   }));
   assert.equal(layout.display,'flex','Every property must receive its own row');
-  assert.equal(layout.rows.length,7,'Expected complete metadata inspector');
+  assert.equal(layout.rows.length,10,'Expected editable filename, author and character count in the metadata inspector');
   assert.ok(layout.rows.every(({label,value})=>label&&value&&label.right<=value.left+2),
    'Property values must not overlap labels: '+JSON.stringify(layout));
   return layout;
@@ -58,6 +58,12 @@ try{
  await inspector.getByRole('textbox',{name:'新标签'}).fill('Workbench');
  await page.keyboard.press('Enter');
  await header.getByText('workbench',{exact:true}).waitFor();
+ const tagStyle=await header.locator('.workbench-summary-tag').first().evaluate(el=>({
+  background:getComputedStyle(el).backgroundColor,radius:parseFloat(getComputedStyle(el).borderTopLeftRadius)
+ }));
+ assert.ok(tagStyle.background!=='rgba(0, 0, 0, 0)'&&tagStyle.radius>=6,'Tags need a rounded visible background');
+ assert.equal(await header.locator('.workbench-tag-line').count(),1,'Tags should occupy their own optional row');
+ assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'grid','Metadata details button should align at the far right');
  await inspector.getByRole('tab',{name:'关联'}).click();
  assert.equal(await inspector.getByRole('tab',{name:'关联'}).getAttribute('aria-selected'),'true');
  await inspector.getByRole('tab',{name:'信息'}).click();

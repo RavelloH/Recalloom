@@ -1,6 +1,6 @@
 import '../styles/features/records.css';
 import {Icon} from '../icon';
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useNavigate,useParams} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
@@ -10,7 +10,8 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {ApiError,api,mutate,queryString} from '../api';
 import {ContextPanel} from '../context-panel';
-import {DocumentWorkbenchHeader,DocumentWorkbenchInspector,type DocumentInspectorTab} from '../record-workbench';
+import {DocumentWorkbenchHeader,DocumentWorkbenchInspector,type DocumentInspectorTab,type DocumentPresentation} from '../record-workbench';
+import {leadingDocumentHeading,markdownCharacterCount} from '../document-heading';
 import {useConfirmDialog} from '../confirm-dialog';
 import {TopbarPortal} from '../topbar-slot';
 import {Breadcrumbs,InlineTitle,PageActions,Properties,Property,TagEditor} from '../page-chrome';
@@ -25,14 +26,32 @@ import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
+ const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
+ const titleEditorRef=useRef<((title:string)=>Promise<void>)|null>(null);
+ // A save remounts the editor at a new revision, but must not count as
+ // reopening the document for newly inserted, unpromoted first-block H1s.
+ const delayedHeadingAfterSave=useRef<{id:string;content:string}|null>(null);
+ const registerTitleEditor=useCallback((fn:((title:string)=>Promise<void>)|null)=>{titleEditorRef.current=fn;},[]);
+ const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
+  prev&&prev.id===next.id&&prev.revision===next.revision&&prev.headingTitle===next.headingTitle&&prev.characters===next.characters?prev:next),[]);
  const lastInspectorTab=useRef<DocumentInspectorTab>('details');
  const openInspector=(tab:DocumentInspectorTab)=>{lastInspectorTab.current=tab;setInspectorTab(tab);};
  const [focusTitle]=useState(()=>consumeTitleFocus(recordId));
  const fullWidth=useFullWidth();
- useEffect(()=>{setMetaOpen(false);lastInspectorTab.current='details';setInspectorTab(null);setOutlineTarget(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
+ useEffect(()=>{setMetaOpen(false);lastInspectorTab.current='details';setInspectorTab(null);setOutlineTarget(null);setError(null);delayedHeadingAfterSave.current=null;},[recordId]);const [archiving,setArchiving]=useState(false);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const outline=useQuery({queryKey:['outline',recordId,q.data?.revision],queryFn:()=>api<{headings:Array<{title:string;level:number;lineStart:number;lineEnd:number}>;totalHeadings:number}>('/records/'+recordId+'/outline?limit=200'),enabled:Boolean(inspectorTab==='outline'&&q.data&&q.data.kind==='document')});
  const item=q.data;
+ const deferHeadingPromotion=item?.kind==='document'&&delayedHeadingAfterSave.current?.id===item.id&&delayedHeadingAfterSave.current?.content===item.content;
+ const originalPresentation=useMemo(()=>item?.kind==='document'?{
+  id:item.id,revision:item.revision,headingTitle:deferHeadingPromotion?null:leadingDocumentHeading(item.content)?.title??null,
+  characters:markdownCharacterCount(item.content)
+ }:null,[item?.id,item?.kind,item?.revision,item?.content,deferHeadingPromotion]);
+ const currentPresentation=item?.kind==='document'&&documentPresentation?.id===item.id&&documentPresentation.revision===item.revision
+  ?documentPresentation:originalPresentation;
+ const editorsQuery=useQuery({queryKey:['record-editors',recordId,item?.revision],
+  queryFn:()=>api<{items:string[]}>('/records/'+recordId+'/editors'),enabled:item?.kind==='document'});
+ const editorNames=editorsQuery.data?.items??[];
  const lastReveal=useRef<string|null>(null);
  useEffect(()=>{if(!item)return;if(item.status==='archived'){forgetPage(item.id);return;}rememberPage({id:item.id,name:item.name,kind:item.kind,path:item.path});},[item?.id,item?.name,item?.kind,item?.path,item?.status]);
  useEffect(()=>{
@@ -84,8 +103,13 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  <TopbarPortal slot="start"><Breadcrumbs folderId={item.folderId} current={item.name}/></TopbarPortal>
  <AutoResizer>{item.status==='archived'&&<div className="doc-notice"><Banner status="warning" container="section" title="此记录已归档" description="归档的记录不会显示在侧边栏中，内容和历史版本仍完整保留。" endContent={<Button label="恢复为正常" size="sm" variant="secondary" onClick={()=>void updateMeta({status:'active'})}/>}/></div>}</AutoResizer>
  {item.kind==='document'
-  ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle}
-    onRename={next=>saveMeta({name:next})} onDetails={()=>openInspector('details')}/>
+  ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle} title={currentPresentation?.headingTitle??item.name}
+    usesHeading={currentPresentation?.headingTitle!==null&&currentPresentation?.headingTitle!==undefined}
+    characters={currentPresentation?.characters??0} editors={editorNames}
+    onRename={next=>currentPresentation?.headingTitle!==null&&currentPresentation?.headingTitle!==undefined
+      ?titleEditorRef.current?.(next)??Promise.reject(new Error('文档编辑器仍在加载'))
+      :saveMeta({name:next})}
+    onDetails={()=>openInspector('details')}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
     <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle}/>
@@ -98,13 +122,20 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
  <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><TasksPage recordId={recordId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
-  pageActions={pageActions} onSaved={()=>void refresh()} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}/></React.Suspense>}</div>
+  pageActions={pageActions} onSaved={(content,wasPromoted)=>{
+   delayedHeadingAfterSave.current=content&&!wasPromoted&&leadingDocumentHeading(content)?{id:item.id,content}:null;
+   void refresh();
+  }} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}
+  deferInitialPromotion={deferHeadingPromotion}
+  onRegisterTitleEditor={registerTitleEditor} onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
   <dl><dt>记录类型</dt><dd>任务列表</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
  </div></ContextPanel>}
  {item.kind==='document'&&<DocumentWorkbenchInspector open={inspectorTab!==null} tab={inspectorTab??lastInspectorTab.current}
   onChangeTab={openInspector} onClose={()=>setInspectorTab(null)} item={item} outline={outline}
   onJump={line=>{setOutlineTarget(prev=>({line,token:(prev?.token??0)+1}));setInspectorTab(null);}}
-  onChangeTag={changeTag} onHistoryTarget={setHistoryTarget}/>}
+  onChangeTag={changeTag} onRenameFilename={next=>saveMeta({name:next})}
+  characters={currentPresentation?.characters??0} editors={editorNames}
+  onHistoryTarget={setHistoryTarget}/>}
  </div></div>;
 }

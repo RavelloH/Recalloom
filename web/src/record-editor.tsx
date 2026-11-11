@@ -20,9 +20,11 @@ import type {RecordDetail} from './types';
 import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor,PreviewEditorChunk as PreviewEditor,type EditorMode} from './editor-chunks';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import {observeMathHorizontalOverflow} from './math-scroll';
+import {leadingDocumentHeading,displayedDocumentBody,withDocumentBody,renameDocumentHeading,markdownCharacterCount,type PromotedHeading} from './document-heading';
+import type {DocumentPresentation} from './record-workbench';
 
 
-export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,historyTarget}:{item:RecordDetail;onSaved:()=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null}){
+export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,historyTarget,onRegisterTitleEditor,onDocumentPresentation,deferInitialPromotion}:{item:RecordDetail;onSaved:(content?:string,headingWasPromoted?:boolean)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onRegisterTitleEditor:(handler:((name:string)=>Promise<void>)|null)=>void;onDocumentPresentation:(value:DocumentPresentation)=>void;deferInitialPromotion?:boolean}){
  const initialMode=new URLSearchParams(location.search).get('mode');
  const visualRef=useRef<VisualEditorHandle>(null);
  const editorSectionRef=useRef<HTMLDivElement>(null);
@@ -39,6 +41,16 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
  const [mode,setMode]=useState<EditorMode>(initialMode==='source'||initialMode==='preview'?initialMode:'visual');
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [draft,setDraft]=useState(usableRecovery?stored.content:item.content);
+ // Promotion is frozen for the current editing session: newly inserted H1
+ // remains a body block until the next explicit mode change or document open.
+ const [promoted,setPromoted]=useState<PromotedHeading|null>(()=>deferInitialPromotion?null:leadingDocumentHeading(usableRecovery?stored.content:item.content));
+ const promotedRef=useRef(promoted);
+ const deferredDraft=React.useDeferredValue(draft);
+ const characters=React.useMemo(()=>markdownCharacterCount(deferredDraft),[deferredDraft]);
+ const visibleDraft=displayedDocumentBody(draft,promoted);
+ const hiddenHeadingLines=promoted?(promoted.before+promoted.headingSource+promoted.separator).split('\n').length-1:0;
+ const visibleFocusLine=jumpToLine?.line===undefined?undefined:Math.max(1,jumpToLine.line-hiddenHeadingLines);
+ useEffect(()=>onDocumentPresentation({id:item.id,revision:item.revision,headingTitle:promoted?.title??null,characters}),[item.id,item.revision,promoted,characters]);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[diff,setDiff]=useState('');
  const [editorKey,setEditorKey]=useState(0);
  const latestDraft=useRef(draft);
@@ -51,6 +63,26 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
   // current revision instead of the older recovery candidate.
   if(staleRecovery)setRecoveryNotice(false);
  };
+ const changeVisibleDraft=(value:string)=>changeDraft(withDocumentBody(promotedRef.current,value));
+ const latestVisibleFromEditor=()=>{
+  const visible=visualRef.current?.flushEditedMarkdown();
+  return visible===null||visible===undefined?latestDraft.current:withDocumentBody(promotedRef.current,visible);
+ };
+ const titleEditorRegisterRef=useRef(onRegisterTitleEditor);
+ titleEditorRegisterRef.current=onRegisterTitleEditor;
+ useEffect(()=>{
+  const editHeading=async(title:string)=>{
+   const previous=promotedRef.current;
+   if(!previous)throw new Error('文档没有可提升的 H1 标题');
+   const body=displayedDocumentBody(latestDraft.current,previous);
+   const next=renameDocumentHeading(previous,title);
+   promotedRef.current=next;
+   setPromoted(next);
+   changeDraft(withDocumentBody(next,body));
+  };
+  titleEditorRegisterRef.current(editHeading);
+  return()=>titleEditorRegisterRef.current(null);
+ },[item.id,item.revision]);
  useEffect(()=>{if(!jumpToLine)return;setMode('source');const url=new URL(location.href);url.searchParams.set('mode','source');historyReplace(url);},[jumpToLine]);
  useEffect(()=>{
   if(changed&&!busy)writeSessionDraft(sessionId,item.id,item.revision,draft);
@@ -64,7 +96,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
  const closeBlocker=()=>{if(blocker.status==='blocked')blocker.reset();};
  const keepAndLeave=()=>{
   if(blocker.status!=='blocked'||busy)return;
-  const latest=mode==='visual'?visualRef.current?.flushEditedMarkdown()??latestDraft.current:latestDraft.current;
+  const latest=mode==='visual'?latestVisibleFromEditor():latestDraft.current;
   if(latest!==item.content&&!writeSessionDraft(sessionId,item.id,item.revision,latest)){setError(new Error('浏览器无法暂存草稿。内容仍保留在当前编辑器，请先复制或保存后再离开。'));blocker.reset();return;}
   blocker.proceed();
  };
@@ -79,21 +111,30 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
   if(mode==='visual'){
    await settleVisualInput();
    const latest=visualRef.current?.flushEditedMarkdown();
-   if(latest!==null&&latest!==undefined)changeDraft(latest);
+   if(latest!==null&&latest!==undefined)changeVisibleDraft(latest);
   }
   setWarning('');
+  // A newly inserted first-block H1 stays in the body during editing and is
+  // promoted only after this mode switch.
+  if(!promotedRef.current){
+   const heading=leadingDocumentHeading(latestDraft.current);
+   if(heading){promotedRef.current=heading;setPromoted(heading);}
+  }
   // Commit the requested mode to the URL before awaiting the lazy chunk.
   // A concurrent save increments the revision and remounts RecordEditor;
   // the replacement must read the requested mode, not the previous one.
   const url=new URL(location.href);url.searchParams.set('mode',next);historyReplace(url);
-  // Warm the next view first so the cross-fade never passes through a loading state.
-  await (next==='source'?SourceEditor:next==='preview'?PreviewEditor:VisualEditor).preload().catch(()=>undefined);
+  // Prefer a fully warmed view, but never leave the mode button unresponsive
+  // if a cold code chunk takes longer to arrive. Suspense already owns the
+  // fallback while that chunk completes downloading.
+  const warm=(next==='source'?SourceEditor:next==='preview'?PreviewEditor:VisualEditor).preload().catch(()=>undefined);
+  await Promise.race([warm,new Promise<void>(resolve=>setTimeout(resolve,350))]);
   setMode(next);
  };
  const save=async()=>{
   if(busy)return;
   if(mode==='visual')await settleVisualInput();
-  const latest=mode==='visual'?visualRef.current?.flushEditedMarkdown()??latestDraft.current:latestDraft.current;
+  const latest=mode==='visual'?latestVisibleFromEditor():latestDraft.current;
   if(latest===item.content)return;
   changeDraft(latest);setBusy(true);setError(null);
   try{
@@ -104,7 +145,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
     // Further edits made during save must survive the record query refresh.
     writeSessionDraft(sessionId,item.id,item.revision,latestDraft.current);
    }
-   onSaved();
+   onSaved(latest,Boolean(promotedRef.current));
   }catch(e){setError(e);}
   finally{setBusy(false);}
  };
@@ -121,7 +162,9 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
  const showDiff=async(rev:number)=>{try{const value=await api<{diff?:string;patch?:string;changed:boolean}>('/records/'+item.id+'/diff?from='+rev+'&to='+item.revision);setDiff(value.diff||value.patch||JSON.stringify(value,null,2));}catch(e){setError(e);}};
  const restore=async(rev:number)=>{if(changed||!(await askConfirm({title:'恢复历史版本？',description:'这会将所选版本的内容创建为一个新的当前 Revision，不会覆盖已有历史。',actionLabel:'恢复该版本'})))return;setBusy(true);try{await mutate('/records/'+item.id+'/restore',{targetRevision:rev,expectedRevision:item.revision});onSaved();}catch(e){setError(e);}finally{setBusy(false);}};
  const discardRecovered=()=>{
-  clearSessionDraft(sessionId,item.id);latestDraft.current=item.content;setDraft(item.content);setEditorKey(key=>key+1);setRecoveryNotice(false);
+  clearSessionDraft(sessionId,item.id);latestDraft.current=item.content;setDraft(item.content);
+  const initial=leadingDocumentHeading(item.content);promotedRef.current=initial;setPromoted(initial);
+  setEditorKey(key=>key+1);setRecoveryNotice(false);
  };
  return <div ref={editorSectionRef} className="editor-section">{confirmation}
   <PageActions className="editor-topline" pinned={<>
@@ -135,10 +178,10 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
   <AutoResizer><div className="doc-notice">
   {recoveryNotice&&usableRecovery&&<Banner status="info" container="section" title="已恢复本标签页未保存的草稿" description="草稿属于当前 Revision，保存后才会写入知识库。" endContent={<Button label="丢弃恢复的草稿" variant="secondary" size="sm" onClick={discardRecovered}/>}/>}
   {recoveryNotice&&staleRecovery&&<Banner status="warning" container="section" title="发现旧版本的未保存草稿" description={"草稿来自 R"+stored.revision+"，当前是 R"+item.revision+"。为避免覆盖其他客户端的更新，未自动恢复。"} endContent={<div className="row gap"><Button label="复制旧草稿" size="sm" onClick={()=>navigator.clipboard.writeText(stored.content)}/><Button label="丢弃旧草稿" size="sm" variant="secondary" onClick={()=>{clearSessionDraft(sessionId,item.id);setRecoveryNotice(false);}}/></div>}/>}
-  {Boolean(error)&&<Banner status="error" container="section" title="保存失败" description={error instanceof ApiError&&error.status===409?'记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'请稍后重试'} endContent={error instanceof ApiError&&error.status===409?<Button label="重新加载" onClick={onSaved}/>:undefined}/>}
+  {Boolean(error)&&<Banner status="error" container="section" title="保存失败" description={error instanceof ApiError&&error.status===409?'记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'请稍后重试'} endContent={error instanceof ApiError&&error.status===409?<Button label="重新加载" onClick={()=>onSaved()}/>:undefined}/>}
   {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   </div></AutoResizer>
-  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={draft} onChange={changeDraft} focusLine={jumpToLine?.line} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={draft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={draft} recordId={item.id} onChange={changeDraft}/>}</React.Suspense></div></AutoTransition>
+  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={visibleDraft} onChange={changeVisibleDraft} focusLine={visibleFocusLine} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={visibleDraft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={visibleDraft} recordId={item.id} onChange={changeVisibleDraft}/>}</React.Suspense></div></AutoTransition>
   {historyTarget&&createPortal(<div className="history-panel"><h3 className="workbench-history-title">版本历史</h3>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||v.revision===item.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div>,historyTarget)}
   <Dialog isOpen={blocker.status==='blocked'} onOpenChange={open=>{if(!open)closeBlocker();}} width={440} padding={4} purpose="info" aria-label="未保存的编辑内容">
    <div className="draft-leave-dialog"><h2>还有未保存的编辑内容</h2><p>离开后当前编辑器将关闭。可以先保留本标签页草稿，下次进入此文档时自动恢复；也可以明确丢弃。</p><div className="draft-leave-actions"><Button label="留在编辑器" variant="primary" onClick={closeBlocker}/><Button label="保留草稿并离开" variant="secondary" isDisabled={busy} onClick={keepAndLeave}/><Button label="丢弃更改并离开" variant="destructive" isDisabled={busy} onClick={discardAndLeave}/></div></div>

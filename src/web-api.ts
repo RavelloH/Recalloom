@@ -202,6 +202,10 @@ webApi.get('/records/:id/outline',async(c)=>{
   const q=parseQuery(c.req.url,z.object({revision:z.coerce.number().int().positive().optional(),limit:z.coerce.number().int().min(1).max(200).optional(),cursor:z.coerce.number().int().nonnegative().optional()}));
   return asJson(await agent.getOutline(c.env,id,q.revision,q.limit,q.cursor));
 });
+webApi.get('/records/:id/editors',async(c)=>{
+  const id=idSchema.parse(c.req.param()).id;
+  return asJson(await store.listRecordEditors(c.env,id));
+});
 webApi.get('/records/:id/versions',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
   const q=parseQuery(c.req.url,z.object({cursor:z.coerce.number().int().positive().optional(),limit}));

@@ -74,6 +74,28 @@ export async function restoreRecord(env:Env,id:string,targetRevision:number,expe
   return commitContent(env,row,historic,expectedRevision,'Restored task list revision '+targetRevision,actor,tasks,{action:'restore',targetRevision,taskCount:tasks.length});
 }
 
+/** Distinct, human-readable authors of the document's saved content revisions. */
+export async function listRecordEditors(env:Env,id:string){
+  await getRecord(env,id);
+  const rows=await env.DB.prepare(`SELECT r.actor, a.client_name AS clientName, MAX(r.created_at) AS lastEdited
+    FROM revisions r
+    LEFT JOIN oauth_actor_names a ON r.actor=('grant:' || a.actor_id)
+    WHERE r.record_id=?
+    GROUP BY r.actor, a.client_name
+    ORDER BY lastEdited DESC`).bind(id).all<{actor:string;clientName:string|null}>();
+  const names=new Set<string>();
+  for(const row of rows.results){
+    const actor=row.actor??'';
+    const name=actor.startsWith('web:owner:')?'本人（Web）'
+      :actor.startsWith('grant:')?(row.clientName?.trim()||'未识别 Agent')
+      :actor==='system:migration'?'系统迁移'
+      :actor.startsWith('system:')?'系统'
+      :actor==='agent'?'Agent':'未识别的历史操作方';
+    names.add(name);
+  }
+  return {items:[...names]};
+}
+
 export async function listVersions(env:Env,id:string,limit=50,cursor?:number){
   await getRecord(env,id);
   const size=bounded(limit,200);

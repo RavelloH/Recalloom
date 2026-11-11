@@ -57,7 +57,7 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
 }
 
 /** Editable document title: Enter or blur commits a rename, Escape reverts. */
-export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean}){
+export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false,allowSlash=false}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean;allowSlash?:boolean}){
  const ref=useRef<HTMLHeadingElement>(null);
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
@@ -74,7 +74,7 @@ export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=fa
   if(!el||!onRename)return;
   const next=(el.textContent??'').replace(/\s+/g,' ').trim();
   if(!next||next===value){el.textContent=value;return;}
-  if(/[\\/]/.test(next)||next.length>180){setError('名称需为 1–180 个字符，且不能包含 / 或 \\。');el.textContent=value;return;}
+  if((!allowSlash&&/[\\/]/.test(next))||next.length>180){setError('名称需为 1–180 个字符，且不能包含 / 或 \\。');el.textContent=value;return;}
   setSaving(true);setError('');
   try{await onRename(next);}
   catch(e){setError(errorMessage(e));el.textContent=value;}

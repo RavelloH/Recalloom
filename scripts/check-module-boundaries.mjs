@@ -5,7 +5,7 @@ import ts from 'typescript';
 const errors=[];
 const modules=[
  {entry:'web/src/pages.tsx',directory:'web/src/pages',public:['PageTitle','LoginPage','HomePage','LibraryPage','ArchivePage','RecordPage','TasksPage','SearchPage','ActivityPage','SettingsPage']},
- {entry:'src/storage.ts',directory:'src/storage',public:['getRecord','revisionContent','createFolder','browse','archivedRecords','createRecord','readRecord','editRecord','restoreRecord','listVersions','updateMeta','tagRecord','taskOperation','getTasks','changesSince','manageFolder','resolvePath']},
+ {entry:'src/storage.ts',directory:'src/storage',public:['getRecord','revisionContent','createFolder','browse','archivedRecords','createRecord','readRecord','editRecord','restoreRecord','listVersions','listRecordEditors','updateMeta','tagRecord','taskOperation','getTasks','changesSince','manageFolder','resolvePath']},
  {entry:'web/src/visual-editor.tsx',directory:'web/src/visual-editor',public:['default','VisualEditorHandle']}
 ];
 const sf=(filename)=>ts.createSourceFile(filename,readFileSync(filename,'utf8'),ts.ScriptTarget.Latest,true,filename.endsWith('.tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS);

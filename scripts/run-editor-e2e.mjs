@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const wrangler=join(root,'node_modules','wrangler','bin','wrangler.js');
 const suite=[
- 'record-workbench-e2e.mjs','web-bundle-loading-e2e.mjs','css-layout-e2e.mjs','icon-system-e2e.mjs',
+ 'document-heading-e2e.mjs','record-workbench-e2e.mjs','web-bundle-loading-e2e.mjs','css-layout-e2e.mjs','icon-system-e2e.mjs',
  'rmd-v1-e2e.mjs','rmd-visual-e2e.mjs','rmd-wiki-e2e.mjs',
  'rmd-security-e2e.mjs','rmd-ui-polish-e2e.mjs','rmd-parity-e2e.mjs',
  'rmd-chat-ui-e2e.mjs','editor-inline-menu-e2e.mjs','editor-extra-inline-e2e.mjs',
