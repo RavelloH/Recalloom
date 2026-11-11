@@ -31,6 +31,7 @@
     "db:local": "wrangler d1 migrations apply recalloom --local",
     "db:remote": "wrangler d1 migrations apply recalloom --remote",
     "build:web": "node scripts/stage-cap-wasm.mjs && vite build",
+    "bundle:check": "node scripts/check-web-bundle.mjs",
     "dev:web": "node scripts/stage-cap-wasm.mjs && vite --host 127.0.0.1",
     "test:ui": "node scripts/web-ui-e2e.mjs",
     "test:editor": "pnpm build:web && node scripts/run-editor-e2e.mjs",

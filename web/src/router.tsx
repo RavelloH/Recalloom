@@ -1,10 +1,20 @@
 import {Button} from '@astryxdesign/core/Button';
 import React from 'react';
-import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation} from '@tanstack/react-router';
+import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation,lazyRouteComponent} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
 import {Shell} from './shell';
-import {LoginPage,HomePage,LibraryPage,ArchivePage,RecordPage,TasksPage,SearchPage,ActivityPage,SettingsPage} from './pages';
+// Route modules load only when visited/preloaded, rather than entering the
+// initial shell bundle. TanStack preloads these on navigation intent.
+const LoginPage=lazyRouteComponent(()=>import('./pages/login'),'LoginPage');
+const HomePage=lazyRouteComponent(()=>import('./pages/home'),'HomePage');
+const LibraryPage=lazyRouteComponent(()=>import('./pages/library'),'LibraryPage');
+const ArchivePage=lazyRouteComponent(()=>import('./pages/archive'),'ArchivePage');
+const RecordPage=lazyRouteComponent(()=>import('./pages/record'),'RecordPage');
+const TasksPage=lazyRouteComponent(()=>import('./pages/tasks'),'TasksPage');
+const SearchPage=lazyRouteComponent(()=>import('./pages/search'),'SearchPage');
+const ActivityPage=lazyRouteComponent(()=>import('./pages/activity'),'ActivityPage');
+const SettingsPage=lazyRouteComponent(()=>import('./pages/settings'),'SettingsPage');
 import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 const KnowledgeGraphPage=React.lazy(()=>import('./knowledge-graph'));
@@ -13,10 +23,10 @@ const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="statu
 const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
- if(onLogin)return <Outlet/>;
+ if(onLogin)return <React.Suspense fallback={<div className="center-screen" role="status">正在加载登录页面…</div>}><Outlet/></React.Suspense>;
  if(state.isPending)return <div className="center-screen"><span className="spin"/>正在连接…</div>;
  if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
- return <Shell><Outlet/></Shell>;
+ return <Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell>;
 }
 // Loaders only warm caches; pages still own their loading and error states,
 // so a failed prefetch never replaces the page with a router error screen.

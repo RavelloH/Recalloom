@@ -13,7 +13,9 @@ import {clearAllSessionDrafts,hasSessionDrafts,hasActiveEditorDirty,approveLogou
 import {useConfirmDialog} from './confirm-dialog';
 import {menu} from './navigation';
 import {PageTree} from './page-tree';
-import {QuickSwitcher} from './command-palette';
+// Load the sizeable command palette only on first use; retain it after closing
+// so its dismissal animation and in-memory search state still behave normally.
+const QuickSwitcher=React.lazy(()=>import('./command-palette').then(module=>({default:module.QuickSwitcher})));
 import {TopbarSlotProvider} from './topbar-slot';
 import {clearRecentPages} from './recent-pages';
 import {OverlayScroll} from './scrollbars';
@@ -25,7 +27,7 @@ const shortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.
 
 export function Shell({children}:{children:React.ReactNode}){
  const [collapsed,setCollapsed]=useState(()=>localStorage.getItem('recalloom:sidebar')==='collapsed');
- const [mobileOpen,setMobileOpen]=useState(false),[commands,setCommands]=useState(false),[scrolled,setScrolled]=useState(false);
+ const [mobileOpen,setMobileOpen]=useState(false),[commands,setCommands]=useState(false),[paletteActivated,setPaletteActivated]=useState(false),[scrolled,setScrolled]=useState(false);
  const [slotStart,setSlotStart]=useState<HTMLDivElement|null>(null),[slotEnd,setSlotEnd]=useState<HTMLDivElement|null>(null);
  const scroller=useRef<HTMLDivElement|null>(null);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
@@ -40,7 +42,7 @@ export function Shell({children}:{children:React.ReactNode}){
  const closeMobile=()=>setMobileOpen(false);
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{
   const mod=event.ctrlKey||event.metaKey;
-  if(mod&&event.key.toLowerCase()==='k'){event.preventDefault();setCommands(v=>!v);}
+  if(mod&&event.key.toLowerCase()==='k'){event.preventDefault();setPaletteActivated(true);setCommands(v=>!v);}
   if(mod&&event.key==='\\'){event.preventDefault();setCollapsed(v=>!v);}
   if(event.key==='Escape')setMobileOpen(false);
  };window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
@@ -59,7 +61,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
-    <NavRow icon="search" label="搜索" className="nav-search" trailing={<kbd className="nav-kbd">{shortcut}</kbd>} onClick={()=>{closeMobile();setCommands(true);}}/>
+    <NavRow icon="search" label="搜索" className="nav-search" trailing={<kbd className="nav-kbd">{shortcut}</kbd>} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
     <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon})=><NavRow key={to} to={to} icon={icon} label={name} onClick={closeMobile} exact={to==='/'}/>)}</nav>
    </div>
    <PageTree onNavigate={closeMobile}/>
@@ -82,7 +84,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </OverlayScroll>
  </main></div>
  <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
- <QuickSwitcher isOpen={commands} onOpenChange={setCommands}/>
+ {paletteActivated&&<React.Suspense fallback={null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
  {confirmation}
  </div>;
 }

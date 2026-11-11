@@ -1,5 +1,12 @@
 import React,{useEffect,useLayoutEffect,useRef} from 'react';
-import {OverlayScrollbars,type PartialOptions} from 'overlayscrollbars';
+import type {PartialOptions} from 'overlayscrollbars';
+
+// The static UI policy is lightweight. Load the scrollbar engine only where
+// non-native scrollbars are actually needed; Apple WebKit never downloads it.
+type ScrollbarEngine=typeof import('overlayscrollbars')['OverlayScrollbars'];
+type ScrollbarInstance=ReturnType<ScrollbarEngine>;
+let enginePromise:Promise<ScrollbarEngine>|undefined;
+const loadEngine=()=>enginePromise??=import('overlayscrollbars').then(m=>m.OverlayScrollbars).catch(error=>{enginePromise=undefined;throw error;});
 import 'overlayscrollbars/overlayscrollbars.css';
 
 /* JS overlay scrollbars everywhere except Apple WebKit, where native
@@ -40,10 +47,13 @@ function trackEdges(host:HTMLElement,viewport:HTMLElement){
 
 /** Imperative attachment for DOM owned by ProseMirror node views. */
 export function attachScrollbars(host:HTMLElement,viewport:HTMLElement,axis:ScrollAxis,{edges=false}:{edges?:boolean}={}){
- let instance:OverlayScrollbars|undefined;
- if(!usesNativeScrollbars())instance=OverlayScrollbars({target:host,elements:{viewport,content:false,padding:false}},optionsFor(axis));
+ let instance:ScrollbarInstance|undefined,disposed=false;
+ if(!usesNativeScrollbars())void loadEngine().then(engine=>{
+  if(!disposed&&host.isConnected&&viewport.isConnected)
+   instance=engine({target:host,elements:{viewport,content:false,padding:false}},optionsFor(axis));
+ }).catch(()=>undefined);
  const untrack=edges?trackEdges(host,viewport):undefined;
- return()=>{untrack?.();if(instance&&OverlayScrollbars.valid(instance))instance.destroy();};
+ return()=>{disposed=true;untrack?.();instance?.destroy();};
 }
 
 type ScrollProps=Omit<React.HTMLAttributes<HTMLDivElement>,'children'>&{
@@ -58,8 +68,12 @@ export function OverlayScroll({axis='y',children,className='',viewportClassName=
  useLayoutEffect(()=>{
   const h=host.current,v=viewport.current;
   if(!h||!v||usesNativeScrollbars())return;
-  const instance=OverlayScrollbars({target:h,elements:{viewport:v,content:false,padding:false}},optionsFor(axis,persistent));
-  return()=>{if(OverlayScrollbars.valid(instance))instance.destroy();};
+  let instance:ScrollbarInstance|undefined,disposed=false;
+  void loadEngine().then(engine=>{
+   if(!disposed&&h.isConnected&&v.isConnected)
+    instance=engine({target:h,elements:{viewport:v,content:false,padding:false}},optionsFor(axis,persistent));
+  }).catch(()=>undefined);
+  return()=>{disposed=true;instance?.destroy();};
  },[axis,persistent]);
  useEffect(()=>{const h=host.current,v=viewport.current;if(edges&&h&&v)return trackEdges(h,v);},[edges]);
  return <div {...props} ref={host} className={('rk-scroll '+className).trim()} data-axis={axis}>

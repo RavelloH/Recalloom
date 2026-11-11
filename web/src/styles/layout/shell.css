@@ -494,6 +494,25 @@ html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hove
   text-decoration: underline;
 }
 
+/* Tree errors do not require the entire Motion runtime in the app shell. */
+.tree-error-region,
+.tree-branch-region {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--rk-motion-medium, 180ms) ease;
+}
+
+.tree-error-region[data-visible="true"],
+.tree-branch-region[data-visible="true"] { grid-template-rows: 1fr; }
+
+.tree-error-inner,
+.tree-branch-inner { min-height: 0; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-error-region,
+  .tree-branch-region { transition: none; }
+}
+
 .tree-error {
   margin: 4px 14px 8px;
   font-size: var(--rk-font-small);

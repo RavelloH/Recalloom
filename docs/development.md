@@ -37,12 +37,13 @@ pnpm test:editor:quick
 | `pnpm check` | CSS 归属、图标、帮助文档、语法覆盖、前后端类型 | 无远端凭证 |
 | `pnpm test` | 使用受控并发运行 Node 单元测试 | 无远端凭证 |
 | `pnpm build:web` | Vite 前端构建、静态资源打包 | 无远端凭证 |
+| `pnpm bundle:check` | 检查构建后主入口 gzip 不超过 275KiB，关键页面与功能保持独立 chunk | 需要先执行 `pnpm build:web` |
 | `pnpm test:migrations` | 临时本地 D1 数据迁移回放 | 不接触生产，但可能较慢 |
 | `pnpm test:editor` | 使用隔离 Worker/D1 的核心编辑器浏览器 E2E | 本地 `.dev.vars` + 浏览器 |
 
-- `.github/workflows/quality.yml` 在 Push/PR 上运行前三类稳定检查，不执行远端 D1 迁移。
+- `.github/workflows/quality.yml` 在 Push/PR 上运行静态检查、单元测试、构建及包体预算检查，不执行远端 D1 迁移。
 - `scripts/` 中的 E2E 可能属于核心套件或单独的可重复回归测试；单次开发任务的临时脚本应放在被 Git 忽略的 `.agents/`。
-- UI 回归不仅验证 SVG 或 DOM 是否存在，还应验证 Computed Style、可见性、尺寸和实际交互。
+- UI 回归不仅验证 SVG 或 DOM 是否存在，还应验证 Computed Style、可见性、尺寸和实际交互。`web-bundle-loading-e2e.mjs` 通过隔离浏览器请求记录确认路由、命令面板与原生滚动条策略不会提前下载功能脚本。
 - OAuth、归档/永久删除、关系网和迁移必须在隔离环境进行专项测试，不能用单元测试代替。
 - 本地迁移测试会启动隔离的 Wrangler/D1，执行成本高于纯单元测试，因此与快速 CI 分开运行。
 

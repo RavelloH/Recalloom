@@ -8,7 +8,6 @@ import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {browse} from './api';
 import type {Entry} from './types';
 import {createUntitled,type NewPageKind} from './create-page';
-import {AutoResizer} from './motion-primitives';
 
 const storageKey='recalloom:tree-open';
 const listeners=new Set<()=>void>();
@@ -62,7 +61,7 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
     :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>}
    {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<Icon name="plus"/>} items={createItems(entry.id)}/></div>}
   </div>
-  {folder&&<AutoResizer duration={0.2}>{open&&<TreeChildren folderId={entry.id} depth={depth+1}/>}</AutoResizer>}
+  {folder&&<div className="tree-branch-region" data-visible={open}><div className="tree-branch-inner">{open&&<TreeChildren folderId={entry.id} depth={depth+1}/>}</div></div>}
  </li>;
 }
 
@@ -108,7 +107,7 @@ export function PageTree({onNavigate}:{onNavigate?:()=>void}){
    <Link to="/library" onClick={onNavigate} className="tree-heading-link">知识库</Link>
    <MoreMenu size="sm" variant="ghost" label="在知识库根目录新建" icon={<Icon name="plus"/>} items={createItems(null)}/>
   </div>
-  <AutoResizer>{error&&<p className="tree-error" role="alert">{error}</p>}</AutoResizer>
+  <div className="tree-error-region" data-visible={Boolean(error)}><div className="tree-error-inner">{error&&<p className="tree-error" role="alert">{error}</p>}</div></div>
   <nav aria-label="页面树" className="page-tree"><TreeChildren folderId={null} depth={0}/></nav>
  </TreeContext.Provider>;
 }
