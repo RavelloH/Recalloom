@@ -35,14 +35,16 @@ const asRect=(bounds:SketchBounds)=>new DOMRect(
  bounds.left,bounds.top,bounds.right-bounds.left,bounds.bottom-bounds.top
 );
 
-/** Expand each visual line to cover KaTeX glyphs: the .katex wrapper's CSS
- * box can be only 20px tall while its actual .base glyph is 23–25px tall.
- * MathML accessibility nodes must not contribute to visible geometry.
+/** Merge fragments by visual line and expand KaTeX glyph bounds (whose
+ * visible height may exceed the wrapper). A hover selection can span sibling
+ * DOM elements at bold/italic boundaries; treat them as a single annotation.
+ * Ignore MathML accessibility nodes when measuring visible glyphs.
  */
-export function measureInlineSketchLines(element:HTMLElement):{rect:DOMRect;hasMath:boolean}[]{
- const fragments=Array.from(element.getClientRects(),toBounds);
+export function measureInlineSketchLines(elements:HTMLElement|readonly HTMLElement[]):{rect:DOMRect;hasMath:boolean}[]{
+ const parts:readonly HTMLElement[]=Array.isArray(elements)?elements:[elements as HTMLElement];
+ const fragments=parts.flatMap(element=>Array.from(element.getClientRects(),toBounds));
  const lines=groupSketchLineBounds(fragments).map(bounds=>({bounds,hasMath:false}));
- for(const math of Array.from(element.querySelectorAll<HTMLElement>('.katex'))){
+ for(const element of parts)for(const math of Array.from(element.querySelectorAll<HTMLElement>('.katex'))){
   const anchor=toBounds(math.getBoundingClientRect());
   if(!valid(anchor)||!lines.length)continue;
   const target=lines.reduce((best,line)=>

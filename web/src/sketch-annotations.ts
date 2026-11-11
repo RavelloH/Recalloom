@@ -39,7 +39,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   }
  };
  resize.observe(root);
- const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0)=>{
+ const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0,groupText?:string)=>{
   if(!isSketchKind(kind)||rect.width<1||rect.height<1)return;
   const stroke=parseSketchNumber(element.dataset.rkSketchStroke,'stroke')??2;
   const padding=parseSketchNumber(element.dataset.rkSketchPadding,'padding')??(kind==='circle'||kind==='box'||kind==='bracket'?5:3);
@@ -50,7 +50,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    ?SKETCH_PALETTE[chosen as keyof typeof SKETCH_PALETTE]
    :SKETCH_PALETTE[SKETCH_DEFAULT_COLORS[kind]];
   const width=rect.width+padding*2,height=rect.height+padding*2;
-  const seed=sketchSeed(kind+':'+(element.textContent??'')+':'+index);
+  const seed=sketchSeed(kind+':'+(groupText??element.textContent??'')+':'+index);
   const paths=sketchPaths(kind,width,height,seed,roughness,hasMath);
   const svg=document.createElementNS(SVG_NS,'svg');
   svg.setAttribute('class',element.dataset.rkPreviewSketch==='true'?'rk-sketch-svg rk-sketch-preview-svg':'rk-sketch-svg');
@@ -94,6 +94,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   const currentlyVisible=new Set<HTMLElement>();
   const base=root.getBoundingClientRect();
   let count=0;
+  const previewGroups=new Map<string,HTMLElement[]>();
   for(const element of root.querySelectorAll<HTMLElement>(SELECTOR)){
    if(layer.contains(element)||element.closest('.markdown-preview,.wysiwyg')!==root)continue;
    if(++count>500)break; // Bound work on unusually large notebooks.
@@ -101,6 +102,14 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    if(!observed.has(element)){resize.observe(element);observed.add(element);}
    if(element.getClientRects().length===0)continue;
    const kind=element.dataset.rkSketchKind??'';
+   if(element.dataset.rkPreviewSketch==='true'){
+    // ProseMirror divides one decoration at bold/italic mark boundaries.
+    // Collect ALL DOM spans from the same selected range before drawing.
+    const key=element.dataset.rkPreviewGroup??kind;
+    const group=previewGroups.get(key)??[];
+    group.push(element);previewGroups.set(key,group);
+    continue;
+   }
    // Browser inline client rects are *fragments*, not visual lines. Group
    // adjacent text + KaTeX on the same line into one drawing, while preserving
    // separate drawings on actual wrapped lines. Measure visible KaTeX glyphs
@@ -110,6 +119,15 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
     :measureInlineSketchLines(element);
    lines.forEach((line,index)=>make(kind,line.rect,base,element,index,line.hasMath,
     'inkOffset' in line&&typeof line.inkOffset==='number'?line.inkOffset:0));
+  }
+  // One sketch per physical line, not per ProseMirror DOM fragment. This
+  // also keeps KaTeX glyph expansion consistent with committed annotations.
+  for(const group of previewGroups.values()){
+   const owner=group[0];if(!owner)continue;
+   const kind=owner.dataset.rkSketchKind??'';
+   const text=group.map(element=>element.textContent??'').join('');
+   measureInlineSketchLines(group).forEach((line,index)=>
+    make(kind,line.rect,base,owner,index,line.hasMath,0,text));
   }
   for(const old of observed)if(!currentlyVisible.has(old)){
    resize.unobserve(old);observed.delete(old);

@@ -47,7 +47,13 @@ function previewDecorations(state:import('@tiptap/pm/state').EditorState):Decora
  if(from>=to)return DecorationSet.empty;
  const cls=kind.startsWith('sketch:')?'sketch':kind.replaceAll(':','-');
  const sketch=kind.startsWith('sketch:');
- const extras=sketch?{'data-rk-preview-sketch':'true','data-rk-sketch-kind':kind.slice(7)}:{};
+ // ProseMirror splits inline decorations at mark boundaries (e.g. bold).
+ // All DOM fragments from this one selection must share a drawing group.
+ const extras=sketch?{
+  'data-rk-preview-sketch':'true',
+  'data-rk-preview-group':kind+':'+from+':'+to,
+  'data-rk-sketch-kind':kind.slice(7)
+ }:{};
  return DecorationSet.create(doc,[Decoration.inline(from,to,{
   class:'rk-hover-format rk-hover-format--'+cls+(sketch?' rk-sketch-inline':''),
   ...extras
