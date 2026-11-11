@@ -220,20 +220,28 @@ try{
   await inspector.waitFor({state:'hidden'});
  }
 
- // Recent and search pages use the same crossfade, including history.
+ // A desktop topbar portal appears on the record page but not on home.
+ // It must never resize or displace the animated scroll viewport.
  await page.goto(base+'/');
  const recent=page.locator('.recent-page').filter({hasText:promoted.name}).first();
  await recent.waitFor();
  await assertTextInPage(recent.locator('.recent-page-name'));
+ const viewportBox=async()=>page.locator('.main-scroll-host').evaluate(el=>{
+  const {x,y,width,height}=el.getBoundingClientRect();
+  return {x,y,width,height};
+ });
+ const homeBox=await viewportBox();
  before=await count();
  await recent.click();
  await recordPage(promoted);
  await assertRouteTransition(before);
+ if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'opening a portal must not move or resize the snapshot viewport');
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');
  await recent.waitFor();
  await assertRouteTransition(before);
+ if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'closing a portal must not move or resize the snapshot viewport');
 
  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
  const hit=page.locator('.search-result').filter({hasText:promoted.name}).first();

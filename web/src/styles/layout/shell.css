@@ -801,6 +801,20 @@ html[data-effective-theme="dark"] .bottom-nav {
 
 @media (min-width: 721px) {
 
+/* A page-owned portal must not change the viewport's geometry halfway
+   through a View Transition. Keep the desktop topbar out of flex layout;
+   record and folder pages reserve space in their own scroll content. */
+.workspace {
+  position: relative;
+}
+
+.shell .topbar {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 46px;
+}
+
 .topbar-title {
   display: none;
 }

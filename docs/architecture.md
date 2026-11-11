@@ -46,7 +46,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 ## 页面导航与动效
 
-- **路由层：** TanStack Router 统一使用 `defaultViewTransition: true`，覆盖点击、程序导航与前进/后退。`:root { view-transition-name: none }` 明确禁止全屏快照：侧栏、顶栏和底栏保持为实时 DOM，而不是两个重叠的旧/新截图。固定尺寸的 `.main-scroll-host` 是唯一的命名快照 `rk-route-content`，仍使用原有的 130ms 淡出与延迟 105ms 的 175ms 淡入。不要把过渡名称赋给页面内容节点，也不要对 `root` 恢复截图。
+- **路由层：** TanStack Router 统一使用 `defaultViewTransition: true`，覆盖点击、程序导航与前进/后退。`:root { view-transition-name: none }` 明确禁止全屏快照：侧栏、顶栏和底栏保持为实时 DOM，而不是两个重叠的旧/新截图。固定尺寸的 `.main-scroll-host` 是唯一的命名快照 `rk-route-content`，仍使用原有的 130ms 淡出与延迟 105ms 的 175ms 淡入。**桌面顶栏由路由页面通过 Portal 填充，必须绝对定位，不参与 `.workspace` 的 flex 高度计算；仅有面包屑的文档/文件夹页面在各自内容里预留顶栏高度。** 否则从概览进入详情时 `:empty` 导致顶栏由 `display:none` 变为 `flex`，会把仍在淡出的旧页面整体推移，造成闪动。不要把过渡名称赋给页面内容节点，也不要对 `root` 恢复截图。
 - **文字与共享元素：** 当前默认关闭文本级共享快照。即使资源 ID 稳定，跨列表/详情/搜索时单独捕获文字仍会出现孤立快照，导致文字提前消失、漂浮鬼影，或与主页面淡化不同步。`web/src/shared-view-transition.ts` 暂保留稳定 ID 的命名算法作为未来受控、成对共享过渡的入口，但默认返回 `undefined`，保证标题、行和图标跟随整个页面一起渐变；不再使用 `::view-transition-old(*):only-child` 隐藏孤立文字。只有确认两端匹配、可控制裁切/层叠和连续导航中断时才能重新启用。
 - **文件名与 H1：** Markdown 首块 H1 独立于数据库文件名。当前不单独捕获文件名/H1；二者都在同一个页面视口快照内按整体渐变，避免从列表到编辑器时文字被拉伸成鬼影。参考 `web/src/record-workbench.tsx`。
 - **页面就绪：** `router.tsx` 不再使用旧的 600ms 预热截止时间。关键路由 loader 必须在提交前准备好首屏查询和懒加载组件；文档额外预加载编辑器，任务列表额外加载任务项。慢网络时保留旧页面及导航进度，不得把 Skeleton / Suspense fallback 捕获到新页面快照中；加载失败仍由原有页面错误组件处理。**局部效果：** 检查器 Tab 用 Motion Layout，编辑器模式、侧栏折叠、块拖动继续使用专用动画，所有效果遵守 `prefers-reduced-motion`。
