@@ -34,7 +34,9 @@ pnpm test:editor:quick
 
 Cloudflare 构建环境曾出现已声明依赖在 pnpm 隔离目录中无法解析的问题，包括 `@uiw/react-codemirror` 对 Babel helper 和 `@codemirror/autocomplete` 对 `@codemirror/state` 的导入。本地及 GitHub Linux CI 的锁文件安装可以正常解析，说明不能仅根据 Vite 的 unresolved import 日志判断是代码忘记声明依赖。
 
-`pnpm build:web` 首先运行 `scripts/ensure-build-deps.mjs --repair`：从实际引用包的位置验证 CodeMirror 与 Babel Runtime 7 的解析链；若有缺失，则执行 `pnpm install --frozen-lockfile --force --prod=false` 重新建立完整依赖树，再次验证后才构建。正常安装不触发重装。`pnpm deps:check` 只验证、不修改安装目录。
+仓库的 `pnpm-workspace.yaml` 设置 `nodeLinker: hoisted`，从干净安装起使用实体依赖目录，避免 Cloudflare 构建阶段丢失 pnpm 虚拟目录间的符号链接；继续保留原有 `allowBuilds` 列表和 `minimumReleaseAgeExclude` 策略。已经在隔离的全新安装目录中验证 `pnpm install --frozen-lockfile --prod=false`、真实 Vite 构建及包体检查。
+
+`pnpm build:web` 仍会先运行 `scripts/ensure-build-deps.mjs --repair`：从实际引用包的位置验证 CodeMirror 与 Babel Runtime 7 的解析链；若有缺失，则执行 `pnpm install --frozen-lockfile --force --prod=false` 重新安装，再次验证后才构建。正常安装不触发重装。`pnpm deps:check` 只验证、不修改安装目录。
 
 如重建后依然失败，检查 Cloudflare Workers 项目的 **Settings → Build → Build cache → Clear Cache** 并重试；必须查看构建日志中预检列出的具体依赖链接。不要把出错模块加进 Rollup `external` 来绕过问题，否则浏览器运行时仍可能缺包。
 

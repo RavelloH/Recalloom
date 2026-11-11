@@ -1,3 +1,7 @@
+# Cloudflare Workers Builds: use real package directories rather than
+# relying on symlinks between pnpm's virtual-store package directories.
+nodeLinker: hoisted
+
 allowBuilds:
   '@astryxdesign/core': true
   esbuild: true
