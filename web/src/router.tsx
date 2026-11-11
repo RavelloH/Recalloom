@@ -6,19 +6,30 @@ import {ApiError,api} from './api';
 import {Shell} from './shell';
 // Route modules load only when visited/preloaded, rather than entering the
 // initial shell bundle. TanStack preloads these on navigation intent.
-const LoginPage=lazyRouteComponent(()=>import('./pages/login'),'LoginPage');
-const HomePage=lazyRouteComponent(()=>import('./pages/home'),'HomePage');
-const LibraryPage=lazyRouteComponent(()=>import('./pages/library'),'LibraryPage');
-const ArchivePage=lazyRouteComponent(()=>import('./pages/archive'),'ArchivePage');
-const RecordPage=lazyRouteComponent(()=>import('./pages/record'),'RecordPage');
-const TasksPage=lazyRouteComponent(()=>import('./pages/tasks'),'TasksPage');
-const SearchPage=lazyRouteComponent(()=>import('./pages/search'),'SearchPage');
-const ActivityPage=lazyRouteComponent(()=>import('./pages/activity'),'ActivityPage');
-const SettingsPage=lazyRouteComponent(()=>import('./pages/settings'),'SettingsPage');
+const importLogin=()=>import('./pages/login');
+const importHome=()=>import('./pages/home');
+const importLibrary=()=>import('./pages/library');
+const importArchive=()=>import('./pages/archive');
+const importRecord=()=>import('./pages/record');
+const importTasks=()=>import('./pages/tasks');
+const importSearch=()=>import('./pages/search');
+const importActivity=()=>import('./pages/activity');
+const importSettings=()=>import('./pages/settings');
+const LoginPage=lazyRouteComponent(importLogin,'LoginPage');
+const HomePage=lazyRouteComponent(importHome,'HomePage');
+const LibraryPage=lazyRouteComponent(importLibrary,'LibraryPage');
+const ArchivePage=lazyRouteComponent(importArchive,'ArchivePage');
+const RecordPage=lazyRouteComponent(importRecord,'RecordPage');
+const TasksPage=lazyRouteComponent(importTasks,'TasksPage');
+const SearchPage=lazyRouteComponent(importSearch,'SearchPage');
+const ActivityPage=lazyRouteComponent(importActivity,'ActivityPage');
+const SettingsPage=lazyRouteComponent(importSettings,'SettingsPage');
 import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,searchQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
-const KnowledgeGraphPage=React.lazy(()=>import('./knowledge-graph'));
-const RmdHelpPage=React.lazy(()=>import('./rmd-help-page'));
+const importGraph=()=>import('./knowledge-graph');
+const importHelp=()=>import('./rmd-help-page');
+const KnowledgeGraphPage=React.lazy(importGraph);
+const RmdHelpPage=React.lazy(importHelp);
 const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="status">正在加载 RMD 语法帮助…</div>}><RmdHelpPage/></React.Suspense>;
 const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
@@ -28,27 +39,33 @@ function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({
  if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
  return <Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell>;
 }
-// Loaders only warm caches; pages still own their loading and error states,
-// so a failed prefetch never replaces the page with a router error screen.
-// Waiting is capped: a slow request shows the page's own loading state instead of holding the old page.
-const WARM_LIMIT_MS=600;
-const warm=(...work:Array<Promise<unknown>>)=>Promise.race([Promise.allSettled(work),new Promise(resolve=>setTimeout(resolve,WARM_LIMIT_MS))]).then(()=>undefined);
+// Wait for critical page data AND lazy component code before committing the
+// destination. The former 600ms cap could resolve while the cache was still
+// pending, so View Transitions captured Skeleton/Suspense instead of a title.
+// Existing content stays visible under the route progress bar until ready.
+// Errors are still rendered by the page's own query/error components.
+const ready=async(...work:Array<Promise<unknown>>)=>{await Promise.allSettled(work);};
 const root=createRootRoute({component:Root,notFoundComponent:()=> <div className="page"><h2>页面不存在</h2><a href="/library">返回知识库</a></div>});
 const list=[
- createRoute({getParentRoute:()=>root,path:'/',component:HomePage,loader:()=>warm(queryClient.ensureQueryData(tasksQuery()),queryClient.ensureQueryData(activityQuery()))}),
- createRoute({getParentRoute:()=>root,path:'/login',component:LoginPage}),
- createRoute({getParentRoute:()=>root,path:'/library',component:LibraryPage,loader:()=>warm(queryClient.ensureInfiniteQueryData(folderPagesQuery(null)))}),
- createRoute({getParentRoute:()=>root,path:'/library/$folderId',component:LibraryPage,loader:({params})=>warm(queryClient.ensureInfiniteQueryData(folderPagesQuery(params.folderId)),queryClient.ensureQueryData(folderQuery(params.folderId)))}),
+ createRoute({getParentRoute:()=>root,path:'/',component:HomePage,loader:()=>ready(importHome(),queryClient.ensureQueryData(tasksQuery()),queryClient.ensureQueryData(activityQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/login',component:LoginPage,loader:()=>ready(importLogin())}),
+ createRoute({getParentRoute:()=>root,path:'/library',component:LibraryPage,loader:()=>ready(importLibrary(),queryClient.ensureInfiniteQueryData(folderPagesQuery(null)))}),
+ createRoute({getParentRoute:()=>root,path:'/library/$folderId',component:LibraryPage,loader:({params})=>ready(importLibrary(),queryClient.ensureInfiniteQueryData(folderPagesQuery(params.folderId)),queryClient.ensureQueryData(folderQuery(params.folderId)))}),
  createRoute({getParentRoute:()=>root,path:'/records/$recordId',component:RecordPage,
   validateSearch:(search:Record<string,unknown>):{mode?:'source'}=>search.mode==='source'?{mode:'source'}:{},
   loaderDeps:({search})=>({mode:search.mode}),
-  loader:({params,deps})=>warm((async()=>{
+  loader:async({params,deps})=>{
+   const chunk=importRecord();
    const item=await queryClient.ensureQueryData(recordQuery(params.recordId)).catch(()=>null);
-   await (item?.kind==='task_list'?queryClient.ensureQueryData(tasksQuery(params.recordId)):preloadEditor(deps.mode??'visual'));
-  })())}),
- createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>warm(queryClient.ensureQueryData(tasksQuery()))}),
- createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>warm(queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
- createRoute({getParentRoute:()=>root,path:'/graph',component:GraphRoute,
+   // The editor is part of a document's first fully rendered view, not a
+   // second-stage placeholder. Task lists instead need their initial tasks.
+   await ready(chunk,...(item?[item.kind==='task_list'
+    ?queryClient.ensureQueryData(tasksQuery(params.recordId))
+    :preloadEditor(deps.mode??'visual')]:[]));
+  }}),
+ createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),queryClient.ensureQueryData(tasksQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>ready(importArchive(),queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/graph',component:GraphRoute,loader:()=>ready(importGraph()),
   validateSearch:(search:Record<string,unknown>):{focus?:string}=>typeof search.focus==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(search.focus)?{focus:search.focus}:{}}),
  createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage,
   validateSearch:(search:Record<string,unknown>):{q?:string;mode?:SearchMode}=>({
@@ -56,19 +73,19 @@ const list=[
    ...(isSearchMode(search.mode)&&search.mode!=='auto'?{mode:search.mode}:{})
   }),
   loaderDeps:({search})=>({q:search.q,mode:search.mode}),
-  loader:({deps})=>deps.q?warm(queryClient.ensureQueryData(searchQuery(deps.q,deps.mode??'auto'))):undefined}),
- createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>warm(queryClient.ensureInfiniteQueryData(activityPagesQuery()))}),
- createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute}),
- createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage}),
+  loader:({deps})=>ready(importSearch(),...(deps.q?[queryClient.ensureQueryData(searchQuery(deps.q,deps.mode??'auto'))]:[]))}),
+ createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>ready(importActivity(),queryClient.ensureInfiniteQueryData(activityPagesQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute,loader:()=>ready(importHelp())}),
+ createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:()=> <Navigate to="/settings" replace/>}),
- createRoute({getParentRoute:()=>root,path:'/settings/oauth',component:SettingsPage}),
- createRoute({getParentRoute:()=>root,path:'/settings/sessions',component:SettingsPage}),
- createRoute({getParentRoute:()=>root,path:'/settings/indexing',component:SettingsPage}),
- createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage})
+ createRoute({getParentRoute:()=>root,path:'/settings/oauth',component:SettingsPage,loader:()=>ready(importSettings())}),
+ createRoute({getParentRoute:()=>root,path:'/settings/sessions',component:SettingsPage,loader:()=>ready(importSettings())}),
+ createRoute({getParentRoute:()=>root,path:'/settings/indexing',component:SettingsPage,loader:()=>ready(importSettings())}),
+ createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage,loader:()=>ready(importSettings())})
 ];
 // Loaders read through the shared query cache; the router itself never caches stale data.
-// Every route keeps the subtle content transition. The root snapshot is scoped
-// by CSS to .page-transition, leaving the persistent shell untouched. Only
-// the clicked resource receives a separate shared-element name.
+// Every route gets the native transition, including browser history. The
+// default root snapshot preserves persistent navigation, while the fixed main
+// scroll viewport and stable resource IDs animate separately.
 export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,defaultViewTransition:true});
 declare module '@tanstack/react-router'{interface Register{router:typeof router;}}

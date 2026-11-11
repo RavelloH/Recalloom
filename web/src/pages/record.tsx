@@ -22,12 +22,12 @@ import {AutoResizer} from '../motion-primitives';
 import {RecordEditorChunk} from '../editor-chunks';
 import {setFullWidth,useFullWidth} from '../preferences';
 import {recordQuery} from '../queries';
-import {useSharedTransitionTarget} from '../shared-view-transition';
+import {sharedViewTransitionName} from '../shared-view-transition';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
- const sharedRecordName=useSharedTransitionTarget('record',recordId);
+ const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const titleEditorRef=useRef<((title:string)=>Promise<void>)|null>(null);
  // A save remounts the editor at a new revision, but must not count as

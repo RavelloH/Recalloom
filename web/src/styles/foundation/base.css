@@ -60,8 +60,6 @@ html {
   width: 100%;
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
-  /* The persistent shell must never be captured as the native root image. */
-  view-transition-name: none;
 }
 
 button {

@@ -8,7 +8,7 @@ import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
 import {RecordRelations} from './record-relations';
 import {ago,statusNames} from './pages/shared';
 import type {RecordDetail} from './types';
-import {useSharedTransitionTarget} from './shared-view-transition';
+import {sharedViewTransitionName} from './shared-view-transition';
 
 export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
 
@@ -70,7 +70,7 @@ export function DocumentWorkbenchHeader({item,title,usesHeading,characters,edito
  onRename:(name:string)=>Promise<void>;
  onDetails:()=>void;
 }){
- const sharedName=useSharedTransitionTarget('record',item.id);
+ const sharedName=sharedViewTransitionName('record',item.id);
  return <header className="doc-header workbench-header">
   <div className="workbench-identity">
    <span className="workbench-document-kind"><Icon name="document" size="sm" aria-hidden="true"/> Markdown 文档

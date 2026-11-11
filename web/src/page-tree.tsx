@@ -8,7 +8,6 @@ import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {browse} from './api';
 import type {Entry} from './types';
 import {createUntitled,type NewPageKind} from './create-page';
-import {selectSharedTransition} from './shared-view-transition';
 
 const storageKey='recalloom:tree-open';
 const listeners=new Set<()=>void>();
@@ -58,8 +57,8 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
     ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><Icon name="chevronRight"/></button>
     :<span className="tree-toggle is-leaf" aria-hidden="true"/>}
    {folder
-    ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" viewTransition onClickCapture={event=>selectSharedTransition(event,'folder',entry.id,'.truncate')} onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>
-    :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" viewTransition onClickCapture={event=>selectSharedTransition(event,'record',entry.id,'.truncate')} onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>}
+    ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>
+    :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={onNavigate} aria-current={active?'page':undefined}>{label}</Link>}
    {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<Icon name="plus"/>} items={createItems(entry.id)}/></div>}
   </div>
   {folder&&<div className="tree-branch-region" data-visible={open}><div className="tree-branch-inner">{open&&<TreeChildren folderId={entry.id} depth={depth+1}/>}</div></div>}

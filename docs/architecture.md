@@ -46,11 +46,11 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 
 ## 页面导航与动效
 
-- **路由层：** TanStack Router 统一使用 `defaultViewTransition: true`，但在 `foundation/base.css` 把 `html` 的原生 `view-transition-name` 设为 `none`，并在 `layout/pages.css` 把 `.page-transition` 设为 `root`，从而只截取路由正文，而不截取不变的顶部栏、侧栏或移动端底栏。页面内容采用短促、非对称淡入淡出，并关闭整个路由容器的几何缩放；正常浏览器仍有连续导航反馈。旧浏览器由 Router 降级，绝不叠加 React `<ViewTransition>`。
-- **共享元素：** `web/src/shared-view-transition.ts` 按资源类型和不可变 ID 命名。文件列表、侧栏文件树、搜索、最近访问、归档、面包屑与详情共享对应身份；只有本次**实际点击**的源元素临时命名，目标详情组件按匹配资源命名，路由提交后清理。不能给整张列表的所有标题永久命名：那样会生成大量旧快照。回归测试必须在 `ViewTransition.updateCallbackDone` 阶段核对旧/新快照中确实有同一个 ID，并比较边界框位置；单纯检查最终 DOM 不等于真正发生了共享元素动画。
+- **路由层：** TanStack Router 始终使用 `defaultViewTransition: true`，让点击、编程导航与浏览器前进/后退统一执行。保留 `html` 默认的 `root` 快照供稳定 App 外壳使用，`::view-transition-old(root)` / `new(root)` 均保持不透明且不播放动画，避免侧栏、顶栏、底栏消失。`shell.css` 为固定尺寸的主滚动视口 `.main-scroll-host` 指定独立名称 `rk-route-content`，只有它淡出/淡入；切忌重新把整个 `root` 指到高度随内容变化的 `.page-transition`。
+- **共享元素：** `web/src/shared-view-transition.ts` 按资源类型和不可变 ID 生成**稳定名称**，列表、最近访问、搜索、归档、面包屑和详情均命名；不能依赖本次点击，否则浏览器后退/前进不触发共享动画。持久侧栏树不参与单独命名，以免和正文列表同一资源重名导致整次过渡跳过；搜索重复结果仅给首条命名。未匹配的旧快照通过 `::view-transition-old(*):only-child` 立即隐藏，只有真正匹配的前后标题执行位置变形；回归需在 `ViewTransition.updateCallbackDone` 阶段核对旧/新 ID 和边界框。
 - **文件名与 H1：** Markdown 首块 H1 独立于数据库文件名。当正文存在提升后的 H1，列表文件名只过渡到工作台顶部的文件标识；没有提升后的 H1 时才过渡到编辑标题。参考 `web/src/record-workbench.tsx`。
-- **局部效果：** 检查器 Tab 指示条采用 Motion Layout，编辑器视图切换、侧栏折叠与块拖拽继续使用原有专用动画，避免整个编辑器反复截图。样式位于所属模块；所有动画遵守 `prefers-reduced-motion`。
-- **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check` 和 `node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs`（后者只运行在隔离本地 Worker/D1）。
+- **页面就绪：** `router.tsx` 不再使用旧的 600ms 预热截止时间。关键路由 loader 必须在提交前准备好首屏查询和懒加载组件；文档额外预加载编辑器，任务列表额外加载任务项。慢网络时保留旧页面及导航进度，不得把 Skeleton / Suspense fallback 捕获到新页面快照中；加载失败仍由原有页面错误组件处理。**局部效果：** 检查器 Tab 用 Motion Layout，编辑器模式、侧栏折叠、块拖动继续使用专用动画，所有效果遵守 `prefers-reduced-motion`。
+- **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check`、`node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs`。E2E 使用隔离的本地 Worker/D1，覆盖真实快照、双向历史、导航栏、手机视口与 1.7 秒延迟 API。WebKit 可用 `RECALLOOM_TEST_ENGINE=webkit`，独立手机会话再设置 `RECALLOOM_TEST_MOBILE=1`；本地 HTTP 不支持生产的 `__Host-` 安全 Cookie，测试脚本仅在回环地址转发本地会话，请勿将此处理加入线上代码。
 
 ## 边界原则
 

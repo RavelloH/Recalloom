@@ -1,6 +1,5 @@
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useRouterState} from '@tanstack/react-router';
-import {clearSharedTransition,hasPendingSharedTransition} from './shared-view-transition';
 
 /** Route presentation never blocks navigation, loaders or unsaved-draft guards.
  * A brief enter animation begins only after the destination is committed.
@@ -20,10 +19,8 @@ export function PageTransition({children,scrollTarget}:{children:React.ReactNode
   lastPath.current=pathname;
   scrollTarget()?.scrollTo({top:0,left:0});
   clearTimeout(timer.current);
-  // Router owns the native animation; never layer the legacy entrance on it.
-  // The source selection survives long enough for the destination snapshot.
-  const selected=hasPendingSharedTransition();
-  if(selected)setTimeout(clearSharedTransition,650);
+  // Native navigation runs for forward and history transitions; never layer
+  // the legacy route entrance on the browser's own snapshot animation.
   if(reduced()||typeof document.startViewTransition==='function'){setPhase('idle');return;}
   setPhase('enter');
   timer.current=setTimeout(()=>setPhase('idle'),ENTER_MS);

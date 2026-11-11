@@ -151,35 +151,55 @@ to {
 }
 }
 
-/* The browser's "root" image is reassigned to .page-transition.
-   Thus persistent navigation never double-renders. Only the clicked label
-   has a separate shared image; all other content stays in the route frame. */
-::view-transition-group(*) {
-  animation-duration: 320ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* The frame does not change geometry: document heights differ greatly. */
-::view-transition-group(root) {
+/* The root snapshot includes only the persistent shell/background.
+   Do not crossfade it: that would make the header and bottom nav blink.
+   The fixed-size main scroll viewport owns the content transition. */
+::view-transition-group(root),
+::view-transition-group(rk-route-content) {
   animation: none;
 }
 
-/* Never show readable old and new copies of the same text simultaneously. */
-::view-transition-old(*) {
-  animation: 145ms ease-in both rk-view-exit;
+::view-transition-old(root),
+::view-transition-new(root) {
+  /* Both persistent shell snapshots remain fully opaque. Keeping the old
+     shell visible until the new one is captured prevents WebKit blank frames
+     during async navigation. Only rk-route-content fades. */
+  animation: none;
+  opacity: 1;
+}
+
+::view-transition-old(rk-route-content) {
+  animation: 130ms ease-in both rk-view-exit;
+}
+
+::view-transition-new(rk-route-content) {
+  animation: 175ms 105ms ease-out both rk-view-enter;
+}
+
+/* Stable resource identities can exist in a list without a match on the
+   other page. Remove orphaned snapshots immediately to prevent ghost text.
+   A matched pair still gets the native geometry morph and split fade. */
+::view-transition-group(*) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation: 140ms ease-in both rk-view-exit;
 }
 
 ::view-transition-new(*) {
-  animation: 165ms 140ms ease-out both rk-view-enter;
+  animation: 160ms 125ms ease-out both rk-view-enter;
 }
 
-/* Route body crossfade only (not page title/hero, and not persistent shell). */
-::view-transition-old(root) {
-  animation: 110ms ease-in both rk-view-exit;
+::view-transition-old(*):only-child {
+  animation: none;
+  opacity: 0;
 }
 
-::view-transition-new(root) {
-  animation: 175ms 95ms ease-out both rk-view-enter;
+::view-transition-new(*):only-child {
+  animation: 130ms ease-out both rk-view-enter;
 }
 
 @keyframes rk-view-exit {
