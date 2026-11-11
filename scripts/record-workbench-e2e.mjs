@@ -58,10 +58,19 @@ try{
  await inspector.getByRole('textbox',{name:'新标签'}).fill('Workbench');
  await page.keyboard.press('Enter');
  await header.getByText('workbench',{exact:true}).waitFor();
- const tagStyle=await header.locator('.workbench-summary-tag').first().evaluate(el=>({
-  background:getComputedStyle(el).backgroundColor,radius:parseFloat(getComputedStyle(el).borderTopLeftRadius)
- }));
- assert.ok(tagStyle.background!=='rgba(0, 0, 0, 0)'&&tagStyle.radius>=6,'Tags need a rounded visible background');
+ const tagStyle=await header.locator('.workbench-summary-tag').first().evaluate(el=>{
+  const swatch=document.createElement('span');swatch.style.background='var(--rk-canvas)';document.body.appendChild(swatch);
+  const result={background:getComputedStyle(el).backgroundColor,canvas:getComputedStyle(swatch).backgroundColor,
+   radius:parseFloat(getComputedStyle(el).borderTopLeftRadius),border:parseFloat(getComputedStyle(el).borderTopWidth)};
+  swatch.remove();return result;
+ });
+ const channels=color=>{
+  if(color.startsWith('color(srgb '))return color.slice('color(srgb '.length).split(/[ )/]/).filter(Boolean).slice(0,3).map(v=>Number(v)*255);
+  return color.replace(/^rgba?\(/,'').split(',').slice(0,3).map(v=>parseFloat(v));
+ };
+ const contrast=Math.max(...channels(tagStyle.background).map((v,i)=>Math.abs(v-channels(tagStyle.canvas)[i])));
+ assert.ok(tagStyle.background!=='rgba(0, 0, 0, 0)'&&tagStyle.radius>=6&&tagStyle.border>=1&&contrast>=10,
+  'Tags must have a visibly distinct filled background: '+JSON.stringify({...tagStyle,contrast}));
  assert.equal(await header.locator('.workbench-tag-line').count(),1,'Tags should occupy their own optional row');
  assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'grid','Metadata details button should align at the far right');
  await inspector.getByRole('tab',{name:'关联'}).click();
@@ -125,6 +134,13 @@ try{
   height:document.querySelector('.workbench-header')?.getBoundingClientRect().height??0}));
  assert.ok(narrow.width<=narrow.viewport+1,'Dark 320px document overflows: '+JSON.stringify(narrow));
  assert.ok(narrow.height<245,'Narrow document header occupies too much space: '+JSON.stringify(narrow));
+ const darkTag=await header.locator('.workbench-summary-tag').first().evaluate(el=>{
+  const swatch=document.createElement('span');swatch.style.background='var(--rk-canvas)';document.body.appendChild(swatch);
+  const result={background:getComputedStyle(el).backgroundColor,canvas:getComputedStyle(swatch).backgroundColor};
+  swatch.remove();return result;
+ });
+ const darkContrast=Math.max(...channels(darkTag.background).map((v,i)=>Math.abs(v-channels(darkTag.canvas)[i])));
+ assert.ok(darkContrast>=10,'Dark-mode tag must have an evident background: '+JSON.stringify({...darkTag,darkContrast}));
  await page.screenshot({path:'tmp/workbench-dark-320.png'});
  console.log('PASS 320px dark-mode Workbench, no horizontal overflow');
  assert.deepEqual(errors,[],'Browser runtime errors');

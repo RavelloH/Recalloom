@@ -15,6 +15,7 @@ export type PromotedHeading={
  title:string;
  before:string;
  headingSource:string;
+ attributeSuffix:string;
  separator:string;
 };
 
@@ -34,9 +35,13 @@ export function leadingDocumentHeading(markdown:string):PromotedHeading|null{
  const start=first.position?.start?.offset,end=first.position?.end?.offset;
  if(start===undefined||end===undefined)return null;
  const remainder=markdown.slice(end);
+ const headingSource=markdown.slice(start,end);
+ // RMD block attributes may appear after an H1, but are control syntax,
+ // not part of the human-readable page title. Keep them in stored Markdown.
+ const attributeSuffix=/(\s+@\s*attrs\b[^@\r\n]*@\s*)$/i.exec(headingSource)?.[1]??'';
  const separator=/^(?:\r?\n)+/.exec(remainder)?.[0]??'';
- return {title:plainText(first).replace(/\s+/g,' ').trim(),
-  before:markdown.slice(0,start),headingSource:markdown.slice(start,end),separator};
+ const title=plainText(first).replace(/\s+@\s*attrs\b[^@\r\n]*@\s*$/i,'').replace(/\s+/g,' ').trim();
+ return {title,before:markdown.slice(0,start),headingSource,attributeSuffix,separator};
 }
 
 export function headingPrefix(frame:PromotedHeading):string{
@@ -62,7 +67,7 @@ export function withDocumentBody(frame:PromotedHeading|null,body:string):string{
 export function renameDocumentHeading(frame:PromotedHeading,title:string):PromotedHeading{
  // Only the heading block is rewritten. All preceding whitespace, separators,
  // remaining body text, and file metadata keep their original identity.
- return {...frame,title,headingSource:'# '+title};
+ return {...frame,title,headingSource:'# '+title+frame.attributeSuffix};
 }
 
 /** Counts visible Unicode characters, rather than whitespace or Markdown delimiters.

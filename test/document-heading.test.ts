@@ -18,6 +18,22 @@ test('only the first top-level H1 qualifies as the document title',()=>{
  assert.equal(leadingDocumentHeading('Setext title\n============\n\nBody')?.title,'Setext title');
 });
 
+test('RMD H1 attributes stay in Markdown but never leak into the page title',()=>{
+ for(const [source,suffix] of [
+  ['# 我的标题 @ attrs stable-heading @',' @ attrs stable-heading @'],
+  ['# **Important** @ attrs | id=top-title | align=center @',' @ attrs | id=top-title | align=center @']
+ ]){
+  const markdown=source+'\n\n正文';
+  const promoted=leadingDocumentHeading(markdown);
+  assert.ok(promoted);
+  assert.equal(promoted.title,source.includes('我的标题')?'我的标题':'Important');
+  assert.equal(promoted.attributeSuffix,suffix);
+  assert.equal(displayedDocumentBody(markdown,promoted),'正文');
+  const renamed=renameDocumentHeading(promoted,'重命名标题');
+  assert.equal(withDocumentBody(renamed,'正文'),'# 重命名标题'+suffix+'\n\n正文');
+ }
+});
+
 test('promoted headings are hidden only in the presentation, never removed from source',()=>{
  const original='# Top title\r\n\r\nBody with # literal\r\n\r\n## Secondary';
  const first=leadingDocumentHeading(original);

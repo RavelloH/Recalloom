@@ -74,11 +74,18 @@ try{
  await bubble.getByRole('button',{name:'标题'}).hover();
  const menu=p.getByRole('menu',{name:'标题'});
  await menu.waitFor();
+ const openMotion=await menu.evaluate(el=>({state:el.dataset.state,animation:getComputedStyle(el).animationName,duration:getComputedStyle(el).animationDuration}));
+ assert.equal(openMotion.state,'open');
+ assert.ok(openMotion.animation.includes('rk-inline-menu-enter')&&openMotion.duration!=='0s','Desktop menu should animate opening '+JSON.stringify(openMotion));
  const menuWidth=await menu.evaluate(el=>el.getBoundingClientRect().width);
  assert.ok(menuWidth<=219,'Popup should not be excessively wide: '+menuWidth);
- await line.hover();
- await menu.waitFor({state:'hidden'});
- console.log('PASS desktop: exact order, full-height group separators, centered visible icons, yellow H and hover close');
+ await p.keyboard.press('Escape'); // deterministic close while the hover menu is mounted
+ const desktopClosing=p.locator('.rk-inline-popover[data-state="closing"]');
+ await desktopClosing.waitFor({state:'attached'});
+ const closeMotion=await desktopClosing.evaluate(el=>({animation:getComputedStyle(el).animationName,pointer:getComputedStyle(el).pointerEvents}));
+ assert.ok(closeMotion.animation.includes('rk-inline-menu-exit')&&closeMotion.pointer==='none','Desktop menu must animate a pointer-inert exit '+JSON.stringify(closeMotion));
+ await desktopClosing.waitFor({state:'detached'});
+ console.log('PASS desktop: exact order, full-height group separators, centered icons, animated hover dropdown');
 
  for(const width of [390,320,1024]){
   const ctx=await browser.newContext({viewport:{width,height:width===1024?768:844},isMobile:true,hasTouch:true});
@@ -99,6 +106,15 @@ try{
      mask:getComputedStyle(viewport).maskImage};
    });
    assert.ok(first.overflowing&&first.end&&!first.start,'Expected right-side scroll hint on touch '+JSON.stringify(first));
+   const surface=await host.evaluate(el=>({
+    background:getComputedStyle(el).backgroundColor,
+    toolbar:getComputedStyle(el.querySelector('.wysiwyg-toolbar')).backgroundColor,
+    start:getComputedStyle(el,'::before').backgroundImage,
+    end:getComputedStyle(el,'::after').backgroundImage
+   }));
+   assert.equal(surface.background,surface.toolbar,'Scroll fades must sit on the exact toolbar background');
+   assert.ok(surface.start.includes(surface.background)&&surface.end.includes(surface.background),
+    'Both fade gradients must start with the exact toolbar surface color '+JSON.stringify(surface));
    await toolbar.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.dispatchEvent(new Event('scroll'));});
    await page.waitForFunction(()=>document.querySelector('.rk-editor-format-scroll')?.hasAttribute('data-edge-start'));
    const last=await host.evaluate(el=>({
@@ -116,15 +132,25 @@ try{
    assert.ok(bounds.head&&bounds.popup&&(
     bounds.popup.top>=bounds.head.bottom+3||bounds.popup.bottom<=bounds.head.top-3),
     'Touch popup must not overlap its trigger '+JSON.stringify(bounds));
-   await head.tap();await menu.waitFor({state:'hidden'});
+   await head.tap();
+   const touchClosing=page.locator('.rk-inline-popover[data-state="closing"]');
+   await touchClosing.waitFor({state:'attached'});
+   const touchMotion=await touchClosing.evaluate(el=>({animation:getComputedStyle(el).animationName,pointer:getComputedStyle(el).pointerEvents}));
+   assert.ok(touchMotion.animation.includes('rk-inline-menu-exit')&&touchMotion.pointer==='none',
+    'Touch menu should animate out without intercepting taps '+JSON.stringify(touchMotion));
+   await touchClosing.waitFor({state:'detached'});
    await head.tap();await menu.waitFor();
    await page.locator('.workbench-header').tap();await menu.waitFor({state:'hidden'});
    const metrics=await page.evaluate(()=>({
     viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
     actions:document.querySelector('.record-main .editor-topline')?.getBoundingClientRect().toJSON(),
     group:document.querySelector('.record-main .editor-view-switcher')?.getBoundingClientRect().toJSON(),
-    icons:document.querySelector('.record-main .editor-view-actions')?.getBoundingClientRect().toJSON()
+    icons:document.querySelector('.record-main .editor-view-actions')?.getBoundingClientRect().toJSON(),
+    switcherStyle:(()=>{const el=document.querySelector('.record-main .editor-view-switcher');if(!el)return null;
+     const s=getComputedStyle(el);return {padding:s.paddingTop,border:s.borderTopWidth};})()
    }));
+   if(width<=390)assert.ok(metrics.switcherStyle?.border==='1px'&&metrics.switcherStyle.padding==='0px',
+    'Mode switcher must have a direct outer border without extra padding '+JSON.stringify(metrics));
    assert.ok(metrics.scrollWidth<=metrics.viewport+1,'Mobile root overflow '+JSON.stringify(metrics));
    if(width<=390){
     assert.ok(metrics.group&&metrics.icons&&metrics.group.right<=metrics.icons.left+2,
@@ -139,7 +165,23 @@ try{
    assert.ok(scrollbar.length>0&&scrollbar.every(bar=>bar.hidden||Number(bar.opacity)<0.15),
     'JS scrollbar must auto-hide at rest '+JSON.stringify(scrollbar));
    await page.screenshot({path:'tmp/editor-toolbar-new-'+width+'.png'});
-   console.log('PASS touch '+width+': OverlayScroll, edge hints, auto-hide, click toggle, outside dismiss, compact modes');
+   if(width===390){
+    await page.emulateMedia({colorScheme:'dark'});
+    await page.waitForFunction(()=>document.documentElement.dataset.effectiveTheme==='dark');
+    const darkSurface=await host.evaluate(el=>{
+     const target=el.querySelector('.wysiwyg-toolbar');
+     return {
+      host:getComputedStyle(el).backgroundColor,
+      toolbar:getComputedStyle(target).backgroundColor,
+      start:getComputedStyle(el,'::before').backgroundImage,
+      end:getComputedStyle(el,'::after').backgroundImage
+     };
+    });
+    assert.ok(darkSurface.host===darkSurface.toolbar&&darkSurface.start.includes(darkSurface.toolbar)&&darkSurface.end.includes(darkSurface.toolbar),
+     'Dark toolbar fades must match the actual dark canvas '+JSON.stringify(darkSurface));
+    await page.screenshot({path:'tmp/editor-toolbar-dark-390.png'});
+   }
+   console.log('PASS touch '+width+': OverlayScroll, edge hints, dark/light fades, auto-hide, animated click dropdown, compact modes');
   }finally{await ctx.close();}
  }
  assert.deepEqual(errors,[],'No browser runtime errors');

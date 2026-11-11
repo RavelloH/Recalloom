@@ -126,6 +126,16 @@ to {
 }
 }
 
+@keyframes rk-inline-menu-enter {
+  from {opacity:0;transform:translateY(5px) scale(.985);filter:blur(1px);}
+  to {opacity:1;transform:translateY(0) scale(1);filter:blur(0);}
+}
+
+@keyframes rk-inline-menu-exit {
+  from {opacity:1;transform:translateY(0) scale(1);}
+  to {opacity:0;transform:translateY(-3px) scale(.985);}
+}
+
 @keyframes rk-route-enter {
 
 from {

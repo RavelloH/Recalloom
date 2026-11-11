@@ -61,6 +61,13 @@ try{
  const inspector=page.getByRole('dialog',{name:'文档检查器'});
  await inspector.waitFor();
  const filename=inspector.getByRole('textbox',{name:'文件名'});
+ const filenameStyle=await filename.evaluate(el=>({tag:el.tagName,background:getComputedStyle(el).backgroundColor,border:parseFloat(getComputedStyle(el).borderTopWidth)}));
+ assert.equal(filenameStyle.tag,'INPUT','Filename must be a real text input');
+ assert.ok(filenameStyle.border>=1&&filenameStyle.background!=='rgba(0, 0, 0, 0)','Filename must look like an input even when idle');
+ await filename.fill('Cancelled filename');
+ await filename.press('Escape');
+ assert.equal(await filename.inputValue(),'Renamed file');
+ assert.equal((await read(pure.id)).name,'Renamed file','Escape must not rename the document');
  await filename.fill('New name from details');
  await filename.press('Enter');
  await filename.waitFor({state:'visible'});
@@ -103,6 +110,17 @@ try{
  }
  assert.equal(await page.locator('.tiptap h1').count(),0,'Promoted H1 should not appear in visual editor');
  console.log('PASS opening H1, no duplication in three modes, H1 source edits and filename independent');
+
+ const attributed=await create('h1-with-attrs','# 顶部标题 @ attrs stable-heading @\n\n正文段落');
+ await open(attributed.id);
+ await topTitle().getByText('顶部标题',{exact:true}).waitFor();
+ assert.equal((await topTitle().innerText()).trim(),'顶部标题','H1 RMD control syntax must not appear in header');
+ assert.equal(await page.locator('.cm-content').getByText('stable-heading').count(),0,'Promoted attribute syntax remains out of the body');
+ await editTop('已修改的 H1');
+ await save();
+ assert.equal((await read(attributed.id)).content,'# 已修改的 H1 @ attrs stable-heading @\n\n正文段落','Title edit must preserve H1 attribute metadata in Markdown');
+ assert.equal((await read(attributed.id)).name,'h1-with-attrs');
+ console.log('PASS H1 attributes hidden from title and retained in saved Markdown');
 
  const delayed=await create('first-block-delayed','Body original');
  await open(delayed.id);

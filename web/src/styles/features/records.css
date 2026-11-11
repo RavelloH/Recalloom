@@ -450,9 +450,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: 7px;
+  border: 1px solid var(--rk-border-soft);
+  border-radius: 8px;
   padding: 4px 9px;
-  background: var(--color-background-muted, rgba(128,128,128,.09));
+  background: color-mix(in srgb, var(--color-text-primary, #222) 12%, var(--rk-canvas));
   color: var(--color-text-primary);
   font-size: var(--rk-font-label);
 }
@@ -494,11 +495,12 @@
   display: block;
   width: 100%;
   min-width: 0;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
+  border: 1px solid var(--rk-border-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-text-primary, #222) 4%, var(--rk-canvas));
   color: var(--color-text-primary);
-  padding: 5px 7px;
+  padding: 7px 9px;
+  appearance: none;
   font: inherit;
   line-height: 1.5;
 }

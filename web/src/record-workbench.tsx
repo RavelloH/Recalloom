@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
@@ -33,8 +33,10 @@ const displayFileName=(name:string)=>/\.md$/i.test(name)?name:name+'.md';
 
 function FilenameField({name,onRename}:{name:string;onRename:(value:string)=>Promise<void>}){
  const [value,setValue]=useState(name),[error,setError]=useState(''),[pending,setPending]=useState(false);
+ const cancelOnBlur=useRef(false);
  useEffect(()=>setValue(name),[name]);
  const commit=async()=>{
+  if(cancelOnBlur.current){cancelOnBlur.current=false;return;}
   const next=value.trim();
   if(next===name)return;
   if(!next||next.length>180||/[\\/]/.test(next)){
@@ -45,12 +47,12 @@ function FilenameField({name,onRename}:{name:string;onRename:(value:string)=>Pro
   finally{setPending(false);}
  };
  return <div className="workbench-filename-field">
-  <input aria-label="文件名" className="workbench-filename-input" value={value} disabled={pending}
+  <input type="text" aria-label="文件名" className="workbench-filename-input" value={value} disabled={pending} spellCheck={false}
    onChange={event=>setValue(event.target.value)}
    onBlur={()=>void commit()} onKeyDown={event=>{
     if(event.nativeEvent.isComposing)return;
     if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}
-    if(event.key==='Escape'){setValue(name);event.currentTarget.blur();}
+    if(event.key==='Escape'){event.preventDefault();cancelOnBlur.current=true;setError('');setValue(name);event.currentTarget.blur();}
    }}/>
   {error&&<span role="alert" className="page-title-error">{error}</span>}
  </div>;

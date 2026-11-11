@@ -430,7 +430,12 @@
   background: var(--rk-popover,var(--color-background-popover,#fff));
   color: var(--color-text-primary);
   box-shadow: var(--rk-pop-shadow,0 8px 28px rgba(0,0,0,.14));
-  animation: rk-popover-appear .16s cubic-bezier(.2,.8,.2,1) both;
+  transform-origin:top center;
+  animation: rk-inline-menu-enter 170ms var(--rk-ease-out) both;
+}
+.rk-inline-popover[data-state="closing"] {
+  pointer-events:none;
+  animation:rk-inline-menu-exit 150ms ease-in both;
 }
 
 .rk-inline-popover-item {

@@ -26,6 +26,9 @@ const create=async()=>{
  assert.equal(r.status,201);
  await page.goto(base+'/records/'+r.data.id+'?mode=visual');
  await page.locator('.tiptap').waitFor();
+ // The mounted Tiptap DOM precedes the headless browser's portaled context
+ // menu positioning/transition readiness after a full document navigation.
+ await page.waitForTimeout(700);
 };
 const menu=()=>page.getByRole('menu',{name:'编辑器右键菜单'});
 const source=async()=>{
