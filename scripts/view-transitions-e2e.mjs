@@ -131,6 +131,18 @@ try{
  const promoted=await create('/records',{name:'1 With heading '+suffix,kind:'document',folderId:folder.id,content:'# Promoted content title\n\nBody text.\n'});
  const task=await create('/records',{name:'2 RMD task list '+suffix,kind:'task_list',folderId:folder.id,content:''});
  const nested=await create('/folders',{name:'3 Journal '+suffix,parentId:folder.id});
+ const animationFolder=await create('/folders',{name:'4 Tree animation '+suffix});
+ await create('/folders',{name:'Child of animation folder '+suffix,parentId:animationFolder.id});
+ // A real task and activity rows let the refresh regression assert that the
+ // page mounts final content directly, without a second animated resize.
+ await page.evaluate(async recordId=>{
+  const revisionResponse=await fetch('/api/records/'+recordId+'?metadataOnly=true');
+  const {revision}=await revisionResponse.json();
+  const result=await fetch('/api/tasks/mutate',{method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({action:'add',recordId,expectedRevision:revision,
+    changes:{title:'Route stability test task',status:'todo',priority:3}})});
+  if(!result.ok)throw Error('Failed to prepare a task for the refresh regression: '+await result.text());
+ },task.id);
 
  await page.goto(base+'/library');
  const folderRow=page.locator('.file-row').filter({hasText:folder.name});
@@ -276,6 +288,115 @@ try{
  await page.waitForURL(/\/search\?/);
  await hit.waitFor();
  await assertRouteTransition(before);
+
+ // Cold refreshes should not animate data-loading states as a second page
+ // swap: the final rows must be direct children, as on the archive route.
+ if(!mobileRun){
+  const requests=[];
+  const recordRequest=request=>{
+   const {pathname}=new URL(request.url());
+   if(pathname==='/api/tasks'||pathname==='/api/activity')requests.push(pathname);
+  };
+  page.on('request',recordRequest);
+  await page.goto(base+'/');
+  await page.locator('.home-card > .compact-row').first().waitFor();
+  await page.locator('.home-card > .recent-entry').first().waitFor();
+  assert.equal(await page.locator('.home-card > .compact-row').count()>0,true,'home tasks must render without a secondary animated wrapper');
+  assert.equal(await page.locator('.home-card > .recent-entry').count()>0,true,'home activity must render without a secondary animated wrapper');
+  await page.waitForTimeout(400);
+  assert.equal(requests.filter(path=>path==='/api/tasks').length,1,'home must load tasks only once');
+  assert.equal(requests.filter(path=>path==='/api/activity').length,1,'home must load activity only once');
+  page.off('request',recordRequest);
+
+  await page.goto(base+'/tasks');
+  await page.locator('.page > .task-list .task-item').first().waitFor();
+  const taskRequests=[];
+  const spyTasks=request=>{
+   if(new URL(request.url()).pathname==='/api/tasks')taskRequests.push(request.url());
+  };
+  page.on('request',spyTasks);
+  await page.reload();
+  await page.locator('.page > .task-list .task-item').first().waitFor();
+  await page.waitForTimeout(350);
+  page.off('request',spyTasks);
+  assert.equal(taskRequests.length,1,'task page refresh must request its items only once');
+
+  await page.goto(base+'/activity');
+  await page.locator('.page > .activity-list').waitFor();
+  const activityRequests=[];
+  const spyActivity=request=>{
+   if(new URL(request.url()).pathname==='/api/activity')activityRequests.push(request.url());
+  };
+  page.on('request',spyActivity);
+  await page.reload();
+  await page.locator('.page > .activity-list').waitFor();
+  await page.waitForTimeout(350);
+  page.off('request',spyActivity);
+  assert.equal(activityRequests.length,1,'activity page refresh must request its items only once');
+
+  // Archive is the baseline: it never owned an animated data-state wrapper.
+  await page.goto(base+'/archive');
+  await page.getByRole('heading',{name:'归档',level:1}).waitFor();
+  await page.reload();
+  await page.getByRole('heading',{name:'归档',level:1}).waitFor();
+
+  // A newly opened sidebar folder must stay collapsed while its children
+  // fetch, then animate its real rows. Closing retains DOM until the grid
+  // transition finishes; restored open folders follow the same path.
+  await page.goto(base+'/');
+  const toggle=page.getByRole('button',{name:'展开 '+animationFolder.name});
+  await toggle.waitFor();
+  // Anchor to the stable row, not a toggle whose accessible name changes on click.
+  const branch=page.locator('.page-tree .tree-row').filter({hasText:animationFolder.name}).first()
+   .locator('xpath=following-sibling::div[contains(@class,"tree-branch-region")]');
+  let delayedBrowse=false;
+  await page.route('**/api/folders?*',async route=>{
+   if(new URL(route.request().url()).searchParams.get('parentId')!==animationFolder.id){await route.fallback();return;}
+   delayedBrowse=true;
+   await new Promise(resolve=>setTimeout(resolve,700));
+   // Keep the WebKit loopback session cookie handler in the routing chain.
+   await route.fallback();
+  });
+  await toggle.click();
+  await page.waitForTimeout(180);
+  assert.equal(delayedBrowse,true,'tree folder API should be delayed by the fixture');
+  assert.equal(await branch.getAttribute('data-loading'),'true','folder should indicate pending data');
+  assert.equal(await branch.getAttribute('data-visible'),'false','folder must not expand a temporary loader row');
+  assert.equal(await branch.locator('ul.tree-list').count(),0,'folder children must wait for data');
+  await page.waitForFunction(name=>{
+   const button=[...document.querySelectorAll('.tree-toggle')].find(el=>el.getAttribute('aria-label')==='收起 '+name);
+   return button?.parentElement?.nextElementSibling?.getAttribute('data-visible')==='true';
+  },animationFolder.name);
+  await branch.locator('.tree-list').first().waitFor({state:'attached'});
+  await page.waitForTimeout(300);
+  const treeMetrics=await branch.evaluate(el=>{
+   const inner=el.querySelector('.tree-branch-inner'),list=el.querySelector('.tree-list');
+   const rect=node=>node?{y:node.getBoundingClientRect().y,height:node.getBoundingClientRect().height}:null;
+   return {visible:el.dataset.visible,grid:getComputedStyle(el).gridTemplateRows,
+    opacity:getComputedStyle(el).opacity,outer:rect(el),inner:rect(inner),list:rect(list)};
+  });
+  assert.ok(treeMetrics.outer.height>0,'folder content must be laid out after expansion: '+JSON.stringify(treeMetrics));
+  await page.getByRole('button',{name:'收起 '+animationFolder.name}).click();
+  await page.waitForTimeout(45);
+  assert.equal(await branch.getAttribute('data-visible'),'false');
+  assert.ok(await branch.locator('ul.tree-list').count()>0,'collapse must retain rows while the animation runs');
+  await page.waitForTimeout(310);
+  assert.equal(await branch.locator('ul.tree-list').count(),0,'collapsed children must be released after animation');
+
+  await page.getByRole('button',{name:'展开 '+animationFolder.name}).click();
+  await page.waitForFunction(name=>{
+   const button=[...document.querySelectorAll('.tree-toggle')].find(el=>el.getAttribute('aria-label')==='收起 '+name);
+   return button?.parentElement?.nextElementSibling?.getAttribute('data-visible')==='true';
+  },animationFolder.name);
+  await page.reload();
+  await page.getByRole('button',{name:'收起 '+animationFolder.name}).waitFor();
+  await page.waitForFunction(name=>{
+   const button=[...document.querySelectorAll('.tree-toggle')].find(el=>el.getAttribute('aria-label')==='收起 '+name);
+   return button?.parentElement?.nextElementSibling?.getAttribute('data-visible')==='true';
+  },animationFolder.name);
+  await branch.locator('ul.tree-list').first().waitFor();
+  await page.unroute('**/api/folders?*');
+ }
 
  // Mobile top/bottom shell stays live, outside the route snapshot, on WebKit.
  // Avoid resizing the active WebKit page in this regression test.

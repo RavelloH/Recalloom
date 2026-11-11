@@ -490,12 +490,14 @@ html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hove
   text-decoration: underline;
 }
 
-/* Tree errors do not require the entire Motion runtime in the app shell. */
+/* Keep the tree lightweight: children are prepared while collapsed, and
+   the actual list opens only after its query is ready. Closing keeps rows
+   mounted until the grid has finished shrinking, without a Motion bundle. */
 .tree-error-region,
 .tree-branch-region {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows var(--rk-motion-medium, 180ms) ease;
+  transition: grid-template-rows 220ms var(--rk-ease-out);
 }
 
 .tree-error-region[data-visible="true"],
@@ -504,9 +506,38 @@ html[data-effective-theme="dark"] .sidebar-footer button.nav-link.is-danger:hove
 .tree-error-inner,
 .tree-branch-inner { min-height: 0; overflow: hidden; }
 
+.tree-branch-region {
+  opacity: 0;
+  transition: grid-template-rows 220ms var(--rk-ease-out), opacity 170ms ease;
+}
+
+.tree-branch-region[data-visible="true"] { opacity: 1; }
+
+.tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle {
+  position: relative;
+}
+
+.tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle svg {
+  opacity: .25;
+}
+
+.tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle::after {
+  content: "";
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: rk-tree-loading 700ms linear infinite;
+}
+
+@keyframes rk-tree-loading { to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   .tree-error-region,
   .tree-branch-region { transition: none; }
+  .tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle::after { animation: none; }
 }
 
 .tree-error {
