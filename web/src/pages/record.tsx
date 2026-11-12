@@ -97,7 +97,7 @@ export function RecordPage(){
   ]}/>
  </>;
  const archiveNotice=item.status==='archived'
-  ?<Banner className="record-archive-banner" status="warning" container="section"
+  ?<Banner data-rk-record-notice="archive" status="warning" container="section"
     title="此记录已归档" description="已从知识库列表中隐藏，内容及历史版本仍完整保留。"
     endContent={<Button label="恢复为正常" size="sm" variant="secondary" onClick={()=>void updateMeta({status:'active'})}/>}/>
   :null;
@@ -119,7 +119,7 @@ export function RecordPage(){
     </Properties>
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice record-status-notices">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
   pageActions={pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>

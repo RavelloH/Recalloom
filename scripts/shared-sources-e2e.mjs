@@ -326,7 +326,7 @@ try{
  await archived.locator('a.archive-item-link').click();
  await recordPage(doc);
  await assertRouteTransition(before,{expectPair:true});
- const archiveBanner=page.locator('.record-main .record-status-notices .record-archive-banner');
+ const archiveBanner=page.locator('.record-main .doc-notice [data-rk-record-notice="archive"]');
  await archiveBanner.getByText('此记录已归档').waitFor();
  await archiveBanner.getByRole('button',{name:'恢复为正常'}).waitFor();
  assert.equal(await page.locator('.record-page > .doc-notice').count(),0,
@@ -334,32 +334,27 @@ try{
  const noticeGeometry=await page.evaluate(()=>{
   const rect=selector=>document.querySelector(selector)?.getBoundingClientRect();
   const heading=rect('.workbench-header'),modes=rect('.editor-topline'),
-   notice=rect('.record-archive-banner'),body=rect('.editor-body');
-  const surface=document.querySelector('.record-archive-banner .astryx-banner');
+   notice=rect('[data-rk-record-notice="archive"]'),body=rect('.editor-body');
+  const native=document.querySelector('[data-rk-record-notice="archive"] .astryx-banner');
   return {headerBottom:heading.bottom,modeBottom:modes.bottom,
    noticeTop:notice.top,noticeBottom:notice.bottom,bodyTop:body.top,
    noticeWidth:notice.width,viewportWidth:document.querySelector('.main-scroll').clientWidth,
-   layout:getComputedStyle(surface).display,
-   columns:getComputedStyle(surface).gridTemplateColumns};
+   nativeBanner:Boolean(native)};
  });
  assert.ok(noticeGeometry.noticeTop>=Math.max(noticeGeometry.headerBottom,noticeGeometry.modeBottom)-2,
   'archive status must live BELOW the title and mode controls: '+JSON.stringify(noticeGeometry));
  assert.ok(noticeGeometry.noticeBottom<=noticeGeometry.bodyTop+2,
   'archive status must precede editable content: '+JSON.stringify(noticeGeometry));
- assert.equal(noticeGeometry.layout,'grid','archive banner should use compact responsive layout');
+ assert.equal(noticeGeometry.nativeBanner,true,
+  'archived notice must use the native Astryx Banner structure');
  assert.ok(noticeGeometry.noticeWidth<=noticeGeometry.viewportWidth,
-  'archive banner must not overflow the mobile viewport');
+  'native Astryx Banner must not overflow the mobile viewport');
  if(mobileRun){
-  assert.equal(noticeGeometry.columns.trim().split(/\s+/).length,2,
-   'mobile archive status should place action on its own line: '+JSON.stringify(noticeGeometry));
   await page.screenshot({path:'tmp/record-archive-mobile-preview.png',fullPage:false});
   await page.emulateMedia({colorScheme:'dark'});
   await page.waitForTimeout(160);
   await page.screenshot({path:'tmp/record-archive-mobile-dark.png',fullPage:false});
  }
- const archiveActionBorder=await archiveBanner.getByRole('button',{name:'恢复为正常'}).evaluate(el=>
-  getComputedStyle(el).borderTopWidth);
- assert.ok(parseFloat(archiveActionBorder)>=1,'restore action must be visually identifiable as a button');
  console.log('PASS archived document notice follows header and modes ('+engine+')');
  before=await count();
  await page.goBack();
@@ -378,17 +373,17 @@ try{
  },taskList.id);
  await stableGoto(base+'/records/'+taskList.id);
  await page.locator('.record-page .doc-header').waitFor();
- const taskArchive=page.locator('.record-main .record-status-notices .record-archive-banner');
+ const taskArchive=page.locator('.record-main .doc-notice [data-rk-record-notice="archive"]');
  await taskArchive.getByText('此记录已归档').waitFor();
  assert.ok(await page.evaluate(()=>{
   const header=document.querySelector('.record-page .doc-header').getBoundingClientRect();
-  const notice=document.querySelector('.record-archive-banner').getBoundingClientRect();
+  const notice=document.querySelector('[data-rk-record-notice="archive"]').getBoundingClientRect();
   const tasks=document.querySelector('.embedded-tasks').getBoundingClientRect();
   return header.bottom<=notice.top+2&&notice.bottom<=tasks.top+2;
  }),'task-list status must follow record identity and precede tasks');
  await taskArchive.getByRole('button',{name:'恢复为正常'}).click();
  await taskArchive.waitFor({state:'detached'});
- assert.equal(await page.locator('.record-main .record-status-notices .record-archive-banner').count(),0);
+ assert.equal(await page.locator('.record-main .doc-notice [data-rk-record-notice="archive"]').count(),0);
  console.log('PASS task-list archive state and restore action without header displacement');
  assert.deepEqual(faults,[],'new navigation sources must not cause runtime errors; failed scripts='+JSON.stringify(failedScripts));
 }finally{await browser.close();}

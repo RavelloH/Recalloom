@@ -149,7 +149,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
     {pageActions}
    </div>
   </PageActions>
-  <AutoResizer><div className="doc-notice record-status-notices">
+  <AutoResizer><div className="doc-notice">
   {archiveNotice}
   {recoveryNotice&&usableRecovery&&<Banner status="info" container="section" title="已恢复本标签页未保存的草稿" description="草稿属于当前 Revision，保存后才会写入知识库。" endContent={<Button label="丢弃恢复的草稿" variant="secondary" size="sm" onClick={discardRecovered}/>}/>}
   {recoveryNotice&&staleRecovery&&<Banner status="warning" container="section" title="发现旧版本的未保存草稿" description={"草稿来自 R"+stored.revision+"，当前是 R"+item.revision+"。为避免覆盖其他客户端的更新，未自动恢复。"} endContent={<div className="row gap"><Button label="复制旧草稿" size="sm" onClick={()=>navigator.clipboard.writeText(stored.content)}/><Button label="丢弃旧草稿" size="sm" variant="secondary" onClick={()=>{clearSessionDraft(sessionId,item.id);setRecoveryNotice(false);}}/></div>}/>}
