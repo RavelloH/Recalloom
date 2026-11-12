@@ -23,6 +23,12 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  await page.goto(base+'/library');
+ // The editor-author query is independent of the record timestamp. Delay it
+ // to prove that no separator, dash or author label leaks during loading.
+ await page.route('**/api/records/*/editors',async route=>{
+  await new Promise(resolve=>setTimeout(resolve,1100));
+  await route.continue();
+ });
  const name='Knowledge Workbench '+Date.now();
  await page.getByRole('button',{name:'新建记录'}).click();
  await page.getByRole('textbox',{name:'名称'}).fill(name);
@@ -35,6 +41,64 @@ try{
  await header.getByText('Markdown 文档').waitFor();
  await header.getByText('R1',{exact:true}).waitFor();
  assert.ok((await page.locator('.crumbs').innerText()).includes(name),'Keep the file hierarchy in the global breadcrumb');
+ assert.equal(await header.locator('.workbench-editors').count(),0,'async editors must not show a loading placeholder');
+ assert.equal(await header.locator('.workbench-meta-separator').count(),1,'loading editors must not leave a stray separator');
+ await header.locator('.workbench-editors').getByText('本人（Web）').waitFor();
+ assert.equal(await header.locator('.workbench-meta-separator').count(),2,'resolved editors gain their separator');
+ assert.ok(await header.locator('.workbench-summary-resizer').count()>0,'metadata line must use AutoResizer');
+ const metaLabels=await header.locator('.workbench-summary-details').innerText();
+ assert.ok(metaLabels.indexOf(' 字')<metaLabels.indexOf('编辑者：'),'editor metadata should appear last');
+ await page.unroute('**/api/records/*/editors');
+ // All pages share one first-content baseline. At tablet widths editor
+ // controls stay in the document flow BELOW the header, while breadcrumbs
+ // stay in the anchored shell bar. Phones keep compact in-flow controls.
+ for(const width of [390,768,820,1000,1280,1440]){
+  await page.setViewportSize({width,height:900});
+  await page.waitForTimeout(100);
+  const geometry=await page.evaluate(()=>{
+   const box=selector=>{const el=document.querySelector(selector);if(!el)return null;
+    const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width};};
+   return {header:box('.workbench-header'),topbar:box('.topbar'),
+    actions:box('.editor-topline'),switcher:box('.editor-view-switcher'),
+    insideTopbar:Boolean(document.querySelector('.topbar .editor-topline')),
+    topbarPosition:getComputedStyle(document.querySelector('.topbar')).position};
+  });
+  const expectedTop=width<=720?52+20:width<=1000?92:96;
+  assert.ok(Math.abs(geometry.header.top-expectedTop)<=2,
+   'document header must align with the site-wide baseline: '+width+' '+JSON.stringify(geometry));
+  if(width>720&&width<=1200){
+   assert.equal(geometry.insideTopbar,false,'tablet editing toolbar must remain in flow');
+   assert.ok(geometry.actions.top>=geometry.header.bottom,'tablet toolbar must not overlap sticky topbar or header');
+   assert.equal(geometry.topbarPosition,'absolute','tablet breadcrumb shell stays anchored');
+  }else if(width>1200){
+   assert.equal(geometry.insideTopbar,true,'wide desktop actions stay in shell topbar');
+  }else{
+   assert.equal(geometry.insideTopbar,false);
+   assert.ok(geometry.switcher.width<=244,'phone mode switcher must have a bounded natural width');
+  }
+  if(width===768||width===1280){
+   const movement=await page.evaluate(async()=>{
+    const viewport=document.querySelector('.main-scroll');
+    const documentPage=document.querySelector('.record-page');
+    const topbar=document.querySelector('.topbar');
+    const header=document.querySelector('.workbench-header');
+    const beforeBar=topbar.getBoundingClientRect().top;
+    const beforeTitle=header.getBoundingClientRect().top;
+    const original=documentPage.style.minHeight;
+    documentPage.style.minHeight='1600px';
+    viewport.scrollTop=80;
+    await new Promise(requestAnimationFrame);
+    const barTravel=topbar.getBoundingClientRect().top-beforeBar;
+    const titleTravel=header.getBoundingClientRect().top-beforeTitle;
+    viewport.scrollTop=0;documentPage.style.minHeight=original;
+    await new Promise(requestAnimationFrame);
+    return {barTravel,titleTravel};
+   });
+   assert.ok(Math.abs(movement.barTravel)<=1,'contentful topbar must stay anchored while scrolling: '+JSON.stringify(movement));
+   assert.ok(Math.abs(movement.titleTravel+80)<=2,'document content must scroll independently: '+JSON.stringify(movement));
+  }
+ }
+ await page.setViewportSize({width:1440,height:900});
  await header.getByRole('button',{name:'详细信息'}).click();
  const inspector=page.getByRole('dialog',{name:'文档检查器'});
  await inspector.waitFor();

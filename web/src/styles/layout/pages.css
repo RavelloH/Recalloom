@@ -189,12 +189,12 @@
 
 .doc-header {
   box-sizing: content-box;
-  margin: 48px auto 0;
+  margin: 0 auto;
   padding: 0 var(--rk-doc-pad);
   max-width: none;
   padding-inline: 0;
   margin-inline: 0;
-  margin-top: 40px;
+  margin-top: 0;
 }
 
 @media (max-width: 1000px) {
@@ -273,7 +273,7 @@
 }
 
 .doc-header {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .page-actions-pinned {
@@ -305,24 +305,18 @@
 }
 }
 
-/* Keep a consistent top rhythm on desktop, even when no page-owned
-   breadcrumb portal exists. The space belongs to scrollable page content,
-   NOT to a fixed/empty topbar, so it scrolls away naturally.
-   Record/folder pages already reserve the same area for their overlay topbar. */
-@media (min-width: 721px) {
-
-.page,
-.page:is(.record-page, .folder-page) {
-  padding-top: 74px;
+/* Every page owns its top gap INSIDE its scrolling content. When the
+   shell topbar has no breadcrumb/actions, the gap naturally scrolls away;
+   when it has content the real topbar stays anchored above the viewport.
+   Do not stack a second document-header margin on this same reserved space. */
+@media (min-width: 1001px) {
+ .page, .page.record-page, .page.folder-page { padding-top: 96px; }
 }
-}
-
 @media (min-width: 721px) and (max-width: 1000px) {
-
-.page,
-.page:is(.record-page, .folder-page) {
-  padding-top: 70px;
+ .page, .page.record-page, .page.folder-page { padding-top: 92px; }
 }
+@media (max-width: 720px) {
+ .page, .page.record-page, .page.folder-page { padding-top: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

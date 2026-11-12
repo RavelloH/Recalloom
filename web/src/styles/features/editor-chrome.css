@@ -263,16 +263,18 @@
   gap:4px;
 }
 .record-page .record-main .editor-topline .editor-view-switcher {
-  flex:1 1 auto;
+  flex:0 1 auto;
   min-width:0;
+  max-width:244px;
 }
 .editor-topline .editor-view-switcher [role="group"] {
   display:flex;
-  width:100%;
-  justify-content:stretch;
+  width:max-content;
+  max-width:100%;
+  justify-content:flex-start;
 }
 .editor-topline .editor-view-switcher [role="group"] button {
-  flex:1 1 0;
+  flex:0 1 auto;
   min-width:0;
   padding-inline:5px;
   min-height:38px;
@@ -309,7 +311,11 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
   -webkit-backdrop-filter: none;
 }
 
-.rk-editor-format-scroll {
+.record-main .rk-editor-format-scroll {
+  /* The host must span the real screen edge; a negative margin alone keeps
+     its 100%-wide box one gutter short, moving the fade inward. */
+  inline-size:calc(100% + 2 * var(--rk-gutter));
+  max-inline-size:none;
   margin-inline:calc(-1 * var(--rk-gutter));
 }
 .rk-editor-format-scroll .wysiwyg-toolbar {

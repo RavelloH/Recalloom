@@ -294,8 +294,19 @@ try{
    await new Promise(requestAnimationFrame);
    return {top,moved};
   });
-  assert.equal(spacing.top,74,'home without a breadcrumb must reserve the same 46px header area');
+  assert.equal(spacing.top,96,'all desktop pages must share the preview/workbench first-content baseline');
   assert.ok(Math.abs(spacing.moved-80)<=2,'home top spacing must scroll away with the content');
+  // Ordinary routes and library folders use the same first-content baseline
+  // as document preview. Switching pages must not add another header margin.
+  for(const route of ['/','/tasks','/activity','/archive','/search','/settings','/library','/graph']){
+   await page.goto(base+route);
+   const heading=page.locator('.page > .page-header, .folder-page > .doc-header, .knowledge-graph-page > .graph-page-heading').first();
+   await heading.waitFor();
+   const top=await heading.evaluate(el=>el.getBoundingClientRect().top);
+   assert.ok(Math.abs(top-96)<=2,'inconsistent desktop first-content baseline '+route+': '+top);
+  }
+  await page.goto(base+'/');
+  await recent.waitFor();
  }
  const viewportBox=async()=>page.locator('.main-scroll-host').evaluate(el=>{
   const {x,y,width,height}=el.getBoundingClientRect();

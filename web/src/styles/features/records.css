@@ -388,7 +388,7 @@
 
 /* Document-only Knowledge Workbench. Task-list records keep their original header. */
 .record-page.workbench-document .workbench-header {
-  margin-top: 22px;
+  margin-top: 0;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--rk-border-soft);
 }
@@ -463,6 +463,10 @@
   font-size: var(--rk-font-label);
 }
 
+.workbench-document .workbench-summary-resizer {
+  width: 100%;
+  min-width: 0;
+}
 .workbench-document .workbench-summary-details {
   display: flex;
   flex-wrap: wrap;
@@ -474,6 +478,15 @@
 
 .workbench-document .workbench-meta-separator {
   color: var(--rk-ink-faint);
+}
+.workbench-document .workbench-editor-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+}
+.workbench-document .workbench-summary-details > span {
+  min-width: 0;
 }
 .workbench-document .workbench-editors {
   min-width: 0;
@@ -621,7 +634,7 @@
 
 @media (max-width: 720px) {
   .record-page.workbench-document .workbench-header {
-    margin-top: 10px;
+    margin-top: 0;
     padding-bottom: 14px;
   }
   .workbench-document .workbench-header .page-title {

@@ -10,6 +10,7 @@ import {ago,statusNames} from './pages/shared';
 import type {RecordDetail} from './types';
 import {sharedViewTransitionName} from './shared-view-transition';
 import {documentDisplayName} from './document-filename';
+import {AutoResizer,AutoTransition} from './motion-primitives';
 
 export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
 
@@ -34,7 +35,7 @@ export type DocumentPresentation={
 export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename,onDetails}:{
  item:RecordDetail;
  characters:number;
- editors:string[];
+ editors:string[]|null;
  focusTitle:boolean;
  onRename:(name:string)=>Promise<void>;
  onDetails:()=>void;
@@ -52,13 +53,19 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
    {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
   </div>}
   <div className="workbench-summary">
-   <div className="workbench-summary-details">
-    <time dateTime={item.updatedAt} title={item.updatedAt}>更新于 {ago(item.updatedAt)||'刚刚'}</time>
-    <span className="workbench-meta-separator" aria-hidden="true">·</span>
-    <span className="workbench-editors" title={editors.join('，')}>编辑者：{editors.length?editors.join('，'):'—'}</span>
-    <span className="workbench-meta-separator" aria-hidden="true">·</span>
-    <span className="workbench-character-count" aria-label={'字数 '+characters}>{characters.toLocaleString('zh-CN')} 字</span>
-   </div>
+   <AutoResizer className="workbench-summary-resizer">
+    <div className="workbench-summary-details">
+     <time dateTime={item.updatedAt} title={item.updatedAt}>更新于 {ago(item.updatedAt)||'刚刚'}</time>
+     <span className="workbench-meta-separator" aria-hidden="true">·</span>
+     <span className="workbench-character-count" aria-label={'字数 '+characters}>{characters.toLocaleString('zh-CN')} 字</span>
+     <AutoTransition as="span" transitionKey={editors===null?'loading':'ready'} duration={.2}>
+      {editors!==null&&<span className="workbench-editor-entry">
+       <span className="workbench-meta-separator" aria-hidden="true">·</span>
+       <span className="workbench-editors" title={editors.join('，')}>编辑者：{editors.length?editors.join('，'):'—'}</span>
+      </span>}
+     </AutoTransition>
+    </div>
+   </AutoResizer>
    <button type="button" className="workbench-details-trigger" onClick={onDetails}>
     详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
    </button>

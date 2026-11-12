@@ -100,7 +100,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
  <AutoResizer>{item.status==='archived'&&<div className="doc-notice"><Banner status="warning" container="section" title="此记录已归档" description="归档的记录不会显示在侧边栏中，内容和历史版本仍完整保留。" endContent={<Button label="恢复为正常" size="sm" variant="secondary" onClick={()=>void updateMeta({status:'active'})}/>}/></div>}</AutoResizer>
  {item.kind==='document'
   ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle}
-    characters={currentPresentation?.characters??0} editors={editorNames}
+    characters={currentPresentation?.characters??0} editors={editorsQuery.isSuccess?editorNames:null}
     onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}
     onDetails={()=>openInspector('details')}/>
   :<header className="doc-header">

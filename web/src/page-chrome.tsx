@@ -8,16 +8,21 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 
 import {ApiError,api} from './api';
 import {TopbarPortal} from './topbar-slot';
-import {useCompactLayout} from './use-media';
+import {useCompactLayout,useMediaQuery} from './use-media';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 
-/** Page actions live in the shell top bar on desktop. On phones the bar sits
- *  inline under the title, while `pinned` actions (save) stay in the top bar
- *  so they are never scrolled or wrapped out of reach. */
+/** Wide desktop actions belong to the shell topbar. Tablet widths keep the
+ * complete action row inline beneath the document title so it cannot collide
+ * with breadcrumbs; phones keep save actions pinned in the shell topbar. */
 export function PageActions({className='',children,pinned}:{className?:string;children:React.ReactNode;pinned?:React.ReactNode}){
  const compact=useCompactLayout();
+ const tabletActions=useMediaQuery('(max-width: 1200px)');
  const classes=('page-actions-bar '+className).trim();
- if(!compact)return <TopbarPortal slot="end"><div className={classes}>{children}{pinned}</div></TopbarPortal>;
+ if(!tabletActions)return <TopbarPortal slot="end"><div className={classes}>{children}{pinned}</div></TopbarPortal>;
+ // A tablet has an always-visible breadcrumb topbar but not enough width for
+ // both breadcrumbs and the full editor mode/action bar. Keep the latter in
+ // the document's scroll flow rather than covering the fixed topbar.
+ if(!compact)return <div className={classes}>{children}{pinned}</div>;
  return <>
   <div className={classes}>{children}</div>
   {pinned&&<TopbarPortal slot="end"><div className="page-actions-bar page-actions-pinned">{pinned}</div></TopbarPortal>}

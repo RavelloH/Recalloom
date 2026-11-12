@@ -106,6 +106,17 @@ try{
      mask:getComputedStyle(viewport).maskImage};
    });
    assert.ok(first.overflowing&&first.end&&!first.start,'Expected right-side scroll hint on touch '+JSON.stringify(first));
+   if(width<=390){
+    const edges=await host.evaluate(el=>{
+     const host=el.getBoundingClientRect();
+     const viewport=el.querySelector('.rk-scroll-viewport').getBoundingClientRect();
+     return {hostLeft:host.left,hostRight:host.right,viewportRight:viewport.right,
+      screenWidth:innerWidth,fadeStart:getComputedStyle(el,'::after').right};
+    });
+    assert.ok(Math.abs(edges.hostLeft)<=1&&Math.abs(edges.hostRight-edges.screenWidth)<=1&&
+     Math.abs(edges.viewportRight-edges.screenWidth)<=1,
+     'touch formatting toolbar fade must sit at the REAL screen edge: '+JSON.stringify(edges));
+   }
    const surface=await host.evaluate(el=>({
     background:getComputedStyle(el).backgroundColor,
     toolbar:getComputedStyle(el.querySelector('.wysiwyg-toolbar')).backgroundColor,
@@ -153,7 +164,18 @@ try{
    if(width<=390)assert.ok(metrics.switcherStyle?.outline==='1px'&&metrics.switcherStyle?.offset==='0px'&&metrics.switcherStyle.padding==='0px',
     'Mode switcher must ring the actual button group with no internal gap '+JSON.stringify(metrics));
    assert.ok(metrics.scrollWidth<=metrics.viewport+1,'Mobile root overflow '+JSON.stringify(metrics));
+   if(width===1024){
+    const tablet=await page.evaluate(()=>{
+     const bounds=selector=>document.querySelector(selector)?.getBoundingClientRect().toJSON();
+     return {header:bounds('.workbench-header'),actions:bounds('.editor-topline'),
+      inShell:Boolean(document.querySelector('.topbar .editor-topline'))};
+    });
+    assert.equal(tablet.inShell,false,'iPad edit controls must not overlap the anchored topbar');
+    assert.ok(tablet.actions.top>=tablet.header.bottom,'iPad editor controls belong below document header');
+   }
    if(width<=390){
+    assert.ok(metrics.group&&metrics.icons&&metrics.group.width<=244,
+     'phone view mode switcher must use its natural bounded width: '+JSON.stringify(metrics));
     assert.ok(metrics.group&&metrics.icons&&metrics.group.right<=metrics.icons.left+2,
       'View modes and compact action icons must not overlap '+JSON.stringify(metrics));
     assert.ok(metrics.group.width>metrics.icons.width,'Mode switcher must be wider than 3 icon controls '+JSON.stringify(metrics));
