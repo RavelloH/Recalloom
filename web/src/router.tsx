@@ -5,6 +5,8 @@ import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
 import {Shell} from './shell';
 import {prepareScrollbars,useScrollbarsReady} from './scrollbars';
+import {preparePairedNavigation} from './shared-view-transition';
+import {documentDisplayName} from './document-filename';
 // Route modules load only when visited/preloaded, rather than entering the
 // initial shell bundle. TanStack preloads these on navigation intent.
 const importLogin=()=>import('./pages/login');
@@ -95,5 +97,20 @@ const list=[
 // Every route gets the native transition, including browser history. The
 // default root snapshot preserves persistent navigation, while the fixed main
 // scroll viewport and stable resource IDs animate separately.
-export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,defaultViewTransition:true});
+export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,
+ defaultViewTransition:{types:({fromLocation,toLocation})=>
+  preparePairedNavigation(fromLocation,toLocation,(kind,id,direction,folderId)=>{
+   if(direction==='forward'){
+    if(kind==='folder')return queryClient.getQueryData<{name:string}>(['folder',id])?.name;
+    const detail=queryClient.getQueryData<{name:string;kind:string}>(['record',id]);
+    return detail?.kind==='document'?documentDisplayName(detail.name):undefined;
+   }
+   const data=queryClient.getQueryData<{pages:Array<{items:Array<{
+    id:string;entityType:string;name:string;kind?:string
+   }>}>}>(['browse-pages',folderId]);
+   const entry=data?.pages.flatMap(page=>page.items).find(item=>
+    item.id===id&&item.entityType===kind&&(kind==='folder'||item.kind==='document'));
+   return entry?(kind==='record'?documentDisplayName(entry.name):entry.name):undefined;
+  })}
+});
 declare module '@tanstack/react-router'{interface Register{router:typeof router;}}

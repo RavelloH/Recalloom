@@ -1,5 +1,5 @@
 import {Icon} from './icon';
-import {sharedViewTransitionName} from './shared-view-transition';
+import {sharedViewTransitionName,sharedTitleAttributes,type SharedResourceKind} from './shared-view-transition';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -58,7 +58,7 @@ export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;c
 }
 
 /** Editable document title: Enter or blur commits a rename, Escape reverts. */
-export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false,allowSlash=false,transitionName}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean;allowSlash?:boolean;transitionName?:string}){
+export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=false,allowSlash=false,transitionName,transitionResource}:{value:string;onRename?:(name:string)=>Promise<void>;placeholder?:string;autoFocus?:boolean;allowSlash?:boolean;transitionName?:string;transitionResource?:{kind:SharedResourceKind;id:string}}){
  const ref=useRef<HTMLHeadingElement>(null);
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
@@ -82,7 +82,7 @@ export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=fa
   finally{setSaving(false);}
  };
  return <div className="page-title-block">
-  <h1 ref={ref} className={'page-title'+(onRename?' is-editable':'')} style={transitionName?{viewTransitionName:transitionName}:undefined} data-placeholder={placeholder}
+  <h1 ref={ref} className={'page-title'+(onRename?' is-editable':'')} style={transitionName?{viewTransitionName:transitionName}:undefined} {...(transitionResource?sharedTitleAttributes(transitionResource.kind,transitionResource.id):{})} data-placeholder={placeholder}
    contentEditable={onRename&&!saving?'plaintext-only':false} suppressContentEditableWarning spellCheck={false}
    onKeyDown={event=>{
     if(event.nativeEvent.isComposing)return;

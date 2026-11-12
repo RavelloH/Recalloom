@@ -75,18 +75,24 @@ const vtName=locator=>locator.evaluate(el=>getComputedStyle(el).viewTransitionNa
 const activeNames=()=>page.evaluate(()=>[...document.querySelectorAll('*')].map(el=>getComputedStyle(el).viewTransitionName).filter(n=>n!=='none'&&n!=='root'));
 const assertUnique=async()=>{
  const names=await activeNames();
- assert.deepEqual(names,['rk-route-content'],'only the route viewport may own a snapshot: '+JSON.stringify(names));
+ assert.deepEqual(names,['rk-route-content'],'no shared title name may remain after a transition: '+JSON.stringify(names));
 };
 const count=()=>page.evaluate(()=>window.__rkVTLog.length);
-const assertRouteTransition=async(since)=>{
+const assertRouteTransition=async(since,{expectPair=false,expectFallback=false}={})=>{
  await page.waitForFunction(n=>window.__rkVTLog.length>n,since);
  await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.new!==null);
  const result=await page.evaluate(()=>window.__rkVTLog.at(-1));
- assert.deepEqual(result.old,['rk-route-content'],'outgoing text must stay inside the full-page fade');
- assert.deepEqual(result.new,['rk-route-content'],'incoming text must stay inside the full-page fade');
+ assert.ok(result.old.includes('rk-route-content')&&result.new.includes('rk-route-content'),
+  'the fixed route viewport must continue to crossfade');
+ assert.deepEqual(result.new,result.old,
+  'the paired title must be captured on BOTH sides: '+JSON.stringify(result));
+ assert.equal(new Set(result.old).size,result.old.length,'snapshot names must be unique');
+ if(expectPair)assert.ok(result.old.includes('rk-shared-title'),'expected a matched resource title: '+JSON.stringify(result));
+ if(expectFallback)assert.deepEqual(result.old,['rk-route-content'],'other navigation must use the original crossfade');
  assert.equal(result.error,null,'native transition was skipped');
  // Avoid racing a still-active WebKit snapshot when testing the next click.
  await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.finished===true);
+ await page.waitForFunction(()=>document.querySelectorAll('[data-rk-vt-active="true"]').length===0);
  return result;
 };
 const assertTextInPage=async(locator)=>assert.equal(await vtName(locator),'none','text must fade together with its parent viewport');
@@ -128,6 +134,7 @@ try{
  const suffix=String(Date.now());
  const folder=await create('/folders',{name:'0 Transition audit '+suffix});
  const basic=await create('/records',{name:'0 Native transition '+suffix,kind:'document',folderId:folder.id,content:'A document without a heading.\n'});
+ const markdownNamed=await create('/records',{name:'0 Clean label '+suffix+'.md',kind:'document',folderId:folder.id,content:'# Body heading\n'});
  const promoted=await create('/records',{name:'1 With heading '+suffix,kind:'document',folderId:folder.id,content:'# Promoted content title\n\nBody text.\n'});
  const task=await create('/records',{name:'2 RMD task list '+suffix,kind:'task_list',folderId:folder.id,content:''});
  const nested=await create('/folders',{name:'3 Journal '+suffix,parentId:folder.id});
@@ -147,13 +154,15 @@ try{
  await page.goto(base+'/library');
  const folderRow=page.locator('.file-row').filter({hasText:folder.name});
  await folderRow.waitFor();
+ // Wait until the list's 300ms staggered entrance is complete before capture.
+ await page.waitForTimeout(470);
  await assertShell();
- await assertTextInPage(folderRow.locator('.truncate').first());
+ await assertTextInPage(folderRow.locator('.file-row-title').first());
  await assertUnique();
  let before=await count();
  await folderRow.click();
  await folderPage(folder);
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectPair:true});
  await assertTextInPage(page.locator('.folder-page h1.page-title'));
  await assertShell();
 
@@ -162,17 +171,24 @@ try{
  await page.goBack();
  await page.waitForURL(base+'/library');
  await folderRow.waitFor();
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectPair:true});
  await assertUnique();
 
- // Browser forward must use the same atomic route crossfade.
+ // Browser forward restores the same pair once the list's entrance settles.
+ await page.waitForTimeout(350);
  before=await count();
  await page.goForward();
  await folderPage(folder);
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectPair:true});
 
  const basicRow=page.locator('.file-row').filter({hasText:basic.name});
- await assertTextInPage(basicRow.locator('.truncate').first());
+ await assertTextInPage(basicRow.locator('.file-row-title').first());
+ assert.equal(await basicRow.locator('.file-row-title').innerText(),basic.name,
+  'only the clean filename may participate in sharing');
+ assert.equal(await basicRow.locator('.file-row-extension').innerText(),'.md',
+  'the Markdown extension stays in a separate element');
+ assert.equal(await vtName(basicRow.locator('.file-row-extension')),'none',
+  'the .md extension must stay in the full-page fade');
  await assertUnique();
 
  // The old 600ms loader cap could commit a Skeleton while this request was
@@ -191,34 +207,54 @@ try{
  assert.ok(await page.locator('.folder-page h1.page-title').isVisible(),'the old folder must remain visible while record data loads');
  await click;
  await recordPage(basic);
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectPair:true});
  await assertTextInPage(page.locator('.record-page h1.page-title'));
  before=await count();
  await page.goBack();
  await folderPage(folder);
- await assertRouteTransition(before);
- await assertTextInPage(page.locator('.file-row').filter({hasText:basic.name}).locator('.truncate').first());
+ await assertRouteTransition(before,{expectPair:true});
+ await assertTextInPage(page.locator('.file-row').filter({hasText:basic.name}).locator('.file-row-title').first());
+
+ // Persisted .md names are split into exactly two inline elements; only the
+ // base name travels to the document heading, not the extension.
+ const markdownRow=page.locator('.file-row').filter({hasText:markdownNamed.name});
+ const pureName=markdownNamed.name.slice(0,-3);
+ assert.equal(await markdownRow.locator('.file-row-title').innerText(),pureName);
+ assert.equal(await markdownRow.locator('.file-row-extension').innerText(),'.md');
+ assert.equal(await markdownRow.locator('.file-row-extension').count(),1);
+ await page.waitForTimeout(350);
+ before=await count();
+ await markdownRow.click();
+ await recordPage(markdownNamed);
+ await page.getByRole('heading',{name:pureName,level:1}).waitFor();
+ await assertRouteTransition(before,{expectPair:true});
+ before=await count();
+ await page.goBack();
+ await folderPage(folder);
+ await assertRouteTransition(before,{expectPair:true});
 
  // The exact layout families from the two user screenshots.
  for(const entry of [task,nested]){
   const kind=entry===task?'record':'folder';
   await assertUnique();
+  await page.waitForTimeout(360);
   before=await count();
   await page.locator('.file-row').filter({hasText:entry.name}).click();
   if(kind==='record')await recordPage(entry);else await folderPage(entry);
-  await assertRouteTransition(before);
+  await assertRouteTransition(before,kind==='folder'?{expectPair:true}:{expectFallback:true});
   before=await count();
   await page.goBack();
   await folderPage(folder);
-  await assertRouteTransition(before);
+  await assertRouteTransition(before,kind==='folder'?{expectPair:true}:{expectFallback:true});
  }
 
  // Document filenames remain the header identity; the H1 stays in the body.
+ await page.waitForTimeout(360);
  before=await count();
  await page.locator('.file-row').filter({hasText:promoted.name}).click();
  await recordPage(promoted);
  await page.locator('.workbench-header h1.page-title').waitFor();
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectPair:true});
 
  await assertTextInPage(page.locator('.workbench-header h1.page-title'));
  await assertUnique();
@@ -266,13 +302,13 @@ try{
  before=await count();
  await recent.click();
  await recordPage(promoted);
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectFallback:true});
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'opening a portal must not move or resize the snapshot viewport');
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');
  await recent.waitFor();
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectFallback:true});
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'closing a portal must not move or resize the snapshot viewport');
 
  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
@@ -282,12 +318,12 @@ try{
  before=await count();
  await hit.click();
  await recordPage(promoted);
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectFallback:true});
  before=await count();
  await page.goBack();
  await page.waitForURL(/\/search\?/);
  await hit.waitFor();
- await assertRouteTransition(before);
+ await assertRouteTransition(before,{expectFallback:true});
 
 
  // Search submit must commit immediately and display loading feedback while

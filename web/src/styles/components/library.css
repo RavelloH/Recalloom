@@ -125,6 +125,31 @@
   flex: none;
 }
 
+/* The actual document identity and its Markdown extension are separate.
+   Only .file-row-title is eligible for a matched title View Transition. */
+.file-row-filename {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: baseline;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.file-row-title {
+  display: inline-block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row-extension {
+  flex: none;
+  color: var(--rk-ink-faint);
+  font-weight: 400;
+}
+
 .file-row > span:not(:first-child) {
   font-size: var(--rk-font-label);
   color: var(--rk-ink-faint);

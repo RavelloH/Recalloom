@@ -153,9 +153,25 @@ to {
 
 /* The root is excluded from the transition in foundation/tokens.css.
    The live sidebar, topbar and bottom nav never become old/new snapshots. */
-/* The route viewport is the only named snapshot. Keep text, headings,
-   icons and list rows inside this SAME crossfade; do not extract unmatched
-   text into independent ghosts or hide it before the old page exits. */
+/* The route viewport always crossfades. Exactly one verified pair of
+   library filename / destination heading may additionally receive a name,
+   only during its navigation. Other text remains in the route snapshot. */
+[data-rk-vt-active="true"] {
+  view-transition-name: rk-shared-title;
+}
+
+::view-transition-group(rk-shared-title) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+}
+
+::view-transition-old(rk-shared-title) {
+  animation: 130ms ease-in both rk-view-exit;
+}
+
+::view-transition-new(rk-shared-title) {
+  animation: 160ms 100ms ease-out both rk-view-enter;
+}
 ::view-transition {
   pointer-events: none;
 }

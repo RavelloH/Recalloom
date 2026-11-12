@@ -46,7 +46,8 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
    <span className="workbench-revision" title={'当前正文版本 R'+item.revision}>R{item.revision}</span>
   </div>
   <InlineTitle value={documentDisplayName(item.name)} onRename={onRename}
-   placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}/>
+   placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}
+   transitionResource={{kind:'record',id:item.id}}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
    {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
   </div>}

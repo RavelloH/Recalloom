@@ -12,6 +12,7 @@ import {router} from './router';
 import {queryClient} from './queries';
 import {ThemeProvider,useAppearance} from './theme';
 import {applyScrollbarPolicy,prepareScrollbars} from './scrollbars';
+import {installPairedTransitionLifecycle} from './shared-view-transition';
 import {installAdaptiveFavicon} from './favicon';
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
@@ -26,5 +27,6 @@ function App(){const {mode}=useAppearance();return <InternationalizationProvider
 // Start the overlay engine fetch alongside the auth query, not ahead of the
 // entire React app. The route root gates only the authenticated scroll shell;
 // login and the initial connection UI never wait for this optional chunk.
+installPairedTransitionLifecycle();
 if(location.pathname!=='/login')void prepareScrollbars();
 createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><App/></ThemeProvider></React.StrictMode>);
