@@ -161,6 +161,18 @@ try{
      const group=el.querySelector('[role="group"]');const s=getComputedStyle(group??el);
      return {padding:s.paddingTop,border:s.borderTopWidth,outline:s.outlineWidth,offset:s.outlineOffset};})()
    }));
+   if(width<=390){
+    const modeSizing=await page.evaluate(()=>{
+     const group=document.querySelector('.record-main .editor-view-switcher [role="group"]');
+     return {buttons:[...group.querySelectorAll('button')].map(el=>{
+      const css=getComputedStyle(el);const r=el.getBoundingClientRect();
+      return {label:el.textContent.trim(),width:r.width,padLeft:css.paddingLeft,padRight:css.paddingRight,fontSize:css.fontSize};
+     }),container:document.querySelector('.record-main .editor-topline').getBoundingClientRect().width};
+    });
+    assert.ok(modeSizing.buttons.every(button=>
+     parseFloat(button.padLeft)>=8&&parseFloat(button.padRight)>=8&&parseFloat(button.fontSize)>=13),
+     'mobile editor modes need readable text and consistent inner breathing room: '+JSON.stringify(modeSizing));
+   }
    if(width<=390)assert.ok(metrics.switcherStyle?.outline==='1px'&&metrics.switcherStyle?.offset==='0px'&&metrics.switcherStyle.padding==='0px',
     'Mode switcher must ring the actual button group with no internal gap '+JSON.stringify(metrics));
    assert.ok(metrics.scrollWidth<=metrics.viewport+1,'Mobile root overflow '+JSON.stringify(metrics));
@@ -174,8 +186,8 @@ try{
     assert.ok(tablet.actions.top>=tablet.header.bottom,'iPad editor controls belong below document header');
    }
    if(width<=390){
-    assert.ok(metrics.group&&metrics.icons&&metrics.group.width<=244,
-     'phone view mode switcher must use its natural bounded width: '+JSON.stringify(metrics));
+    assert.ok(metrics.group&&metrics.icons&&metrics.group.width<=280,
+     'phone mode switcher must keep a natural, bounded width: '+JSON.stringify(metrics));
     assert.ok(metrics.group&&metrics.icons&&metrics.group.right<=metrics.icons.left+2,
       'View modes and compact action icons must not overlap '+JSON.stringify(metrics));
     assert.ok(metrics.group.width>metrics.icons.width,'Mode switcher must be wider than 3 icon controls '+JSON.stringify(metrics));

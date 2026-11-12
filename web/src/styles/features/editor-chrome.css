@@ -265,7 +265,7 @@
 .record-page .record-main .editor-topline .editor-view-switcher {
   flex:0 1 auto;
   min-width:0;
-  max-width:244px;
+  max-width:280px;
 }
 .editor-topline .editor-view-switcher [role="group"] {
   display:flex;
@@ -276,7 +276,7 @@
 .editor-topline .editor-view-switcher [role="group"] button {
   flex:0 1 auto;
   min-width:0;
-  padding-inline:5px;
+  padding-inline:10px;
   min-height:38px;
   height:38px;
   gap:3px;
@@ -336,12 +336,9 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 /* Narrow-phone geometry only. Input modality still comes from pointer media. */
 @media (max-width: 350px) {
  .record-main .editor-view-switcher [role="group"] button {
-  font-size:12px;
-  padding-inline:2px;
-  gap:1px;
- }
- .record-main .editor-view-switcher [role="group"] button:first-child {
-  flex:1.35 1 0;
+  font-size:14px;
+  padding-inline:8px;
+  gap:3px;
  }
  .record-main .editor-view-switcher [role="group"] button svg {
   width:14px;
