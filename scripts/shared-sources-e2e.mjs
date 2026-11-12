@@ -162,7 +162,6 @@ try{
  const targetTasks=await page.evaluate(async id=>(await(await fetch('/api/tasks?recordId='+id+'&limit=200')).json()).items,taskList.id);
  const targetTask=targetTasks.find(t=>t.title==='Target shared task');
  assert.ok(targetTask,'Task fixture must have its own stable task ID');
-
  // Visit a document to populate the real localStorage-backed recent feed.
  await stableGoto(base+'/records/'+doc.id);
  await recordPage(doc);
@@ -186,6 +185,10 @@ try{
  await page.reload();
  const todo=page.locator('.compact-row').filter({hasText:targetTask.title});
  await todo.waitFor();
+ // Inject after the last full reload: style tags from an earlier document
+ // are discarded on page.goto()/reload(), but survive SPA navigation.
+ // Put the requested task below the fold to verify its anchor wins.
+ await page.addStyleTag({content:'.embedded-tasks .task-item[data-task-target="true"] { margin-top: 1100px !important; }'});
  await page.waitForTimeout(450);
  before=await count();
  await todo.locator('a').click();
@@ -200,6 +203,16 @@ try{
   'Home task must NOT replace its parent task-list record title');
  assert.equal(await target.locator('.task-title').innerText(),targetTask.title);
  await assertRouteTransition(before,{expectPair:true});
+ const focusedPosition=await page.evaluate(taskId=>{
+  const row=document.querySelector('.task-item[data-task-id="'+taskId+'"]');
+  const viewport=document.querySelector('.main-scroll');
+  const bounds=row.getBoundingClientRect(),clip=viewport.getBoundingClientRect();
+  return {scrollTop:viewport.scrollTop,top:bounds.top,bottom:bounds.bottom,
+   viewportTop:clip.top,viewportBottom:clip.bottom};
+ },targetTask.id);
+ assert.ok(focusedPosition.scrollTop>150&&focusedPosition.top<focusedPosition.viewportBottom&&
+  focusedPosition.bottom>focusedPosition.viewportTop,
+  'explicit home task deep link must override normal scroll-to-top: '+JSON.stringify(focusedPosition));
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');

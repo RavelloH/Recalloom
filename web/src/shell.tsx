@@ -136,7 +136,7 @@ export function Shell({children}:{children:React.ReactNode}){
  </header><main className="main-content">
   <OverlayScroll className="main-scroll-host" axis="y" persistent viewportClassName="main-scroll" viewportRef={scroller} viewportProps={{role:'region','aria-label':'页面内容',tabIndex:-1}}>
    <TopbarSlotProvider slots={{start:slotStart,end:slotEnd}}>
-    <PageTransition scrollTarget={()=>scroller.current}><div key={pathname} className="route-stage">{children}</div></PageTransition>
+    <PageTransition><div key={pathname} className="route-stage">{children}</div></PageTransition>
    </TopbarSlotProvider>
   </OverlayScroll>
  </main></div>

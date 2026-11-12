@@ -168,6 +168,10 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
 // default root snapshot preserves persistent navigation, while the fixed main
 // scroll viewport and stable resource IDs animate separately.
 export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,
+ // The app scrolls inside a persistent div, not window. Router-managed
+ // history keys reset NEW destinations and restore POP positions. Instant
+ // avoids a second scroll animation underneath native View Transitions.
+ scrollRestoration:true,scrollToTopSelectors:['.main-scroll'],scrollRestorationBehavior:'instant',
  defaultViewTransition:{types:({fromLocation,toLocation})=>
   preparePairedNavigation(fromLocation,toLocation,resolveSharedLabel)}
 

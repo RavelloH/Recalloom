@@ -8,7 +8,7 @@ import {useRouterState} from '@tanstack/react-router';
 const ENTER_MS=180;
 const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function PageTransition({children,scrollTarget}:{children:React.ReactNode;scrollTarget:()=>HTMLElement|null}){
+export function PageTransition({children}:{children:React.ReactNode}){
  const pathname=useRouterState({select:state=>state.matches[state.matches.length-1]?.pathname??state.location.pathname});
  const pending=useRouterState({select:state=>state.status==='pending'});
  const [phase,setPhase]=useState<'idle'|'enter'>('idle');
@@ -17,14 +17,13 @@ export function PageTransition({children,scrollTarget}:{children:React.ReactNode
  useLayoutEffect(()=>{
   if(lastPath.current===pathname)return;
   lastPath.current=pathname;
-  scrollTarget()?.scrollTo({top:0,left:0});
   clearTimeout(timer.current);
   // Native navigation runs for forward and history transitions; never layer
   // the legacy route entrance on the browser's own snapshot animation.
   if(reduced()||typeof document.startViewTransition==='function'){setPhase('idle');return;}
   setPhase('enter');
   timer.current=setTimeout(()=>setPhase('idle'),ENTER_MS);
- },[pathname,scrollTarget]);
+ },[pathname]);
  useEffect(()=>{document.documentElement.dataset.routePhase=phase;},[phase]);
  useEffect(()=>()=>{clearTimeout(timer.current);delete document.documentElement.dataset.routePhase;},[]);
  return <>

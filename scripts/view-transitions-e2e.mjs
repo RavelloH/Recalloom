@@ -432,7 +432,7 @@ try{
    window.__rkRowStartup={starts:[],viewportMoves:[]};
    document.addEventListener('animationstart',event=>{
     if(event.target.matches?.('.task-list .task-item')&&event.animationName==='data-row-fade-in')
-     window.__rkRowStartup.starts.push(Math.round(performance.now()));
+     window.__rkRowStartup.starts.push({taskId:event.target.getAttribute('data-task-id'),at:Math.round(performance.now())});
    },true);
    const monitor=()=>{
     const observer=new MutationObserver(records=>{
@@ -467,10 +467,15 @@ try{
    animation:getComputedStyle(document.querySelector('.page .task-list .task-item')).animationName
   }));
   assert.equal(startup.animation,'data-row-fade-in','the staggered entrance animation must remain enabled');
-  assert.equal(startup.starts.length,1,'each task row must animate only once: '+JSON.stringify(startup));
+  assert.ok(startup.starts.length>0,'task list must have entrance animations');
+  const perTask=new Map();
+  for(const event of startup.starts)perTask.set(event.taskId,(perTask.get(event.taskId)??0)+1);
+  assert.ok([...perTask.values()].every(count=>count===1),
+   'each individual task row must animate only once: '+JSON.stringify(startup));
   if(engine==='chromium'){
    assert.ok(startup.viewportMoves.length>0,'overlay scrollbars must initialize the scroll viewport');
-   assert.ok(startup.viewportMoves.every(t=>t<=startup.starts[0]),
+   const firstAnimation=Math.min(...startup.starts.map(entry=>entry.at));
+   assert.ok(startup.viewportMoves.every(t=>t<=firstAnimation),
     'scrollbars must re-parent BEFORE row animations: '+JSON.stringify(startup));
    await page.unroute('**/assets/overlayscrollbars-*.js');
   }
