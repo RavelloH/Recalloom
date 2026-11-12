@@ -100,6 +100,15 @@
   color: var(--color-text-primary, inherit);
 }
 
+/* A matched library label is shrink-to-fit: View Transitions interpolate
+   snapshot geometry. A normal block h1 spans the whole page (~760px), so
+   morphing a 37px folder label into that block massively enlarges its text.
+   Preserve natural heading typography without capturing blank page width. */
+.page-title[data-rk-vt-kind] {
+  inline-size: fit-content;
+  max-inline-size: 100%;
+}
+
 .page-title.is-editable {
   cursor: text;
 }

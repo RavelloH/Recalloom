@@ -132,9 +132,10 @@ try{
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  const suffix=String(Date.now());
- const folder=await create('/folders',{name:'Shared animation '+suffix});
+ const folder=await create('/folders',{name:'Game'});
  const child=await create('/folders',{name:'Nested folder '+suffix,parentId:folder.id});
  const documentRecord=await create('/records',{name:'Project design '+suffix+'.md',kind:'document',folderId:folder.id,content:'# Markdown heading\n\nBody text.'});
+ const shortDocument=await create('/records',{name:'Note.md',kind:'document',folderId:folder.id,content:'A short title for geometry regression.'});
  const brokenRecord=await create('/records',{name:'Unavailable destination '+suffix,kind:'document',folderId:folder.id,content:'Body'});
 
  await page.goto(base+'/library');
@@ -143,8 +144,19 @@ try{
  await page.waitForTimeout(470);
  await assertUnique();
  let before=await count();
+ const listTitleWidth=await folderRow.locator('.file-row-title').evaluate(el=>el.getBoundingClientRect().width);
  await folderRow.click();
  await folderPage(folder);
+ const folderTitleGeometry=await page.locator('.folder-page h1.page-title').evaluate(el=>{
+  const style=getComputedStyle(el),rect=el.getBoundingClientRect();
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+  ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  return {box:rect.width,actualText:ctx.measureText(el.textContent).width,layout:style.display};
+ });
+ assert.ok(folderTitleGeometry.box<=folderTitleGeometry.actualText+24,
+  'short shared title must have intrinsic width, not a page-wide screenshot: '+JSON.stringify({listTitleWidth,folderTitleGeometry}));
+ assert.ok(folderTitleGeometry.box<=listTitleWidth*4,
+  'short title should not scale an old screenshot many times larger: '+JSON.stringify({listTitleWidth,folderTitleGeometry}));
  await assertRouteTransition(before,{expectPair:true});
  await assertUnique();
 
@@ -173,6 +185,29 @@ try{
  await page.locator('.tiptap h1').getByText('Markdown heading').waitFor();
  await assertUnique();
 
+ before=await count();
+ await page.goBack();
+ await folderPage(folder);
+ await assertRouteTransition(before,{expectPair:true});
+ await page.waitForTimeout(350);
+
+ // A second short label tests the editable Markdown workbench title. It used
+ // to capture the full page width too, producing the same oversized ghost.
+ const shortRow=page.locator('.file-row').filter({hasText:shortDocument.name});
+ await shortRow.waitFor();
+ const oldShortWidth=await shortRow.locator('.file-row-title').evaluate(el=>el.getBoundingClientRect().width);
+ before=await count();
+ await shortRow.click();
+ await recordPage(shortDocument);
+ const shortTitle=await page.locator('.workbench-header h1.page-title').evaluate(el=>{
+  const style=getComputedStyle(el),rect=el.getBoundingClientRect();
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+  ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  return {width:rect.width,text:ctx.measureText(el.textContent).width};
+ });
+ assert.ok(shortTitle.width<=shortTitle.text+24&&shortTitle.width<=oldShortWidth*4,
+  'Markdown shared title must not span the page: '+JSON.stringify({oldShortWidth,shortTitle}));
+ await assertRouteTransition(before,{expectPair:true});
  before=await count();
  await page.goBack();
  await folderPage(folder);
