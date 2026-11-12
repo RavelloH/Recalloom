@@ -18,7 +18,8 @@ const browser=await (engine==='webkit'?webkit:chromium).launch({
  headless:true,...(executable?{executablePath:executable}:{})
 });
 const mobileRun=process.env.RECALLOOM_TEST_MOBILE==='1';
-const page=await browser.newPage({viewport:mobileRun?{width:390,height:844}:{width:1365,height:900}});
+const narrowMobile=process.env.RECALLOOM_TEST_MOBILE_WIDTH==='320';
+const page=await browser.newPage({viewport:mobileRun?(narrowMobile?{width:320,height:568}:{width:390,height:844}):{width:1365,height:900},isMobile:mobileRun,hasTouch:mobileRun});
 page.setDefaultTimeout(25000);
 // WebKit refuses production __Host- Secure cookies over plain HTTP.
 // For this isolated 127.0.0.1 test only, retain the login response cookie
@@ -87,7 +88,9 @@ const assertRouteTransition=async(since,{expectPair=false,expectFallback=false}=
  assert.deepEqual(result.new,result.old,
   'the paired title must be captured on BOTH sides: '+JSON.stringify(result));
  assert.equal(new Set(result.old).size,result.old.length,'snapshot names must be unique');
- if(expectPair)assert.ok(result.old.includes('rk-shared-title'),'expected a matched resource title: '+JSON.stringify(result));
+ // Narrow 320px layouts can truncate a source label, deliberately falling
+ // back to the full-page crossfade instead of morphing clipped text.
+ if(expectPair&&!narrowMobile)assert.ok(result.old.includes('rk-shared-title'),'expected a matched resource title: '+JSON.stringify(result));
  if(expectFallback)assert.deepEqual(result.old,['rk-route-content'],'other navigation must use the original crossfade');
  assert.equal(result.error,null,'native transition was skipped');
  // Avoid racing a still-active WebKit snapshot when testing the next click.
@@ -525,16 +528,60 @@ try{
  if(engine!=='webkit'||mobileRun){
   if(!mobileRun)await page.setViewportSize({width:390,height:844});
   await assertShell();
+  // View Transition snapshots live in a browser top layer above ordinary
+  // z-index. The route snapshot must not overlap the live fixed tab bar,
+  // otherwise its fading content visually erases the tab icons and labels.
+  const assertLiveMobileTabBar=async()=>{
+   const geometry=await page.evaluate(()=>{
+    const snapshot=document.querySelector('.main-scroll-host').getBoundingClientRect();
+    const tabs=document.querySelector('.bottom-nav').getBoundingClientRect();
+    const tabStyle=getComputedStyle(document.querySelector('.bottom-nav'));
+    return {snapshotBottom:snapshot.bottom,tabsTop:tabs.top,
+     tabsBottom:tabs.bottom,height:tabs.height,opacity:tabStyle.opacity,
+     display:tabStyle.display,background:tabStyle.backgroundColor};
+   });
+   assert.equal(geometry.display,'grid','mobile tab bar must be rendered');
+   assert.equal(geometry.opacity,'1','live tab bar must not fade with page transitions');
+   assert.ok(geometry.snapshotBottom<=geometry.tabsTop+1,
+    'route snapshot must stop BEFORE live bottom tabs: '+JSON.stringify(geometry));
+  };
+  await assertLiveMobileTabBar();
  await page.goto(base+'/library');
  const mobileFolder=page.locator('.file-row').filter({hasText:folder.name});
  await mobileFolder.waitFor();
+ await assertLiveMobileTabBar();
  await assertUnique();
  before=await count();
  await mobileFolder.click();
  await folderPage(folder);
  await assertRouteTransition(before);
  await assertShell();
+ await assertLiveMobileTabBar();
  assert.ok(await page.locator('.bottom-nav').isVisible(),'mobile bottom navigation remains visible');
+ // Return navigation must keep the fixed tabs outside the screenshot as well.
+ before=await count();
+ await page.goBack();
+ await page.waitForURL(base+'/library');
+ await assertRouteTransition(before);
+ await assertLiveMobileTabBar();
+ if(mobileRun){
+  // Mobile keyboard focus hides tabs; regain that scroll space on focus.
+  await page.goto(base+'/library/'+folder.id);
+  await page.locator('.file-row').filter({hasText:basic.name}).click();
+  await recordPage(basic);
+  const title=page.locator('.record-page .page-title');
+  await title.focus();
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.bottom-nav')).display==='none');
+  const focused=await page.evaluate(()=>({
+   viewportBottom:document.querySelector('.main-scroll-host').getBoundingClientRect().bottom,
+   screenHeight:innerHeight
+  }));
+  assert.ok(Math.abs(focused.viewportBottom-focused.screenHeight)<=1,
+   'editor focus must recover the space used by hidden tabs: '+JSON.stringify(focused));
+  await title.blur();
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.bottom-nav')).display==='grid');
+  await assertLiveMobileTabBar();
+ }
  const size=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth}));
  assert.ok(size.scrollWidth<=size.width+1,'mobile horizontal overflow '+JSON.stringify(size));
  }

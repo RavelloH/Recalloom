@@ -670,6 +670,14 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
 
 @media (max-width: 720px) {
 
+/* Keep the route snapshot ABOVE the bottom tabs. View Transition captures
+   paint in a top layer, which outranks any normal z-index; a full-height
+   snapshot covering these fixed tabs makes them appear to fade or disappear.
+   Reserve the tab height in the shell itself, not in the scroll content. */
+.shell {
+  --rk-mobile-tab-bar-height: calc(68px + env(safe-area-inset-bottom, 0px));
+}
+
 .mobile-menu {
   display: inline-flex;
 }
@@ -689,10 +697,10 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   color: var(--color-text-secondary,#777);
 }
 
-/* The scroll viewport continues behind the fixed tab bar. Reserve space
-   inside its scroll content so the final row remains reachable. */
+/* The viewport now stops before the fixed tab bar. Keep a small natural
+   end inset, without the old 76px fake space inside the scroll snapshot. */
 .route-stage {
-  padding-block-end: calc(76px + env(safe-area-inset-bottom,0px));
+  padding-block-end: 16px;
 }
 
 .sidebar-collapsed .sidebar {
@@ -706,6 +714,7 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
 .workspace {
   width: 100%;
   min-width: 0;
+  padding-block-end: var(--rk-mobile-tab-bar-height);
 }
 
 .mobile-scrim {
@@ -803,6 +812,7 @@ html[data-effective-theme="dark"] .bottom-nav {
   display: grid;
   grid-template-columns: repeat(4,minmax(0,1fr));
   position: fixed;
+  block-size: var(--rk-mobile-tab-bar-height);
   z-index: 20;
   left: 0;
   right: 0;
@@ -823,6 +833,11 @@ html[data-effective-theme="dark"] .bottom-nav {
 
 .shell:has(.tiptap:focus, .cm-editor.cm-focused, .page-title:focus, textarea:focus) .bottom-nav {
   display: none;
+}
+
+/* Return the space to the editor when the keyboard hides the tabs. */
+.shell:has(.tiptap:focus, .cm-editor.cm-focused, .page-title:focus, textarea:focus) .workspace {
+  padding-block-end: 0;
 }
 
 .shell:has(.tiptap:focus, .cm-editor.cm-focused, .page-title:focus, textarea:focus) .route-stage {
