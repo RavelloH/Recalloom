@@ -24,7 +24,7 @@ import {markdownCharacterCount} from './document-heading';
 import type {DocumentPresentation} from './record-workbench';
 
 
-export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,historyTarget,onDocumentPresentation}:{item:RecordDetail;onSaved:(content?:string)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onDocumentPresentation:(value:DocumentPresentation)=>void}){
+export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,onOpenHistory,historyTarget,onDocumentPresentation}:{item:RecordDetail;onSaved:(content?:string)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;archiveNotice?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onDocumentPresentation:(value:DocumentPresentation)=>void}){
  const initialMode=new URLSearchParams(location.search).get('mode');
  const visualRef=useRef<VisualEditorHandle>(null);
  const editorSectionRef=useRef<HTMLDivElement>(null);
@@ -149,7 +149,8 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,onOpenHistory,
     {pageActions}
    </div>
   </PageActions>
-  <AutoResizer><div className="doc-notice">
+  <AutoResizer><div className="doc-notice record-status-notices">
+  {archiveNotice}
   {recoveryNotice&&usableRecovery&&<Banner status="info" container="section" title="已恢复本标签页未保存的草稿" description="草稿属于当前 Revision，保存后才会写入知识库。" endContent={<Button label="丢弃恢复的草稿" variant="secondary" size="sm" onClick={discardRecovered}/>}/>}
   {recoveryNotice&&staleRecovery&&<Banner status="warning" container="section" title="发现旧版本的未保存草稿" description={"草稿来自 R"+stored.revision+"，当前是 R"+item.revision+"。为避免覆盖其他客户端的更新，未自动恢复。"} endContent={<div className="row gap"><Button label="复制旧草稿" size="sm" onClick={()=>navigator.clipboard.writeText(stored.content)}/><Button label="丢弃旧草稿" size="sm" variant="secondary" onClick={()=>{clearSessionDraft(sessionId,item.id);setRecoveryNotice(false);}}/></div>}/>}
   {Boolean(error)&&<Banner status="error" container="section" title="保存失败" description={error instanceof ApiError&&error.status===409?'记录已被其他客户端修改。草稿已保留，请重新载入并核对差异后手动合并。':error instanceof Error?error.message:'请稍后重试'} endContent={error instanceof ApiError&&error.status===409?<Button label="重新加载" onClick={()=>onSaved()}/>:undefined}/>}

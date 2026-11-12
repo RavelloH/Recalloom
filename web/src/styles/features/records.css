@@ -256,6 +256,63 @@
   --rk-doc-pad: var(--rk-document-pad);
 }
 
+/* Record status notices belong below the title and view controls, alongside
+   recovery/save alerts. An archived record is an actionable state, not a
+   full-width warning header that should displace the document identity. */
+.record-status-notices .record-archive-banner .astryx-banner {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-text-warning, #b7791f) 18%, var(--rk-border-soft));
+  border-radius: var(--rk-radius);
+  background: color-mix(in srgb, var(--color-text-warning, #b7791f) 5%, var(--rk-canvas));
+  color: var(--color-text-primary, #222);
+}
+.record-status-notices .record-archive-banner .astryx-banner > :nth-child(2) {
+  min-width: 0;
+}
+.record-status-notices .record-archive-banner .astryx-banner > :nth-child(2) > :first-child {
+  color: var(--color-text-primary, #222);
+  font-size: 14px;
+  font-weight: 600;
+}
+.record-status-notices .record-archive-banner .astryx-banner-description {
+  color: var(--rk-ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.record-status-notices .record-archive-banner .astryx-banner > :last-child {
+  justify-self: end;
+  min-width: 0;
+}
+.record-status-notices .record-archive-banner button {
+  min-height: 32px;
+  padding-inline: 11px;
+  border: 1px solid var(--rk-border-soft);
+  border-radius: 8px;
+  background: var(--rk-canvas);
+  color: var(--color-text-primary, #222);
+  white-space: nowrap;
+}
+.record-status-notices .record-archive-banner button:hover {
+  background: var(--rk-hover);
+}
+@media (max-width: 720px) {
+  .record-status-notices .record-archive-banner .astryx-banner {
+    grid-template-columns: 20px minmax(0, 1fr);
+    padding: 12px;
+    column-gap: 10px;
+  }
+  .record-status-notices .record-archive-banner .astryx-banner > :last-child {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 2px;
+  }
+}
+
 .record-page .record-main .page-actions-bar {
   margin: 10px 0 2px;
   flex-wrap: wrap;

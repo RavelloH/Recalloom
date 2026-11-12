@@ -326,11 +326,69 @@ try{
  await archived.locator('a.archive-item-link').click();
  await recordPage(doc);
  await assertRouteTransition(before,{expectPair:true});
+ const archiveBanner=page.locator('.record-main .record-status-notices .record-archive-banner');
+ await archiveBanner.getByText('此记录已归档').waitFor();
+ await archiveBanner.getByRole('button',{name:'恢复为正常'}).waitFor();
+ assert.equal(await page.locator('.record-page > .doc-notice').count(),0,
+  'archived alert must not precede the document title');
+ const noticeGeometry=await page.evaluate(()=>{
+  const rect=selector=>document.querySelector(selector)?.getBoundingClientRect();
+  const heading=rect('.workbench-header'),modes=rect('.editor-topline'),
+   notice=rect('.record-archive-banner'),body=rect('.editor-body');
+  const surface=document.querySelector('.record-archive-banner .astryx-banner');
+  return {headerBottom:heading.bottom,modeBottom:modes.bottom,
+   noticeTop:notice.top,noticeBottom:notice.bottom,bodyTop:body.top,
+   noticeWidth:notice.width,viewportWidth:document.querySelector('.main-scroll').clientWidth,
+   layout:getComputedStyle(surface).display,
+   columns:getComputedStyle(surface).gridTemplateColumns};
+ });
+ assert.ok(noticeGeometry.noticeTop>=Math.max(noticeGeometry.headerBottom,noticeGeometry.modeBottom)-2,
+  'archive status must live BELOW the title and mode controls: '+JSON.stringify(noticeGeometry));
+ assert.ok(noticeGeometry.noticeBottom<=noticeGeometry.bodyTop+2,
+  'archive status must precede editable content: '+JSON.stringify(noticeGeometry));
+ assert.equal(noticeGeometry.layout,'grid','archive banner should use compact responsive layout');
+ assert.ok(noticeGeometry.noticeWidth<=noticeGeometry.viewportWidth,
+  'archive banner must not overflow the mobile viewport');
+ if(mobileRun){
+  assert.equal(noticeGeometry.columns.trim().split(/\s+/).length,2,
+   'mobile archive status should place action on its own line: '+JSON.stringify(noticeGeometry));
+  await page.screenshot({path:'tmp/record-archive-mobile-preview.png',fullPage:false});
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.waitForTimeout(160);
+  await page.screenshot({path:'tmp/record-archive-mobile-dark.png',fullPage:false});
+ }
+ const archiveActionBorder=await archiveBanner.getByRole('button',{name:'恢复为正常'}).evaluate(el=>
+  getComputedStyle(el).borderTopWidth);
+ assert.ok(parseFloat(archiveActionBorder)>=1,'restore action must be visually identifiable as a button');
+ console.log('PASS archived document notice follows header and modes ('+engine+')');
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/archive');
  await archived.waitFor();
  await assertRouteTransition(before,{expectPair:true});
  console.log('PASS archive title to document and history pairing');
+ // A task-list record uses the same status placement even though it has no
+ // document view switcher or rich-text editor.
+ await page.evaluate(async recordId=>{
+  const record=await(await fetch('/api/records/'+recordId+'?metadataOnly=true')).json();
+  const response=await fetch('/api/records/'+recordId+'/meta',{method:'PATCH',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({status:'archived',expectedMetadataRevision:record.metadataRevision})});
+  if(!response.ok)throw Error('archiving task-list record: '+await response.text());
+ },taskList.id);
+ await stableGoto(base+'/records/'+taskList.id);
+ await page.locator('.record-page .doc-header').waitFor();
+ const taskArchive=page.locator('.record-main .record-status-notices .record-archive-banner');
+ await taskArchive.getByText('此记录已归档').waitFor();
+ assert.ok(await page.evaluate(()=>{
+  const header=document.querySelector('.record-page .doc-header').getBoundingClientRect();
+  const notice=document.querySelector('.record-archive-banner').getBoundingClientRect();
+  const tasks=document.querySelector('.embedded-tasks').getBoundingClientRect();
+  return header.bottom<=notice.top+2&&notice.bottom<=tasks.top+2;
+ }),'task-list status must follow record identity and precede tasks');
+ await taskArchive.getByRole('button',{name:'恢复为正常'}).click();
+ await taskArchive.waitFor({state:'detached'});
+ assert.equal(await page.locator('.record-main .record-status-notices .record-archive-banner').count(),0);
+ console.log('PASS task-list archive state and restore action without header displacement');
  assert.deepEqual(faults,[],'new navigation sources must not cause runtime errors; failed scripts='+JSON.stringify(failedScripts));
 }finally{await browser.close();}
