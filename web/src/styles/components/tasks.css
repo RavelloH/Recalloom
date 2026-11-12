@@ -85,6 +85,18 @@
   max-width: 100%;
 }
 
+/* Home todo navigation focuses the exact task, not its parent record title. */
+.embedded-tasks .task-item[data-task-target="true"] {
+  scroll-margin-block: 88px;
+  outline: 1px solid var(--rk-border-soft);
+  outline-offset: -1px;
+  animation: rk-task-target-enter 550ms ease-out both;
+}
+@keyframes rk-task-target-enter {
+  from {background: var(--rk-hover);}
+  to {background: transparent;}
+}
+
 .task-heading {
   display: flex;
   align-items: flex-start;

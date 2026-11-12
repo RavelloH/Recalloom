@@ -1,7 +1,7 @@
 import '../styles/features/records.css';
 import {Icon} from '../icon';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {useNavigate,useParams} from '@tanstack/react-router';
+import {useNavigate,useParams,useSearch} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -27,7 +27,8 @@ import {sharedViewTransitionName} from '../shared-view-transition';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
-export function RecordPage(){const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
+export function RecordPage(){
+ const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
  const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
@@ -105,7 +106,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
     onDetails={()=>openInspector('details')}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
-    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedRecordName}/>
+    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedRecordName} transitionResource={{kind:'record',id:item.id}}/>
     <Properties>
      <Property label="类型">任务列表</Property>
      <Property label="标签"><TagEditor tags={item.tags??[]} onChange={changeTag}/></Property>
@@ -114,7 +115,7 @@ export function RecordPage(){const {recordId}=useParams({strict:false}) as {reco
     </Properties>
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><TasksPage recordId={recordId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
   pageActions={pageActions} onSaved={()=>{void refresh();}} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>

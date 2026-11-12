@@ -1,138 +1,215 @@
 /**
- * A shared title may be captured only when a library row and its destination
- * header represent the same document/folder. Never globally name text nodes:
- * unmatched snapshots were the cause of floating ghosts and early text loss.
+ * One temporary, verified shared element per navigation. The route viewport
+ * always keeps its normal crossfade. Never name unrelated text globally.
  */
-export type SharedResourceKind='record'|'folder';
-export type LocationPath={pathname:string};
+export type SharedResourceKind='record'|'folder'|'task';
+export type LocationPath={pathname:string;search?:Record<string,unknown>};
+export type PairDirection='forward'|'back';
+export type PairCandidate={kind:SharedResourceKind;id:string;direction:PairDirection};
 
-export function resourceViewTransitionIdentity(kind:SharedResourceKind,id:string):string{
- return 'rk-'+kind+'-'+Array.from(id,character=>
-  /^[a-z\d_-]$/i.test(character)?character:'_'+character.codePointAt(0)!.toString(16)+'_'
- ).join('');
-}
-
-/** Remaining legacy call sites intentionally participate in no shared capture. */
-export function sharedViewTransitionName(_kind:SharedResourceKind,_id:string):undefined{
- return undefined;
-}
-
-type Pair={kind:SharedResourceKind;id:string;from:string;to:string;token:number;source:HTMLElement};
+type SourceKind='library'|'recent'|'activity'|'search'|'archive'|'tree'|'todo';
+type Pair={
+ kind:SharedResourceKind;id:string;direction:PairDirection;sourceKey:string;
+ token:number;label:string;sourceKind:SourceKind;source:HTMLElement;
+ from:string;to:string;
+};
+type PreviousPair=Omit<Pair,'token'|'direction'|'source'> &{scrollTop:number};
 let active:Pair|null=null;
-let previousList:{kind:SharedResourceKind;id:string;from:string;to:string;scrollTop:number}|null=null;
+let previous:PreviousPair|null=null;
+let selectedKey:string|null=null;
 let sequence=0;
 
+export function resourceViewTransitionIdentity(kind:SharedResourceKind,id:string):string{
+ return 'rk-'+kind+'-'+Array.from(id,char=>
+  /^[a-z\d_-]$/i.test(char)?char:'_'+char.codePointAt(0)!.toString(16)+'_'
+ ).join('');
+}
+/** Old global naming API deliberately remains disabled. */
+export function sharedViewTransitionName(_kind:SharedResourceKind,_id:string):undefined{return undefined;}
+
+/** The header on the destination is the only incoming name on a forward trip. */
 export function sharedTitleAttributes(kind:SharedResourceKind,id:string){
  return {
   'data-rk-vt-kind':kind,
   'data-rk-vt-id':id,
-  'data-rk-vt-active':active?.kind===kind&&active?.id===id?'true':undefined
+  'data-rk-vt-active':active?.direction==='forward'&&active.kind===kind&&active.id===id?'true':undefined
  } as const;
 }
+/** Each row/link gets its own source key: activity and search may repeat IDs. */
+export function sharedSourceAttributes(kind:SharedResourceKind,id:string,key:string){
+ return {
+  'data-rk-vt-kind':kind,
+  'data-rk-vt-id':id,
+  'data-rk-vt-source':key,
+  'data-rk-vt-active':active?.direction==='back'&&active.kind===kind&&active.id===id&&active.sourceKey===key?'true':undefined
+ } as const;
+}
+export function markSharedNavigationSource(key:string){selectedKey=key;}
 
-function parse(path:string):
- |{type:'library';folderId:string|null}
- |{type:'resource';kind:SharedResourceKind;id:string}
- |null{
+type Route={type:'library'|'record'|'home'|'search'|'activity'|'archive'|'other';id?:string;folderId?:string|null};
+function parse(path:string):Route{
+ if(path==='/')return {type:'home'};
  if(path==='/library')return {type:'library',folderId:null};
- const folder=/^\/library\/([^/]+)$/.exec(path);
- if(folder)return {type:'library',folderId:decodeURIComponent(folder[1])};
- const record=/^\/records\/([^/]+)$/.exec(path);
- if(record)return {type:'resource',kind:'record',id:decodeURIComponent(record[1])};
- return null;
+ let match=/^\/library\/([^/]+)$/.exec(path);
+ if(match)return {type:'library',id:decodeURIComponent(match[1]),folderId:decodeURIComponent(match[1])};
+ match=/^\/records\/([^/]+)$/.exec(path);
+ if(match)return {type:'record',id:decodeURIComponent(match[1])};
+ for(const type of ['search','activity','archive'] as const)if(path==='/'+type)return {type};
+ return {type:'other'};
+}
+function selectedKind(key:string|null):SourceKind|null{
+ const part=key?.split(':',1)[0];
+ return part&&['library','recent','activity','search','archive','tree','todo'].includes(part)?part as SourceKind:null;
 }
 
-export type PairCandidate={kind:SharedResourceKind;id:string;direction:'forward'|'back'};
 export function candidateForRoutes(fromPath:string,toPath:string):PairCandidate|null{
  const from=parse(fromPath),to=parse(toPath);
- if(!from||!to)return null;
- if(from.type==='library'&&to.type==='resource')return {kind:to.kind,id:to.id,direction:'forward'};
- if(from.type==='resource'&&to.type==='library')return {kind:from.kind,id:from.id,direction:'back'};
- if(from.type==='library'&&to.type==='library'){
-  if(from.folderId&&previousList?.to===fromPath&&previousList?.from===toPath)
-   return {kind:'folder',id:from.folderId,direction:'back'};
-  if(to.folderId&&to.folderId!==from.folderId)
-   return {kind:'folder',id:to.folderId,direction:'forward'};
-  if(from.folderId&&!to.folderId)
-   return {kind:'folder',id:from.folderId,direction:'back'};
- }
+ if(from.type==='record'&&from.id&&to.type==='library')
+  return {kind:'record',id:from.id,direction:'back'};
+ if(to.type==='record'&&to.id&&['library','home','search','activity','archive','record'].includes(from.type))
+  return {kind:'record',id:to.id,direction:'forward'};
+ if(to.type==='library'&&to.id&&['library','home','activity','record','search','archive'].includes(from.type))
+  return {kind:'folder',id:to.id,direction:'forward'};
+ if(from.type==='library'&&from.id&&to.type==='library'&&(!to.id||previous?.from===toPath&&previous?.to===fromPath))
+  return {kind:'folder',id:from.id,direction:'back'};
  return null;
-}
-
-const activeSelector='[data-rk-vt-active="true"]';
-function candidates(kind:SharedResourceKind,id:string):HTMLElement[]{
- return Array.from(document.querySelectorAll<HTMLElement>('[data-rk-vt-kind][data-rk-vt-id]'))
-  .filter(el=>el.dataset.rkVtKind===kind&&el.dataset.rkVtId===id);
-}
-function visible(el:HTMLElement):boolean{
- const viewport=document.querySelector('.main-scroll');
- if(!viewport||!el.isConnected)return false;
- const rect=el.getBoundingClientRect(),bounds=viewport.getBoundingClientRect();
- const style=getComputedStyle(el);
- return rect.width>0&&rect.height>0&&style.visibility==='visible'&&
-  rect.top>=bounds.top-2&&rect.bottom<=bounds.bottom+2&&
-  rect.left>=bounds.left-2&&rect.right<=bounds.right+2;
 }
 function stop(token?:number){
  if(token!==undefined&&active?.token!==token)return;
- document.querySelectorAll(activeSelector).forEach(el=>el.removeAttribute('data-rk-vt-active'));
+ document.querySelectorAll('[data-rk-vt-active="true"]').forEach(el=>el.removeAttribute('data-rk-vt-active'));
+ document.querySelectorAll('[data-rk-vt-handoff="true"]').forEach(el=>el.removeAttribute('data-rk-vt-handoff'));
  active=null;
 }
+function visible(element:HTMLElement):boolean{
+ const viewport=document.querySelector('.main-scroll');
+ if(!viewport||!element.isConnected)return false;
+ const rect=element.getBoundingClientRect(),bounds=viewport.getBoundingClientRect();
+ const css=getComputedStyle(element);
+ // Sidebar sources are in a persistent shell, outside the content scrollport.
+ if(element.closest('.sidebar')){
+  if(matchMedia('(max-width:720px)').matches)return false;
+  return rect.width>0&&rect.height>0&&rect.top>=0&&rect.bottom<=innerHeight&&rect.left>=0&&
+   css.visibility==='visible'&&css.opacity!=='0';
+ }
+ return rect.width>0&&rect.height>0&&css.visibility==='visible'&&
+  rect.top>=bounds.top-2&&rect.bottom<=bounds.bottom+2&&
+  rect.left>=bounds.left-2&&rect.right<=bounds.right+2;
+}
+const sourceQuery='[data-rk-vt-source]';
+function findSource(kind:SharedResourceKind,id:string,key:string):HTMLElement|null{
+ const matches=Array.from(document.querySelectorAll<HTMLElement>(sourceQuery)).filter(el=>
+  el.dataset.rkVtKind===kind&&el.dataset.rkVtId===id&&el.dataset.rkVtSource===key);
+ return matches.length===1?matches[0]:null;
+}
+function findHeader(kind:SharedResourceKind,id:string):HTMLElement|null{
+ const matches=Array.from(document.querySelectorAll<HTMLElement>('.doc-header [data-rk-vt-kind]')).filter(el=>
+  el.dataset.rkVtKind===kind&&el.dataset.rkVtId===id);
+ // A task targets its own inline row, not the enclosing task-list filename.
+ if(kind==='task'){
+  const tasks=Array.from(document.querySelectorAll<HTMLElement>('.embedded-tasks .task-title [data-rk-vt-kind="task"]')).filter(el=>
+   el.dataset.rkVtId===id);
+  return tasks.length===1?tasks[0]:null;
+ }
+ return matches.length===1?matches[0]:null;
+}
+export type ResolveSharedLabel=(
+ kind:SharedResourceKind,id:string,direction:PairDirection,
+ sourceKind:SourceKind,destination:LocationPath,sourceKey:string
+)=>string|undefined;
 
-export function preparePairedNavigation(fromLocation:LocationPath|null|undefined,toLocation:LocationPath,targetLabel:(kind:SharedResourceKind,id:string,direction:PairCandidate['direction'],destinationFolderId:string|null)=>string|undefined):string[]{
+export function preparePairedNavigation(fromLocation:LocationPath|null|undefined,toLocation:LocationPath,resolveLabel:ResolveSharedLabel):string[]{
  if(typeof document==='undefined')return [];
- // The previous screenshot must not be altered by an interrupted transition.
  stop();
- if(matchMedia('(prefers-reduced-motion: reduce)').matches)return [];
+ if(matchMedia('(prefers-reduced-motion: reduce)').matches){selectedKey=null;return [];}
  const from=fromLocation?.pathname??'',to=toLocation.pathname;
- const candidate=candidateForRoutes(from,to);
- if(!candidate)return [];
- const {kind,id,direction}=candidate;
- const destination=parse(to);
- const destinationFolderId=destination?.type==='library'?destination.folderId:null;
- // The loader has finished before this callback. A missing query or a stale
- // rename must not animate two different title strings as one shared snapshot.
- const expectedLabel=targetLabel(kind,id,direction,destinationFolderId);
- if(expectedLabel===undefined)return [];
- // Only main library rows, never recents, search, sidebar or breadcrumbs.
- const eligible=candidates(kind,id).filter(el=>el.closest(direction==='forward'?'.file-table':'.doc-header'));
- if(eligible.length!==1)return [];
- const source=eligible[0];
- if(source.textContent?.trim()!==expectedLabel||!visible(source))return [];
- // Avoid animating a truncated filename snapshot into a full heading or
- // capturing a title while its contentEditable field is actively being edited.
- if(source.scrollWidth>source.clientWidth+1||document.activeElement===source)return [];
- if(direction==='forward'){
-  if(!source.closest('.file-row'))return [];
-  // The row itself must already be painted; the title may still be entering.
-  const row=source.closest('.file-row');
-  if(row?.getAnimations().some(animation=>('animationName' in animation)&&animation.animationName==='data-row-fade-in'&&animation.playState==='running'))return [];
-  const viewport=document.querySelector('.main-scroll');
-  previousList={kind,id,from,to,scrollTop:viewport?.scrollTop??0};
+ const fromRoute=parse(from),toRoute=parse(to);
+ const clicked=selectedKey;selectedKey=null;
+ // An exact previous route pair is required for return navigation. Don't
+ // try to pair a random record name in the sidebar or a repeated search hit.
+ const last=previous;
+ const reverse=last!==null&&last.to===from&&last.from===to;
+ let candidate:PairCandidate|null=null;
+ let sourceKind:SourceKind;
+ let sourceKey:string;
+ if(reverse){
+  candidate={kind:last!.kind,id:last!.id,direction:'back'};
+  sourceKind=last!.sourceKind;sourceKey=last!.sourceKey;
  }else{
-  // Route history may bring the user back to a different or off-screen list.
-  // Only animate a matching recent library/detail pair near the list top.
-  if(!previousList||previousList.kind!==kind||previousList.id!==id||
-   previousList.from!==to||previousList.to!==from||previousList.scrollTop>8)return [];
-  // A backwards pair is permitted only for the recent list/detail origin.
-  // Its target membership and label were checked above.
+  candidate=selectedKind(clicked)==='tree'&&toRoute.type==='library'&&toRoute.id
+   ?{kind:'folder',id:toRoute.id,direction:'forward'}
+   :selectedKind(clicked)==='tree'&&toRoute.type==='record'&&toRoute.id
+   ?{kind:'record',id:toRoute.id,direction:'forward'}
+   :candidateForRoutes(from,to);
+  if(!candidate||candidate.direction!=='forward')return [];
+  if(clicked?.startsWith('todo:')&&fromRoute.type==='home'&&toRoute.type==='record'){
+   const taskId=toLocation.search?.task;
+   if(typeof taskId!=='string'||clicked!==('todo:'+taskId))return [];
+   candidate={kind:'task',id:taskId,direction:'forward'};
+  }
+  sourceKind=selectedKind(clicked)??(fromRoute.type==='library'?'library':null)!;
+  if(!sourceKind)return [];
+  if(sourceKind==='tree'){
+   if(toRoute.type!=='record'&&toRoute.type!=='library')return [];
+  }else if(sourceKind==='todo'){
+   if(candidate.kind!=='task'||fromRoute.type!=='home')return [];
+  }else if(sourceKind==='recent'&&fromRoute.type!=='home'
+   ||sourceKind==='search'&&fromRoute.type!=='search'
+   ||sourceKind==='archive'&&fromRoute.type!=='archive'
+   ||sourceKind==='activity'&&!['home','activity'].includes(fromRoute.type)
+   ||sourceKind==='library'&&fromRoute.type!=='library')return [];
+  sourceKey=clicked??('library:'+candidate.kind+':'+candidate.id);
+ }
+ const {kind,id,direction}=candidate;
+ // Never join unrelated task and document names (or a stale record title).
+ if(kind==='task'&&(toRoute.type==='record'&&typeof toLocation.search?.task!=='string'&&direction==='forward'))return [];
+ const expected=resolveLabel(kind,id,direction,sourceKind,toLocation,sourceKey);
+ if(expected===undefined)return [];
+ const source=direction==='forward'?findSource(kind,id,sourceKey):findHeader(kind,id);
+ if(!source||source.textContent?.trim()!==expected||!visible(source))return [];
+ if(source.scrollWidth>source.clientWidth+1||document.activeElement===source)return [];
+ // A two-line/clamped card title cannot morph cleanly into a one-line page
+ // heading: only share the actual single-line text, never a cropped layout.
+ const sourceStyle=getComputedStyle(source);
+ const lineHeight=parseFloat(sourceStyle.lineHeight);
+ if(Number.isFinite(lineHeight)&&lineHeight>0&&source.getBoundingClientRect().height>lineHeight*1.55)return [];
+ if(direction==='forward'){
+  const row=source.closest('.file-row,.recent-page,.search-result,.archive-item,.compact-row,.recent-entry,.activity-row');
+  if(row?.getAnimations().some(animation=>
+   'animationName' in animation&&animation.animationName==='data-row-fade-in'&&animation.playState==='running'))return [];
+  const scroll=document.querySelector('.main-scroll')?.scrollTop??0;
+  previous={kind,id,from,to,sourceKind,sourceKey,label:expected,scrollTop:scroll};
+ }else{
+  if(!previous||previous.kind!==kind||previous.id!==id||previous.sourceKey!==sourceKey)return [];
+  // Only return-pair when the origin is near its original viewport position.
+  // Otherwise an offscreen destination would produce a single floating ghost.
+  if(previous.scrollTop>8)return [];
  }
  const token=++sequence;
- active={kind,id,from,to,token,source};
+ active={kind,id,direction,sourceKey,token,label:expected,sourceKind,source,from,to};
  source.setAttribute('data-rk-vt-active','true');
  return ['rk-paired-navigation'];
 }
-
-export function clearPairedNavigation(){stop();}
-
-/** Attach cleanup to the browser's real transition lifecycle, not an arbitrary
- * timer. Return history navigation and interrupted transitions use this too. */
+export function clearPairedNavigation(){if(typeof document!=='undefined')stop();}
+/** Cleanup is attached to the native transition lifecycle, including skips. */
 export function installPairedTransitionLifecycle(){
  if(typeof document==='undefined'||typeof document.startViewTransition!=='function')return;
  const native=document.startViewTransition.bind(document);
  document.startViewTransition=((...args:Parameters<Document['startViewTransition']>)=>{
   const token=active?.token;
-  const transition=native(...args);
+  const handoff=active?.direction==='forward'&&active.sourceKind==='tree'&&token!==undefined;
+  const original=typeof args[0]==='function'?args[0]:args[0]?.update;
+  const captured=handoff&&original?async()=>{
+   await original();
+   // The sidebar persists in the next DOM. After the OLD snapshot, remove its
+   // shared name before capturing the NEW header: two names would skip VT.
+   // Keep the live sidebar text hidden only while its image is travelling.
+   if(active?.token===token){
+    active.source.removeAttribute('data-rk-vt-active');
+    active.source.setAttribute('data-rk-vt-handoff','true');
+   }
+  }:null;
+  const next=captured?(typeof args[0]==='function'?captured:{...args[0],update:captured}):args[0];
+  const transition=native(next as typeof args[0]);
   if(token!==undefined){
    void transition.finished.then(()=>stop(token),()=>stop(token));
    void transition.ready.catch(()=>stop(token));

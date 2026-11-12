@@ -5,8 +5,11 @@ import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
 import {Shell} from './shell';
 import {prepareScrollbars,useScrollbarsReady} from './scrollbars';
-import {preparePairedNavigation} from './shared-view-transition';
+import {preparePairedNavigation,type ResolveSharedLabel} from './shared-view-transition';
+import {getRecentPages} from './recent-pages';
 import {documentDisplayName} from './document-filename';
+import type {Task,Event,Entry} from './types';
+import type {SearchResult} from './queries';
 // Route modules load only when visited/preloaded, rather than entering the
 // initial shell bundle. TanStack preloads these on navigation intent.
 const importLogin=()=>import('./pages/login');
@@ -60,7 +63,10 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/library',component:LibraryPage,loader:()=>ready(importLibrary(),queryClient.ensureInfiniteQueryData(folderPagesQuery(null)))}),
  createRoute({getParentRoute:()=>root,path:'/library/$folderId',component:LibraryPage,loader:({params})=>ready(importLibrary(),queryClient.ensureInfiniteQueryData(folderPagesQuery(params.folderId)),queryClient.ensureQueryData(folderQuery(params.folderId)))}),
  createRoute({getParentRoute:()=>root,path:'/records/$recordId',component:RecordPage,
-  validateSearch:(search:Record<string,unknown>):{mode?:'source'}=>search.mode==='source'?{mode:'source'}:{},
+  validateSearch:(search:Record<string,unknown>):{mode?:'source';task?:string}=>({
+   ...(search.mode==='source'?{mode:'source' as const}:{}),
+   ...(typeof search.task==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(search.task)?{task:search.task}:{})
+  }),
   loaderDeps:({search})=>({mode:search.mode}),
   loader:async({params,deps})=>{
    const chunk=importRecord();
@@ -93,24 +99,77 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/settings/indexing',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage,loader:()=>ready(importSettings())})
 ];
+/**
+ * Verify the exact label on both sides BEFORE capturing an old snapshot.
+ * Cache membership is mandatory for history navigation: a missing destination
+ * must fall back to the normal route crossfade instead of a floating name.
+ */
+const labelForRecord=(name:string,recordKind?:string)=>
+ recordKind==='document'?documentDisplayName(name):name;
+const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,key)=>{
+ if(direction==='forward'){
+  if(kind==='folder')return queryClient.getQueryData<{name:string}>(['folder',id])?.name;
+  if(kind==='task'){
+   const parent=/^\/records\/([^/]+)$/.exec(location.pathname);
+   const tasks=parent?queryClient.getQueryData<{items:Task[]}>(['tasks',decodeURIComponent(parent[1])]):null;
+   return tasks?.items.find(item=>item.id===id)?.title;
+  }
+  const record=queryClient.getQueryData<{kind:string;name:string}>(['record',id]);
+  return record?labelForRecord(record.name,record.kind):undefined;
+ }
+ if(source==='tree'){
+  const element=Array.from(document.querySelectorAll<HTMLElement>('[data-rk-vt-source]'))
+   .find(el=>el.dataset.rkVtSource===key&&el.dataset.rkVtId===id);
+  return element?.isConnected?element.textContent?.trim():undefined;
+ }
+ if(source==='library'){
+  const match=/^\/library\/([^/]+)$/.exec(location.pathname);
+  const folder=location.pathname==='/library'?null:match?.[1];
+  if(folder===undefined)return undefined;
+  const data=queryClient.getQueryData<{pages:Array<{items:Entry[]}>}>(['browse-pages',folder]);
+  const item=data?.pages.flatMap(page=>page.items).find(entry=>entry.id===id&&entry.entityType===kind);
+  return item?kind==='record'?labelForRecord(item.name,item.kind):item.name:undefined;
+ }
+ if(source==='recent'){
+  const item=getRecentPages().find(entry=>entry.id===id);
+  return item?labelForRecord(item.name,item.kind):undefined;
+ }
+ if(source==='todo'){
+  const item=queryClient.getQueryData<{items:Task[]}>(['tasks','all'])?.items.find(t=>t.id===id);
+  return item?.title;
+ }
+ if(source==='search'){
+  const query=location.search?.q,mode=location.search?.mode;
+  if(typeof query!=='string'||!query)return undefined;
+  const searchMode=typeof mode==='string'?mode as SearchMode:'auto';
+  const hits=queryClient.getQueryData<SearchResult>(['search',query,searchMode,30])?.items??[];
+  const item=hits.find((hit,index)=>hit.id===id&&key==='search:'+hit.id+':'+index);
+  return item?labelForRecord(item.name,item.kind):undefined;
+ }
+ if(source==='archive'){
+  const pages=queryClient.getQueryData<{pages:Array<{items:Array<{id:string;name:string;kind:string}>}>}>(['archived-records','']);
+  const item=pages?.pages.flatMap(page=>page.items).find(entry=>entry.id===id);
+  return item?labelForRecord(item.name,item.kind):undefined;
+ }
+ if(source==='activity'){
+  const seq=key.slice('activity:'.length);
+  const events:Event[]=location.pathname==='/activity'
+   ?queryClient.getQueryData<{pages:Array<{items:Event[]}>}>(['recent-activity'])?.pages.flatMap(page=>page.items)??[]
+   :queryClient.getQueryData<{items:Event[]}>(['activity'])?.items??[];
+  const event=events.find(entry=>String(entry.seq??entry.id??'unknown')===seq&&
+   (entry.entityId||entry.recordId)===id);
+  return event?.resourceName?kind==='record'?documentDisplayName(event.resourceName):event.resourceName:undefined;
+ }
+ return undefined;
+};
+
 // Loaders read through the shared query cache; the router itself never caches stale data.
 // Every route gets the native transition, including browser history. The
 // default root snapshot preserves persistent navigation, while the fixed main
 // scroll viewport and stable resource IDs animate separately.
 export const router=createRouter({routeTree:root.addChildren(list),defaultPreload:'intent',defaultPreloadStaleTime:0,
  defaultViewTransition:{types:({fromLocation,toLocation})=>
-  preparePairedNavigation(fromLocation,toLocation,(kind,id,direction,folderId)=>{
-   if(direction==='forward'){
-    if(kind==='folder')return queryClient.getQueryData<{name:string}>(['folder',id])?.name;
-    const detail=queryClient.getQueryData<{name:string;kind:string}>(['record',id]);
-    return detail?.kind==='document'?documentDisplayName(detail.name):undefined;
-   }
-   const data=queryClient.getQueryData<{pages:Array<{items:Array<{
-    id:string;entityType:string;name:string;kind?:string
-   }>}>}>(['browse-pages',folderId]);
-   const entry=data?.pages.flatMap(page=>page.items).find(item=>
-    item.id===id&&item.entityType===kind&&(kind==='folder'||item.kind==='document'));
-   return entry?(kind==='record'?documentDisplayName(entry.name):entry.name):undefined;
-  })}
+  preparePairedNavigation(fromLocation,toLocation,resolveSharedLabel)}
+
 });
 declare module '@tanstack/react-router'{interface Register{router:typeof router;}}

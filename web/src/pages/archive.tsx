@@ -7,7 +7,8 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {ApiError,api,mutate,queryString} from '../api';
 import {useConfirmDialog} from '../confirm-dialog';
 import {archivedRecordsQuery} from '../queries';
-import {sharedViewTransitionName} from '../shared-view-transition';
+import {sharedSourceAttributes,markSharedNavigationSource} from '../shared-view-transition';
+import {documentDisplayName} from '../document-filename';
 import {PageTitle,ErrorText,LoadingRows,Empty,fmt} from './shared';
 
 export function ArchivePage(){
@@ -68,9 +69,9 @@ export function ArchivePage(){
   <div className="archive-filter"><TextInput label="搜索归档" placeholder="搜索归档名称或原路径" width="100%" value={filter} onChange={setFilter}/></div>
   {q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:
    items.length?<div className="archive-list">{items.map(item=><div className="archive-item" key={item.id}>
-    <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link">
+    <Link to="/records/$recordId" params={{recordId:item.id}} className="archive-item-link" onClick={()=>markSharedNavigationSource('archive:'+item.id)}>
      {item.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}
-     <span className="archive-item-text"><strong className="truncate" style={{viewTransitionName:sharedViewTransitionName('record',item.id)}}>{item.name}</strong>
+     <span className="archive-item-text"><strong className="truncate rk-shared-filename"><span className="rk-shared-text" {...sharedSourceAttributes('record',item.id,'archive:'+item.id)}>{item.kind==='document'?documentDisplayName(item.name):item.name}</span>{item.kind==='document'&&/\.md$/i.test(item.name)&&<span className="rk-shared-extension">{item.name.slice(-3)}</span>}</strong>
       <small className="muted truncate">{item.archivedFromPath?'原路径 '+item.archivedFromPath+' · ':''}{fmt(item.archivedAt??item.updatedAt)} · R{item.revision??'—'}</small>
      </span>
     </Link>

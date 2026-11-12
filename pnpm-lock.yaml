@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  tiptap-extension-code-block-shiki@1.2.0: 8ec4ab0cd350d778b1418f30f3f066ea9b5fe901c57ab58d03ab9df630f8b9dd
+
 importers:
 
   .:
@@ -196,7 +199,7 @@ importers:
         version: 2.2.0(diff-match-patch@1.0.5)
       tiptap-extension-code-block-shiki:
         specifier: ^1.2.0
-        version: 1.2.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(shiki@4.6.0)
+        version: 1.2.0(patch_hash=8ec4ab0cd350d778b1418f30f3f066ea9b5fe901c57ab58d03ab9df630f8b9dd)(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(shiki@4.6.0)
       unified:
         specifier: ^11.0.5
         version: 11.0.5
@@ -6152,7 +6155,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
 
-  tiptap-extension-code-block-shiki@1.2.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(shiki@4.6.0):
+  tiptap-extension-code-block-shiki@1.2.0(patch_hash=8ec4ab0cd350d778b1418f30f3f066ea9b5fe901c57ab58d03ab9df630f8b9dd)(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(shiki@4.6.0):
     dependencies:
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
       '@tiptap/pm': 3.32.0

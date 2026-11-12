@@ -156,8 +156,32 @@ to {
 /* The route viewport always crossfades. Exactly one verified pair of
    library filename / destination heading may additionally receive a name,
    only during its navigation. Other text remains in the route snapshot. */
+/* Source labels stay intrinsically sized. Never capture a flex item's
+   blank width as a title snapshot (it previously enlarged "Game" 20×). */
+.rk-shared-text {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+.rk-shared-extension { color: var(--rk-ink-faint); }
+.compact-row a .rk-shared-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 [data-rk-vt-active="true"] {
   view-transition-name: rk-shared-title;
+}
+/* A persistent sidebar title is captured as OLD, but must be unnamed/hidden
+   in the NEW live shell until the moving screenshot completes. */
+[data-rk-vt-handoff="true"] {visibility: hidden;}
+/* The matched search title is a plain filename during capture, not a
+   yellow highlight fragment or a collection of separate inline snapshots. */
+[data-rk-vt-active="true"] mark {
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
 }
 
 ::view-transition-group(rk-shared-title) {

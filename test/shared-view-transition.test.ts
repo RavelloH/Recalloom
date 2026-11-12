@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {resourceViewTransitionIdentity,sharedViewTransitionName,sharedTitleAttributes,candidateForRoutes} from '../web/src/shared-view-transition.js';
+import {resourceViewTransitionIdentity,sharedViewTransitionName,sharedTitleAttributes,sharedSourceAttributes,candidateForRoutes} from '../web/src/shared-view-transition.js';
 
 test('resource names are deterministic, safe CSS identifiers',()=>{
  const record=resourceViewTransitionIdentity('record','1234-abcd-5678');
@@ -25,9 +25,13 @@ test('unpaired text stays inside the route snapshot',()=>{
  assert.deepEqual(sharedTitleAttributes('record','1234'),{
   'data-rk-vt-kind':'record','data-rk-vt-id':'1234','data-rk-vt-active':undefined
  });
+ assert.deepEqual(sharedSourceAttributes('record','1234','search:1234:0'),{
+  'data-rk-vt-kind':'record','data-rk-vt-id':'1234',
+  'data-rk-vt-source':'search:1234:0','data-rk-vt-active':undefined
+ });
 });
 
-test('pair candidates come only from knowledge-base list/detail navigation',()=>{
+test('pair candidates cover eligible source and destination route families',()=>{
  assert.deepEqual(candidateForRoutes('/library','/records/abc'),{kind:'record',id:'abc',direction:'forward'});
  assert.deepEqual(candidateForRoutes('/library/parent','/records/abc'),{kind:'record',id:'abc',direction:'forward'});
  assert.deepEqual(candidateForRoutes('/records/abc','/library/parent'),{kind:'record',id:'abc',direction:'back'});
@@ -35,7 +39,9 @@ test('pair candidates come only from knowledge-base list/detail navigation',()=>
  assert.deepEqual(candidateForRoutes('/library/parent','/library/child'),{kind:'folder',id:'child',direction:'forward'});
  assert.deepEqual(candidateForRoutes('/library/child','/library'),{kind:'folder',id:'child',direction:'back'});
  assert.equal(candidateForRoutes('/search?q=abc','/records/abc'),null);
- assert.equal(candidateForRoutes('/','/records/abc'),null);
- assert.equal(candidateForRoutes('/archive','/records/abc'),null);
- assert.equal(candidateForRoutes('/records/abc','/records/def'),null);
+ assert.deepEqual(candidateForRoutes('/','/records/abc'),{kind:'record',id:'abc',direction:'forward'});
+ assert.deepEqual(candidateForRoutes('/archive','/records/abc'),{kind:'record',id:'abc',direction:'forward'});
+ assert.deepEqual(candidateForRoutes('/search','/records/abc'),{kind:'record',id:'abc',direction:'forward'});
+ assert.deepEqual(candidateForRoutes('/activity','/library/folder'),{kind:'folder',id:'folder',direction:'forward'});
+ assert.deepEqual(candidateForRoutes('/records/abc','/records/def'),{kind:'record',id:'def',direction:'forward'});
 });

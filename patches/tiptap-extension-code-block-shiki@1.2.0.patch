@@ -1,0 +1,77 @@
+diff --git a/dist/tiptap-extension-code-block-shiki.js b/dist/tiptap-extension-code-block-shiki.js
+index 7f3453c01d9b8b5fdde2e89c7c237611337150cc..32fd5df398d631a9e0bfbcafad3665a7a4303077 100644
+--- a/dist/tiptap-extension-code-block-shiki.js
++++ b/dist/tiptap-extension-code-block-shiki.js
+@@ -232,6 +232,10 @@ function Q(e) {
+     ), o = [...t, ...B.values()];
+     return w = K({ themes: o, langs: i }).then((n) => {
+       f = n;
++    }, (error) => {
++      // A canceled dynamic import must not permanently poison the singleton.
++      w = void 0;
++      throw error;
+     }), w;
+   }
+   if (w)
+@@ -241,12 +245,24 @@ async function b(e) {
+   if (f && !f.getLoadedThemes().includes(e) && !D.has(e) && q(e)) {
+     D.add(e);
+     const t = B.get(e) ?? e;
+-    return await f.loadTheme(t), D.delete(e), !0;
++    try {
++      await f.loadTheme(t);
++      return !0;
++    } finally {
++      D.delete(e);
++    }
+   }
+   return !1;
+ }
+ async function H(e) {
+-  return f && !f.getLoadedLanguages().includes(e) && !N.has(e) && e in W ? (N.add(e), await f.loadLanguage(e), N.delete(e), !0) : !1;
++  if (!f || f.getLoadedLanguages().includes(e) || N.has(e) || !(e in W)) return !1;
++  N.add(e);
++  try {
++    await f.loadLanguage(e);
++    return !0;
++  } finally {
++    N.delete(e);
++  }
+ }
+ async function X({
+   doc: e,
+@@ -348,12 +364,16 @@ function Y({
+     view(r) {
+       class s {
+         constructor() {
+-          this.initDecorations();
++          this.destroyed = !1;
++          // Pending language imports may be canceled when the editor unmounts.
++          // Do not leak unhandled rejections into unrelated route navigation.
++          void this.initDecorations().catch(() => {});
+         }
+         update() {
+-          this.checkUndecoratedBlocks();
++          if (!this.destroyed) void this.checkUndecoratedBlocks().catch(() => {});
+         }
+         destroy() {
++          this.destroyed = !0;
+         }
+         // Initialize shiki async, and then highlight initial document
+         async initDecorations() {
+@@ -366,6 +386,7 @@ function Y({
+             themeModes: o,
+             customThemes: n ?? void 0
+           });
++          if (this.destroyed || r.isDestroyed) return;
+           const g = r.state.tr.setMeta("shikiPluginForceDecoration", !0);
+           r.dispatch(g);
+         }
+@@ -384,6 +405,7 @@ function Y({
+           if ((await Promise.all(
+             a.flatMap((l) => g(l))
+           )).includes(!0)) {
++            if (this.destroyed || r.isDestroyed) return;
+             const l = r.state.tr.setMeta("shikiPluginForceDecoration", !0);
+             r.dispatch(l);
+           }

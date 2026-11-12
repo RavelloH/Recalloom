@@ -99,6 +99,10 @@ const assertRouteTransition=async(since,{expectPair=false,expectFallback=false}=
  return result;
 };
 const assertTextInPage=async(locator)=>assert.equal(await vtName(locator),'none','text must fade together with its parent viewport');
+const canMorphCurrentHeader=()=>page.locator('.doc-header [data-rk-vt-kind]').first().evaluate(el=>{
+ const lh=parseFloat(getComputedStyle(el).lineHeight);
+ return el.scrollWidth<=el.clientWidth+1&&(!Number.isFinite(lh)||el.getBoundingClientRect().height<=lh*1.55);
+});
 const assertShell=async()=>{
  const computed=await page.evaluate(()=>{
   const css=(part)=>getComputedStyle(document.documentElement,part);
@@ -170,11 +174,17 @@ try{
  await assertShell();
 
  // History back MUST crossfade the entire content without any click handler.
+ // A wrapped phone heading must safely fall back instead of morphing a
+ // two-line title snapshot into the single-line list row.
+ const canMorphFolderBack=await page.locator('.folder-page h1.page-title').evaluate(el=>{
+  const lh=parseFloat(getComputedStyle(el).lineHeight);
+  return el.scrollWidth<=el.clientWidth+1&&(!Number.isFinite(lh)||el.getBoundingClientRect().height<=lh*1.55);
+ });
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/library');
  await folderRow.waitFor();
- await assertRouteTransition(before,{expectPair:true});
+ await assertRouteTransition(before,canMorphFolderBack?{expectPair:true}:{expectFallback:true});
  await assertUnique();
 
  // Browser forward restores the same pair once the list's entrance settles.
@@ -212,10 +222,11 @@ try{
  await recordPage(basic);
  await assertRouteTransition(before,{expectPair:true});
  await assertTextInPage(page.locator('.record-page h1.page-title'));
+ const basicBackPair=await canMorphCurrentHeader();
  before=await count();
  await page.goBack();
  await folderPage(folder);
- await assertRouteTransition(before,{expectPair:true});
+ await assertRouteTransition(before,basicBackPair?{expectPair:true}:{expectFallback:true});
  await assertTextInPage(page.locator('.file-row').filter({hasText:basic.name}).locator('.file-row-title').first());
 
  // Persisted .md names are split into exactly two inline elements; only the
@@ -231,10 +242,11 @@ try{
  await recordPage(markdownNamed);
  await page.getByRole('heading',{name:pureName,level:1}).waitFor();
  await assertRouteTransition(before,{expectPair:true});
+ const markdownBackPair=await canMorphCurrentHeader();
  before=await count();
  await page.goBack();
  await folderPage(folder);
- await assertRouteTransition(before,{expectPair:true});
+ await assertRouteTransition(before,markdownBackPair?{expectPair:true}:{expectFallback:true});
 
  // The exact layout families from the two user screenshots.
  for(const entry of [task,nested]){
@@ -244,11 +256,12 @@ try{
   before=await count();
   await page.locator('.file-row').filter({hasText:entry.name}).click();
   if(kind==='record')await recordPage(entry);else await folderPage(entry);
-  await assertRouteTransition(before,kind==='folder'?{expectPair:true}:{expectFallback:true});
+  await assertRouteTransition(before,{expectPair:true});
+  const entryBackPair=await canMorphCurrentHeader();
   before=await count();
   await page.goBack();
   await folderPage(folder);
-  await assertRouteTransition(before,kind==='folder'?{expectPair:true}:{expectFallback:true});
+  await assertRouteTransition(before,entryBackPair?{expectPair:true}:{expectFallback:true});
  }
 
  // Document filenames remain the header identity; the H1 stays in the body.
@@ -313,31 +326,41 @@ try{
   return {x,y,width,height};
  });
  const homeBox=await viewportBox();
+ await page.waitForTimeout(410);
+ const canMorphRecent=await recent.locator('.rk-shared-text').evaluate(el=>{
+  const lh=parseFloat(getComputedStyle(el).lineHeight);
+  return el.scrollWidth<=el.clientWidth+1&&(!Number.isFinite(lh)||el.getBoundingClientRect().height<=lh*1.55);
+ });
  before=await count();
  await recent.click();
  await recordPage(promoted);
- await assertRouteTransition(before,{expectFallback:true});
+ await assertRouteTransition(before,canMorphRecent?{expectPair:true}:{expectFallback:true});
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'opening a portal must not move or resize the snapshot viewport');
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');
  await recent.waitFor();
- await assertRouteTransition(before,{expectFallback:true});
+ await assertRouteTransition(before);
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'closing a portal must not move or resize the snapshot viewport');
 
  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
  const hit=page.locator('.search-result').filter({hasText:promoted.name}).first();
  await hit.waitFor();
  await assertTextInPage(hit.locator('strong').first());
+ await page.waitForTimeout(410);
+ const canMorphSearch=await hit.locator('.rk-shared-text').evaluate(el=>{
+  const lh=parseFloat(getComputedStyle(el).lineHeight);
+  return el.scrollWidth<=el.clientWidth+1&&(!Number.isFinite(lh)||el.getBoundingClientRect().height<=lh*1.55);
+ });
  before=await count();
  await hit.click();
  await recordPage(promoted);
- await assertRouteTransition(before,{expectFallback:true});
+ await assertRouteTransition(before,canMorphSearch?{expectPair:true}:{expectFallback:true});
  before=await count();
  await page.goBack();
  await page.waitForURL(/\/search\?/);
  await hit.waitFor();
- await assertRouteTransition(before,{expectFallback:true});
+ await assertRouteTransition(before);
 
 
  // Search submit must commit immediately and display loading feedback while

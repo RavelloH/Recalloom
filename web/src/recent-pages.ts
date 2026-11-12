@@ -30,6 +30,7 @@ export function clearRecentPages(){
  try{localStorage.removeItem(key);}catch{ /* storage may be unavailable */ }
  listeners.forEach(fn=>fn());
 }
+export const getRecentPages=read;
 export function useRecentPages(){
  return useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn);},read,read);
 }
