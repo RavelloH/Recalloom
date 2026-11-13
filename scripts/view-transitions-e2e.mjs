@@ -188,7 +188,14 @@ try{
  await assertUnique();
 
  // Browser forward restores the same pair once the list's entrance settles.
- await page.waitForTimeout(350);
+ // In combined suites this folder may be the 6th+ row; its stagger delay
+ // adds up to 165ms on top of the 300ms animation. Wait for the actual row,
+ // not an arbitrary 350ms sleep that silently races our snapshot guard.
+ await page.waitForFunction(name=>{
+  const row=[...document.querySelectorAll('.file-row')].find(el=>el.textContent?.includes(name));
+  return row&&!row.getAnimations().some(animation=>
+   'animationName' in animation&&animation.animationName==='data-row-fade-in'&&animation.playState==='running');
+ },folder.name);
  before=await count();
  await page.goForward();
  await folderPage(folder);

@@ -276,8 +276,9 @@ try{
  await assertRouteTransition(before,{expectPair:true});
  console.log('PASS search title to document; return to same query');
 
- // The task list FILE NAME is also a normal record title. Library rows and
- // the persistent desktop tree link should both be eligible sources.
+ // Task-list filenames still share from the actual library CONTENT row.
+ // The persistent sidebar, however, must NOT morph its always-visible label
+ // into a route heading: that would briefly hide or duplicate shell text.
  await stableGoto(base+'/library/'+folder.id);
  const taskRow=page.locator('.file-row').filter({hasText:taskList.name});
  await taskRow.waitFor();
@@ -298,15 +299,15 @@ try{
   before=await count();
   await tree.click();
   await recordPage(taskList);
-  await assertRouteTransition(before,{expectPair:true});
-  assert.equal(await page.locator('[data-rk-vt-handoff="true"]').count(),0,
-   'persistent shell handoff must clean up the original sidebar label');
+  await assertRouteTransition(before,{expectFallback:true});
+  assert.equal(await tree.locator('[data-rk-vt-active="true"]').count(),0,
+   'persistent sidebar must never become a paired title snapshot');
   before=await count();
   await page.goBack();
   await page.waitForURL(base+'/library/'+folder.id);
-  await assertRouteTransition(before,{expectPair:true});
-  assert.equal(await page.locator('[data-rk-vt-handoff="true"]').count(),0);
-  console.log('PASS desktop persistent knowledge-tree item to task-list title, forward and back');
+  await assertRouteTransition(before,{expectFallback:true});
+  assert.equal(await page.locator('.sidebar [data-rk-vt-active="true"]').count(),0);
+  console.log('PASS desktop persistent sidebar text stays live; navigation uses route fade only');
  }
 
  // Archive-to-document is a real shared title; the archived record's kind

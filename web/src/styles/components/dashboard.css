@@ -328,17 +328,9 @@
 .recent-mode-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
   margin-bottom: 14px;
   min-width: 0;
-}
-
-.recent-mode-title {
-  margin: 0;
-  color: var(--rk-ink-soft);
-  font-size: var(--rk-font-label);
-  font-weight: 650;
 }
 
 .home-recent-resizer,
@@ -346,14 +338,29 @@
   min-width: 0;
 }
 
+/* AutoResizer intentionally clips during height animation. Extend its
+   clipping rectangle beyond the cards on ALL four sides so desktop hover
+   shadows and focus rings stay visible, without enlarging the actual grid
+   or changing the dashboard's vertical spacing. */
+.home-recent-resizer {
+  box-sizing: border-box;
+  width: calc(100% + 48px);
+  margin-inline: -24px;
+  margin-block: -24px;
+}
+
+.home-recent-content {
+  padding: 24px;
+}
+
 /* The two homepage summaries use one compact row rhythm. Full activity pages
    retain their multi-line layout; only the dashboard previews are clamped. */
 .home-card .compact-row,
 .home-card .recent-entry {
   box-sizing: border-box;
-  height: 60px;
-  min-height: 60px;
-  padding-block: 10px;
+  height: 48px;
+  min-height: 48px;
+  padding-block: 8px;
 }
 
 .home-card .recent-entry .activity-main {
@@ -598,8 +605,8 @@
   align-self: flex-end;
 }
 
-.recent-mode-title {
-  display: none;
+.home-recent-content {
+  padding: 0;
 }
 
 .home-recent-resizer {
@@ -608,6 +615,7 @@
   box-sizing: border-box;
   width: calc(100% + 2 * var(--rk-gutter));
   margin-inline: calc(-1 * var(--rk-gutter));
+  margin-block: 0;
 }
 
 .home-recent-content > .recent-pages {

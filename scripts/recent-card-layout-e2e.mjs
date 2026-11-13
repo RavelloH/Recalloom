@@ -144,7 +144,10 @@ try{
  await cards.first().waitFor();
  for(const width of [320,390,768,1365]){
   await page.setViewportSize({width,height:900});
-  await page.waitForTimeout(130);
+  // A narrow carousel becomes a multi-row desktop grid. The measured
+  // AutoResizer interpolates height for 240ms; inspect the settled layout,
+  // not an intentionally mid-transition clip rectangle.
+  await page.waitForTimeout(width>720?380:130);
   const geometry=await cards.evaluateAll(elements=>elements.map(el=>{
    const box=el.querySelector('.recent-page-name');
    const source=el.querySelector('.rk-shared-text');
@@ -241,6 +244,26 @@ try{
    }));
    assert.equal(desktop.display,'grid');
    assert.equal(desktop.mask,'none','full-bleed fade must be limited to mobile');
+   const shadowSafe=await page.locator('.home-recent-resizer').evaluate(el=>{
+    const clip=el.getBoundingClientRect();
+    const cards=[...el.querySelectorAll('.recent-page')].map(node=>node.getBoundingClientRect());
+    const bounds={
+     left:Math.min(...cards.map(r=>r.left)),right:Math.max(...cards.map(r=>r.right)),
+     top:Math.min(...cards.map(r=>r.top)),bottom:Math.max(...cards.map(r=>r.bottom))
+    };
+    const title=document.querySelector('.home-page h1')?.getBoundingClientRect();
+    return {insetLeft:bounds.left-clip.left,insetRight:clip.right-bounds.right,
+     insetTop:bounds.top-clip.top,insetBottom:clip.bottom-bounds.bottom,
+     titleLeft:title?.left,cardLeft:bounds.left,
+     width:clip.width,height:clip.height};
+   });
+   for(const side of ['insetLeft','insetRight','insetTop','insetBottom'])
+    assert.ok(shadowSafe[side]>=20,
+     'desktop AutoResizer must reserve four-sided clearance for card shadows: '+JSON.stringify({width,side,shadowSafe}));
+   assert.ok(Math.abs(shadowSafe.cardLeft-shadowSafe.titleLeft)<=2,
+    'desktop cards must still align with the page heading: '+JSON.stringify(shadowSafe));
+   if(width===1365)await page.screenshot({path:'tmp/recent-card-desktop-shadow-safe.png',fullPage:false});
+   console.log('PASS four-sided desktop card shadow clearance '+width+'px');
   }
   console.log('PASS recent card title clamping '+width+'px');
   if(width===390)await page.screenshot({path:'tmp/recent-card-390.png',fullPage:false});

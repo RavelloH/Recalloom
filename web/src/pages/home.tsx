@@ -59,7 +59,6 @@ export function HomePage(){
  return <div className="page home-page"><PageTitle title="概览" description={greeting()+'。从最近的页面继续，或查看待办与近期变化。'}/>
  <section className="home-section" aria-label="最近访问与更新">
   <div className="recent-mode-heading">
-   <h2 className="recent-mode-title">近期记录</h2>
    <SegmentedControl value={recentMode} onChange={switchRecentMode} label="最近记录分类" size="lg" layout="hug">
     <SegmentedControlItem value="visited" label="最近访问" icon={<Icon name="clock" size="sm"/>}/>
     <SegmentedControlItem value="updated" label="最近更新" icon={<Icon name="updated" size="sm"/>}/>

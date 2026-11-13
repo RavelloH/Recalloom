@@ -173,9 +173,6 @@ to {
 [data-rk-vt-active="true"] {
   view-transition-name: rk-shared-title;
 }
-/* A persistent sidebar title is captured as OLD, but must be unnamed/hidden
-   in the NEW live shell until the moving screenshot completes. */
-[data-rk-vt-handoff="true"] {visibility: hidden;}
 /* The matched search title is a plain filename during capture, not a
    yellow highlight fragment or a collection of separate inline snapshots. */
 [data-rk-vt-active="true"] mark {

@@ -125,11 +125,6 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
   }
   return undefined;
  }
- if(source==='tree'){
-  const element=Array.from(document.querySelectorAll<HTMLElement>('[data-rk-vt-source]'))
-   .find(el=>el.dataset.rkVtSource===key&&el.dataset.rkVtId===id);
-  return element?.isConnected?element.textContent?.trim():undefined;
- }
  if(source==='library'){
   const match=/^\/library\/([^/]+)$/.exec(location.pathname);
   const folder=location.pathname==='/library'?null:match?.[1];

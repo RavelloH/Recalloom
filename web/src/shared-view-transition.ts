@@ -7,7 +7,7 @@ export type LocationPath={pathname:string;search?:Record<string,unknown>};
 export type PairDirection='forward'|'back';
 export type PairCandidate={kind:SharedResourceKind;id:string;direction:PairDirection};
 
-type SourceKind='library'|'recent'|'updated'|'activity'|'search'|'archive'|'tree'|'todo';
+type SourceKind='library'|'recent'|'updated'|'activity'|'search'|'archive'|'todo';
 type Pair={
  kind:SharedResourceKind;id:string;direction:PairDirection;sourceKey:string;
  token:number;label:string;sourceKind:SourceKind;source:HTMLElement;
@@ -59,7 +59,7 @@ function parse(path:string):Route{
 }
 function selectedKind(key:string|null):SourceKind|null{
  const part=key?.split(':',1)[0];
- return part&&['library','recent','updated','activity','search','archive','tree','todo'].includes(part)?part as SourceKind:null;
+ return part&&['library','recent','updated','activity','search','archive','todo'].includes(part)?part as SourceKind:null;
 }
 
 export function candidateForRoutes(fromPath:string,toPath:string):PairCandidate|null{
@@ -77,7 +77,6 @@ export function candidateForRoutes(fromPath:string,toPath:string):PairCandidate|
 function stop(token?:number){
  if(token!==undefined&&active?.token!==token)return;
  document.querySelectorAll('[data-rk-vt-active="true"]').forEach(el=>el.removeAttribute('data-rk-vt-active'));
- document.querySelectorAll('[data-rk-vt-handoff="true"]').forEach(el=>el.removeAttribute('data-rk-vt-handoff'));
  active=null;
 }
 function visible(element:HTMLElement):boolean{
@@ -85,12 +84,6 @@ function visible(element:HTMLElement):boolean{
  if(!viewport||!element.isConnected)return false;
  const rect=element.getBoundingClientRect(),bounds=viewport.getBoundingClientRect();
  const css=getComputedStyle(element);
- // Sidebar sources are in a persistent shell, outside the content scrollport.
- if(element.closest('.sidebar')){
-  if(matchMedia('(max-width:720px)').matches)return false;
-  return rect.width>0&&rect.height>0&&rect.top>=0&&rect.bottom<=innerHeight&&rect.left>=0&&
-   css.visibility==='visible'&&css.opacity!=='0';
- }
  return rect.width>0&&rect.height>0&&css.visibility==='visible'&&
   rect.top>=bounds.top-2&&rect.bottom<=bounds.bottom+2&&
   rect.left>=bounds.left-2&&rect.right<=bounds.right+2;
@@ -124,6 +117,9 @@ export function preparePairedNavigation(fromLocation:LocationPath|null|undefined
  const from=fromLocation?.pathname??'',to=toLocation.pathname;
  const fromRoute=parse(from),toRoute=parse(to);
  const clicked=selectedKey;selectedKey=null;
+ // Sidebar navigation persists across routes. Suppress text-sharing even if
+ // a previous library/record route pair happens to match.
+ if(clicked==='sidebar'){previous=null;return [];}
  // An exact previous route pair is required for return navigation. Don't
  // try to pair a random record name in the sidebar or a repeated search hit.
  const last=previous;
@@ -135,22 +131,19 @@ export function preparePairedNavigation(fromLocation:LocationPath|null|undefined
   candidate={kind:last!.kind,id:last!.id,direction:'back'};
   sourceKind=last!.sourceKind;sourceKey=last!.sourceKey;
  }else{
-  candidate=selectedKind(clicked)==='tree'&&toRoute.type==='library'&&toRoute.id
-   ?{kind:'folder',id:toRoute.id,direction:'forward'}
-   :selectedKind(clicked)==='tree'&&toRoute.type==='record'&&toRoute.id
-   ?{kind:'record',id:toRoute.id,direction:'forward'}
-   :candidateForRoutes(from,to);
+  candidate=candidateForRoutes(from,to);
   if(!candidate||candidate.direction!=='forward')return [];
   if(clicked?.startsWith('todo:')&&fromRoute.type==='home'&&toRoute.type==='record'){
    const taskId=toLocation.search?.task;
    if(typeof taskId!=='string'||clicked!==('todo:'+taskId))return [];
    candidate={kind:'task',id:taskId,direction:'forward'};
   }
+  // Preserve browser-forward pairing for an already visible library row,
+  // even without a click. Sidebar clicks carry the explicit 'sidebar'
+  // suppression marker above and can never borrow that library row.
   sourceKind=selectedKind(clicked)??(fromRoute.type==='library'?'library':null)!;
   if(!sourceKind)return [];
-  if(sourceKind==='tree'){
-   if(toRoute.type!=='record'&&toRoute.type!=='library')return [];
-  }else if(sourceKind==='todo'){
+  if(sourceKind==='todo'){
    if(candidate.kind!=='task'||fromRoute.type!=='home')return [];
   }else if((sourceKind==='recent'||sourceKind==='updated')&&fromRoute.type!=='home'
    ||sourceKind==='search'&&fromRoute.type!=='search'
@@ -196,20 +189,7 @@ export function installPairedTransitionLifecycle(){
  const native=document.startViewTransition.bind(document);
  document.startViewTransition=((...args:Parameters<Document['startViewTransition']>)=>{
   const token=active?.token;
-  const handoff=active?.direction==='forward'&&active.sourceKind==='tree'&&token!==undefined;
-  const original=typeof args[0]==='function'?args[0]:args[0]?.update;
-  const captured=handoff&&original?async()=>{
-   await original();
-   // The sidebar persists in the next DOM. After the OLD snapshot, remove its
-   // shared name before capturing the NEW header: two names would skip VT.
-   // Keep the live sidebar text hidden only while its image is travelling.
-   if(active?.token===token){
-    active.source.removeAttribute('data-rk-vt-active');
-    active.source.setAttribute('data-rk-vt-handoff','true');
-   }
-  }:null;
-  const next=captured?(typeof args[0]==='function'?captured:{...args[0],update:captured}):args[0];
-  const transition=native(next as typeof args[0]);
+  const transition=native(args[0] as typeof args[0]);
   if(token!==undefined){
    void transition.finished.then(()=>stop(token),()=>stop(token));
    void transition.ready.catch(()=>stop(token));

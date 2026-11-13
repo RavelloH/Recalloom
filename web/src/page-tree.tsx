@@ -1,4 +1,5 @@
 import {Icon} from './icon';
+import {markSharedNavigationSource} from './shared-view-transition';
 import React,{createContext,useContext,useEffect,useState,useSyncExternalStore} from 'react';
 import {Link,useLocation,useNavigate} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
@@ -8,7 +9,6 @@ import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 import {browse} from './api';
 import type {Entry} from './types';
 import {createUntitled,type NewPageKind} from './create-page';
-import {sharedSourceAttributes,markSharedNavigationSource} from './shared-view-transition';
 import {documentDisplayName} from './document-filename';
 
 const storageKey='recalloom:tree-open';
@@ -52,17 +52,16 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
  const folder=entry.entityType==='folder';
  const active=pathname===(folder?'/library/':'/records/')+entry.id;
  const icon=folder?(open?"folderOpen":"folder"):entry.kind==='task_list'?"taskList":"document";
- const key='tree:'+(folder?'folder':'record')+':'+entry.id;
  const clean=entry.kind==='document'?documentDisplayName(entry.name):entry.name;
- const label=<><Icon name={icon} size="md" className="tree-icon" aria-hidden="true"/><span className="truncate"><span className="rk-shared-text" {...sharedSourceAttributes(folder?'folder':'record',entry.id,key)}>{clean}</span>{entry.kind==='document'&&/\.md$/i.test(entry.name)&&<span className="rk-shared-extension">{entry.name.slice(-3)}</span>}</span></>;
+ const label=<><Icon name={icon} size="md" className="tree-icon" aria-hidden="true"/><span className="truncate"><span>{clean}</span>{entry.kind==='document'&&/\.md$/i.test(entry.name)&&<span className="rk-shared-extension">{entry.name.slice(-3)}</span>}</span></>;
  return <li>
   <div className={'tree-row'+(active?' is-active':'')} style={{'--tree-depth':depth} as React.CSSProperties}>
    {folder
     ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><Icon name="chevronRight"/></button>
     :<span className="tree-toggle is-leaf" aria-hidden="true"/>}
    {folder
-    ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={()=>{markSharedNavigationSource(key);onNavigate?.();}} aria-current={active?'page':undefined}>{label}</Link>
-    :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={()=>{markSharedNavigationSource(key);onNavigate?.();}} aria-current={active?'page':undefined}>{label}</Link>}
+    ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={()=>{markSharedNavigationSource('sidebar');onNavigate?.();}} aria-current={active?'page':undefined}>{label}</Link>
+    :<Link to="/records/$recordId" params={{recordId:entry.id}} className="tree-link" onClick={()=>{markSharedNavigationSource('sidebar');onNavigate?.();}} aria-current={active?'page':undefined}>{label}</Link>}
    {folder&&<div className="tree-actions"><MoreMenu size="sm" variant="ghost" label={'在「'+entry.name+'」中新建'} icon={<Icon name="plus"/>} items={createItems(entry.id)}/></div>}
   </div>
   {folder&&<TreeBranch folderId={entry.id} depth={depth+1} open={open}/>}

@@ -210,6 +210,15 @@ try{
  assert.ok(dashboardRows&&Math.abs(dashboardRows.taskHeight-dashboardRows.activityHeight)<=1,
   'home task/activity preview row heights must match: '+JSON.stringify(dashboardRows));
  assert.equal(dashboardRows.activitySummary,'nowrap','home activity should truncate rather than change row height');
+ assert.equal(dashboardRows.taskHeight,48,'dashboard previews should stay compact on desktop and mobile');
+ assert.equal(await page.getByText('近期记录',{exact:true}).count(),0,
+  'the switcher alone must label the recent section; no redundant heading');
+ const switcherLeft=await page.locator('.recent-mode-heading [role="radiogroup"]').evaluate(el=>
+  el.getBoundingClientRect().left);
+ const overviewLeft=await page.locator('.home-page h1').evaluate(el=>
+  el.getBoundingClientRect().left);
+ assert.ok(Math.abs(switcherLeft-overviewLeft)<=2,
+  'recent mode switcher should align to left content edge');
  const initialPanel=page.locator('.home-recent-resizer');
  await initialPanel.waitFor();
  assert.equal(await initialPanel.locator('.home-recent-content').count(),1,
@@ -237,8 +246,21 @@ try{
   assert.ok(Math.abs(initial.outerX)<=2&&Math.abs(initial.outerWidth-initial.viewport)<=2,
    'AutoResizer must be full-bleed, never clip the edge carousel: '+JSON.stringify(initial));
  }
+ if(!mobileRun){
+  const desktopClearance=await page.locator('.home-recent-resizer').evaluate(el=>{
+   const clip=el.getBoundingClientRect();
+   const all=[...el.querySelectorAll('.recent-page')].map(node=>node.getBoundingClientRect());
+   return {left:Math.min(...all.map(r=>r.left))-clip.left,
+    right:clip.right-Math.max(...all.map(r=>r.right)),
+    top:Math.min(...all.map(r=>r.top))-clip.top,
+    bottom:clip.bottom-Math.max(...all.map(r=>r.bottom))};
+  });
+  assert.ok(Object.values(desktopClearance).every(value=>value>=20),
+   'updated mode should have four-sided card shadow clearance: '+JSON.stringify(desktopClearance));
+  await page.screenshot({path:'tmp/home-recent-updates-desktop.png',fullPage:false});
+ }
  if(mobileRun)await page.screenshot({path:'tmp/home-recent-updates-mobile.png',fullPage:false});
- console.log('PASS Astryx icon switcher, balanced dashboard rows and unclipped carousel transition');
+ console.log('PASS Astryx icon switcher, compact dashboard rows and unclipped carousel');
 
  // The detail has never been opened in this browser. The server summary must
  // still allow a matching title snapshot on the FIRST click.
