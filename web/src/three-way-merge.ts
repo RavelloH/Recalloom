@@ -1,7 +1,7 @@
 import {diffArrays} from 'diff';
 
 /** Exact, conservative three-way Markdown merge with no normalization. */
-export type MergeChoice='local'|'remote';
+export type MergeChoice='local'|'remote'|'custom';
 export type MergePiece={
  id:number;kind:'auto'|'conflict';reason?:'overlap'|'structured';
  baseStart:number;baseEnd:number;base:string;local:string;remote:string;text:string;
@@ -30,7 +30,22 @@ function changes(base:string[],target:string[],side:MergeChoice):Hunk[]|null{
  const diff=diffArrays(base,target,{timeout:150,maxEditLength:1600});
  if(!diff)return null;
  const hunks:Hunk[]=[];let offset=0,active:Hunk|null=null;
- const finish=()=>{if(active){hunks.push(active);active=null;}};
+ const finish=()=>{
+  if(!active)return;
+  const h=active;
+  const span=h.end-h.start;
+  // diffArrays groups adjacent replacements into one hunk. If both sides
+  // keep a one-to-one line mapping, split each changed line so choosing one
+  // conflicted line never discards a neighboring independent remote edit.
+  if(span>1&&span===h.replacement.length){
+   for(let i=0;i<span;i++){
+    if(base[h.start+i]!==h.replacement[i])hunks.push({
+     start:h.start+i,end:h.start+i+1,replacement:[h.replacement[i]!],side:h.side
+    });
+   }
+  }else hunks.push(h);
+  active=null;
+ };
  for(const part of diff){
   if(!part.added&&!part.removed){finish();offset+=part.count??part.value.length;continue;}
   if(!active)active={start:offset,end:offset,replacement:[],side};
@@ -136,9 +151,11 @@ export function planThreeWayMerge(baseText:string,localText:string,remoteText:st
  }
  return{pieces,conflictCount:conflicts,autoContent:conflicts?null:pieces.map(p=>p.text).join('')};
 }
-export function resolveThreeWayMerge(plan:MergePlan,choices:Record<number,MergeChoice>):string|null{
+export function resolveThreeWayMerge(plan:MergePlan,choices:Record<number,MergeChoice>,custom:Record<number,string>={}):string|null{
  if(plan.reason==='limit')return null;
  if(plan.autoContent!==null)return plan.autoContent;
- if(plan.pieces.some(p=>p.kind==='conflict'&&!choices[p.id]))return null;
- return plan.pieces.map(p=>p.kind==='auto'?p.text:choices[p.id]==='local'?p.local:p.remote).join('');
+ if(plan.pieces.some(p=>p.kind==='conflict'&&(!choices[p.id]||
+  choices[p.id]==='custom'&&!Object.hasOwn(custom,p.id))))return null;
+ return plan.pieces.map(p=>p.kind==='auto'?p.text:choices[p.id]==='local'?p.local:
+  choices[p.id]==='remote'?p.remote:custom[p.id]!).join('');
 }

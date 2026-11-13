@@ -23,6 +23,7 @@ import {observeMathHorizontalOverflow} from './math-scroll';
 import {markdownCharacterCount} from './document-heading';
 import type {DocumentPresentation} from './record-workbench';
 import {planThreeWayMerge,resolveThreeWayMerge,preserveUnchangedVisualTerminator,type MergeChoice} from './three-way-merge';
+import {checkMergeStructure} from './merge-structure-check';
 import type {MergeReview} from './editor-merge-review';
 
 const EditorMergeReview=React.lazy(()=>import('./editor-merge-review')
@@ -218,16 +219,19 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
     remote:remote.content,local,
     plan:planThreeWayMerge(base.content,mode==='visual'
      ?preserveUnchangedVisualTerminator(base.content,local):local,remote.content),
-    choices:{}});
+    choices:{},custom:{}});
   }catch(e){setError(e);}
   finally{setMergeBusy(false);}
  };
  const chooseMerge=(id:number,choice:MergeChoice)=>setMergeReview(previous=>previous
   ?{...previous,choices:{...previous.choices,[id]:choice}}:null);
+ const editMerge=(id:number,value:string)=>setMergeReview(previous=>previous
+  ?{...previous,choices:{...previous.choices,[id]:'custom'},
+   custom:{...previous.custom,[id]:value}}:null);
  const applyMerge=async(output:string,strategy:'save'|'stage')=>{
   const review=mergeReview;
   if(!review||busy||mergeBusy)return;
-  const resolved=resolveThreeWayMerge(review.plan,review.choices);
+  const resolved=resolveThreeWayMerge(review.plan,review.choices,review.custom);
   if(resolved===null||resolved!==output)return;
   if(mode==='visual')await settleVisualInput();
   const local=mode==='visual'?latestVisibleFromEditor():latestDraft.current;
@@ -274,7 +278,9 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
     return;
    }
    // Only conflict-free, structurally safe plans can write immediately.
-   if(review.plan.conflictCount>0||review.plan.reason==='limit')return;
+   // Even a crafted UI state must not save an invalid structured candidate.
+   if(review.plan.conflictCount>0||review.plan.reason==='limit'
+    ||checkMergeStructure(output).some(issue=>issue.severity==='error'))return;
    const saved=output===remote.content?{revision:remote.revision}
     :await mutate<{revision:number}>('/records/'+item.id+'/content',
       {expectedRevision:remote.revision,content:output,message:'Web editor three-way merge'},'PATCH');
@@ -349,7 +355,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
   <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy}><React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={visibleDraft} onChange={changeVisibleDraft} focusLine={visibleFocusLine} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={visibleDraft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={visibleDraft} recordId={item.id} onChange={changeVisibleDraft}/>}</React.Suspense></div></AutoTransition>
   {historyTarget&&createPortal(<div className="history-panel"><h3 className="workbench-history-title">版本历史</h3>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||remoteAhead||v.revision===base.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div>,historyTarget)}
   <React.Suspense fallback={null}>{mergeReview&&<EditorMergeReview
-   review={mergeReview} busy={mergeBusy} onChoose={chooseMerge}
+   review={mergeReview} busy={mergeBusy} onChoose={chooseMerge} onEdit={editMerge}
    onClose={()=>{if(!mergeBusy)setMergeReview(null);}}
    onApply={(output,strategy)=>void applyMerge(output,strategy)}/>}</React.Suspense>
   <Dialog isOpen={blocker.status==='blocked'} onOpenChange={open=>{if(!open)closeBlocker();}} width={440} padding={4} purpose="info" aria-label="未保存的编辑内容">
