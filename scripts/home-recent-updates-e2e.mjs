@@ -146,7 +146,7 @@ try{
  await page.waitForURL(base+'/');
  const suffix=String(Date.now()).slice(-5);
  const docA=await create('/records',{name:'更新A'+suffix+'.md',kind:'document',folderId:null,content:'# Version A'});
- const docB=await create('/records',{name:'更新B'+suffix+'.md',kind:'document',folderId:null,content:'# Version B'});
+ const docB=await create('/records',{name:'最近更新文稿共享标题测试-'+suffix+'.md',kind:'document',folderId:null,content:'# Version B'});
  const task=await create('/records',{name:'Tasks'+suffix,kind:'task_list',folderId:null,content:''});
  const archived=await create('/records',{name:'已归档'+suffix+'.md',kind:'document',folderId:null,content:'Archived'});
  await page.waitForTimeout(35);
@@ -202,6 +202,8 @@ try{
   const activity=document.querySelector('.home-card .recent-entry');
   if(!task||!activity)return null;
   return {taskHeight:task.getBoundingClientRect().height,
+   dotCenter:(()=>{const r=task.querySelector('.status-dot').getBoundingClientRect();return r.top+r.height/2;})(),
+   textCenter:(()=>{const r=task.querySelector('.rk-shared-text').getBoundingClientRect();return r.top+r.height/2;})(),
    activityHeight:activity.getBoundingClientRect().height,
    taskPadding:getComputedStyle(task).paddingTop,
    activityPadding:getComputedStyle(activity).paddingTop,
@@ -210,7 +212,10 @@ try{
  assert.ok(dashboardRows&&Math.abs(dashboardRows.taskHeight-dashboardRows.activityHeight)<=1,
   'home task/activity preview row heights must match: '+JSON.stringify(dashboardRows));
  assert.equal(dashboardRows.activitySummary,'nowrap','home activity should truncate rather than change row height');
- assert.equal(dashboardRows.taskHeight,48,'dashboard previews should stay compact on desktop and mobile');
+ assert.ok(Math.abs(dashboardRows.taskHeight-48)<=1,
+  'dashboard previews should stay compact on desktop and mobile');
+ assert.ok(Math.abs(dashboardRows.dotCenter-dashboardRows.textCenter)<=1,
+  'home task status dot and title must share a horizontal center line: '+JSON.stringify(dashboardRows));
  assert.equal(await page.getByText('近期记录',{exact:true}).count(),0,
   'the switcher alone must label the recent section; no redundant heading');
  const switcherLeft=await page.locator('.recent-mode-heading [role="radiogroup"]').evaluate(el=>

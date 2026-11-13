@@ -186,6 +186,16 @@ to {
   animation-timing-function: cubic-bezier(.22, 1, .36, 1);
 }
 
+/* Card filenames can wrap while the destination heading uses fewer lines.
+   Fit each captured image without stretching its glyphs to the other layout. */
+::view-transition-old(rk-shared-title),
+::view-transition-new(rk-shared-title) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left top;
+}
+
 ::view-transition-old(rk-shared-title) {
   animation: 130ms ease-in both rk-view-exit;
 }

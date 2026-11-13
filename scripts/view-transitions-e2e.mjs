@@ -133,8 +133,19 @@ const recordPage=async(record)=>{
  await page.locator('.record-page h1.page-title').waitFor();
 };
 
+// Finish intercepted loopback API requests before replacing the document.
+// WebKit otherwise reports their cancellation as an access-control pageerror.
+const stableGoto=async url=>{
+ if(engine==='webkit')await page.waitForLoadState('networkidle');
+ await page.goto(url);
+};
+const stableReload=async options=>{
+ if(engine==='webkit')await page.waitForLoadState('networkidle');
+ await page.reload(options);
+};
+
 try{
- await page.goto(base+'/login');
+ await stableGoto(base+'/login');
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
@@ -158,7 +169,7 @@ try{
   if(!result.ok)throw Error('Failed to prepare a task for the refresh regression: '+await result.text());
  },task.id);
 
- await page.goto(base+'/library');
+ await stableGoto(base+'/library');
  const folderRow=page.locator('.file-row').filter({hasText:folder.name});
  await folderRow.waitFor();
  // Wait until the list's 300ms staggered entrance is complete before capture.
@@ -293,7 +304,7 @@ try{
 
  // A desktop topbar portal appears on the record page but not on home.
  // It must never resize or displace the animated scroll viewport.
- await page.goto(base+'/');
+ await stableGoto(base+'/');
  const recent=page.locator('.recent-page').filter({hasText:promoted.name}).first();
  await recent.waitFor();
  await assertTextInPage(recent.locator('.recent-page-name'));
@@ -319,13 +330,13 @@ try{
   // Ordinary routes and library folders use the same first-content baseline
   // as document preview. Switching pages must not add another header margin.
   for(const route of ['/','/tasks','/activity','/archive','/search','/settings','/library','/graph']){
-   await page.goto(base+route);
+   await stableGoto(base+route);
    const heading=page.locator('.page > .page-header, .folder-page > .doc-header, .knowledge-graph-page > .graph-page-heading').first();
    await heading.waitFor();
    const top=await heading.evaluate(el=>el.getBoundingClientRect().top);
    assert.ok(Math.abs(top-96)<=2,'inconsistent desktop first-content baseline '+route+': '+top);
   }
-  await page.goto(base+'/');
+  await stableGoto(base+'/');
   await recent.waitFor();
  }
  const viewportBox=async()=>page.locator('.main-scroll-host').evaluate(el=>{
@@ -334,14 +345,10 @@ try{
  });
  const homeBox=await viewportBox();
  await page.waitForTimeout(410);
- const canMorphRecent=await recent.locator('.rk-shared-text').evaluate(el=>{
-  const lh=parseFloat(getComputedStyle(el).lineHeight);
-  return el.scrollWidth<=el.clientWidth+1&&(!Number.isFinite(lh)||el.getBoundingClientRect().height<=lh*1.55);
- });
  before=await count();
  await recent.click();
  await recordPage(promoted);
- await assertRouteTransition(before,canMorphRecent?{expectPair:true}:{expectFallback:true});
+ await assertRouteTransition(before,{expectPair:true});
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'opening a portal must not move or resize the snapshot viewport');
  before=await count();
  await page.goBack();
@@ -350,7 +357,7 @@ try{
  await assertRouteTransition(before);
  if(!mobileRun)assert.deepEqual(await viewportBox(),homeBox,'closing a portal must not move or resize the snapshot viewport');
 
- await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
+ await stableGoto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
  const hit=page.locator('.search-result').filter({hasText:promoted.name}).first();
  await hit.waitFor();
  await assertTextInPage(hit.locator('strong').first());
@@ -373,7 +380,7 @@ try{
  // Search submit must commit immediately and display loading feedback while
  // the API is deliberately slow. Route loader must not await search results.
  if(engine==='chromium'&&!mobileRun){
-  await page.goto(base+'/search?mode=literal');
+  await stableGoto(base+'/search?mode=literal');
   await page.locator('.search-page').waitFor();
   const slowTerm='latency-probe-'+suffix;
   await page.evaluate(term=>{
@@ -401,7 +408,7 @@ try{
   assert.equal(await page.evaluate(()=>window.__searchRequestFinished),true);
   await page.evaluate(()=>window.__restoreSearchFetch());
   // A completed search still animates the result rows, not just the spinner.
-  await page.goto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
+  await stableGoto(base+'/search?q='+encodeURIComponent(promoted.name)+'&mode=metadata');
   await page.locator('.search-result').first().waitFor();
   assert.equal(await page.locator('.search-result').first().evaluate(el=>getComputedStyle(el).animationName),
    'data-row-fade-in','search results retain their staggered entrance animation');
@@ -416,7 +423,7 @@ try{
    if(pathname==='/api/tasks'||pathname==='/api/activity')requests.push(pathname);
   };
   page.on('request',recordRequest);
-  await page.goto(base+'/');
+  await stableGoto(base+'/');
   await page.locator('.home-card > .compact-row').first().waitFor();
   await page.locator('.home-card > .recent-entry').first().waitFor();
   assert.equal(await page.locator('.home-card > .compact-row').count()>0,true,'home tasks must render without a secondary animated wrapper');
@@ -426,7 +433,7 @@ try{
   assert.equal(requests.filter(path=>path==='/api/activity').length,1,'home must load activity only once');
   page.off('request',recordRequest);
 
-  await page.goto(base+'/tasks');
+  await stableGoto(base+'/tasks');
   await page.locator('.page > .task-list .task-item').first().waitFor();
   const taskRequests=[];
   const spyTasks=request=>{
@@ -459,7 +466,7 @@ try{
    overlayChunkDelivered=true;
    await route.continue();
   });
-  await page.reload({waitUntil:'domcontentloaded'});
+  await stableReload({waitUntil:'domcontentloaded'});
   if(engine==='chromium'){
    // Authentication / connection UI paints before the optional module arrives,
    // but scroll viewports must not mount until their engine is ready.
@@ -489,29 +496,29 @@ try{
   page.off('request',spyTasks);
   assert.equal(taskRequests.length,1,'task page refresh must request its items only once');
 
-  await page.goto(base+'/activity');
+  await stableGoto(base+'/activity');
   await page.locator('.page > .activity-list').waitFor();
   const activityRequests=[];
   const spyActivity=request=>{
    if(new URL(request.url()).pathname==='/api/activity')activityRequests.push(request.url());
   };
   page.on('request',spyActivity);
-  await page.reload();
+  await stableReload();
   await page.locator('.page > .activity-list').waitFor();
   await page.waitForTimeout(350);
   page.off('request',spyActivity);
   assert.equal(activityRequests.length,1,'activity page refresh must request its items only once');
 
   // Archive is the baseline: it never owned an animated data-state wrapper.
-  await page.goto(base+'/archive');
+  await stableGoto(base+'/archive');
   await page.getByRole('heading',{name:'归档',level:1}).waitFor();
-  await page.reload();
+  await stableReload();
   await page.getByRole('heading',{name:'归档',level:1}).waitFor();
 
   // A newly opened sidebar folder must stay collapsed while its children
   // fetch, then animate its real rows. Closing retains DOM until the grid
   // transition finishes; restored open folders follow the same path.
-  await page.goto(base+'/');
+  await stableGoto(base+'/');
   const toggle=page.getByRole('button',{name:'展开 '+animationFolder.name});
   await toggle.waitFor();
   // Anchor to the stable row, not a toggle whose accessible name changes on click.
@@ -559,7 +566,7 @@ try{
   // End the artificial API delay before full navigation; WebKit otherwise
   // reports an aborted intercepted fetch as an access-control pageerror.
   await page.unroute('**/api/folders?*');
-  await page.reload();
+  await stableReload();
   await page.getByRole('button',{name:'收起 '+animationFolder.name}).waitFor();
   await page.waitForFunction(name=>{
    const button=[...document.querySelectorAll('.tree-toggle')].find(el=>el.getAttribute('aria-label')==='收起 '+name);
@@ -592,7 +599,7 @@ try{
     'route snapshot must stop BEFORE live bottom tabs: '+JSON.stringify(geometry));
   };
   await assertLiveMobileTabBar();
- await page.goto(base+'/library');
+ await stableGoto(base+'/library');
  const mobileFolder=page.locator('.file-row').filter({hasText:folder.name});
  await mobileFolder.waitFor();
  await assertLiveMobileTabBar();
@@ -612,7 +619,7 @@ try{
  await assertLiveMobileTabBar();
  if(mobileRun){
   // Mobile keyboard focus hides tabs; regain that scroll space on focus.
-  await page.goto(base+'/library/'+folder.id);
+  await stableGoto(base+'/library/'+folder.id);
   await page.locator('.file-row').filter({hasText:basic.name}).click();
   await recordPage(basic);
   const title=page.locator('.record-page .page-title');

@@ -16,6 +16,8 @@
 }
 
 .compact-row>a {
+  display: flex;
+  align-items: center;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -412,6 +414,7 @@
   font-size: var(--rk-font-body);
   font-weight: 600;
   line-height: 1.4;
+  max-height: 2.8em;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -428,11 +431,15 @@
   max-width: none;
 }
 .recent-page-name .rk-shared-text[data-rk-vt-active="true"] {
-  /* Only fully visible, single-line names are selected for a shared title
-     snapshot; restore their intrinsic box while the snapshot is captured. */
-  display: inline-block;
+  /* Give the named text its own atomic, clipped box. Ancestor clamping alone
+     would expose hidden lines when the browser extracts a shared snapshot. */
+  display: -webkit-inline-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   width: fit-content;
   max-width: 100%;
+  vertical-align: top;
 }
 
 .recent-page-meta {

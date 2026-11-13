@@ -158,13 +158,19 @@ export function preparePairedNavigation(fromLocation:LocationPath|null|undefined
  const expected=resolveLabel(kind,id,direction,sourceKind,toLocation,sourceKey);
  if(expected===undefined)return [];
  const source=direction==='forward'?findSource(kind,id,sourceKey):findHeader(kind,id);
- if(!source||source.textContent?.trim()!==expected||!visible(source))return [];
+ const cardPair=sourceKind==='recent'||sourceKind==='updated';
+ // Inline card labels include rects for text hidden by the parent's clamp.
+ // Validate the visible title box; capture CSS clamps the named text itself.
+ const visibleSource=cardPair&&direction==='forward'
+  ?source?.closest<HTMLElement>('.recent-page-name'):source;
+ if(!source||source.textContent?.trim()!==expected||!visibleSource||!visible(visibleSource))return [];
  if(source.scrollWidth>source.clientWidth+1||document.activeElement===source)return [];
- // A two-line/clamped card title cannot morph cleanly into a one-line page
- // heading: only share the actual single-line text, never a cropped layout.
+ // Cards have a bounded two-line snapshot on either side, so their filename
+ // can pair with a larger heading, including after a cold home-page reload.
+ // Other source layouts retain the conservative single-line requirement.
  const sourceStyle=getComputedStyle(source);
  const lineHeight=parseFloat(sourceStyle.lineHeight);
- if(Number.isFinite(lineHeight)&&lineHeight>0&&source.getBoundingClientRect().height>lineHeight*1.55)return [];
+ if(!cardPair&&Number.isFinite(lineHeight)&&lineHeight>0&&source.getBoundingClientRect().height>lineHeight*1.55)return [];
  if(direction==='forward'){
   const row=source.closest('.file-row,.recent-page,.search-result,.archive-item,.compact-row,.recent-entry,.activity-row');
   if(row?.getAnimations().some(animation=>

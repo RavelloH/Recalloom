@@ -228,15 +228,10 @@ try{
  const recent=page.locator('.recent-page').filter({hasText:documentRecord.name}).first();
  await recent.waitFor();
  await page.waitForTimeout(420);
- const recentNameUnwrapped=await recent.locator('.rk-shared-text').evaluate(el=>{
-  const lineHeight=parseFloat(getComputedStyle(el).lineHeight);
-  return el.scrollWidth<=el.clientWidth+1&&
-   (!Number.isFinite(lineHeight)||el.getBoundingClientRect().height<=lineHeight*1.55);
- });
  before=await count();
  await recent.click();
  await recordPage(documentRecord);
- await assertRouteTransition(before,recentNameUnwrapped?{expectPair:true}:{expectFallback:true});
+ await assertRouteTransition(before,{expectPair:true});
 
  if(engine==='chromium'){
   // The source is real, but the destination loader fails. Do not capture an

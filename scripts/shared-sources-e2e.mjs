@@ -51,13 +51,26 @@ await page.addInitScript(()=>{
  if(typeof document.startViewTransition==='function'){
   const original=document.startViewTransition.bind(document);
   document.startViewTransition=(...args)=>{
-   const record={old:names(),new:null,ready:false,finished:false,error:null};
+   const titleBox=()=>{
+    const title=document.querySelector('.recent-page-name [data-rk-vt-active="true"]');
+    if(!title)return null;
+    const rect=title.getBoundingClientRect(),clip=title.parentElement.getBoundingClientRect();
+    return {width:rect.width,height:rect.height,clipWidth:clip.width,clipHeight:clip.height};
+   };
+   const record={old:names(),new:null,oldTitle:titleBox(),newTitle:null,ready:false,finished:false,error:null};
    window.__rkVTLog.push(record);
    const transition=original(...args);
    transition.updateCallbackDone.then(()=>{
     record.new=names();
+    record.newTitle=titleBox();
    },error=>{record.error=String(error);});
-   transition.ready.then(()=>{record.ready=true;},error=>{record.error=String(error);});
+   transition.ready.then(()=>{
+    record.ready=true;
+    record.sharedAnimation=document.getAnimations().find(animation=>
+     animation.effect?.pseudoElement==='::view-transition-group(rk-shared-title)')?.effect.getKeyframes();
+    record.sharedImageFit=['old','new'].map(part=>getComputedStyle(document.documentElement,
+     '::view-transition-'+part+'(rk-shared-title)').objectFit);
+   },error=>{record.error=String(error);});
    transition.finished.then(()=>{record.finished=true;},error=>{record.error=String(error);});
    return transition;
   };
@@ -94,6 +107,7 @@ const count=()=>page.evaluate(()=>window.__rkVTLog.length);
 const assertRouteTransition=async(since,{expectPair=false,expectFallback=false}={})=>{
  await page.waitForFunction(n=>window.__rkVTLog.length>n,since);
  await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.new!==null);
+ await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.ready||window.__rkVTLog.at(-1)?.error);
  const result=await page.evaluate(()=>window.__rkVTLog.at(-1));
  assert.ok(result.old.includes('rk-route-content')&&result.new.includes('rk-route-content'),
   'the fixed route viewport must continue to crossfade');
@@ -101,6 +115,14 @@ const assertRouteTransition=async(since,{expectPair=false,expectFallback=false}=
   'each shared name must exist on BOTH sides even when a source lives in the persistent sidebar: '+JSON.stringify(result));
  assert.equal(new Set(result.old).size,result.old.length,'snapshot names must be unique');
  if(expectPair)assert.ok(result.old.includes('rk-shared-title'),'expected a matched resource title: '+JSON.stringify(result));
+ if(expectPair)assert.ok(result.sharedAnimation?.length>=2,
+  'the paired title needs a real native geometry animation: '+JSON.stringify(result));
+ if(expectPair)assert.deepEqual(result.sharedImageFit,['contain','contain'],
+  'shared title images must keep their aspect ratio when line counts differ');
+ for(const title of [result.oldTitle,result.newTitle].filter(Boolean)){
+  assert.ok(title.width<=title.clipWidth+1&&title.height<=title.clipHeight+1,
+   'card snapshots must exclude text hidden beyond the two-line title: '+JSON.stringify(title));
+ }
  if(expectFallback)assert.deepEqual(result.old,['rk-route-content'],'other navigation must use the original crossfade');
  assert.equal(result.error,null,'native transition was skipped');
  // Avoid racing a still-active WebKit snapshot when testing the next click.
@@ -147,6 +169,8 @@ try{
  const suffix=String(Date.now());
  const folder=await create('/folders',{name:'Transitions folder '+suffix});
  const doc=await create('/records',{name:'Shared '+suffix.slice(-4)+'.md',kind:'document',folderId:folder.id,content:'# Body heading\n\nDetails'});
+ const wrappedDoc=await create('/records',{name:'共享标题双向导航文稿 '+suffix.slice(-4)+'.md',kind:'document',folderId:folder.id,content:'Wrapped card title navigation'});
+ const clippedDoc=await create('/records',{name:'需要截断的文稿标题'.repeat(5)+'.md',kind:'document',folderId:folder.id,content:'Clipped card title navigation'});
  const taskList=await create('/records',{name:'Tasks '+suffix.slice(-4),kind:'task_list',folderId:folder.id,content:''});
  await page.evaluate(async(recordId)=>{
   const meta=await (await fetch('/api/records/'+recordId+'?metadataOnly=true')).json();
@@ -162,24 +186,45 @@ try{
  const targetTasks=await page.evaluate(async id=>(await(await fetch('/api/tasks?recordId='+id+'&limit=200')).json()).items,taskList.id);
  const targetTask=targetTasks.find(t=>t.title==='Target shared task');
  assert.ok(targetTask,'Task fixture must have its own stable task ID');
- // Visit a document to populate the real localStorage-backed recent feed.
+ // Populate real local history, then reload home to discard the detail cache.
  await stableGoto(base+'/records/'+doc.id);
  await recordPage(doc);
+ await stableGoto(base+'/records/'+clippedDoc.id);
+ await recordPage(clippedDoc);
+ await stableGoto(base+'/records/'+wrappedDoc.id);
+ await recordPage(wrappedDoc);
  await stableGoto(base+'/');
- const recent=page.locator('.recent-page').filter({hasText:doc.name}).first();
+ const recent=page.locator('.recent-page').filter({hasText:wrappedDoc.name}).first();
  await recent.waitFor();
- assert.equal(await recent.locator('.rk-shared-text').innerText(),doc.name.slice(0,-3));
+ assert.equal(await recent.locator('.rk-shared-text').innerText(),wrappedDoc.name.slice(0,-3));
  assert.equal(await recent.locator('.rk-shared-extension').innerText(),'.md');
+ const wrapped=await recent.locator('.rk-shared-text').evaluate(el=>
+  el.getBoundingClientRect().height>parseFloat(getComputedStyle(el).lineHeight)*1.55);
+ assert.ok(wrapped,'the regression fixture must wrap on a home card');
  let before=await count();
  await recent.click();
- await recordPage(doc);
+ await recordPage(wrappedDoc);
  await assertRouteTransition(before,{expectPair:true});
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');
  await recent.waitFor();
  await assertRouteTransition(before,{expectPair:true});
- console.log('PASS home recent title to document and history pairing');
+ const clipped=page.locator('.recent-page').filter({hasText:clippedDoc.name});
+ assert.ok(await clipped.locator('.recent-page-name').evaluate(el=>el.scrollHeight>el.clientHeight+1),
+  'the second regression fixture must be visibly clamped');
+ // On mobile the next card peeks past the rail edge. Bring the complete
+ // source box into view before requiring a shared-element snapshot.
+ await clipped.evaluate(el=>el.scrollIntoView({block:'nearest',inline:'center',behavior:'instant'}));
+ before=await count();
+ await clipped.click();
+ await recordPage(clippedDoc);
+ await assertRouteTransition(before,{expectPair:true});
+ before=await count();
+ await page.goBack();
+ await page.waitForURL(base+'/');
+ await assertRouteTransition(before,{expectPair:true});
+ console.log('PASS cold home recent titles, wrapped/clipped snapshots and history pairing');
 
  // Home todo links target the exact embedded task, not the record filename.
  await page.reload();
