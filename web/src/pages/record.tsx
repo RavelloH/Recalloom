@@ -28,7 +28,7 @@ import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){
- const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery(recordQuery(recordId));const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
+ const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
  const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
@@ -44,7 +44,7 @@ export function RecordPage(){
  const originalPresentation=useMemo(()=>item?.kind==='document'?{
   id:item.id,revision:item.revision,characters:markdownCharacterCount(item.content)
  }:null,[item?.id,item?.kind,item?.revision,item?.content]);
- const currentPresentation=item?.kind==='document'&&documentPresentation?.id===item.id&&documentPresentation.revision===item.revision
+ const currentPresentation=item?.kind==='document'&&documentPresentation?.id===item.id
   ?documentPresentation:originalPresentation;
  const editorsQuery=useQuery({queryKey:['record-editors',recordId,item?.revision],
   queryFn:()=>api<{items:string[]}>('/records/'+recordId+'/editors'),enabled:item?.kind==='document'});
@@ -119,7 +119,7 @@ export function RecordPage(){
     </Properties>
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId+'@'+item.revision} item={item} jumpToLine={outlineTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToLine={outlineTarget}
   pageActions={pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>

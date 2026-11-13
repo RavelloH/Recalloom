@@ -59,6 +59,14 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 - **刷新加载稳定性：** 首页的未完成事项与近期活动、任务页与活动页在异步数据首次就绪时直接渲染最终结果，不叠加 `Swap → AutoTransition → AutoResizer` 的先退出后进入与高度补间；归档的直接渲染方式是基线。数据仍由共享 TanStack Query 缓存管理。**保留数据行 `data-row-fade-in` 的错峰动画，不要通过删除动画掩盖重复播放。** `OverlayScrollbars` 初始化会重新挂接已存在的滚动容器，导致里面所有 CSS 入场动画重新启动；在非 Apple WebKit 浏览器里，`prepareScrollbars()` 与 React/认证请求**并行**启动；只延迟已认证主界面的 `Shell` 挂载，登录界面和连接提示无需等待滚动条。`OverlayScroll` 在 layout effect 使用已预热的引擎同步初始化，使 DOM 重组发生在首帧绘制前。若引擎下载失败或超过 3 秒仍未就绪，本次页面生命周期固定退回原生滚动条，绝不能在内容已经入场后再升级重组 DOM。Apple WebKit 默认使用原生滚动条而不下载该模块。E2E 将滚动条 chunk 人为延迟 1.5 秒验证连接提示及时显示、列表动画只执行一次，并测试资源错误与超时的原生回退。侧栏文件夹通过按需查询等待实际子项加载，先将真实子树挂载在折叠容器内，随后于独立动画帧展开；关闭时保留 DOM 到收起动画完成，缩减动态效果和动画被打断时有兜底卸载。不要在展开时先显示短暂的“加载中…”子行，导致内容二次撑开。
 - **验证：** `pnpm check`、`pnpm build:web`、`pnpm bundle:check`、`node scripts/run-editor-e2e.mjs view-transitions-e2e.mjs shared-title-e2e.mjs`。E2E 使用隔离的本地 Worker/D1，核对旧/新快照始终包含 `rk-route-content`，合格导航额外且仅额外配对一个 `rk-shared-title`；验证 `.md` 不参加共享、动画完成后标记清理、无配对时回退整页渐变、外壳实时、双向历史、手机视口与 1.7 秒延迟 API。WebKit 可用 `RECALLOOM_TEST_ENGINE=webkit`，独立手机会话再设置 `RECALLOOM_TEST_MOBILE=1`；本地 HTTP 不支持生产的 `__Host-` 安全 Cookie，测试脚本仅在回环地址转发本地会话，请勿将此处理加入线上代码。
 
+## 多客户端编辑会话与 Revision 冲突
+
+- **固定编辑基线而非跟随查询刷新。** `RecordPage` 的文档编辑器仅以 `recordId` 为 React key；`RecordEditor` 在进入文档时固定 `base.revision/base.content`，本地 `draft`、CodeMirror/Tiptap 实例及 undo/redo 历史独立于最新 `recordQuery`。不能恢复成 `key={recordId+'@'+revision}`。头部的可见字数跟随当前编辑会话，而不是服务器刷新后的新版本。
+- **发现远端更新，不自动重置。** 记录页恢复焦点时重新校验，活跃时每 60 秒检查一次 Revision（隐藏页面不后台轮询）。若 `item.revision > base.revision`，展示 Astryx warning Banner，注明本地基线与远端 Revision；不覆盖编辑器、光标、草稿或撤销历史。用户明确选择“加载新版”时，若有未保存内容，必须经过 destructive 确认，之后清理当前标签页草稿，重置编辑器正文和历史。
+- **CAS 是最终安全边界。** 保存必须始终携带 `base.revision` 的 `expectedRevision`；409 后只重新查询最新数据并保留旧编辑会话。服务器成功接收保存后，`base` 才推进到返回的 Revision；保存过程中用户继续输入的草稿必须按新 Revision 保留。历史版本恢复是用户明确操作，成功后读取服务器接受的 Revision 内容，再重置编辑器，不能依赖 query key 自动重挂载。
+- **状态过渡不能阻塞真实状态。** “保存中 / 未保存 / 已保存”的轻量 `AutoTransition` 使用 `mode="sync"`，避免 WebKit 在连续异步状态切换时永久显示旧的“保存中”文本；交互和保存安全依赖真实 `busy` / `draft` 状态，不能依赖动画生命周期。
+- **保守处理冲突。** 当前阶段不进行自动重写、隐式覆盖或缺少基准的双向合并。安全的自动三方合并需要先比较 `base/local/remote`，仅对互不重叠且保留 RMD 结构的修改生成可预览结果，再以远端最新 Revision 提交；仍有重叠时由用户逐块选择。对应 `scripts/editor-concurrent-session-e2e.mjs` 在 Chromium/WebKit 桌面与手机中验证 R1→R6、409、显式接受、历史恢复、视觉撤销、刷新后过期草稿隔离。
+
 ## 边界原则
 
 1. **业务逻辑不依赖 React。** 记录身份、版本、归档、安全性和搜索准则优先在 Worker/共享纯模块实现；UI 不应重写安全校验。
