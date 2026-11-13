@@ -168,6 +168,15 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
  .editor-table-actions button{min-height:44px;min-width:44px;}
 }
 
+/* The tablet/desktop shell topbar is absolutely positioned over the
+ * scroll viewport (46px high). A touch-first format rail must stick BELOW
+ * it; top:0 hides its buttons beneath the breadcrumb/header.
+ * On phones the topbar is in normal layout, outside .main-scroll, so the
+ * existing top:0 is correct. Keep coarse tablets above 1200px covered too. */
+@media (min-width:721px) and (hover:none), (min-width:721px) and (pointer:coarse) {
+ .rk-editor-format-scroll { top:46px; }
+}
+
 /* TaskItem in Tiptap 3 puts data-type on the parent UL, not each LI. */
 .tiptap ul[data-type="taskList"]{list-style:none;padding-inline-start:0;}
 .tiptap ul[data-type="taskList"] > li{

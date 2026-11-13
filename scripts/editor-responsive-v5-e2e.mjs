@@ -167,7 +167,7 @@ try{
  await page.getByRole('status').filter({hasText:'Ctrl+V'}).first().waitFor({timeout:4500}).catch(()=>{});
  console.log('PASS clipboard paste entry exists');
 }finally{await desktop.close();}
-for(const [kind,width,height] of [['pad',1024,768],['phone',390,844]]){
+for(const [kind,width,height] of [['tablet-narrow',820,768],['pad',1024,768],['tablet-wide',1194,834],['tablet-large',1280,900],['phone',390,844]]){
  const ctx=await browser.newContext({viewport:{width,height},hasTouch:true,isMobile:true});
  const p=await ctx.newPage();
  try{
@@ -191,6 +191,45 @@ for(const [kind,width,height] of [['pad',1024,768],['phone',390,844]]){
   })));
   assert.ok(metrics.every(v=>v.height>=42&&v.offset!==null&&v.offset<4),
    'touch toolbar icons not vertically centered: '+JSON.stringify(metrics));
+  // Tablet has a real 46px shell header anchored OVER the scroll viewport.
+  // The touch formatting rail must stick below it instead of using top:0.
+  // Phones keep their header outside the scrolling viewport.
+  const sticky=await p.evaluate(async ()=>{
+   const viewport=document.querySelector('.main-scroll');
+   const editor=document.querySelector('.tiptap');
+   const rail=document.querySelector('.rk-editor-format-scroll');
+   const topbar=document.querySelector('.topbar');
+   const prior=editor.style.minHeight,priorScroll=viewport.scrollTop;
+   editor.style.minHeight='2600px';
+   await new Promise(requestAnimationFrame);
+   const start=rail.getBoundingClientRect().toJSON();
+   viewport.scrollTop=650;
+   await new Promise(requestAnimationFrame);
+   await new Promise(requestAnimationFrame);
+   const result={
+    startTop:start.top,host:rail.getBoundingClientRect().toJSON(),
+    bar:topbar.getBoundingClientRect().toJSON(),
+    viewport:viewport.getBoundingClientRect().toJSON(),
+    scrollTop:viewport.scrollTop,
+    stickyTop:getComputedStyle(rail).top,
+    stickyPosition:getComputedStyle(rail).position,
+    viewportHeight:viewport.clientHeight,
+    editorHeight:editor.getBoundingClientRect().height
+   };
+   return result;
+  });
+  assert.ok(sticky.scrollTop>400,kind+' should exercise a real scrollable editor: '+JSON.stringify(sticky));
+  assert.equal(sticky.stickyPosition,'sticky',kind+' uses native touch sticky');
+  const stickyExpected=kind==='phone'?sticky.viewport.top:sticky.bar.bottom;
+  assert.ok(Math.abs(sticky.host.top-stickyExpected)<=2,
+   kind+' sticky formatting rail must remain BELOW the visible topbar: '+JSON.stringify(sticky));
+  assert.ok(sticky.host.top>=sticky.bar.bottom-1,
+   kind+' formatting buttons must never disappear beneath the header: '+JSON.stringify(sticky));
+  if(kind==='pad')await p.screenshot({path:'tmp/editor-tablet-sticky-header.png',fullPage:false});
+  await p.evaluate(()=>{document.querySelector('.main-scroll').scrollTop=0;
+   document.querySelector('.tiptap').style.minHeight='';});
+  await p.waitForTimeout(80);
+  console.log('PASS touch sticky formatting toolbar clears shell header',kind,sticky.stickyTop);
   await top.getByRole('button',{name:'插入内容'}).click();
   const picker=p.getByRole('listbox',{name:'插入内容'});await picker.waitFor();
   assert.ok(await picker.getByText('表格').count()>0,kind+' slash insertion content');
