@@ -72,13 +72,20 @@ try{
   return labels.length===1&&labels[0].textContent==='未保存';
  });
  console.log('PASS remote R2 refetch retains active unsaved R1 editor and shows remote notice',engine);
- await page.getByRole('button',{name:'保存',exact:true}).click();
- await page.getByText('保存失败').first().waitFor();
+ assert.equal(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),true,
+  'known remote Revision must disable the old-base save action');
+ // CAS is still the server-enforced protection even against direct clients.
+ const rejected=await page.evaluate(async({id,content})=>{
+  const result=await fetch('/api/records/'+id+'/content',{method:'PATCH',headers:{'content-type':'application/json'},
+   body:JSON.stringify({expectedRevision:1,content,message:'Stale edit attempt'})});
+  return result.status;
+ },{id:record.id,content:local});
+ assert.equal(rejected,409,'server must reject stale expectedRevision regardless of UI');
  assert.match(await source.innerText(),/Local unsaved paragraph/);
  const actual=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()),record.id);
  assert.equal(actual.revision,2,'R1 client must not overwrite the remote R2');
  assert.equal(actual.content,remote);
- console.log('PASS stale R1 save is rejected and both local and remote edits survive',engine);
+ console.log('PASS stale R1 save is blocked in UI and rejected by CAS while retaining both drafts',engine);
  await page.waitForFunction(()=>Object.keys(sessionStorage).some(key=>key.startsWith('recalloom:draft:')));
  await page.getByRole('button',{name:'放弃本地修改并加载新版'}).click();
  await page.getByRole('button',{name:'取消',exact:true}).click();

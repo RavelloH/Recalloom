@@ -65,7 +65,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 - **发现远端更新，不自动重置。** 记录页恢复焦点时重新校验，活跃时每 60 秒检查一次 Revision（隐藏页面不后台轮询）。若 `item.revision > base.revision`，展示 Astryx warning Banner，注明本地基线与远端 Revision；不覆盖编辑器、光标、草稿或撤销历史。用户明确选择“加载新版”时，若有未保存内容，必须经过 destructive 确认，之后清理当前标签页草稿，重置编辑器正文和历史。
 - **CAS 是最终安全边界。** 保存必须始终携带 `base.revision` 的 `expectedRevision`；409 后只重新查询最新数据并保留旧编辑会话。服务器成功接收保存后，`base` 才推进到返回的 Revision；保存过程中用户继续输入的草稿必须按新 Revision 保留。历史版本恢复是用户明确操作，成功后读取服务器接受的 Revision 内容，再重置编辑器，不能依赖 query key 自动重挂载。
 - **状态过渡不能阻塞真实状态。** “保存中 / 未保存 / 已保存”的轻量 `AutoTransition` 使用 `mode="sync"`，避免 WebKit 在连续异步状态切换时永久显示旧的“保存中”文本；交互和保存安全依赖真实 `busy` / `draft` 状态，不能依赖动画生命周期。
-- **保守处理冲突。** 当前阶段不进行自动重写、隐式覆盖或缺少基准的双向合并。安全的自动三方合并需要先比较 `base/local/remote`，仅对互不重叠且保留 RMD 结构的修改生成可预览结果，再以远端最新 Revision 提交；仍有重叠时由用户逐块选择。对应 `scripts/editor-concurrent-session-e2e.mjs` 在 Chromium/WebKit 桌面与手机中验证 R1→R6、409、显式接受、历史恢复、视觉撤销、刷新后过期草稿隔离。
+- **保守处理冲突。** 继续使用服务器 `expectedRevision` 乐观锁作为最终防覆盖边界。`web/src/three-way-merge.ts` 通过逐行三方比较，精确保留原始 Markdown 字节、CRLF、空行：互不重叠的普通修改生成可预览候选；同一位置（含插入边界）或涉及代码围栏、块级公式、表格、RMD 指令容器及 attrs 的修改必须明确选择，决不自动保存。可视化 Tiptap 序列化会丢失结尾单个换行；仅当原始最后一行内容完全未改时，`preserveUnchangedVisualTerminator` 恢复这个准确的换行符，不做全局 trim 或任意规范化。冲突审查使用 Astryx Dialog 展示 Base / 本地 / 远端及相对远端的差异；无冲突时点击确认后按最新 Revision CAS 写入；有冲突时选择各块后只将结果载入源码编辑器供进一步核对，用户须另行保存。暂存前将原始本地草稿写入单独的 `sessionStorage` merge-backup（24h、按身份/记录隔离），备份恢复会恢复旧 Revision 基线，不能直接覆盖新版服务器；同一记录若尚有旧备份，必须先恢复或明确删除，禁止新一轮人工合并悄悄覆盖旧备份。任何提交前都重新获取服务端最新正文并校验 Revision；期间远端再次修改就使预览失效并保留本地内容。算法上限为 300K 字符/6000 行，超限仅允许人工处理；任何不安全的冲突不做猜测。`test/three-way-merge.test.ts` 覆盖纯算法，`scripts/editor-merge-e2e.mjs` 在 Chromium/WebKit 桌面与手机模拟 Agent 竞争、RMD、Tiptap 及备份恢复；`scripts/editor-concurrent-session-e2e.mjs` 验证 R1→R6、409、显式接受、历史恢复、视觉撤销和过期草稿隔离。
 
 ## 边界原则
 

@@ -5,6 +5,7 @@
  */
 export type SessionDraft={recordId:string;revision:number;content:string;updatedAt:number};
 const prefix='recalloom:draft:';
+const mergeBackupPrefix='recalloom:merge-backup:';
 const maxAge=24*60*60*1000;
 const key=(sessionId:string,recordId:string)=>prefix+sessionId+':'+recordId;
 export function readSessionDraft(sessionId:string,recordId:string):SessionDraft|null{
@@ -32,17 +33,55 @@ export function clearSessionDraft(sessionId:string,recordId:string){
  if(!sessionId)return;
  try{sessionStorage.removeItem(key(sessionId,recordId));}catch{ /* storage may be disabled */ }
 }
+/** A separate tab-scoped safety copy when resolving a merge conflict.
+ * It is not the active draft: never silently restore or overwrite the server.
+ */
+export type SessionMergeBackup={
+ recordId:string;baseRevision:number;baseContent:string;localContent:string;updatedAt:number
+};
+const mergeKey=(sessionId:string,recordId:string)=>mergeBackupPrefix+sessionId+':'+recordId;
+export function readSessionMergeBackup(sessionId:string,recordId:string):SessionMergeBackup|null{
+ if(!sessionId)return null;
+ try{
+  const raw=sessionStorage.getItem(mergeKey(sessionId,recordId));
+  if(!raw)return null;
+  const value:unknown=JSON.parse(raw);
+  if(!value||typeof value!=='object')return null;
+  const x=value as Partial<SessionMergeBackup>;
+  if(x.recordId!==recordId||!Number.isSafeInteger(x.baseRevision)||Number(x.baseRevision)<1
+   ||typeof x.baseContent!=='string'||typeof x.localContent!=='string'
+   ||typeof x.updatedAt!=='number'||x.updatedAt>Date.now()+60_000
+   ||Date.now()-x.updatedAt>maxAge){
+   clearSessionMergeBackup(sessionId,recordId);return null;
+  }
+  return x as SessionMergeBackup;
+ }catch{return null;}
+}
+export function writeSessionMergeBackup(sessionId:string,recordId:string,
+ baseRevision:number,baseContent:string,localContent:string):boolean{
+ if(!sessionId)return false;
+ try{
+  sessionStorage.setItem(mergeKey(sessionId,recordId),JSON.stringify({
+   recordId,baseRevision,baseContent,localContent,updatedAt:Date.now()
+  } satisfies SessionMergeBackup));
+  return true;
+ }catch{return false;}
+}
+export function clearSessionMergeBackup(sessionId:string,recordId:string){
+ if(!sessionId)return;
+ try{sessionStorage.removeItem(mergeKey(sessionId,recordId));}catch{}
+}
 export function clearAllSessionDrafts(){
  try{
   for(let i=sessionStorage.length-1;i>=0;i--){
    const candidate=sessionStorage.key(i);
-   if(candidate?.startsWith(prefix))sessionStorage.removeItem(candidate);
+   if(candidate?.startsWith(prefix)||candidate?.startsWith(mergeBackupPrefix))sessionStorage.removeItem(candidate);
   }
  }catch{ /* browser storage may be disabled */ }
 }
 
 export function hasSessionDrafts():boolean{
- try{for(let i=0;i<sessionStorage.length;i++)if(sessionStorage.key(i)?.startsWith(prefix))return true;}catch{}
+ try{for(let i=0;i<sessionStorage.length;i++)if(sessionStorage.key(i)?.startsWith(prefix)||sessionStorage.key(i)?.startsWith(mergeBackupPrefix))return true;}catch{}
  return false;
 }
 
