@@ -177,10 +177,16 @@ try{
    await page.waitForFunction(()=>document.querySelector('.recent-pages')?.dataset.canScrollRight==='true');
    const position=()=>rail.evaluate(el=>{
     const box=el.getBoundingClientRect(),first=el.firstElementChild.getBoundingClientRect();
+    const last=el.lastElementChild.getBoundingClientRect();
+    const heading=document.querySelector('.home-page h1')?.getBoundingClientRect();
     const css=getComputedStyle(el);
     return {x:box.x,right:box.right,width:box.width,viewport:innerWidth,
      maxScroll:el.scrollWidth-el.clientWidth,scrollLeft:el.scrollLeft,
-     firstCardLeft:first.left,left:el.dataset.canScrollLeft,rightState:el.dataset.canScrollRight,
+     firstCardLeft:first.left,lastCardRight:last.right,cardWidth:first.width,
+     headingLeft:heading?.left,leadingInset:parseFloat(css.paddingInlineStart),
+     trailingInset:parseFloat(css.paddingInlineEnd),
+     snapInset:parseFloat(css.scrollPaddingInlineStart),
+     left:el.dataset.canScrollLeft,rightState:el.dataset.canScrollRight,
      fadeLeft:css.getPropertyValue('--rk-recent-fade-left').trim(),
      fadeRight:css.getPropertyValue('--rk-recent-fade-right').trim(),
      mask:css.webkitMaskImage||css.maskImage,
@@ -190,7 +196,16 @@ try{
    const start=await position();
    assert.ok(Math.abs(start.x)<=2&&Math.abs(start.right-width)<=2,
     'the rail must extend to both SCREEN edges, not stop at page gutters: '+JSON.stringify(start));
-   assert.ok(start.firstCardLeft<=3,'the first card should start at the screen edge');
+   assert.ok(start.leadingInset>=16&&start.trailingInset>=16,
+    'the scrollable track must include normal left/right page insets: '+JSON.stringify(start));
+   assert.ok(Math.abs(start.firstCardLeft-start.headingLeft)<=2,
+    'first recent card must align with the overview title: '+JSON.stringify(start));
+   assert.ok(Math.abs(start.firstCardLeft-start.leadingInset)<=2,
+    'first card inset must belong to scrollable content: '+JSON.stringify(start));
+   assert.ok(Math.abs(start.snapInset-start.leadingInset)<=1,
+    'card snapping must account for the initial left inset: '+JSON.stringify(start));
+   assert.ok(start.cardWidth>148&&start.cardWidth<=188,
+    'cards should be slightly wider while still exposing the next card: '+JSON.stringify(start));
    assert.ok(start.maxScroll>=130,'neighboring cards must continue horizontally');
    assert.equal(start.left,'false');
    assert.equal(start.rightState,'true');
@@ -202,12 +217,16 @@ try{
    await rail.evaluate(el=>el.scrollTo({left:(el.scrollWidth-el.clientWidth)/2,behavior:'instant'}));
    await page.waitForFunction(()=>{const el=document.querySelector('.recent-pages');return el?.dataset.canScrollLeft==='true'&&el?.dataset.canScrollRight==='true';});
    const middle=await position();
+   assert.ok(middle.firstCardLeft<start.firstCardLeft-100,
+    'left inset must scroll away, allowing cards to occupy the screen edge: '+JSON.stringify(middle));
    assert.equal(middle.fadeLeft,'20px');
    assert.equal(middle.fadeRight,'20px');
    if(width===390)await page.screenshot({path:'tmp/recent-carousel-middle-390.png',fullPage:false});
    await rail.evaluate(el=>el.scrollTo({left:el.scrollWidth,behavior:'instant'}));
    await page.waitForFunction(()=>{const el=document.querySelector('.recent-pages');return el?.dataset.canScrollRight==='false'&&el?.dataset.canScrollLeft==='true';});
    const end=await position();
+   assert.ok(Math.abs(end.lastCardRight-(width-end.trailingInset))<=2,
+    'last card should end on a symmetric scrollable right inset: '+JSON.stringify(end));
    assert.equal(end.fadeLeft,'20px');
    assert.equal(end.fadeRight,'0px');
    console.log('PASS full-bleed scroll rail + dynamic edge fades '+width+'px');

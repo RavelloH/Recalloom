@@ -553,19 +553,24 @@
 }
 
 .recent-pages {
-  /* Full-bleed horizontal rail: only the cards, not the entire overview,
-     extend to the screen edges. Neighbouring cards can peek through. */
+  /* Full-bleed viewport with a scrollable leading inset: the first card
+     starts aligned with the page while neighbouring cards peek through. */
   box-sizing: border-box;
   width: calc(100% + 2 * var(--rk-gutter));
   max-width: none;
   margin-inline: calc(-1 * var(--rk-gutter));
   grid-template-columns: none;
   grid-auto-flow: column;
-  grid-auto-columns: 148px;
+  grid-auto-columns: min(78vw, 188px);
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scroll-snap-type: x proximity;
-  padding: 2px 0 6px;
+  /* The leading inset is part of scrollable content, not a fixed outer
+     gutter: first card aligns with the page title, but cards can later
+     scroll through the full-bleed space. Match snap offsets at both ends. */
+  padding-block: 2px 6px;
+  padding-inline: var(--rk-gutter);
+  scroll-padding-inline: var(--rk-gutter);
   scrollbar-width: none;
 
   /* The mask is applied to the scroll viewport, not individual cards.
