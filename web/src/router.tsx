@@ -8,7 +8,7 @@ import {prepareScrollbars,useScrollbarsReady} from './scrollbars';
 import {preparePairedNavigation,type ResolveSharedLabel} from './shared-view-transition';
 import {getRecentPages} from './recent-pages';
 import {documentDisplayName} from './document-filename';
-import type {Task,Event,Entry} from './types';
+import type {Task,Event,Entry,RecentUpdate} from './types';
 import type {SearchResult} from './queries';
 // Route modules load only when visited/preloaded, rather than entering the
 // initial shell bundle. TanStack preloads these on navigation intent.
@@ -115,7 +115,15 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
    return tasks?.items.find(item=>item.id===id)?.title;
   }
   const record=queryClient.getQueryData<{kind:string;name:string}>(['record',id]);
-  return record?labelForRecord(record.name,record.kind):undefined;
+  if(record)return labelForRecord(record.name,record.kind);
+  // A server-fed recent update is often a record the user has NEVER opened.
+  // Its fresh, identity-keyed summary is a valid source for the first visit;
+  // waiting for a detail cache would silently disable the new shared title.
+  if(source==='updated'){
+   const summary=queryClient.getQueryData<{items:RecentUpdate[]}>(['recent-updates'])?.items.find(item=>item.id===id);
+   return summary?labelForRecord(summary.name,summary.kind):undefined;
+  }
+  return undefined;
  }
  if(source==='tree'){
   const element=Array.from(document.querySelectorAll<HTMLElement>('[data-rk-vt-source]'))
@@ -132,6 +140,10 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
  }
  if(source==='recent'){
   const item=getRecentPages().find(entry=>entry.id===id);
+  return item?labelForRecord(item.name,item.kind):undefined;
+ }
+ if(source==='updated'){
+  const item=queryClient.getQueryData<{items:RecentUpdate[]}>(['recent-updates'])?.items.find(entry=>entry.id===id);
   return item?labelForRecord(item.name,item.kind):undefined;
  }
  if(source==='todo'){

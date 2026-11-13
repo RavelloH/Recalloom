@@ -7,7 +7,7 @@ export type LocationPath={pathname:string;search?:Record<string,unknown>};
 export type PairDirection='forward'|'back';
 export type PairCandidate={kind:SharedResourceKind;id:string;direction:PairDirection};
 
-type SourceKind='library'|'recent'|'activity'|'search'|'archive'|'tree'|'todo';
+type SourceKind='library'|'recent'|'updated'|'activity'|'search'|'archive'|'tree'|'todo';
 type Pair={
  kind:SharedResourceKind;id:string;direction:PairDirection;sourceKey:string;
  token:number;label:string;sourceKind:SourceKind;source:HTMLElement;
@@ -59,7 +59,7 @@ function parse(path:string):Route{
 }
 function selectedKind(key:string|null):SourceKind|null{
  const part=key?.split(':',1)[0];
- return part&&['library','recent','activity','search','archive','tree','todo'].includes(part)?part as SourceKind:null;
+ return part&&['library','recent','updated','activity','search','archive','tree','todo'].includes(part)?part as SourceKind:null;
 }
 
 export function candidateForRoutes(fromPath:string,toPath:string):PairCandidate|null{
@@ -152,7 +152,7 @@ export function preparePairedNavigation(fromLocation:LocationPath|null|undefined
    if(toRoute.type!=='record'&&toRoute.type!=='library')return [];
   }else if(sourceKind==='todo'){
    if(candidate.kind!=='task'||fromRoute.type!=='home')return [];
-  }else if(sourceKind==='recent'&&fromRoute.type!=='home'
+  }else if((sourceKind==='recent'||sourceKind==='updated')&&fromRoute.type!=='home'
    ||sourceKind==='search'&&fromRoute.type!=='search'
    ||sourceKind==='archive'&&fromRoute.type!=='archive'
    ||sourceKind==='activity'&&!['home','activity'].includes(fromRoute.type)

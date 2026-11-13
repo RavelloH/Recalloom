@@ -1,6 +1,6 @@
 import {QueryClient,infiniteQueryOptions,queryOptions} from '@tanstack/react-query';
 import {api,activity,browse,queryString,record,tasks} from './api';
-import type {Event} from './types';
+import type {Event,RecentUpdate} from './types';
 import type {RelationsResponse,GraphResponse} from './graph-types';
 
 /** One client for React and route loaders, so a loader-warmed cache is what pages read. */
@@ -34,6 +34,13 @@ export const archivedRecordsQuery=(query='')=>infiniteQueryOptions({
 });
 export const tasksQuery=(recordId?:string)=>queryOptions({queryKey:['tasks',recordId??'all'],queryFn:()=>tasks(recordId?{recordId}:undefined)});
 export const activityQuery=()=>queryOptions({queryKey:['activity'],queryFn:activity});
+export const recentUpdatesQuery=()=>queryOptions({
+ queryKey:['recent-updates'],
+ queryFn:()=>api<{items:RecentUpdate[]}>('/recent-updates?limit=8'),
+ // A fresh home mount should reflect changes just saved in another route.
+ refetchOnMount:'always',
+ staleTime:30_000
+});
 export const activityPagesQuery=()=>infiniteQueryOptions({
  queryKey:['recent-activity'],
  initialPageParam:undefined as number|undefined,

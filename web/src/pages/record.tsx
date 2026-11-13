@@ -61,7 +61,7 @@ export function RecordPage(){
   revealFolder(item.folderId);
  },[item?.id,item?.folderId,item?.status]);
  useEffect(()=>{if(q.error instanceof ApiError&&q.error.status===404)forgetPage(recordId);},[q.error,recordId]);
- const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['archived-records']})]);
+ const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['archived-records']}),qc.invalidateQueries({queryKey:['recent-updates']})]);
  const saveMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');await refresh();};
  const updateMeta=async(fields:Record<string,unknown>)=>{setError(null);try{await saveMeta(fields);setMetaOpen(false);}catch(e){setError(e);}};
  const changeTag=async(tag:string,action:'add'|'remove')=>{await mutate('/records/'+recordId+'/tags',{tag,action});await refresh();};

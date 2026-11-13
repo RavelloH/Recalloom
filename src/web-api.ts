@@ -9,6 +9,7 @@ import { search } from './search.js';
 import {recordRelations,graphView} from './graph.js';
 import {resolveWikiReference,listWikiReferences,backfillWikiReferences} from './wiki-references.js';
 import { recentActivity } from './web-activity.js';
+import {recentUpdates} from './web-recent-updates.js';
 import {parsePublicImageUrl,proxyRemoteImage,privateImageResponse} from './link-image-proxy.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
@@ -126,6 +127,11 @@ webApi.delete('/auth/oauth-grants/:id',async(c)=>{
   if(!found)return err('GRANT_NOT_FOUND',404);
   await c.env.OAUTH_PROVIDER.revokeGrant(id,'owner');
   return asJson({revoked:true,id});
+});
+/** Homepage-only read model: latest content revisions, one row per active record. */
+webApi.get('/recent-updates',async(c)=>{
+ const q=parseQuery(c.req.url,z.object({limit:z.coerce.number().int().min(1).max(30).optional()}));
+ return asJson(await recentUpdates(c.env,q.limit??8));
 });
 webApi.get('/folders',async(c)=>{
   const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}));

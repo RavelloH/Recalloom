@@ -20,7 +20,7 @@ export async function createUntitled(qc:QueryClient,kind:NewPageKind,parentId:st
    const created=kind==='folder'
     ?await mutate<{id:string}>('/folders',{name,parentId})
     :await mutate<{id:string}>('/records',{name,kind,folderId:parentId});
-   await Promise.all([qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']})]);
+   await Promise.all([qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['recent-updates']})]);
    requestTitleFocus(created.id);
    return created.id;
   }catch(error){

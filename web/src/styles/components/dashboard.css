@@ -325,6 +325,13 @@
   flex-wrap: wrap;
 }
 
+.recent-mode-heading {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
 .recent-pages {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
