@@ -553,13 +553,39 @@
 }
 
 .recent-pages {
+  /* Full-bleed horizontal rail: only the cards, not the entire overview,
+     extend to the screen edges. Neighbouring cards can peek through. */
+  box-sizing: border-box;
+  width: calc(100% + 2 * var(--rk-gutter));
+  max-width: none;
+  margin-inline: calc(-1 * var(--rk-gutter));
   grid-template-columns: none;
   grid-auto-flow: column;
   grid-auto-columns: 148px;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   scroll-snap-type: x proximity;
-  padding: 2px 2px 6px;
+  padding: 2px 0 6px;
   scrollbar-width: none;
+
+  /* The mask is applied to the scroll viewport, not individual cards.
+     Each edge fades only while more cards are available in that direction. */
+  --rk-recent-fade-left: 0px;
+  --rk-recent-fade-right: 0px;
+  -webkit-mask-image: linear-gradient(to right,
+    transparent, #000 var(--rk-recent-fade-left),
+    #000 calc(100% - var(--rk-recent-fade-right)), transparent);
+  mask-image: linear-gradient(to right,
+    transparent, #000 var(--rk-recent-fade-left),
+    #000 calc(100% - var(--rk-recent-fade-right)), transparent);
+}
+
+.recent-pages[data-can-scroll-left="true"] {
+  --rk-recent-fade-left: 20px;
+}
+
+.recent-pages[data-can-scroll-right="true"] {
+  --rk-recent-fade-right: 20px;
 }
 
 .recent-pages::-webkit-scrollbar {

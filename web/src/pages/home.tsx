@@ -1,3 +1,4 @@
+import {useEffect,useRef} from 'react';
 import {Icon} from '../icon';
 import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -9,10 +10,29 @@ import {activityQuery,tasksQuery} from '../queries';
 import {PageTitle,ErrorText,LoadingRows,Empty,ago,greeting} from './shared';
 
 export function HomePage(){const {data:todo,isPending,isError,error:todoError}=useQuery(tasksQuery());const events=useQuery(activityQuery());const recent=useRecentPages();const active=todo?.items.filter(t=>!['done','cancelled'].includes(t.status))??[];
+ const recentRail=useRef<HTMLDivElement>(null);
+ // The edge fade follows the actual horizontal overflow. At the first/last
+ // card its corresponding side stays clear; between them both sides hint at
+ // adjacent cards. No React rerenders or layout measurements on every swipe.
+ useEffect(()=>{
+  const rail=recentRail.current;
+  if(!rail)return;
+  const update=()=>{
+   const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+   rail.dataset.canScrollLeft=rail.scrollLeft>2?'true':'false';
+   rail.dataset.canScrollRight=rail.scrollLeft<max-2?'true':'false';
+  };
+  rail.addEventListener('scroll',update,{passive:true});
+  const observer=new ResizeObserver(update);
+  observer.observe(rail);
+  for(const child of rail.children)observer.observe(child);
+  update();
+  return ()=>{rail.removeEventListener('scroll',update);observer.disconnect();};
+ },[recent.length]);
  const shortcut=/Mac|iPhone|iPad/.test(navigator.platform)?'⌘ K':'Ctrl K';
  return <div className="page home-page"><PageTitle title="概览" description={greeting()+'。从最近的页面继续，或查看待办与近期变化。'}/>
  <section className="home-section" aria-labelledby="home-recent"><h2 id="home-recent" className="section-heading"><Icon name="clock" size="sm"/>最近访问</h2>
-  {recent.length?<div className="recent-pages">{recent.slice(0,8).map(page=><Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page" onClick={()=>markSharedNavigationSource('recent:'+page.id)}><span className="recent-page-cover" aria-hidden="true"/><span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span><strong className="recent-page-name"><span className="rk-shared-text" {...sharedSourceAttributes('record',page.id,'recent:'+page.id)}>{page.kind==='document'?documentDisplayName(page.name):page.name}</span>{page.kind==='document'&&/\.md$/i.test(page.name)&&<span className="rk-shared-extension">{page.name.slice(-3)}</span>}</strong><small className="recent-page-meta truncate">{ago(page.visitedAt)}</small></Link>)}</div>
+  {recent.length?<div className="recent-pages" ref={recentRail}>{recent.slice(0,8).map(page=><Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page" onClick={()=>markSharedNavigationSource('recent:'+page.id)}><span className="recent-page-cover" aria-hidden="true"/><span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span><strong className="recent-page-name"><span className="rk-shared-text" {...sharedSourceAttributes('record',page.id,'recent:'+page.id)}>{page.kind==='document'?documentDisplayName(page.name):page.name}</span>{page.kind==='document'&&/\.md$/i.test(page.name)&&<span className="rk-shared-extension">{page.name.slice(-3)}</span>}</strong><small className="recent-page-meta truncate">{ago(page.visitedAt)}</small></Link>)}</div>
   :<div className="recent-empty"><p className="muted small">最近打开的页面会显示在这里。按 <kbd>{shortcut}</kbd> 可随时搜索。</p><Link to="/library" className="small text-link">浏览知识库</Link></div>}
  </section>
  <div className="dashboard-grid">

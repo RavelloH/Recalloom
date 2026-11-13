@@ -171,10 +171,79 @@ try{
    'short document names and .md should fit on one line: '+JSON.stringify({width,short}));
   if(width<=390)assert.ok(geometry.some(entry=>entry.parentScrollHeight>entry.parentHeight+2),
    'fixture must include real truncated long names on phone widths');
+  if(width<=390){
+   const rail=page.locator('.recent-pages');
+   await rail.evaluate(el=>el.scrollTo({left:0,behavior:'instant'}));
+   await page.waitForFunction(()=>document.querySelector('.recent-pages')?.dataset.canScrollRight==='true');
+   const position=()=>rail.evaluate(el=>{
+    const box=el.getBoundingClientRect(),first=el.firstElementChild.getBoundingClientRect();
+    const css=getComputedStyle(el);
+    return {x:box.x,right:box.right,width:box.width,viewport:innerWidth,
+     maxScroll:el.scrollWidth-el.clientWidth,scrollLeft:el.scrollLeft,
+     firstCardLeft:first.left,left:el.dataset.canScrollLeft,rightState:el.dataset.canScrollRight,
+     fadeLeft:css.getPropertyValue('--rk-recent-fade-left').trim(),
+     fadeRight:css.getPropertyValue('--rk-recent-fade-right').trim(),
+     mask:css.webkitMaskImage||css.maskImage,
+     viewportScrollWidth:document.querySelector('.main-scroll').scrollWidth,
+     viewportClientWidth:document.querySelector('.main-scroll').clientWidth};
+   });
+   const start=await position();
+   assert.ok(Math.abs(start.x)<=2&&Math.abs(start.right-width)<=2,
+    'the rail must extend to both SCREEN edges, not stop at page gutters: '+JSON.stringify(start));
+   assert.ok(start.firstCardLeft<=3,'the first card should start at the screen edge');
+   assert.ok(start.maxScroll>=130,'neighboring cards must continue horizontally');
+   assert.equal(start.left,'false');
+   assert.equal(start.rightState,'true');
+   assert.equal(start.fadeLeft,'0px');
+   assert.equal(start.fadeRight,'20px');
+   assert.ok(start.mask!=='none','the scroll rail must own a real CSS gradient mask');
+   assert.ok(start.viewportScrollWidth<=start.viewportClientWidth+2,
+    'full-bleed carousel must not introduce horizontal body overflow');
+   await rail.evaluate(el=>el.scrollTo({left:(el.scrollWidth-el.clientWidth)/2,behavior:'instant'}));
+   await page.waitForFunction(()=>{const el=document.querySelector('.recent-pages');return el?.dataset.canScrollLeft==='true'&&el?.dataset.canScrollRight==='true';});
+   const middle=await position();
+   assert.equal(middle.fadeLeft,'20px');
+   assert.equal(middle.fadeRight,'20px');
+   if(width===390)await page.screenshot({path:'tmp/recent-carousel-middle-390.png',fullPage:false});
+   await rail.evaluate(el=>el.scrollTo({left:el.scrollWidth,behavior:'instant'}));
+   await page.waitForFunction(()=>{const el=document.querySelector('.recent-pages');return el?.dataset.canScrollRight==='false'&&el?.dataset.canScrollLeft==='true';});
+   const end=await position();
+   assert.equal(end.fadeLeft,'20px');
+   assert.equal(end.fadeRight,'0px');
+   console.log('PASS full-bleed scroll rail + dynamic edge fades '+width+'px');
+   await rail.evaluate(el=>el.scrollTo({left:0,behavior:'instant'}));
+   await page.waitForFunction(()=>document.querySelector('.recent-pages')?.dataset.canScrollLeft==='false');
+  }
+  if(width>720){
+   const desktop=await page.locator('.recent-pages').evaluate(el=>({
+    display:getComputedStyle(el).display,
+    mask:getComputedStyle(el).maskImage,
+    marginLeft:getComputedStyle(el).marginLeft
+   }));
+   assert.equal(desktop.display,'grid');
+   assert.equal(desktop.mask,'none','full-bleed fade must be limited to mobile');
+  }
   console.log('PASS recent card title clamping '+width+'px');
   if(width===390)await page.screenshot({path:'tmp/recent-card-390.png',fullPage:false});
   if(width===320)await page.screenshot({path:'tmp/recent-card-320.png',fullPage:false});
  }
+ // With just one recent card there is no overflow and no gradient should
+ // wrongly suggest content beyond either edge.
+ await page.evaluate(item=>localStorage.setItem('recalloom:recent-pages',JSON.stringify([item])),items[0]);
+ await page.setViewportSize({width:390,height:900});
+ await page.reload();
+ await page.locator('.recent-page').waitFor();
+ const single=await page.locator('.recent-pages').evaluate(el=>({
+  maxScroll:el.scrollWidth-el.clientWidth,
+  left:el.dataset.canScrollLeft,right:el.dataset.canScrollRight,
+  leftFade:getComputedStyle(el).getPropertyValue('--rk-recent-fade-left').trim(),
+  rightFade:getComputedStyle(el).getPropertyValue('--rk-recent-fade-right').trim()
+ }));
+ assert.equal(single.left,'false');
+ assert.equal(single.right,'false');
+ assert.equal(single.leftFade,'0px');
+ assert.equal(single.rightFade,'0px');
+ console.log('PASS single-card carousel has no misleading edge fades');
  console.log('PASS combined recent-title and .md extension truncation at four viewport widths');
  assert.deepEqual(faults,[]);
 }finally{await browser.close();}
