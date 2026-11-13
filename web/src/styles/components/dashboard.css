@@ -366,6 +366,22 @@
   overflow: hidden;
 }
 
+/* The shared filename and its .md suffix must participate in the SAME
+   two-line clamp. The global inline-block snapshot style makes the filename
+   an indivisible block and previously pushed '.md…' onto a third line. */
+.recent-page-name .rk-shared-text {
+  display: inline;
+  width: auto;
+  max-width: none;
+}
+.recent-page-name .rk-shared-text[data-rk-vt-active="true"] {
+  /* Only fully visible, single-line names are selected for a shared title
+     snapshot; restore their intrinsic box while the snapshot is captured. */
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .recent-page-meta {
   margin-top: auto;
   padding-top: 8px;
