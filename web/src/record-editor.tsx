@@ -49,6 +49,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[diff,setDiff]=useState('');
  const [editorKey,setEditorKey]=useState(0);
  const latestDraft=useRef(draft);
+ const hasCurrentDraft=useRef(Boolean(usableRecovery));
  const changed=draft!==item.content;
  useEffect(()=>{setActiveEditorDirty(changed||busy);return()=>setActiveEditorDirty(false);},[changed,busy]);
  const changeDraft=(value:string)=>{
@@ -62,7 +63,16 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  const latestVisibleFromEditor=()=>visualRef.current?.flushEditedMarkdown()??latestDraft.current;
  useEffect(()=>{if(!jumpToLine)return;setMode('source');const url=new URL(location.href);url.searchParams.set('mode','source');historyReplace(url);},[jumpToLine]);
  useEffect(()=>{
-  if(changed&&!busy)writeSessionDraft(sessionId,item.id,item.revision,draft);
+  if(busy)return;
+  if(changed){
+   // Track drafts written for this revision, not an unrelated stale copy.
+   if(writeSessionDraft(sessionId,item.id,item.revision,draft))hasCurrentDraft.current=true;
+  }else if(hasCurrentDraft.current){
+   // A full Undo should clear the emergency draft as well as the dirty UI.
+   const storedDraft=readSessionDraft(sessionId,item.id);
+   if(storedDraft?.revision===item.revision)clearSessionDraft(sessionId,item.id);
+   hasCurrentDraft.current=false;
+  }
  },[changed,busy,draft,sessionId,item.id,item.revision]);
  const blocker=useBlocker({
   shouldBlockFn:({current,next})=>!isLogoutNavigationApproved()&&(changed||busy)&&current.pathname!==next.pathname,

@@ -48,6 +48,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [ready,setReady]=useState(false);
  const applying=useRef(false);
  const edited=useRef(false);
+ // Compare the actual ProseMirror document to its initial snapshot.
+ // Canonical Markdown serialization alone may change whitespace, and
+ // should not leave Ctrl+Z at a false dirty state.
+ const initialSource=useRef(value);
+ const initialDocument=useRef<ProseMirrorNode|null>(null);
+ const markdownForCurrentDocument=(current:Editor)=>
+  initialDocument.current?.eq(current.state.doc)
+   ?initialSource.current:serializeRmdVisual(current.getJSON());
  const lastColumn=useRef<number|null>(null);
  const lastCellPos=useRef<number|null>(null);
  const [tableTarget,setTableTarget]=useState(false);
@@ -152,7 +160,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const extensions=useVisualEditorExtensions(recordId,setDialog);
  const editor=useEditor({
   extensions,content:{type:'doc',content:[{type:'paragraph'}]},immediatelyRender:false,
-  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(serializeRmdVisual(editor.getJSON()));}if(!detectWiki(editor))detectSlash(editor);},
+  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(markdownForCurrentDocument(editor));}if(!detectWiki(editor))detectSlash(editor);},
   onSelectionUpdate:({editor})=>{if(!detectWiki(editor))detectSlash(editor);followTableSelection(editor);},
   // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
   onFocus:({editor})=>followTableSelection(editor),
@@ -195,6 +203,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  useEffect(()=>{
   if(!editor||checked.current)return;
   checked.current=true;
+  initialSource.current=value;
   applying.current=true;
   try{
    const richDocument=parseRmdVisual(value);
@@ -208,7 +217,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    editor.chain().setMeta('addToHistory',false)
     .setContent({type:'doc',content:[rawMarkdownBlock(value)]},{emitUpdate:false}).run();
   }
-  finally{applying.current=false;setReady(true);}
+  finally{initialDocument.current=editor.state.doc;applying.current=false;setReady(true);}
  },[editor,value]);
  useEffect(()=>{
   if(!editor||!ready)return;
@@ -308,7 +317,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   if(!editor)return null;
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
   view.domObserver?.flush();
-  return edited.current?serializeRmdVisual(editor.getJSON()):null;
+  return edited.current?markdownForCurrentDocument(editor):null;
  }}),[editor]);
 
  chooseWikiRef.current=hit=>{
