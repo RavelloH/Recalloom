@@ -189,6 +189,31 @@ try{
  await stableGoto(base+'/');
  const radio=label=>page.getByRole('radio',{name:label,exact:true});
  await radio('最近访问').waitFor();
+ assert.equal(await radio('最近访问').locator('svg').count(),1,'visited segment needs a semantic icon');
+ assert.equal(await radio('最近更新').locator('svg').count(),1,'updated segment needs a semantic icon');
+ const switcherSize=await page.locator('.recent-mode-heading [role="radiogroup"]').evaluate(el=>{
+  const rect=el.getBoundingClientRect();
+  return {width:rect.width,height:rect.height,viewport:innerWidth};
+ });
+ assert.ok(switcherSize.height>=34&&switcherSize.width<switcherSize.viewport,
+  'native Astryx switcher must be touchable without overflowing: '+JSON.stringify(switcherSize));
+ const dashboardRows=await page.evaluate(()=>{
+  const task=document.querySelector('.home-card .compact-row');
+  const activity=document.querySelector('.home-card .recent-entry');
+  if(!task||!activity)return null;
+  return {taskHeight:task.getBoundingClientRect().height,
+   activityHeight:activity.getBoundingClientRect().height,
+   taskPadding:getComputedStyle(task).paddingTop,
+   activityPadding:getComputedStyle(activity).paddingTop,
+   activitySummary:getComputedStyle(activity.querySelector('.activity-summary')).whiteSpace};
+ });
+ assert.ok(dashboardRows&&Math.abs(dashboardRows.taskHeight-dashboardRows.activityHeight)<=1,
+  'home task/activity preview row heights must match: '+JSON.stringify(dashboardRows));
+ assert.equal(dashboardRows.activitySummary,'nowrap','home activity should truncate rather than change row height');
+ const initialPanel=page.locator('.home-recent-resizer');
+ await initialPanel.waitFor();
+ assert.equal(await initialPanel.locator('.home-recent-content').count(),1,
+  'first mount must not duplicate the entrance animation');
  await radio('最近更新').click();
  await page.locator('.recent-page').filter({hasText:docB.name}).waitFor();
  const cards=page.locator('.recent-pages .recent-page');
@@ -198,18 +223,22 @@ try{
  await page.waitForTimeout(180);
  const initial=await page.locator('.recent-pages').evaluate(el=>{
   const first=el.firstElementChild.getBoundingClientRect();
+  const outer=document.querySelector('.home-recent-resizer').getBoundingClientRect();
   return {x:el.getBoundingClientRect().x,width:el.getBoundingClientRect().width,
    firstLeft:first.left,viewport:innerWidth,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,
-   pad:parseFloat(getComputedStyle(el).paddingLeft)};
+   pad:parseFloat(getComputedStyle(el).paddingLeft),
+   outerX:outer.x,outerWidth:outer.width};
  });
  if(mobileRun){
   assert.ok(Math.abs(initial.x)<=2&&Math.abs(initial.width-initial.viewport)<=2,
    'updated mode reuses full-bleed mobile rail');
   assert.ok(Math.abs(initial.firstLeft-initial.pad)<=2,
    'updated cards must retain their scrollable leading inset');
+  assert.ok(Math.abs(initial.outerX)<=2&&Math.abs(initial.outerWidth-initial.viewport)<=2,
+   'AutoResizer must be full-bleed, never clip the edge carousel: '+JSON.stringify(initial));
  }
  if(mobileRun)await page.screenshot({path:'tmp/home-recent-updates-mobile.png',fullPage:false});
- console.log('PASS native Astryx mode switch and reused recent-card layout');
+ console.log('PASS Astryx icon switcher, balanced dashboard rows and unclipped carousel transition');
 
  // The detail has never been opened in this browser. The server summary must
  // still allow a matching title snapshot on the FIRST click.
@@ -236,5 +265,42 @@ try{
  await page.locator('.recent-page').filter({hasText:docB.name}).waitFor();
  assert.equal(await cards.count(),payload.items.length);
  console.log('PASS tab selection survives history and reload without duplicating cards');
+ // Verify BOTH animations are real: content fades, while its height resizes
+ // between an empty local history and populated server results. This catches
+ // regressions where a clipping wrapper is present but never animates.
+ await page.evaluate(()=>localStorage.setItem('recalloom:recent-pages','[]'));
+ await page.reload();
+ await radio('最近更新').waitFor();
+ await page.locator('.recent-page').filter({hasText:docB.name}).waitFor();
+ await radio('最近访问').click();
+ await page.locator('.recent-empty').waitFor();
+ await page.waitForTimeout(480);
+ const emptyHeight=await page.locator('.home-recent-resizer').evaluate(el=>el.getBoundingClientRect().height);
+ await page.evaluate(()=>{
+  window.__rkRecentMotion=[];
+  const until=performance.now()+960;
+  const sample=()=>{
+   const box=document.querySelector('.home-recent-resizer');
+   const panes=[...document.querySelectorAll('.home-recent-content')];
+   window.__rkRecentMotion.push({
+    h:box?.getBoundingClientRect().height??0,
+    opacity:panes.map(el=>Number(getComputedStyle(el).opacity))
+   });
+   if(performance.now()<until)requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+ });
+ await radio('最近更新').click();
+ await page.locator('.recent-page').filter({hasText:docB.name}).waitFor();
+ await page.waitForTimeout(600);
+ const motion=await page.evaluate(()=>window.__rkRecentMotion);
+ const finalHeight=await page.locator('.home-recent-resizer').evaluate(el=>el.getBoundingClientRect().height);
+ assert.ok(finalHeight>emptyHeight+35,
+  'AutoResizer must adapt to larger content: '+JSON.stringify({emptyHeight,finalHeight}));
+ assert.ok(motion.some(sample=>sample.opacity.some(op=>op>0.05&&op<0.95)),
+  'AutoTransition must actually fade swapped content: '+JSON.stringify(motion.slice(0,8)));
+ assert.ok(motion.some(sample=>sample.h>emptyHeight+10&&sample.h<finalHeight-10),
+  'AutoResizer must interpolate height rather than jump: '+JSON.stringify({emptyHeight,finalHeight,heights:motion.map(item=>item.h).slice(0,15)}));
+ console.log('PASS AutoTransition fade and AutoResizer interpolated height on real content swap');
  assert.deepEqual(faults,[],'recent updates must not introduce runtime errors');
 }finally{await browser.close();}

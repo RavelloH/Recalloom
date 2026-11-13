@@ -328,8 +328,47 @@
 .recent-mode-heading {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
   min-width: 0;
+}
+
+.recent-mode-title {
+  margin: 0;
+  color: var(--rk-ink-soft);
+  font-size: var(--rk-font-label);
+  font-weight: 650;
+}
+
+.home-recent-resizer,
+.home-recent-content {
+  min-width: 0;
+}
+
+/* The two homepage summaries use one compact row rhythm. Full activity pages
+   retain their multi-line layout; only the dashboard previews are clamped. */
+.home-card .compact-row,
+.home-card .recent-entry {
+  box-sizing: border-box;
+  height: 60px;
+  min-height: 60px;
+  padding-block: 10px;
+}
+
+.home-card .recent-entry .activity-main {
+  overflow: hidden;
+}
+
+.home-card .recent-entry .activity-summary {
+  overflow: hidden;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-card .recent-entry time {
+  flex: none;
 }
 
 .recent-pages {
@@ -557,6 +596,28 @@
 
 .context-panel-inner .history-row .row {
   align-self: flex-end;
+}
+
+.recent-mode-title {
+  display: none;
+}
+
+.home-recent-resizer {
+  /* AutoResizer clips overflow while animating height; make its viewport
+     full-bleed so it does NOT cut off the horizontal card carousel. */
+  box-sizing: border-box;
+  width: calc(100% + 2 * var(--rk-gutter));
+  margin-inline: calc(-1 * var(--rk-gutter));
+}
+
+.home-recent-content > .recent-pages {
+  width: 100%;
+  margin-inline: 0;
+}
+
+.home-recent-content > .recent-empty,
+.home-recent-content > .home-recent-feedback {
+  margin-inline: var(--rk-gutter);
 }
 
 .recent-pages {
