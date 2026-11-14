@@ -1,7 +1,8 @@
-import React from 'react';
+import React,{useLayoutEffect,useRef,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
+import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {ContextPanel} from './context-panel';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
 import {RecordRelations} from './record-relations';
@@ -11,6 +12,7 @@ import {sharedViewTransitionName} from './shared-view-transition';
 import {documentDisplayName} from './document-filename';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import type {DocumentOutline} from './document-outline';
+import {COMPACT_QUERY} from './use-media';
 
 export const documentPanels=[
  {id:'info',label:'信息',icon:'infoCircle'},
@@ -19,18 +21,64 @@ export const documentPanels=[
 ] as const;
 export type DocumentPanel=typeof documentPanels[number]['id'];
 
+export function DocumentWorkbenchActions({panel,onToggle,moreItems}:{
+ panel:DocumentPanel|null;
+ onToggle:(panel:DocumentPanel)=>void;
+ moreItems:React.ComponentProps<typeof MoreMenu>['items'];
+}){
+ const ref=useRef<HTMLDivElement>(null);
+ const [overflow,setOverflow]=useState(false);
+ useLayoutEffect(()=>{
+  const actions=ref.current;
+  const toolbar=actions?.closest<HTMLElement>('.editor-topline');
+  const switcher=toolbar?.querySelector<HTMLElement>('.editor-view-switcher');
+  if(!actions||!toolbar||!switcher)return;
+  const measure=()=>{
+   if(!matchMedia(COMPACT_QUERY).matches){setOverflow(false);return;}
+   const button=actions.querySelector('button');
+   if(!button)return;
+   const style=getComputedStyle(toolbar);
+   const available=toolbar.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+   // Phone action buttons share a fixed width. Measure the full set even
+   // while two entries are in More, so resizing cannot oscillate the layout.
+   const actionWidth=button.getBoundingClientRect().width*(documentPanels.length+1)
+    +(parseFloat(getComputedStyle(actions).columnGap)||0)*documentPanels.length;
+   // The action row's auto margin only consumes spare room, so it must not
+   // count toward the space needed to restore the expanded buttons.
+   setOverflow(switcher.getBoundingClientRect().width+actionWidth+(parseFloat(style.columnGap)||0)>available+1);
+  };
+  const observer=new ResizeObserver(measure);
+  for(const element of [toolbar,switcher,actions])observer.observe(element);
+  measure();
+  return()=>observer.disconnect();
+ },[]);
+ const overflowPanels=overflow?documentPanels.filter(entry=>entry.id!=='outline'):[];
+ return <div className="document-panel-actions" ref={ref}>
+  {documentPanels.filter(entry=>!overflow||entry.id==='outline').map(entry=><IconButton key={entry.id}
+   variant={panel===entry.id?'secondary':'ghost'} size="sm" label={entry.label} icon={<Icon name={entry.icon} size="sm"/>}
+   aria-haspopup="dialog" aria-controls="document-panel" aria-expanded={panel===entry.id} onClick={()=>onToggle(entry.id)}/>)}
+  <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
+   ...overflowPanels.map(entry=>({label:entry.label,icon:<Icon name={entry.icon} size="sm"/>,onClick:()=>onToggle(entry.id)})),
+   ...(overflowPanels.length?[{type:'divider' as const}]:[]),
+   ...moreItems
+  ]}/>
+ </div>;
+}
+
 export type DocumentPresentation={
  id:string;
  revision:number;
  characters:number;
 };
 
-export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename}:{
+export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename,onDetails,detailsOpen}:{
  item:RecordDetail;
  characters:number;
  editors:string[]|null;
  focusTitle:boolean;
  onRename:(name:string)=>Promise<void>;
+ onDetails:()=>void;
+ detailsOpen:boolean;
 }){
  const sharedName=sharedViewTransitionName('record',item.id);
  return <header className="doc-header workbench-header">
@@ -58,6 +106,10 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
      </AutoTransition>
     </div>
    </AutoResizer>
+   <button type="button" className="workbench-details-trigger" onClick={onDetails}
+    aria-haspopup="dialog" aria-controls="document-panel" aria-expanded={detailsOpen}>
+    详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
+   </button>
   </div>
  </header>;
 }

@@ -322,6 +322,14 @@ try{
  const infoTrigger=()=>page.getByRole('button',{name:'信息',exact:true});
  const outlineTrigger=()=>page.getByRole('button',{name:'目录',exact:true});
  const historyTrigger=()=>page.getByRole('button',{name:'历史',exact:true});
+ const panelEntry=async name=>{
+  const direct=page.getByRole('button',{name,exact:true});
+  if(await direct.isVisible())return direct;
+  await page.getByRole('button',{name:'更多操作',exact:true}).click();
+  const entry=page.getByRole('menuitem',{name,exact:true});
+  await entry.waitFor();
+  return entry;
+ };
  await infoTrigger().waitFor();
  await outlineTrigger().waitFor();
  await historyTrigger().waitFor();
@@ -329,7 +337,7 @@ try{
  assert.equal(await outlineTrigger().count(),1,'Outline has one toolbar entry');
  assert.equal(await historyTrigger().count(),1,'History has one toolbar entry');
  assert.deepEqual(lazyPanelRequests,[],'Outline, relations and history data remain unloaded until their panel opens');
- await openPanelWithMotion(infoTrigger(),'desktop first info open',1440);
+ await openPanelWithMotion(header.getByRole('button',{name:'详细信息',exact:true}),'desktop header details open',1440);
  const verifyPropertyLayout=async()=>{
   const layout=await inspector.locator('.workbench-inspector-details .page-properties').evaluate(el=>({
    display:getComputedStyle(el).display,
@@ -367,8 +375,10 @@ try{
  assert.ok(tagStyle.background!=='rgba(0, 0, 0, 0)'&&tagStyle.radius>=6&&tagStyle.border>=1&&contrast>=10,
   'Tags must have a visibly distinct filled background: '+JSON.stringify({...tagStyle,contrast}));
  assert.equal(await header.locator('.workbench-tag-line').count(),1,'Tags should occupy their own optional row');
- assert.equal(await header.locator('.workbench-details-trigger').count(),0,'Header metadata has no duplicate panel entry');
- assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'block','Document metadata summary is unframed text');
+ assert.equal(await header.getByRole('button',{name:'详细信息',exact:true}).getAttribute('aria-expanded'),'true',
+  'Header details entry opens the same information panel');
+ assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'grid',
+  'Document metadata leaves room for its details entry');
  assert.equal(await inspector.getByRole('region',{name:'文档关联'}).count(),1,'Relations are grouped under document information');
  assert.equal(await inspector.getByRole('textbox',{name:'查找文档'}).count(),0,'Relation search starts collapsed');
  await inspector.getByRole('button',{name:'语义相似',exact:true}).click();
@@ -555,6 +565,49 @@ try{
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.reload();
  await header.waitFor();
+ await page.locator('.record-main .editor-topline').waitFor();
+ const verifyPhoneToolbar=async width=>{
+  await page.waitForFunction(()=>{
+   const toolbar=document.querySelector('.record-main .editor-topline');
+   const switcher=toolbar?.querySelector('.editor-view-switcher')?.getBoundingClientRect();
+   const actions=toolbar?.querySelector('.editor-view-actions')?.getBoundingClientRect();
+   return switcher&&actions&&Math.abs(switcher.y-actions.y)<2&&switcher.right<=actions.left+1&&actions.right<=toolbar.getBoundingClientRect().right+1;
+  });
+  const layout=await page.locator('.record-main .editor-topline').evaluate(toolbar=>({
+   height:toolbar.getBoundingClientRect().height,
+   modeButtons:[...toolbar.querySelectorAll('.editor-view-switcher [role="group"] > button')].map(button=>({
+    label:button.innerText.trim(),width:button.clientWidth,scrollWidth:button.scrollWidth,
+    text:[...button.querySelectorAll('*')].filter(element=>element.childElementCount===0&&element.textContent.trim())
+     .map(element=>({width:element.clientWidth,scrollWidth:element.scrollWidth}))
+   })),
+   actions:[...toolbar.querySelectorAll('.document-panel-actions > button')].map(button=>button.getAttribute('aria-label')),
+   pageWidth:document.documentElement.scrollWidth
+  }));
+  assert.ok(layout.height<=44,'Phone editing controls occupy one row at '+width+': '+JSON.stringify(layout));
+  assert.deepEqual(layout.modeButtons.map(button=>button.label),['可视化','源码','预览']);
+  assert.ok(layout.modeButtons.every(button=>button.scrollWidth<=button.width+1&&button.text.every(text=>text.scrollWidth<=text.width+1)),
+   'Mode labels remain complete at '+width+': '+JSON.stringify(layout));
+  assert.ok(layout.actions.includes('目录')&&layout.actions.includes('更多操作'),'Outline and More stay directly reachable');
+  assert.equal(layout.actions.includes('信息'),layout.actions.includes('历史'),'Information and History overflow together');
+  assert.ok(layout.pageWidth<=width+1,'Phone toolbar cannot widen the page: '+JSON.stringify(layout));
+  return layout;
+ };
+ for(const width of [320,350,360,375,390,393,414,430,480,540,720]){
+  await page.setViewportSize({width,height:mobileHeight});
+  await verifyPhoneToolbar(width);
+ }
+ await page.setViewportSize({width:414,height:mobileHeight});
+ await verifyPhoneToolbar(414);
+ await infoTrigger().waitFor();
+ await page.locator('.record-main .editor-topline').evaluate(toolbar=>{toolbar.style.width='300px';});
+ await infoTrigger().waitFor({state:'hidden'});
+ await verifyPhoneToolbar(414);
+ await page.locator('.record-main .editor-topline').evaluate(toolbar=>{toolbar.style.removeProperty('width');});
+ await infoTrigger().waitFor();
+ await verifyPhoneToolbar(414);
+ console.log('PASS single-row phone toolbar at 320–720px; overflow follows available space');
+ await page.setViewportSize({width:390,height:mobileHeight});
+ await verifyPhoneToolbar(390);
  const measure=await page.evaluate(()=>({
   width:document.documentElement.scrollWidth,
   viewport:innerWidth,
@@ -574,19 +627,19 @@ try{
  assert.ok(modeButtons.every(button=>button.scrollWidth<=button.width+1&&
   (button.labelScrollWidth===null||button.labelScrollWidth<=button.labelWidth+1)),
   'Editor mode labels stay fully visible at 390px: '+JSON.stringify(modeButtons));
- await openPanelWithMotion(infoTrigger(),'mobile first info open',390);
+ await openPanelWithMotion(header.getByRole('button',{name:'详细信息',exact:true}),'mobile header details open',390);
  await verifyPropertyLayout();
  await page.screenshot({path:'tmp/workbench-mobile-details.png'});
  const box=await page.locator('dialog:has(.workbench-inspector) .astryx-bottom-sheet').boundingBox();
  assert.ok(box&&box.width>=385,'Touch inspector must remain a bottom sheet');
  await closePanelWithMotion('mobile info exit',390);
- await openPanelWithMotion(historyTrigger(),
+ await openPanelWithMotion(await panelEntry('历史'),
   'mobile direct history open',390);
  assert.equal(await inspector.getAttribute('data-document-panel'),'history');
  await inspector.getByText('Revision 1').waitFor();
  await page.screenshot({path:'tmp/workbench-mobile-inspector.png'});
  await closePanelWithMotion('mobile history exit',390);
- await openPanelWithMotion(infoTrigger(),
+ await openPanelWithMotion(await panelEntry('信息'),
   'mobile repeated info open',390);
  assert.equal(await inspector.getAttribute('data-document-panel'),'info');
  await verifyPropertyLayout();
@@ -628,9 +681,16 @@ try{
  await page.screenshot({path:'tmp/workbench-mobile.png'});
  console.log('PASS 390px mobile layout, bottom-sheet panels and version history');
  await page.setViewportSize({width:320,height:narrowHeight});
- await openPanelWithMotion(infoTrigger(),
-  'mobile re-open after closed-width change',320);
+ await verifyPhoneToolbar(320);
+ await infoTrigger().waitFor({state:'hidden'});
+ await historyTrigger().waitFor({state:'hidden'});
+ await openPanelWithMotion(await panelEntry('信息'),
+  'mobile overflow info open',320);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'info');
  await closePanelWithMotion('mobile resized reopen exit',320);
+ await openPanelWithMotion(await panelEntry('历史'),'mobile overflow history open',320);
+ await inspector.getByText('Revision 1').waitFor();
+ await closePanelWithMotion('mobile overflow history exit',320);
  await page.emulateMedia({colorScheme:'dark'});
  await page.setViewportSize({width:320,height:narrowHeight});
  await page.reload();
@@ -675,9 +735,9 @@ try{
  await openLongAndClose(historyTrigger(),'long visual 160 math desktop history',1440);
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.waitForFunction(()=>matchMedia('(max-width: 720px)').matches);
- await openLongAndClose(longInfo,'long visual 160 math mobile info',390);
+ await openLongAndClose(await panelEntry('信息'),'long visual 160 math mobile info',390);
  await openLongAndClose(outlineTrigger(),'long visual 160 math mobile outline',390);
- await openLongAndClose(historyTrigger(),'long visual 160 math mobile history',390);
+ await openLongAndClose(await panelEntry('历史'),'long visual 160 math mobile history',390);
  await page.setViewportSize({width:1440,height:900});
  await page.locator('.editor-view-switcher button').nth(2).click();
  await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="preview"]')?.getAttribute('aria-busy')==='false'&&

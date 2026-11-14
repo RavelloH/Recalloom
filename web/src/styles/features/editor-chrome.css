@@ -49,6 +49,11 @@
   margin-inline-start:2px;
 }
 .editor-view-actions > * {flex:none;}
+.document-panel-actions {
+  display:flex;
+  align-items:center;
+  gap:inherit;
+}
 
 .wysiwyg-toolbar {
   display:flex;
@@ -263,7 +268,7 @@
   gap:4px;
 }
 .record-page .record-main .editor-topline .editor-view-switcher {
-  flex:0 1 auto;
+  flex:0 0 auto;
   min-width:0;
   max-width:280px;
 }
@@ -274,7 +279,7 @@
   justify-content:flex-start;
 }
 .editor-topline .editor-view-switcher [role="group"] button {
-  flex:0 1 auto;
+  flex:0 0 auto;
   min-width:0;
   padding-inline:10px;
   min-height:38px;
@@ -292,6 +297,9 @@
   min-height:38px;
   height:38px;
   padding-inline:6px;
+}
+.editor-topline .document-panel-actions > button {
+  width:32px;
 }
 
 .editor-body {
@@ -331,21 +339,6 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-}
-
-/* Keep all three document tools reachable without shrinking the view controls. */
-@media (max-width: 480px) {
- .record-page .record-main .editor-topline {
-  flex-wrap:wrap;
-  row-gap:4px;
- }
- .record-page .record-main .editor-topline .editor-view-switcher {
-  flex:0 0 auto;
- }
- .record-page .record-main .editor-topline .editor-view-actions {
-  flex-basis:100%;
-  justify-content:flex-end;
- }
 }
 
 /* Narrow-phone geometry only. Input modality still comes from pointer media. */

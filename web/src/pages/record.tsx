@@ -10,7 +10,7 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {ApiError,api,mutate,queryString} from '../api';
 import {ContextPanel} from '../context-panel';
-import {DocumentWorkbenchHeader,DocumentWorkbenchPanel,documentPanels,type DocumentPanel,type DocumentPresentation} from '../record-workbench';
+import {DocumentWorkbenchActions,DocumentWorkbenchHeader,DocumentWorkbenchPanel,type DocumentPanel,type DocumentPresentation} from '../record-workbench';
 import type {DocumentOutline} from '../document-outline';
 import {markdownCharacterCount} from '../document-heading';
 import {filenameFromDocumentTitle} from '../document-filename';
@@ -91,20 +91,18 @@ export function RecordPage(){
  };
  if(q.isPending)return <div className="page record-page"><div className="doc-header"><Skeleton width={56} height={56} radius={3}/><div className="doc-skeleton-title"><Skeleton width="55%" height={40} radius={2}/></div><Skeleton width="38%" height={14} radius={1}/></div></div>;
  if(q.isError||!item)return <div className="page"><ErrorText error={q.error}/></div>;
- const pageActions=<>
-  {item.kind==='document'?documentPanels.map(panel=><IconButton key={panel.id} variant={documentPanel===panel.id?'secondary':'ghost'} size="sm"
-   label={panel.label} icon={<Icon name={panel.icon} size="sm"/>} aria-haspopup="dialog" aria-controls="document-panel"
-   aria-expanded={documentPanel===panel.id} onClick={()=>toggleDocumentPanel(panel.id)}/>)
-   :<IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>setMetaOpen(v=>!v)}/>}
-  <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
+ const moreItems:React.ComponentProps<typeof MoreMenu>['items']=[
    {label:'复制页面链接',icon:<Icon name="copy" size="sm"/>,onClick:()=>void navigator.clipboard?.writeText(location.origin+'/records/'+item.id)},
    {label:fullWidth?'恢复标准宽度':'全宽显示',icon:<Icon name="arrowsHorizontal" size="sm"/>,onClick:()=>setFullWidth(!fullWidth)},
    {label:'查看关系网',icon:<Icon name="relationGraph" size="sm"/>,onClick:()=>void nav({to:'/graph',search:{focus:item.id}})},
    {type:'divider'},
    {label:'归档记录',icon:<Icon name="archive" size="sm"/>,variant:'destructive',isDisabled:archiving||item.status==='archived',onClick:()=>void archive()},
    ...(item.status==='archived'?[{label:'永久删除归档记录',icon:<Icon name="trash" size="sm"/>,variant:'destructive' as const,isDisabled:archiving,onClick:()=>void deleteArchived()}]:[])
-  ]}/>
- </>;
+ ];
+ const pageActions=item.kind==='document'
+  ?<DocumentWorkbenchActions panel={documentPanel} onToggle={toggleDocumentPanel} moreItems={moreItems}/>
+  :<><IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>setMetaOpen(v=>!v)}/>
+    <MoreMenu size="sm" variant="ghost" label="更多操作" items={moreItems}/></>;
  const archiveNotice=item.status==='archived'
   ?<Banner data-rk-record-notice="archive" status="warning" container="section"
     title="此记录已归档" description="已从知识库列表中隐藏，内容及历史版本仍完整保留。"
@@ -116,6 +114,7 @@ export function RecordPage(){
  {item.kind==='document'
   ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle}
     characters={currentPresentation?.characters??0} editors={editorsQuery.isSuccess?editorNames:null}
+    onDetails={()=>toggleDocumentPanel('info')} detailsOpen={documentPanel==='info'}
     onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>

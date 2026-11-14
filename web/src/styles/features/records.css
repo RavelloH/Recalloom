@@ -474,7 +474,10 @@
 }
 
 .workbench-document .workbench-summary {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  column-gap: 14px;
   margin-top: 10px;
   min-width: 0;
   color: var(--rk-ink-soft);
@@ -513,6 +516,30 @@
 }
 .workbench-document .workbench-character-count {
   white-space: nowrap;
+}
+
+.workbench-document .workbench-details-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 2px 5px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rk-ink-soft);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workbench-document .workbench-details-trigger:hover {
+    color: var(--color-text-primary);
+    background: var(--color-background-muted, rgba(128,128,128,.08));
+  }
+}
+.workbench-document .workbench-details-trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .workbench-document .record-main .page-actions-bar {
