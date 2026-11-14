@@ -12,7 +12,6 @@ import {BubbleMenu} from '@tiptap/react/menus';
 import {NodeSelection} from '@tiptap/pm/state';
 import type {Editor} from '@tiptap/core';
 import {parseRmdVisual} from '../rmd-visual';
-import {serializeRmdVisual} from '../rmd-serialize';
 import {useSketchAnnotations} from '../sketch-annotations';
 import {isRmdAttrsEditable} from '../tiptap/rmd-schema-attrs-model';
 import {rawMarkdownBlock} from '../tiptap/raw-markdown';
@@ -38,6 +37,7 @@ import {EditorTableControls} from './table-controls';
 import {EditorCompletions} from './completions';
 import {EditorInlinePopup} from './inline-popup';
 import {OverlayScroll} from '../scrollbars';
+import {createRmdVisualDocumentSerializer} from './document-serializer';
 import type {SlashState,WikiState,InlinePopupItem,InlinePopup,VisualEditorHandle} from './types';
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
 const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
@@ -53,9 +53,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  // should not leave Ctrl+Z at a false dirty state.
  const initialSource=useRef(value);
  const initialDocument=useRef<ProseMirrorNode|null>(null);
- const markdownForCurrentDocument=(current:Editor)=>
-  initialDocument.current?.eq(current.state.doc)
-   ?initialSource.current:serializeRmdVisual(current.getJSON());
+ const documentSerializer=useRef<ReturnType<typeof createRmdVisualDocumentSerializer>|null>(null);
+ const markdownForCurrentDocument=(current:Editor)=>{
+  if(initialDocument.current?.eq(current.state.doc))return initialSource.current;
+  documentSerializer.current??=createRmdVisualDocumentSerializer();
+  return documentSerializer.current(current.state.doc);
+ };
  const lastColumn=useRef<number|null>(null);
  const lastCellPos=useRef<number|null>(null);
  const [tableTarget,setTableTarget]=useState(false);
@@ -514,11 +517,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const menuIcon=(icon:React.ReactNode)=><span className="rk-inline-dropdown-icon" aria-hidden="true">
   {icon}<Icon name="chevronDown" className="rk-inline-dropdown-chevron" size="sm"/>
  </span>;
- const moreInlineItems=buildMoreInlineItems(editor,active,runCapturedInline,runInlineFromMenu);
  // Shared ordered toolbar: touch and desktop MUST render the very same
  // controls in DOM/tab order. Put the highest-frequency actions in the first
  // screenful on narrow touch devices; secondary formatting scrolls to the right.
- const sharedFormattingToolbar=buildFormattingToolbar({editor,active,categoryButton,toggle,action,runCapturedInline,runInlineFromMenu,openLink,openMath,moreInlineItems,touchToolbar});
+ const sharedFormattingToolbar=touchToolbar||active?.textSelection
+  ?buildFormattingToolbar({editor,active,categoryButton,toggle,action,runCapturedInline,runInlineFromMenu,openLink,openMath,
+    moreInlineItems:buildMoreInlineItems(editor,active,runCapturedInline,runInlineFromMenu),touchToolbar})
+  :null;
  const editBlock=(pos:number)=>{
   const target=editableBlockAt(editor,pos);
   if(!target)return;
@@ -596,11 +601,11 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       </div>}
    </div>
   </BubbleMenu>}
-  <EditorTableControls editor={editor} active={active} tableTarget={tableTarget} tableToolbarTop={tableToolbarTop}
+  {(tableTarget||(active?.table&&active.focused)||tableCaptionOpen)&&<EditorTableControls editor={editor} active={active} tableTarget={tableTarget} tableToolbarTop={tableToolbarTop}
    tableCaptionOpen={tableCaptionOpen} tableCaptionDraft={tableCaptionDraft} tableIdDraft={tableIdDraft}
    column={lastColumn.current} onTableCaptionDraftChange={setTableCaptionDraft} onTableIdDraftChange={setTableIdDraft}
    onCloseCaption={()=>setTableCaptionOpen(false)} applyTableCaption={applyTableCaption} editTableCaption={editTableCaption}
-   tableCommand={tableCommand} action={action}/>
+   tableCommand={tableCommand} action={action}/>}
   {!finePointer?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={editBlock}
    onEditLink={openLink} onInsert={(pos,point)=>openInsertMenu(pos,point)}><EditorContent editor={editor}/></EditorContextMenu>}
   <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} enabled={finePointer} onEditBlock={editBlock}/>
@@ -618,4 +623,6 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}
  </div>;
 });
-export default VisualEditor;
+// Draft changes still render normally. Character-count replies and surrounding
+// page updates can reuse this subtree when its document props are unchanged.
+export default React.memo(VisualEditor);

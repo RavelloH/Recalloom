@@ -1,13 +1,13 @@
 import {attachScrollbars} from './scrollbars';
 
 /**
- * Code blocks are plentiful in long RMD documents, but most never overflow.
+ * Code blocks and tables are plentiful in long documents, but most never overflow.
  * Keep a single IntersectionObserver/ResizeObserver for the entire document,
- * and activate an overlay scrollbar only when an approaching code block
+ * and activate an overlay scrollbar only when an approaching block
  * actually needs horizontal scrolling. Its ProseMirror contentDOM is never
  * detached, moved or replaced by this scheduler.
  */
-type CodeEntry={
+type BlockEntry={
  host:HTMLElement;
  viewport:HTMLElement;
  near:boolean;
@@ -15,10 +15,10 @@ type CodeEntry={
  release:(()=>void)|null;
 };
 
-class CodeScrollbarScheduler{
- private readonly entries=new Map<Element,CodeEntry>();
- private readonly sizes=new Map<Element,CodeEntry>();
- private readonly pending=new Set<CodeEntry>();
+class BlockScrollbarScheduler{
+ private readonly entries=new Map<Element,BlockEntry>();
+ private readonly sizes=new Map<Element,BlockEntry>();
+ private readonly pending=new Set<BlockEntry>();
  private frame:number|null=null;
  private readonly intersection:IntersectionObserver;
  private readonly resize:ResizeObserver;
@@ -49,7 +49,7 @@ class CodeScrollbarScheduler{
  }
 
  attach(host:HTMLElement,viewport:HTMLElement){
-  const entry:CodeEntry={host,viewport,near:false,content:null,release:null};
+  const entry:BlockEntry={host,viewport,near:false,content:null,release:null};
   this.entries.set(host,entry);
   this.intersection.observe(host);
   return {
@@ -72,7 +72,7 @@ class CodeScrollbarScheduler{
   };
  }
 
- private observeSizes(entry:CodeEntry){
+ private observeSizes(entry:BlockEntry){
   if(this.sizes.has(entry.viewport))return;
   this.sizes.set(entry.viewport,entry);
   this.resize.observe(entry.viewport);
@@ -83,7 +83,7 @@ class CodeScrollbarScheduler{
    this.resize.observe(content);
   }
  }
- private unobserveSizes(entry:CodeEntry){
+ private unobserveSizes(entry:BlockEntry){
   if(this.sizes.delete(entry.viewport))this.resize.unobserve(entry.viewport);
   if(entry.content){
    if(this.sizes.delete(entry.content))this.resize.unobserve(entry.content);
@@ -91,7 +91,7 @@ class CodeScrollbarScheduler{
   }
  }
 
- private schedule(entry:CodeEntry){
+ private schedule(entry:BlockEntry){
   this.pending.add(entry);
   if(this.frame!==null)return;
   const view=this.document.defaultView;
@@ -112,19 +112,34 @@ class CodeScrollbarScheduler{
  }
 }
 
-const schedulers=new WeakMap<Document,CodeScrollbarScheduler>();
+const schedulers=new WeakMap<Document,BlockScrollbarScheduler>();
 
-/** Code-only lazy policy; tables and page scrollers keep their current behavior.
+/** Lazy horizontal block policy; page scrollers keep their current behavior.
  * Without browser observer APIs, safely fall back to the preexisting eager path.
  */
-export function attachLazyCodeScrollbars(host:HTMLElement,viewport:HTMLElement){
+export function attachLazyBlockScrollbars(host:HTMLElement,viewport:HTMLElement){
  if(typeof IntersectionObserver==='undefined'||typeof ResizeObserver==='undefined'){
-  return {check:()=>{},dispose:attachScrollbars(host,viewport,'x',{
-   edges:typeof ResizeObserver!=='undefined'
-  })};
+  // Table node views are constructed before ProseMirror connects their DOM.
+  // Preserve the old eager path's next-frame attachment in this fallback.
+  let release:(()=>void)|null=null,frame:number|null=null,disposed=false;
+  const view=host.ownerDocument.defaultView;
+  const check=()=>{
+   if(disposed||release||frame!==null||!view)return;
+   frame=view.requestAnimationFrame(()=>{
+    frame=null;
+    if(!disposed&&host.isConnected&&viewport.isConnected)
+     release=attachScrollbars(host,viewport,'x',{edges:typeof ResizeObserver!=='undefined'});
+   });
+  };
+  check();
+  return {check,dispose:()=>{
+   disposed=true;
+   if(frame!==null)view?.cancelAnimationFrame(frame);
+   release?.();
+  }};
  }
  const owner=host.ownerDocument;
  let scheduler=schedulers.get(owner);
- if(!scheduler){scheduler=new CodeScrollbarScheduler(owner);schedulers.set(owner,scheduler);}
+ if(!scheduler){scheduler=new BlockScrollbarScheduler(owner);schedulers.set(owner,scheduler);}
  return scheduler.attach(host,viewport);
 }

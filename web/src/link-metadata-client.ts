@@ -138,6 +138,8 @@ export function resolveRemoteIcon(raw:string):Promise<string|null>{
  * generated image URL goes through the existing private Recalloom proxy.
  */
 export function decorateEditorLinks(root:HTMLElement):()=>void{
+ // Link icons are optional; keep the editor usable without viewport observers.
+ if(typeof IntersectionObserver==='undefined')return()=>{};
  let alive=true,queued=false;
  const style=document.createElement('style');
  style.setAttribute('data-rk-editor-link-styles','');

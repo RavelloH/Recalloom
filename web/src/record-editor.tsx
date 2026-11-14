@@ -1,7 +1,7 @@
 import './styles/features/rmd.css';
 import './styles/features/editor-chrome.css';
 import {Icon} from './icon';
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import type {VisualEditorHandle} from './visual-editor';
 import {useBlocker} from '@tanstack/react-router';
@@ -20,7 +20,7 @@ import type {RecordDetail} from './types';
 import {VisualEditorChunk as VisualEditor,SourceEditorChunk as SourceEditor,PreviewEditorChunk as PreviewEditor,type EditorMode} from './editor-chunks';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import {observeMathHorizontalOverflow} from './math-scroll';
-import {markdownCharacterCount} from './document-heading';
+import {useDocumentCharacterCount} from './use-document-character-count';
 import type {DocumentPresentation} from './record-workbench';
 import {planThreeWayMerge,resolveThreeWayMerge,preserveUnchangedVisualTerminator,type MergeChoice} from './three-way-merge';
 import {checkMergeStructure} from './merge-structure-check';
@@ -62,11 +62,12 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  const [mode,setMode]=useState<EditorMode>(initialMode==='source'||initialMode==='preview'?initialMode:'visual');
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [draft,setDraft]=useState(usableRecovery?stored.content:base.content);
- const deferredDraft=React.useDeferredValue(draft);
- const characters=React.useMemo(()=>markdownCharacterCount(deferredDraft),[deferredDraft]);
+ const reportCharacters=useCallback((characters:number)=>
+  onDocumentPresentation({id:item.id,revision:base.revision,characters}),
+ [item.id,base.revision,onDocumentPresentation]);
+ useDocumentCharacterCount(draft,reportCharacters);
  const visibleDraft=draft;
  const visibleFocusLine=jumpToLine?.line;
- useEffect(()=>onDocumentPresentation({id:item.id,revision:base.revision,characters}),[item.id,base.revision,characters]);
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[diff,setDiff]=useState('');
  const [mergeBusy,setMergeBusy]=useState(false);
  const [mergeReview,setMergeReview]=useState<MergeReview|null>(null);
@@ -77,13 +78,13 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  const changed=draft!==base.content;
  const remoteAhead=item.revision>base.revision;
  useEffect(()=>{setActiveEditorDirty(changed||busy);return()=>setActiveEditorDirty(false);},[changed,busy]);
- const changeDraft=(value:string)=>{
+ const changeDraft=useCallback((value:string)=>{
   latestDraft.current=value;
   setDraft(value);
   // Editing the current document constitutes an explicit choice to use the
   // current revision instead of the older recovery candidate.
   if(staleRecovery)setRecoveryNotice(false);
- };
+ },[staleRecovery]);
  const changeVisibleDraft=changeDraft;
  const latestVisibleFromEditor=()=>visualRef.current?.flushEditedMarkdown()??latestDraft.current;
  useEffect(()=>{if(!jumpToLine)return;setMode('source');const url=new URL(location.href);url.searchParams.set('mode','source');historyReplace(url);},[jumpToLine]);

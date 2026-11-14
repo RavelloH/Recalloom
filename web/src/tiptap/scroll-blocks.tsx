@@ -9,8 +9,7 @@ import {ReactNodeViewRenderer,NodeViewWrapper,NodeViewContent,type NodeViewProps
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {TextInput} from '@astryxdesign/core/TextInput';
 
-import {attachScrollbars} from '../scrollbars';
-import {attachLazyCodeScrollbars} from '../code-scrollbars';
+import {attachLazyBlockScrollbars} from '../block-scrollbars';
 import {safeTableId,cleanTableCaption} from '../table-caption';
 import {headingAnchor} from '../wiki-slug';
 import {isRmdId} from '../rmd-schema';
@@ -23,17 +22,20 @@ function scrollFrame(host:HTMLElement,child:HTMLElement){
  viewport.dataset.axis='x';
  host.insertBefore(viewport,child);
  viewport.appendChild(child);
- let detach:(()=>void)|undefined;
- const frame=requestAnimationFrame(()=>{if(host.isConnected)detach=attachScrollbars(host,viewport,'x',{edges:true});});
- return()=>{cancelAnimationFrame(frame);detach?.();};
+ return attachLazyBlockScrollbars(host,viewport);
 }
 export class ScrollTableView extends TableView{
- private release:()=>void;
+ private readonly scrollbars:ReturnType<typeof attachLazyBlockScrollbars>;
  constructor(node:PMNode,cellMinWidth:number,view:EditorView,attrs:Record<string,unknown>={}){
   super(node,cellMinWidth,view,attrs);
-  this.release=scrollFrame(this.dom,this.table);
+  this.scrollbars=scrollFrame(this.dom,this.table);
  }
- destroy(){this.release();}
+ update(node:PMNode){
+  const accepted=super.update(node);
+  if(accepted)this.scrollbars?.check();
+  return accepted;
+ }
+ destroy(){this.scrollbars.dispose();}
 }
 
 /** Keep editable GFM table cells managed exclusively by ProseMirror.
@@ -124,7 +126,7 @@ export class CaptionedScrollTableView extends ScrollTableView{
 }
 const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  const host=useRef<HTMLDivElement>(null);
- const codeScroll=useRef<ReturnType<typeof attachLazyCodeScrollbars>|null>(null);
+ const codeScroll=useRef<ReturnType<typeof attachLazyBlockScrollbars>|null>(null);
  const [expanded,setExpanded]=useState(false);
  const [editing,setEditing]=useState(false);
  const [filename,setFilename]=useState(String(node.attrs.filename??''));
@@ -135,7 +137,7 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
  useEffect(()=>{
   const wrapper=host.current,viewport=wrapper?.querySelector<HTMLElement>('.rk-code-viewport');
   if(!wrapper||!viewport)return;
-  const controller=attachLazyCodeScrollbars(wrapper,viewport);
+  const controller=attachLazyBlockScrollbars(wrapper,viewport);
   codeScroll.current=controller;
   return()=>{codeScroll.current=null;controller.dispose();};
  },[]);
