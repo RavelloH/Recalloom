@@ -109,10 +109,19 @@ a.nav-link {
   justify-content: flex-start;
 }
 
-.rk-nav-row > .rk-icon {
+.rk-nav-row > .rk-icon,
+.rk-nav-row-content > .rk-icon {
   flex: 0 0 20px;
   width: 20px;
   height: 20px;
+}
+
+.rk-nav-row-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .rk-nav-row-label {
@@ -264,6 +273,51 @@ a.nav-link {
   font-weight: 600;
 }
 
+/* Match route links while retaining Astryx's button, focus and disabled semantics. */
+.sidebar .rk-nav-row-action.astryx-button[data-variant="ghost"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  min-height: 30px;
+  padding: 4px 10px;
+  gap: 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rk-ink-soft);
+  font-size: var(--rk-font-body);
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: start;
+  transform: none;
+  transition: background-color var(--rk-motion-fast) ease,
+              color var(--rk-motion-fast) ease;
+}
+
+.sidebar .rk-nav-row-action .rk-icon {
+  opacity: .85;
+}
+
+.sidebar .rk-nav-row-action.astryx-button[data-variant="ghost"]:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  background: var(--rk-hover);
+  color: var(--color-text-primary, inherit);
+}
+
+.sidebar-footer .rk-nav-row-action.astryx-button[data-variant="ghost"] {
+  color: var(--color-text-secondary, #666);
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 140ms;
+}
+
+.sidebar-footer .rk-nav-row-action .rk-icon {
+  opacity: .8;
+}
+
+.sidebar-footer .rk-nav-row-action.astryx-button[data-variant="ghost"]:active:where(:not(:disabled,[aria-disabled="true"])) {
+  background: var(--color-background-surface, rgba(0,0,0,.08));
+}
+
 .nav-kbd {
   font-family: inherit;
   font-size: var(--rk-font-caption);
@@ -357,20 +411,35 @@ a.nav-link {
 
 .tree-toggle {
   flex: none;
+  width: 22px;
+  height: 22px;
 }
 
-.tree-toggle svg {
+.tree-toggle.astryx-button[data-variant="ghost"] {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--rk-ink-faint);
+  transform: none;
+}
+
+.tree-toggle.astryx-button[data-variant="ghost"]:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  background: var(--rk-active);
+  color: var(--rk-ink-soft);
+}
+
+.tree-toggle .rk-icon {
   transition: transform var(--rk-motion-fast, 120ms) ease;
 }
 
-.tree-toggle.is-open svg {
+.tree-toggle.is-open .rk-icon {
   transform: rotate(90deg);
 }
 
 .tree-toggle.is-leaf {
   visibility: hidden;
-  width: var(--size-element-sm, 22px);
-  height: var(--size-element-sm, 22px);
 }
 
 .tree-link {
@@ -413,18 +482,19 @@ a.nav-link {
   opacity: 1;
 }
 
-.tree-actions button {
+.tree-actions > .astryx-button,
+.tree-heading > .astryx-button {
   width: 24px;
   height: 24px;
   min-width: 24px;
   min-height: 24px;
+  padding: 0;
+  color: var(--rk-ink-faint);
 }
 
-.tree-heading > :last-child button {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
+.tree-actions > .astryx-button:hover:where(:not(:disabled,[aria-disabled="true"])),
+.tree-heading > .astryx-button:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  color: var(--rk-ink-soft);
 }
 
 .tree-hint {
@@ -469,7 +539,7 @@ a.nav-link {
   position: relative;
 }
 
-.tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle svg {
+.tree-row:has(+ .tree-branch-region[data-loading="true"]) > .tree-toggle .rk-icon {
   opacity: .25;
 }
 
@@ -822,14 +892,42 @@ html[data-effective-theme="dark"] .bottom-nav {
 }
 }
 
+@media (hover: hover) and (pointer: fine) {
+
+.sidebar-footer .rk-nav-row-action.astryx-button[data-variant="ghost"]:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  background: var(--color-background-surface, rgba(0,0,0,.05));
+  color: var(--color-text-primary, #111);
+}
+
+.sidebar-footer .rk-nav-row-action:hover:where(:not(:disabled,[aria-disabled="true"])) .rk-icon {
+  opacity: 1;
+}
+
+.sidebar-footer .rk-nav-row-action.astryx-button.is-danger[data-variant="ghost"]:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  background: rgba(220,68,68,.1);
+  color: #c0392b;
+}
+
+html[data-effective-theme="dark"] .sidebar-footer .rk-nav-row-action.astryx-button.is-danger[data-variant="ghost"]:hover:where(:not(:disabled,[aria-disabled="true"])) {
+  background: rgba(220,68,68,.18);
+  color: #ff8b80;
+}
+}
+
 @media (pointer: coarse) {
 
-.sidebar a.nav-link {
+.sidebar a.nav-link,
+.sidebar .rk-nav-row-action.astryx-button[data-variant="ghost"] {
   min-height: 42px;
 }
 
 .tree-row {
   min-height: 40px;
+}
+
+.tree-toggle {
+  width: 32px;
+  height: 32px;
 }
 
 }
@@ -859,7 +957,8 @@ html[data-effective-theme="dark"] .bottom-nav {
   transition: none !important;
 }
 
-a.nav-link {
+a.nav-link,
+.sidebar .rk-nav-row-action.astryx-button[data-variant="ghost"] {
   transition: none !important;
 }
 
@@ -867,7 +966,7 @@ a.nav-link {
   transition: none !important;
 }
 
-.tree-toggle svg {
+.tree-toggle .rk-icon {
   transition: none !important;
 }
 

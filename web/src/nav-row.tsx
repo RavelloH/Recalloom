@@ -25,6 +25,7 @@ export function NavRow({icon,label,className='',title,trailing,onClick,onPointer
  if(to!==undefined) return <Link to={to} className={classes} activeProps={{className:classes+' active'}} activeOptions={{exact}} title={title} onPointerEnter={onPointerEnter} onFocus={onFocus} onClick={onClick}>{content}</Link>;
  return <Button label={label} className={classes+' rk-nav-row-action'}
   variant="ghost" width="100%"
-  icon={<Icon name={icon} size="md"/>} endContent={trailing&&<span className="rk-nav-row-trailing">{trailing}</span>}
-  tooltip={title} onPointerEnter={onPointerEnter} onFocus={onFocus} onClick={onClick}/>;
+  tooltip={title} onPointerEnter={onPointerEnter} onFocus={onFocus} onClick={onClick}>
+  <span className="rk-nav-row-content">{content}</span>
+ </Button>;
 }

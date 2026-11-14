@@ -295,7 +295,8 @@ try{
 
  if(!mobileRun){
   await page.getByRole('button',{name:'目录',exact:true}).click();
-  const inspector=page.locator('#document-panel');
+  const inspector=page.locator('#document-panel-outline');
+  await inspector.waitFor({state:'visible'});
   assert.equal(await inspector.locator('.workbench-inspector').getAttribute('data-document-panel'),'outline');
   assert.equal(await inspector.getByRole('tab').count(),0);
   await inspector.getByRole('button',{name:'关闭',exact:true}).click();
@@ -399,7 +400,7 @@ try{
    };
   },slowTerm);
   await page.getByRole('textbox',{name:'搜索关键字'}).fill(slowTerm);
-  await page.getByRole('button',{name:'搜索',exact:true}).click();
+  await page.getByRole('region',{name:'页面内容'}).getByRole('button',{name:'搜索',exact:true}).click();
   await page.waitForURL(url=>new URL(url).searchParams.get('q')===slowTerm);
   assert.equal(await page.evaluate(()=>window.__searchRequestFinished),false,
    'URL must update before the slow search request completes');

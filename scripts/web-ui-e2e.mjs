@@ -301,7 +301,7 @@ try{
  await page.goto(url+'/search');
  await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
  await page.getByRole('group',{name:'搜索方式'}).getByRole('button',{name:'关键词'}).click();
- await page.getByRole('button',{name:'搜索',exact:true}).click();
+ await page.getByRole('region',{name:'页面内容'}).getByRole('button',{name:'搜索',exact:true}).click();
  await page.locator('.search-highlight').first().waitFor({timeout:15000});
  await page.goto(recUrl);
  await page.getByRole('heading',{name:'First note'}).waitFor();
