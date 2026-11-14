@@ -51,12 +51,12 @@ try{
   await rawSource.fill(duplicateRaw);
   await panel.getByRole('alert').filter({hasText:'标题'}).waitFor();
   assert.equal(await page.locator('.rk-editor-block-canvas #user-content-block-caution').count(),1,'invalid raw source must leave the editable canvas anchor unchanged');
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   panel=await open('highlight');
   await panel.getByRole('textbox',{name:'容器锚点 ID（可选）'}).fill('marker-one');
   await page.waitForFunction(()=>!!document.querySelector('.tiptap #user-content-marker-one'));
   assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/id=marker-one/);
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   if(width===1280){
    const block=page.locator('.tiptap .rk-directive-warning').first();await block.hover();
    await page.getByRole('group',{name:'块把手'}).getByRole('button',{name:'块操作'}).click();

@@ -143,7 +143,7 @@ try{
  console.log('PASS VISUAL_LAYOUT',JSON.stringify({marks:visual.marks.map(x=>x.rect.w),table:visual.tables[0].rect,icons:visual.callouts.map(x=>[x.kind,x.color,x.size.w]),link:visual.link,eqHint:eqHint.rect}));
  const control=page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="heading"]').first();
  const panel=page.getByRole('complementary',{name:'块编辑面板'});
- const close=async()=>{await panel.getByRole('button',{name:'关闭块编辑'}).click();await panel.waitFor({state:'hidden'});};
+ const close=async()=>{await panel.getByRole('button',{name:'关闭',exact:true}).click();await panel.waitFor({state:'hidden'});};
  await control.waitFor();await control.focus();await control.press('Enter');
  await panel.waitFor();
  assert.equal(await panel.getByRole('region',{name:'标题 Markdown 属性'}).count(),1,'attribute badge uses shared sidebar');

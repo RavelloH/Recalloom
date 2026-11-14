@@ -127,12 +127,8 @@ export function DocumentWorkbenchPanel({open,panel,onClose,item,outline,onJump,o
  editors:string[];
 }){
  const label=documentPanels.find(section=>section.id===panel)!.label;
- return <WorkspacePanel id={'document-panel-'+panel} open={open} onOpenChange={next=>{if(!next)onClose();}} label={label}>
+ return <WorkspacePanel id={'document-panel-'+panel} open={open} onOpenChange={next=>{if(!next)onClose();}} label={label} titleId={'document-panel-title-'+panel}>
   <div className="record-inspector workbench-inspector" data-document-panel={panel}>
-   <div className="panel-heading">
-    <h2 id={'document-panel-title-'+panel}>{label}</h2>
-    <IconButton variant="ghost" label="关闭" icon={<Icon name="x" size="sm"/>} onClick={onClose}/>
-   </div>
    <p className="workbench-panel-document">{documentDisplayName(item.name)}</p>
    <section key={panel} className="workbench-inspector-content" aria-labelledby={'document-panel-title-'+panel}>
     {panel==='info'&&<div className="workbench-inspector-details">

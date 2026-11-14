@@ -1,5 +1,5 @@
 export const PANEL_MIN_HEIGHT=160;
-export const PANEL_COLLAPSED_HEIGHT=44;
+export const PANEL_COLLAPSED_HEIGHT=64;
 export const PANEL_GAP=10;
 export const PANEL_STACK_PEEK=64;
 

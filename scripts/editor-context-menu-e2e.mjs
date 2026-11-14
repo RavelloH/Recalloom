@@ -106,7 +106,7 @@ try{
  await keyMenu.getByRole('menuitem',{name:'编辑块'}).click();
  await page.getByRole('complementary',{name:'块编辑面板'}).waitFor();
  console.log('PASS keyboard Shift+F10 context menu and edit panel');
- await page.getByRole('button',{name:'关闭块编辑'}).click();
+ await page.getByRole('complementary',{name:'块编辑面板'}).getByRole('button',{name:'关闭',exact:true}).click();
  await page.setViewportSize({width:390,height:844});
  // Width is no longer an input-device proxy. A 390px fine-pointer
  // viewport retains desktop context commands; the separate V5 suite tests

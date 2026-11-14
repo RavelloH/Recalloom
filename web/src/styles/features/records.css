@@ -541,10 +541,6 @@
   margin-bottom: 5px;
 }
 
-.workbench-inspector .panel-heading {
-  margin-bottom: 6px;
-}
-
 .workbench-panel-document {
   margin: 0;
   color: var(--rk-ink-soft);
@@ -598,6 +594,8 @@
   border: 0;
 }
 .workbench-inspector .outline-items {
+  max-height: none;
+  overflow: visible;
   margin: 0;
   padding: 0;
   list-style: none;

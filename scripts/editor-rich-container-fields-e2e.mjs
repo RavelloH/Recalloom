@@ -78,7 +78,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='green');
   assert.match(await raw.inputValue(),/stroke=2.25/);
   await page.screenshot({path:'tmp/editor-rich-screens/highlight-'+width+'.png',fullPage:width===1280});
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   panel=await openBlock('circle',width);
   assert.equal(await panel.getByRole('textbox',{name:/荧光笔透明度/}).count(),0,'circle does not support Highlight opacity');
   assert.equal(await panel.getByRole('textbox',{name:'块标题'}).count(),0);
@@ -86,7 +86,7 @@ try{
   await page.getByRole('option',{name:/默认颜色/}).last().click();
   await page.waitForFunction(()=>!document.querySelector('.tiptap .rk-directive-circle .rk-sketch-block')?.getAttribute('data-rk-sketch-color'));
   assert.doesNotMatch(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/color=/);
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,rec.data.id);
   assert.equal(persisted,content,'panel editing does not save to D1 without explicit Save');
   await page.getByRole('button',{name:'源码'}).click();

@@ -55,7 +55,7 @@ try{
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('https://example.com/docs')&&el.value.includes('Updated Card')));
   const cardTitle=page.locator('.tiptap .rk-rich-link-card .rk-link-card-title');
   await cardTitle.getByText('Updated Card').waitFor();
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   // The Wiki embed uses the same existing grip to reach its structured fields.
   const wiki=page.locator('.tiptap .wiki-editor-embed').first();
   await wiki.waitFor();
@@ -73,7 +73,7 @@ try{
   assert.match(await panel.getByRole('alert').innerText(),/UUID/);
   await target.fill('/Projects/Recalloom/README.md#quickstart');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('/Projects/Recalloom/README.md#quickstart')));
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,rec.data.id);
   assert.equal(persisted,source,'client-side changes never persist without explicit save');
   await page.getByRole('button',{name:'源码'}).click();

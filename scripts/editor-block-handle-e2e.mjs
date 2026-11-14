@@ -59,7 +59,7 @@ try{
    await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('Final callout.!')));
    assert.equal(await panel.count(),1,'Drawer remains during direct editing');
   }
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   console.log('PASS fixed external block Drawer and live inspector',width,JSON.stringify(layout));
   if(width===1280){
    await callout.hover();

@@ -2,30 +2,32 @@
 .workspace{position:relative;}
 .workspace>.main-content{box-sizing:border-box;padding-inline-end:var(--workspace-panel-space,0px);}
 .workspace-panel-rail{position:absolute;inset-block:96px 16px;inset-inline-end:16px;width:var(--workspace-panel-width);pointer-events:none;z-index:7;}
-.workspace-panel{position:absolute;inset-inline:0;display:flex;flex-direction:column;min-width:0;box-sizing:border-box;overflow:hidden;border:1px solid var(--rk-border-soft,var(--color-border));border-radius:14px;background:var(--color-background-surface,var(--rk-canvas));box-shadow:0 5px 24px -9px rgba(0,0,0,.3);pointer-events:auto;transform:translateX(calc(100% + 24px));opacity:0;transition:top 260ms var(--rk-ease-out,ease),height 260ms var(--rk-ease-out,ease),transform 300ms var(--rk-ease-out,ease),opacity 220ms ease;}
+.workspace-panel{position:absolute;inset-inline:0;display:flex;flex-direction:column;min-width:0;box-sizing:border-box;overflow:hidden;border:1px solid var(--rk-border-soft,var(--color-border));border-radius:14px;background:var(--color-background-surface,var(--rk-canvas));box-shadow:0 -1px 3px rgba(0,0,0,.12),0 5px 14px -4px rgba(0,0,0,.25),0 16px calc(24px + var(--workspace-panel-depth,1)*4px) -10px rgba(0,0,0,.35);pointer-events:auto;transform:translateX(calc(100% + 24px));opacity:0;transition:top 260ms var(--rk-ease-out,ease),height 260ms var(--rk-ease-out,ease),transform 300ms var(--rk-ease-out,ease),opacity 220ms ease;}
 .workspace-panel[data-ready]{transform:translateX(0);opacity:1;}
 .workspace-panel[data-dragging]{transition:none;}
 .workspace-panel[data-closing]{pointer-events:none;}
-.workspace-panel-grip-row{display:flex;align-items:center;position:relative;flex:none;height:23px;}
-.workspace-panel-grip{display:flex;align-items:center;justify-content:center;flex:1;height:100%;cursor:ns-resize;touch-action:none;user-select:none;outline-offset:-3px;border-radius:12px;}
+.workspace-panel-grip-row{display:grid;place-items:center;position:relative;flex:none;height:23px;}
+.workspace-panel-grip{display:flex;align-items:center;justify-content:center;width:52px;height:20px;cursor:grab;touch-action:none;user-select:none;border-radius:8px;outline:none;}
+.workspace-panel-grip:focus-visible{outline:2px solid var(--color-primary);outline-offset:-2px;}
+.workspace-panel[data-dragging] .workspace-panel-grip{cursor:grabbing;outline:none;}
 .workspace-panel-grip-line{display:block;height:4px;width:36px;border-radius:4px;background:var(--color-text-tertiary,#888);opacity:.45;}
-.workspace-panel-fold{position:absolute;inset-inline-end:8px;top:1px;width:24px;height:22px;border:0;background:transparent;color:var(--color-text-secondary);display:grid;place-items:center;border-radius:5px;cursor:pointer;}
-.workspace-panel-body,.workspace-panel-slot,.workspace-panel-content{flex:1;min-height:0;min-width:0;height:100%;}
-.workspace-panel-body{overflow:hidden;}
+.workspace-panel-header.panel-heading{display:flex;align-items:center;justify-content:space-between;flex:none;box-sizing:border-box;height:40px;gap:10px;margin:0;padding:0 12px 0 18px;}
+.workspace-panel-title{display:flex;flex-direction:column;min-width:0;}
+.workspace-panel-title h2{margin:0;font-size:14px;font-weight:650;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.workspace-panel-description{font-size:11px;line-height:14px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.workspace-panel-actions{display:flex;align-items:center;flex:none;gap:2px;}
+.workspace-panel-actions>button{width:28px;height:28px;min-width:28px;min-height:28px;padding:0;}
+.workspace-panel-surface{display:flex;flex-direction:column;min-height:0;height:100%;overflow:hidden;}
+.workspace-panel-body,.workspace-panel-slot,.workspace-panel-content{min-height:0;min-width:0;}
+.workspace-panel-body{flex:1;overflow:hidden;}
+.workspace-panel-slot,.workspace-panel-content{height:100%;}
 .workspace-panel-body[hidden]{display:none;}
 .workspace-panel-content{overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
 .workspace-panel-content:has(>.rk-block-editor-panel){overflow:hidden;}
-.workspace-panel-content>.workbench-inspector{box-sizing:border-box;width:100%;margin:0;padding:4px 18px 20px;min-width:0;animation:none;}
-.workspace-panel-content>.workbench-inspector>.panel-heading{position:sticky;top:0;z-index:1;background:var(--color-background-surface,var(--rk-canvas));}
+.workspace-panel-content>.workbench-inspector{box-sizing:border-box;width:100%;margin:0;padding:6px 18px 20px;min-width:0;animation:none;}
 .workspace-panel-sheet .workspace-panel-slot{height:100%;min-height:0;overflow:hidden;}
 .workspace-panel-sheet .workspace-panel-content>.workbench-inspector{padding:12px 20px 24px;}
-.workspace-panel-collapsed-title{display:flex;align-items:center;position:absolute;inset:0 35px auto 12px;height:min(44px,var(--workspace-panel-exposed));pointer-events:none;}
-.workspace-panel-collapsed-title button{pointer-events:auto;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:13px;}
-.workspace-panel-collapsed-title>button:first-child{font-weight:600;text-align:start;flex:1;}
-.workspace-panel-collapsed-title>button:last-child{display:grid;place-items:center;width:26px;height:30px;}
-.workspace-panel[data-collapsed] .workspace-panel-grip-row{height:min(44px,var(--workspace-panel-exposed));}
-.workspace-panel[data-collapsed] .workspace-panel-grip-line{display:none;}
-.workspace-panel:focus-within{border-color:var(--color-text-tertiary,#888);}
-@media (hover:hover) and (pointer:fine){.workspace-panel-fold:hover{background:var(--rk-active,rgba(128,128,128,.12));}.workspace-panel-grip:hover .workspace-panel-grip-line{opacity:.9;}}
+.workspace-panel-sheet .workspace-panel-header{height:52px;padding:0 12px 0 20px;}
+.workspace-panel-sheet .workspace-panel-actions>button{width:40px;height:40px;min-width:40px;min-height:40px;}
 @media (prefers-reduced-motion:no-preference){.workspace-panel-sheet.workspace-panel-entering{transform:translateY(100%);transition:none;}}
 @media (prefers-reduced-motion:reduce){.workspace>.main-content,.workspace-panel{transition:none;}}

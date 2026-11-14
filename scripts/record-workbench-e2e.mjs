@@ -311,7 +311,7 @@ try{
  };
  const closePanelWithMotion=async(label,viewport)=>{
   await resetMotionSamples(label,false);
-  await inspector.locator('.panel-heading button').click();
+  await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
   await assertInspectorTransformMotion(label,viewport);
   await waitForNativePanelClosed();
  };
@@ -357,7 +357,7 @@ try{
  };
  await verifyPropertyLayout();
  assert.equal(await inspector.getAttribute('data-document-panel'),'info');
- assert.equal(await inspector.getByRole('heading',{name:'信息',exact:true}).count(),1);
+ assert.equal(await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('heading',{name:'信息',exact:true}).count(),1);
  assert.equal(await inspector.getByRole('tab').count(),0,'Document panel has direct entry points instead of an inner tab bar');
  assert.equal(await inspector.getByRole('textbox',{name:'文件名'}).count(),0,'Inspector must not duplicate the filename editor');
  await inspector.getByRole('button',{name:'添加标签'}).click();
@@ -399,7 +399,7 @@ try{
  assert.equal(await informationPanel.isVisible(),true,'Opening the outline keeps desktop information visible');
  assert.equal(await informationPanel.evaluate(element=>element===window.__workbenchInformationPanel),true,
   'Opening another desktop panel preserves the information instance');
- await outlinePanel.getByRole('button',{name:'关闭',exact:true}).click();
+ await outlinePanel.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await outlinePanel.waitFor({state:'hidden'});
  assert.ok(lazyPanelRequests.some(path=>path.endsWith('/relations')),'Information loads document relations on demand');
  await closePanelWithEntryMotion(infoTrigger(),'desktop same-entry toggle close',1440);
@@ -410,7 +410,7 @@ try{
  await openPanelWithMotion(historyTrigger(),
   'desktop history open',1440);
  assert.equal(await inspector.getAttribute('data-document-panel'),'history');
- assert.equal(await inspector.getByRole('heading',{name:'历史',exact:true}).count(),1);
+ assert.equal(await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('heading',{name:'历史',exact:true}).count(),1);
  assert.equal(await inspector.getByRole('tab').count(),0,'History opens directly without a tab switch');
  await inspector.getByText('Revision 1').waitFor();
  assert.ok(lazyPanelRequests.some(path=>path.endsWith('/versions')),'History loads its revision list on demand');
@@ -432,14 +432,14 @@ try{
  assert.equal(await inspector.evaluate(element=>Boolean(element.closest('dialog')&&element.closest('.workspace-panel-sheet'))),true,
   'Tablet workspace below docking width uses a native bottom sheet');
  for(const [trigger,panel] of [[outlineTrigger(),'outline'],[historyTrigger(),'history']]){
-  await inspector.locator('.panel-heading button').click();
+  await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
   await inspector.waitFor({state:'hidden'});
   await trigger.click();
   await page.waitForFunction(expected=>[...document.querySelectorAll('.workbench-inspector')].some(element=>
    element.dataset.documentPanel===expected&&element.getClientRects().length>0),panel);
   assert.equal(await page.locator('dialog[open]:has(.workspace-panel-sheet)').count(),1,'Tablet panel switching keeps one native sheet open');
  }
- await inspector.locator('.panel-heading button').click();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await inspector.waitFor({state:'hidden'});
  await page.setViewportSize({width:1440,height:900});
  await page.getByRole('button',{name:'源码',exact:true}).click();
@@ -451,7 +451,7 @@ try{
  await header.getByText('R2',{exact:true}).waitFor();
  await page.getByRole('button',{name:'历史',exact:true}).click();
  await inspector.waitFor();
- await inspector.getByRole('heading',{name:'历史',exact:true}).waitFor();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('heading',{name:'历史',exact:true}).waitFor();
  await inspector.getByText('Revision 1').waitFor();
  assert.equal(await page.getByRole('dialog',{name:'版本历史'}).count(),0,'Do not open a second, separate history drawer');
  const revision=inspector.locator('.history-row').filter({hasText:'Revision 1'});
@@ -460,7 +460,7 @@ try{
  await comparison.locator('.revision-diff-block').first().waitFor();
  await comparison.getByRole('button',{name:'关闭版本对比'}).click();
  await comparison.waitFor({state:'hidden'});
- await inspector.getByRole('button',{name:'关闭'}).click();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await inspector.waitFor({state:'hidden'});
  for(const [mode,button] of [['source','源码'],['visual','可视化'],['preview','预览']]){
   await page.getByRole('button',{name:button,exact:true}).click();
@@ -529,7 +529,7 @@ try{
   });
   assert.equal(await inspector.locator('.outline-item[aria-current="location"]').count(),1,
    'Outline highlights the active duplicate heading in '+mode+' mode');
-  await inspector.locator('.panel-heading button').click();
+  await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
   await inspector.waitFor({state:'hidden'});
  }
  await page.screenshot({path:'tmp/workbench-desktop.png'});
@@ -567,7 +567,7 @@ try{
  await page.keyboard.press('Control+Z');
  await page.waitForFunction(()=>!document.querySelector('.tiptap')?.textContent?.includes('visual-unsaved'));
  await page.locator('.save-status').getByText('未保存').waitFor({state:'hidden'});
- await inspector.locator('.panel-heading button').click();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await inspector.waitFor({state:'hidden'});
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.reload();
@@ -681,7 +681,7 @@ try{
  });
  assert.equal(await inspector.getByRole('button',{name:'Draft section',exact:true}).getAttribute('aria-current'),'location',
   'Mobile outline marks the heading selected in the visual editor');
- await inspector.locator('.panel-heading button').click();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await inspector.waitFor({state:'hidden'});
  assert.equal(await page.locator('.save-status').getByText('未保存').count(),0,
   'Closing the mobile outline preserves the clean document');
@@ -757,7 +757,7 @@ try{
  await (await panelEntry('信息')).click();
  await page.waitForFunction(()=>[...document.querySelectorAll('dialog')].some(dialog=>dialog.querySelector('.workbench-inspector')&&
   (dialog.open||dialog.matches(':popover-open'))));
- await inspector.locator('.panel-heading button').click();
+ await inspector.locator('xpath=ancestor::*[@data-workspace-panel or self::dialog or @role="dialog"][1]').getByRole('button',{name:'关闭',exact:true}).click();
  await page.waitForFunction(()=>{
   const host=[...document.querySelectorAll('dialog')].find(dialog=>dialog.querySelector('.workbench-inspector'));
   return !host||(!host.open&&!host.matches(':modal')&&!host.matches(':popover-open'));

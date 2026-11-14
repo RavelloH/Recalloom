@@ -125,7 +125,7 @@ try{
   await panel.getByRole('alert').waitFor();
   assert.equal(await page.locator('.tiptap .rk-directive-chat .rk-directive-message').count(),2,'a child source edit cannot inject a second sibling');
   await raw.fill('::: message Updated | sender=assistant\n\nRewritten child.\n\n:::');
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   if(width===1280){
    const child=page.locator('.tiptap .rk-directive-message').first();
    await child.locator('.rk-directive-body p').first().click({button:'right'});
@@ -133,7 +133,7 @@ try{
    const contextual=page.getByRole('complementary',{name:'块编辑面板'});
    await contextual.getByText('编辑子块').waitFor();
    assert.match(await contextual.getByRole('textbox',{name:'块源码'}).inputValue(),/Rewritten child/);
-   await contextual.getByRole('button',{name:'关闭块编辑'}).click();
+   await contextual.getByRole('button',{name:'关闭',exact:true}).click();
    console.log('PASS desktop context menu resolves nested child rather than parent');
   }
   await menu('message',width,0);
@@ -151,13 +151,13 @@ try{
   const title=panel.getByRole('textbox',{name:'块标题'});
   await title.fill('Primary');
   await page.locator('.tiptap .rk-directive-tab').first().getByText('Primary').waitFor();
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   panel=await open('definition',width,0);
   assert.equal(await panel.getByRole('textbox',{name:'术语名称'}).inputValue(),'Voltage');
   await panel.getByRole('textbox',{name:'术语名称'}).fill('Potential');
   await panel.getByRole('textbox',{name:'块源码'}).fill('::: definition Potential\n\nUpdated definition.\n\n:::');
   await page.locator('.tiptap .rk-directive-definition').first().getByText('Updated definition.').waitFor();
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   await menu('front',width,0);
   const forbidden=page.getByRole('menuitem',{name:'复制块',exact:true}).last();
   assert.equal(await forbidden.getAttribute('aria-disabled'),'true','front cannot be duplicated');
@@ -167,7 +167,7 @@ try{
   assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/Original question/);
   await panel.getByRole('textbox',{name:'块源码'}).fill('::: front\n\nRevised question.\n\n:::');
   await page.locator('.tiptap .rk-directive-front').first().getByText('Revised question.').waitFor();
-  await panel.getByRole('button',{name:'关闭块编辑'}).click();
+  await panel.getByRole('button',{name:'关闭',exact:true}).click();
   await page.getByRole('button',{name:'源码'}).click();
   await page.locator('.cm-content').first().click();
   await page.keyboard.press('Control+A');await page.keyboard.press('Control+C');

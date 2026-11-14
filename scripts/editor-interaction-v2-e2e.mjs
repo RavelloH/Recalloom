@@ -54,7 +54,7 @@ try{
  assert.equal(drawer.position,'fixed');assert.equal(drawer.bodyParent,true);
  assert.equal(drawer.canvasWidth,drawer.workspaceWidth,'Drawer must not consume a document column');
  assert.ok(Math.abs(drawer.panelRight-1280)<2,'Drawer should be pinned to viewport right');
- await panel.getByRole('button',{name:'关闭块编辑'}).click();
+ await panel.getByRole('button',{name:'关闭',exact:true}).click();
  console.log('PASS true fixed Drawer and external ::: block grip',geometry,drawer);
  const editable=first.locator('.rk-directive-body p').first();
  for(let attempt=0;attempt<4;attempt++){

@@ -150,7 +150,7 @@ try{
  assert.equal(scoped.scoped,true);
  assert.ok(scoped.accent?.length,'portaled markdown must inherit callout styles');
  assert.ok(scoped.width&&scoped.container&&scoped.width<=scoped.container+1);
- await panel.getByRole('button',{name:'关闭块编辑'}).click();
+ await panel.getByRole('button',{name:'关闭',exact:true}).click();
  console.log('PASS Drawer live preview restores typography and callout styles',scoped);
 
  await page.waitForFunction(()=>!!document.querySelector('.rk-sketch-svg[data-sketch-drawing="box"]'));

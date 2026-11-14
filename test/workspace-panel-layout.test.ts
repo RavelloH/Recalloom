@@ -35,19 +35,19 @@ test('viewport pressure reserves rear header space while keeping expanded minimu
 test('automatic folding happens only when minimum bodies and header strips cannot fit',()=>{
  const panels=[panel('old',250,1),{...panel('outline',250,0),priority:true},panel('new',250,3),panel('active',250,2)];
  assert.ok(calculatePanelLayout(panels,360,'active').every(({collapsed})=>!collapsed));
- const layout=calculatePanelLayout(panels,240,'active');
+ const layout=calculatePanelLayout(panels,270,'active');
  assert.deepEqual(layout.filter(({collapsed})=>collapsed).map(({id})=>id),['new','old']);
  assert.deepEqual(layout.filter(({collapsed})=>!collapsed).map(({id})=>id),['active','outline']);
  const smaller=calculatePanelLayout(panels,200,'active');
- assert.deepEqual(smaller.filter(({collapsed})=>!collapsed).map(({id})=>id),['active']);
- assert.ok(smaller.at(-1)!.height>=PANEL_MIN_HEIGHT);
+ assert.ok(smaller.every(({collapsed})=>collapsed));
+ assert.equal(smaller.at(-1)!.height,200);
 });
 
-test('collapsed cards expose 44px strips and can include covered lower portions',()=>{
+test('collapsed cards expose 64px strips and can include covered lower portions',()=>{
  const panels=[{...panel('manual-old',300,1),collapsed:true},{...panel('manual-new',300,2),collapsed:true},panel('normal',300)];
  const large=calculatePanelLayout(panels,500);
  assert.deepEqual(large.map(({id,height,exposedHeight,collapsed})=>[id,height,exposedHeight,collapsed]),[
-  ['manual-new',44,PANEL_COLLAPSED_HEIGHT,true],['manual-old',88,PANEL_COLLAPSED_HEIGHT,true],['normal',300,212,false]
+  ['manual-new',64,PANEL_COLLAPSED_HEIGHT,true],['manual-old',128,PANEL_COLLAPSED_HEIGHT,true],['normal',300,172,false]
  ]);
  const small=calculatePanelLayout(panels,150);
  assert.ok(small.every(({collapsed})=>collapsed));

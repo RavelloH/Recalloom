@@ -35,7 +35,7 @@ try{
   await page.goto(base+'/records/'+id+'?mode=visual');
   const panel=page.getByRole('dialog',{name:'块编辑面板'});
   const badge=kind=>page.locator('.tiptap button.rk-rmd-attrs-decoration[data-rk-attrs-kind="'+kind+'"]').first();
-  const close=async()=>{await panel.getByRole('button',{name:'关闭块编辑'}).click();await panel.waitFor({state:'hidden'});};
+  const close=async()=>{await panel.getByRole('button',{name:'关闭',exact:true}).click();await panel.waitFor({state:'hidden'});};
   await badge('image').click();
   await panel.waitFor();
   const sheet=panel.locator('.workspace-panel-sheet');

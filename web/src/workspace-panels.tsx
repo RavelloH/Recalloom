@@ -1,14 +1,16 @@
 import React,{createContext,useContext,useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {Icon} from './icon';
-import {calculatePanelLayout,PANEL_MIN_HEIGHT,PANEL_STACK_PEEK} from './workspace-panel-layout';
+import {IconButton} from '@astryxdesign/core/IconButton';
+import {calculatePanelLayout,PANEL_MIN_HEIGHT,PANEL_COLLAPSED_HEIGHT,PANEL_STACK_PEEK} from './workspace-panel-layout';
+import {calculatePanelDrag} from './workspace-panel-drag';
 import './workspace-panels.css';
 
 const BottomSheet=React.lazy(()=>import('@astryxdesign/core/BottomSheet').then(module=>({default:module.BottomSheet})));
 
-type PanelProps={id:string;label:string;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
-type Panel={id:string;label:string;container:HTMLDivElement;owner:symbol;open:boolean;present:boolean;ready:boolean;height:number;sequence:number;collapsed:boolean;change:(open:boolean)=>void;afterClose?:()=>void;opener:HTMLElement|null};
-type Drag={id:string;x:number;y:number;top:number;height:number;dx:number;dy:number;axis:'x'|'y'|null;originalHeight:number};
+type PanelProps={id:string;label:string;title?:string;titleId?:string;description?:string;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
+type Panel={id:string;label:string;title?:string;titleId?:string;description?:string;container:HTMLDivElement;owner:symbol;open:boolean;present:boolean;ready:boolean;height:number;sequence:number;collapsed:boolean;change:(open:boolean)=>void;afterClose?:()=>void;opener:HTMLElement|null};
+type Drag={id:string;x:number;y:number;top:number;height:number;dx:number;dy:number;active:boolean;collapsed:boolean;originalHeight:number;originalCollapsed:boolean};
 type Snapshot={panels:Panel[];width:number;height:number;docked:boolean;drag:Drag|null};
 const motionDuration=440;
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -27,6 +29,10 @@ class PanelStore{
  private emit(patch:Partial<Snapshot>={}){this.snapshot={...this.snapshot,...patch};this.listeners.forEach(fn=>fn());}
  private update(id:string,patch:Partial<Panel>){this.emit({panels:this.snapshot.panels.map(panel=>panel.id===id?{...panel,...patch}:panel)});}
  get(id:string){return this.snapshot.panels.find(panel=>panel.id===id);}
+ describe(id:string,{label,title,titleId,description}:Pick<PanelProps,'label'|'title'|'titleId'|'description'>){
+  const panel=this.get(id);
+  if(panel&&(panel.label!==label||panel.title!==title||panel.titleId!==titleId||panel.description!==description))this.update(id,{label,title,titleId,description});
+ }
  measure(width:number,height:number){
   const nextDocked=width>=840&&height>=260;
   // Never put a newly mounted sheet above a comparison/confirmation already
@@ -43,7 +49,7 @@ class PanelStore{
    panel={id:props.id,label:props.label,owner,container,open:false,present:false,ready:false,height:320,sequence:0,collapsed:false,change:props.onOpenChange,afterClose:props.onAfterClose,opener:null};
    this.emit({panels:[...this.snapshot.panels,panel]});
   }
-  this.update(props.id,{owner,label:props.label,change:props.onOpenChange,afterClose:props.onAfterClose});
+  this.update(props.id,{owner,label:props.label,title:props.title,titleId:props.titleId,description:props.description,change:props.onOpenChange,afterClose:props.onAfterClose});
   this.setOpen(props.id,props.open);
   return panel.container;
  }
@@ -91,24 +97,23 @@ class PanelStore{
  resize(id:string,height:number){this.activeId=id;this.update(id,{height:Math.max(PANEL_MIN_HEIGHT,Math.min(this.snapshot.height-112,height)),collapsed:false});}
  startDrag(id:string,x:number,y:number){
   const layout=this.layout().find(p=>p.id===id),panel=this.get(id);if(!layout||!panel)return;
-  this.emit({drag:{id,x,y,top:layout.top,height:layout.height,originalHeight:panel.height,dx:0,dy:0,axis:null}});
+  this.emit({drag:{id,x,y,top:layout.top,height:layout.height,originalHeight:panel.height,originalCollapsed:panel.collapsed,collapsed:layout.collapsed,dx:0,dy:0,active:false}});
  }
  moveDrag(x:number,y:number){
   const drag=this.snapshot.drag;if(!drag)return;
-  let dx=x-drag.x,dy=y-drag.y,axis=drag.axis;
-  if(!axis&&Math.max(Math.abs(dx),Math.abs(dy))>=6)axis=Math.abs(dx)>Math.abs(dy)?'x':'y';
-  if(axis==='y'){
-   dy=Math.min(drag.height-Math.min(PANEL_MIN_HEIGHT,drag.height),Math.max(-drag.top,dy));
-   this.resize(drag.id,drag.height-dy);
-  }
-  dx=Math.max(0,dx);
-  this.emit({drag:{...drag,dx,dy,axis}});
+  const dx=x-drag.x,dy=y-drag.y;
+  if(!drag.active&&Math.hypot(dx,dy)<6)return;
+  const geometry=calculatePanelDrag({dx,dy,height:drag.height,top:drag.top,collapsed:drag.collapsed});
+  const resizing=geometry.dy!==0||drag.dy!==0;
+  const collapsed=drag.collapsed&&geometry.height<PANEL_MIN_HEIGHT;
+  this.activeId=drag.id;
+  this.emit({drag:{...drag,dx:geometry.dx,dy:geometry.dy,active:true},
+   panels:resizing?this.snapshot.panels.map(panel=>panel.id===drag.id?{...panel,height:collapsed?panel.height:geometry.height,collapsed}:panel):this.snapshot.panels});
  }
  endDrag(cancel=false){
   const drag=this.snapshot.drag;if(!drag)return;
-  if(cancel)this.resize(drag.id,drag.originalHeight);
-  this.emit({drag:null});
-  if(!cancel&&drag.axis==='x'&&drag.dx>=90)this.close(drag.id);
+  this.emit({drag:null,panels:cancel?this.snapshot.panels.map(panel=>panel.id===drag.id?{...panel,height:drag.originalHeight,collapsed:drag.originalCollapsed}:panel):this.snapshot.panels});
+  if(!cancel&&drag.active&&drag.dx>=90)this.close(drag.id);
  }
  dispose(){this.timers.forEach(clearTimeout);this.frames.forEach(cancelAnimationFrame);this.listeners.clear();}
 }
@@ -140,6 +145,18 @@ function ContentSlot({container}:{container:HTMLElement}){
  return <div className="workspace-panel-slot" ref={ref}/>;
 }
 
+function PanelHeader({panel,store,collapsed=false,docked=false}:{panel:Panel;store:PanelStore;collapsed?:boolean;docked?:boolean}){
+ return <div className="workspace-panel-header panel-heading">
+  <div className="workspace-panel-title"><h2 id={panel.titleId??panel.id+'-title'}>{panel.title??panel.label}</h2>
+   {panel.description&&<span className="workspace-panel-description">{panel.description}</span>}</div>
+  <div className="workspace-panel-actions">
+   {docked&&<IconButton className="workspace-panel-fold" variant="ghost" label={(collapsed?'展开':'折叠')+panel.label} aria-expanded={!collapsed}
+    icon={<Icon name={collapsed?'chevronDown':'chevronUp'} size="sm"/>} onClick={()=>store.setCollapsed(panel.id,!collapsed)}/>}
+   <IconButton variant="ghost" label="关闭" icon={<Icon name="x" size="sm"/>} onClick={()=>store.close(panel.id)}/>
+  </div>
+ </div>;
+}
+
 function MobilePanel({panel,store}:{panel:Panel;store:PanelStore}){
  const [entry,setEntry]=useState({open:panel.open,ready:false});
  if(entry.open!==panel.open)setEntry({open:panel.open,ready:false});
@@ -151,7 +168,9 @@ function MobilePanel({panel,store}:{panel:Panel;store:PanelStore}){
  },[panel.open]);
  return <BottomSheet id={panel.id} label={panel.label} height="tall" padding={0} isOpen={panel.open}
   className={'workspace-panel-sheet'+(panel.open&&!entry.ready?' workspace-panel-entering':'')} onOpenChange={open=>{if(!open)store.close(panel.id);}}>
-  <ContentSlot container={panel.container}/>
+  <div className="workspace-panel-surface"><PanelHeader panel={panel} store={store}/>
+   <div className="workspace-panel-body"><ContentSlot container={panel.container}/></div>
+  </div>
  </BottomSheet>;
 }
 
@@ -204,20 +223,19 @@ function DockPanel({panel,store,snapshot}:{panel:Panel;store:PanelStore;snapshot
  const flush=()=>{if(pending.current!==null)cancelAnimationFrame(pending.current);pending.current=null;if(pointer.current)store.moveDrag(pointer.current.x,pointer.current.y);pointer.current=null;};
  const finish=(event:React.PointerEvent,cancel=false)=>{flush();store.endDrag(cancel);if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);};
  return <aside ref={root} id={panel.id} role="complementary" aria-label={panel.label} className="workspace-panel" data-workspace-panel={panel.id}
-  data-ready={panel.ready||undefined} data-closing={!panel.open||undefined} data-collapsed={layout.collapsed||undefined} data-dragging={!!drag||undefined}
-  style={{top:drag?.axis==='y'?drag.top+drag.dy:layout.top,height:drag?.axis==='y'?drag.height-drag.dy:layout.height,transform:drag?.axis==='x'?`translateX(${drag.dx}px)`:undefined,zIndex:z,'--workspace-panel-exposed':layout.exposedHeight+'px'} as React.CSSProperties}>
+  data-ready={panel.ready||undefined} data-closing={!panel.open||undefined} data-collapsed={layout.collapsed||undefined} data-dragging={drag?.active||undefined}
+  style={{top:drag?.active?drag.top+drag.dy:layout.top,height:drag?.active?drag.height-drag.dy:layout.height,transform:drag?.active?`translateX(${drag.dx}px)`:undefined,zIndex:z,'--workspace-panel-depth':Math.max(1,stack.length-rank),'--workspace-panel-exposed':layout.exposedHeight+'px'} as React.CSSProperties}>
   <div className="workspace-panel-grip-row">
    <div className="workspace-panel-grip" data-panel-handle role="separator" aria-orientation="horizontal" tabIndex={0}
-    aria-label={'调整'+panel.label+'高度；向右拖动关闭'} aria-valuemin={layout.collapsed?44:PANEL_MIN_HEIGHT} aria-valuemax={Math.max(PANEL_MIN_HEIGHT,snapshot.height-112)} aria-valuenow={Math.round(layout.height)}
-    onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus({preventScroll:true});event.currentTarget.setPointerCapture(event.pointerId);store.startDrag(panel.id,event.clientX,event.clientY);}}
+    aria-label={'拖动'+panel.label+'；上下调整高度，向右关闭'} aria-valuemin={layout.collapsed?PANEL_COLLAPSED_HEIGHT:PANEL_MIN_HEIGHT} aria-valuemax={Math.max(PANEL_MIN_HEIGHT,snapshot.height-112)} aria-valuenow={Math.round(layout.height)}
+    onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);store.startDrag(panel.id,event.clientX,event.clientY);}}
     onPointerMove={event=>{if(!event.currentTarget.hasPointerCapture(event.pointerId))return;pointer.current={x:event.clientX,y:event.clientY};if(pending.current===null)pending.current=requestAnimationFrame(flush);}}
     onPointerUp={event=>finish(event)} onPointerCancel={event=>finish(event,true)} onLostPointerCapture={()=>{flush();store.endDrag(true);}}
     onKeyDown={event=>{if(['ArrowUp','ArrowDown','Home','End'].includes(event.key)){event.preventDefault();store.resize(panel.id,event.key==='Home'?PANEL_MIN_HEIGHT:event.key==='End'?snapshot.height-112:layout.height+(event.key==='ArrowUp'?32:-32));}}}>
     <span className="workspace-panel-grip-line"/>
    </div>
-   <button type="button" className="workspace-panel-fold" aria-label={(layout.collapsed?'展开':'折叠')+panel.label} aria-expanded={!layout.collapsed} onClick={()=>store.setCollapsed(panel.id,!layout.collapsed)}><Icon name={layout.collapsed?'chevronDown':'chevronUp'} size="sm"/></button>
   </div>
-  {layout.collapsed&&<div className="workspace-panel-collapsed-title"><button type="button" onClick={()=>store.resize(panel.id,Math.max(240,panel.height))}>{panel.label}</button><button type="button" aria-label={'关闭'+panel.label} onClick={()=>store.close(panel.id)}><Icon name="x" size="sm"/></button></div>}
+  <PanelHeader panel={panel} store={store} collapsed={layout.collapsed} docked/>
   <div className="workspace-panel-body" hidden={layout.collapsed}><ContentSlot container={panel.container}/></div>
  </aside>;
 }
@@ -275,6 +293,7 @@ export function WorkspacePanel({children,...props}:PanelProps){
   setContainer(store.attach({...props,onOpenChange:open=>callbacks.current.onOpenChange(open),onAfterClose:()=>callbacks.current.onAfterClose?.()},owner));
   return()=>store.detach(props.id,owner);
  },[store,props.id]);
+ useLayoutEffect(()=>{store?.describe(props.id,props);},[store,props.id,props.label,props.title,props.titleId,props.description]);
  useLayoutEffect(()=>{store?.setOpen(props.id,props.open);},[store,props.id,props.open]);
  return container?createPortal(children,container):null;
 }

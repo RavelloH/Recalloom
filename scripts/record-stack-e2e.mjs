@@ -76,7 +76,7 @@ async function assertCoverage(){
   const hitAt=(x,y)=>document.elementsFromPoint(x,y).find(el=>el.closest('[data-workspace-panel]'))?.closest('[data-workspace-panel]')?.getAttribute('data-workspace-panel');
   return elements.map(el=>{
    const r=el.getBoundingClientRect(),handle=el.querySelector('[data-panel-handle]').getBoundingClientRect();
-   const title=el.querySelector('.panel-heading h2,.rk-block-panel-header strong');
+   const title=el.querySelector('.workspace-panel-header h2,.panel-heading h2,.rk-block-panel-header strong');
    const titleRect=title?.getBoundingClientRect();
    return {id:el.dataset.workspacePanel,handleHit:hitAt(handle.x+handle.width/2,handle.y+handle.height/2),
     titleHit:titleRect?hitAt(titleRect.x+Math.min(10,titleRect.width/2),titleRect.y+titleRect.height/2):null,
@@ -120,6 +120,31 @@ async function drag(id,dx,dy,{sample=false}={}){
  if(sample)await page.waitForFunction(()=>window.__stackMotion?.done);
  await settle();
 }
+async function assertPointerPolish(id){
+ const panel=card(id),handle=panel.locator('[data-panel-handle]');
+ const grip=await handle.boundingBox(),before=await panel.boundingBox();
+ assert.ok(Math.abs(grip.width-52)<=1,'Actual draggable handle is 52px wide');
+ assert.ok(Math.abs(grip.x+grip.width/2-before.x-before.width/2)<=2,'Handle is centered');
+ await handle.hover();assert.equal(await handle.evaluate(el=>getComputedStyle(el).cursor),'grab');
+ const appearance=()=>panel.evaluate(el=>{const s=getComputedStyle(el);return {border:s.borderColor,outline:s.outline,shadow:s.boxShadow};});
+ const original=await appearance();assert.notEqual(original.shadow,'none','Every card has a layered shadow');
+ await page.mouse.down();await page.mouse.move(grip.x+grip.width/2+35,grip.y+grip.height/2-45,{steps:12});
+ await page.waitForTimeout(60);
+ const diagonal=await panel.boundingBox();
+ assert.ok(diagonal.x>before.x+25&&diagonal.y<before.y-30,'Diagonal pointer movement changes both horizontal position and height');
+ assert.equal(await handle.evaluate(el=>getComputedStyle(el).cursor),'grabbing');
+ const active=await appearance();assert.equal(active.border,original.border,'Dragging leaves the card border unchanged');assert.equal(active.outline,original.outline,'Dragging adds no focus outline');
+ await page.mouse.up();await settle();
+ const home=await panel.boundingBox(),r=await handle.boundingBox();
+ await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2-200,r.y+r.height/2,{steps:16});await page.waitForTimeout(60);
+ const resisted=await panel.boundingBox();assert.ok(home.x-resisted.x>=18&&home.x-resisted.x<=24,'A raw 200px left drag is resisted to about 21px');
+ await page.mouse.up();await settle();assert.ok(Math.abs((await panel.boundingBox()).x-home.x)<2,'Left release springs home');
+ const blank=await panel.locator('.workspace-panel-grip-row').boundingBox(),stable=await panel.boundingBox();
+ await page.mouse.move(blank.x+10,blank.y+blank.height/2);await page.mouse.down();await page.mouse.move(blank.x+70,blank.y+blank.height/2-40,{steps:10});await page.mouse.up();await settle();
+ const unchanged=await panel.boundingBox();assert.ok(Math.abs(unchanged.x-stable.x)<2&&Math.abs(unchanged.height-stable.height)<2,'Blank grip row cannot drag');
+ const fold=await panel.locator('.workspace-panel-fold').boundingBox(),close=await panel.getByRole('button',{name:'关闭',exact:true}).boundingBox();
+ assert.ok(fold.x<close.x&&Math.abs(fold.y+fold.height/2-close.y-close.height/2)<2,'Fold sits immediately left of close on its baseline');
+}
 async function dragReveal(frontId,backId){
  const handle=card(frontId).getByRole('separator');
  const r=await handle.boundingBox(),coverTop=(await card(frontId).boundingBox()).y;
@@ -162,14 +187,14 @@ async function dragReveal(frontId,backId){
   },{once:true});
   return state.frames[0];
  },{frontId,backId,coverTop});
- assert.ok(initial.bodyHeight>=initial.panelHeight-26,'The covered background retains a full-height flex body while the foreground is dragged: '+JSON.stringify(initial));
+ assert.ok(initial.bodyHeight>=initial.panelHeight-66,'The covered background retains a full-height flex body while the foreground is dragged: '+JSON.stringify(initial));
  assert.ok(initial.hits.length>0,'Moving the front card exposes real background content at text rectangles in the overlap: '+JSON.stringify(initial));
  await page.screenshot({path:join(artifactDir,'background-body-while-dragged.png'),fullPage:true});
  await page.mouse.up();
  await page.waitForFunction(()=>window.__backgroundReveal?.done);
  const frames=await page.evaluate(()=>window.__backgroundReveal.frames);
  writeFileSync(join(artifactDir,'background-reveal.json'),JSON.stringify(frames,null,2));
- assert.ok(frames.some(frame=>frame?.frontPresent&&frame.closing&&frame.bodyHeight>=frame.panelHeight-26&&frame.hits.length>0),
+ assert.ok(frames.some(frame=>frame?.frontPresent&&frame.closing&&frame.bodyHeight>=frame.panelHeight-66&&frame.hits.length>0),
   'Before the exiting foreground is removed, the uncovered background still renders its full body and visible text');
  await card(frontId).waitFor({state:'hidden'});await settle();
 }
@@ -184,13 +209,13 @@ async function openBlock(mobile=false){
  await (mobile?page.getByRole('dialog',{name:'块编辑面板'}):card(ids.block)).waitFor();await settle();
 }
 const content='# Stack regression\n\nA stable editable paragraph.\n\n## Second heading\n\n::: warning Panel fixture\n\nWarning body remains intact.\n\n:::\n\n### Third heading\n\nLast paragraph.\n';
-async function createRecord(suffix){
+async function createRecord(suffix,fixtureContent=content){
  return page.evaluate(async({content,suffix})=>{
   const response=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},
    body:JSON.stringify({name:'Panel stack '+suffix+' '+Date.now()+'.md',kind:'document',content})});
   if(!response.ok)throw Error('Cannot create stack fixture: '+await response.text());
   return response.json();
- },{content,suffix});
+ },{content:fixtureContent,suffix});
 }
 
 try{
@@ -208,6 +233,18 @@ try{
  if(!await card(ids.outline).isVisible())await trigger('目录');
  await card(ids.outline).waitFor();await settle();
  assert.equal(await card(ids.outline).getAttribute('role'),'complementary');
+ const longRecord=await createRecord('long-outline',Array.from({length:100},(_,i)=>'## Outline heading '+i+'\n\nBody '+i+'.').join('\n\n'));
+ await visit(longRecord);await card(ids.outline).waitFor();await settle();
+ const outline=card(ids.outline),heading=outline.locator('.workspace-panel-header'),grip=outline.locator('[data-panel-handle]');
+ const headingBefore=await heading.boundingBox(),gripBefore=await grip.boundingBox();
+ const scroller=outline.locator('.workspace-panel-content');
+ await scroller.hover();await page.mouse.wheel(0,10000);
+ await page.waitForFunction(()=>{const el=document.querySelector('[data-workspace-panel="document-panel-outline"] .workspace-panel-content');return el&&el.scrollTop>0&&el.scrollHeight-el.clientHeight-el.scrollTop<3;});
+ const last=await outline.locator('.outline-item').last().boundingBox(),view=await scroller.boundingBox();
+ assert.ok(last.y>=view.y-1&&last.y+last.height<=view.y+view.height+1,'Long outline reaches its final heading');
+ assert.ok(Math.abs((await heading.boundingBox()).y-headingBefore.y)<1&&Math.abs((await grip.boundingBox()).y-gripBefore.y)<1,'Outline header and handle remain fixed during body scrolling');
+ await visit(first);await settle();
+
  let previous=await boxes();
  await trigger('信息');await assertNewFront(ids.info,previous);
  await card(ids.info).locator('.workspace-panel-content').hover();
@@ -225,6 +262,8 @@ try{
  assert.ok(geometry.railRight<=geometry.viewport+1&&geometry.pageWidth<=geometry.viewport+1,'The docked stack must fit the viewport');
  await page.screenshot({path:join(artifactDir,'overlap-initial.png'),fullPage:true});
  console.log('PASS docked info/outline/history coexistence, new-panel placement and document clearance',engine);
+
+ await assertPointerPolish(ids.history);
 
  // An exposed background handle accepts a real click without removing peers.
  await card(ids.outline).getByRole('separator').click();await settle();
@@ -291,6 +330,15 @@ try{
  const paragraph=page.locator('.tiptap p').filter({hasText:'A stable editable paragraph.'}).first();
  await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' STACK_UNDO');
  await page.locator('.save-status').getByText('未保存').waitFor();
+ await raw.focus();
+ const blockBefore=await card(ids.block).boundingBox(),escapeGrip=await card(ids.block).locator('[data-panel-handle]').boundingBox();
+ await page.mouse.move(escapeGrip.x+escapeGrip.width/2,escapeGrip.y+escapeGrip.height/2);await page.mouse.down();
+ await page.mouse.move(escapeGrip.x+escapeGrip.width/2+35,escapeGrip.y+escapeGrip.height/2-50,{steps:12});
+ await page.keyboard.press('Escape');await settle();
+ assert.ok(await card(ids.block).isVisible(),'Escape cancels drag while the raw field retains focus');
+ assert.ok(Math.abs((await card(ids.block).boundingBox()).height-blockBefore.height)<2,'Escape restores pre-drag height');
+ assert.equal(await raw.inputValue(),incomplete,'Escape cancel preserves raw draft');
+ await page.mouse.up();await settle();
  await drag(ids.block,40,0);
  assert.equal(await raw.inputValue(),incomplete,'Dragging a panel preserves invalid raw input');
  assert.ok(await page.evaluate(()=>window.__stackRaw===document.querySelector('[data-workspace-panel="block-editor"] textarea')&&window.__stackEditor===document.querySelector('.tiptap')),
@@ -305,7 +353,7 @@ try{
  await page.locator('.save-status').getByText('已保存').waitFor();
  assert.equal(await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,first.id),content,'Panel actions do not implicitly save content');
  await page.screenshot({path:join(artifactDir,'desktop.png'),fullPage:true});
- await card(ids.block).getByRole('button',{name:'关闭块编辑',exact:true}).click();
+ await card(ids.block).getByRole('button',{name:'关闭',exact:true}).click();
  await card(ids.block).waitFor({state:'hidden'});
  console.log('PASS block raw draft, stable editor/form instances and preserved Undo',engine);
 
@@ -355,7 +403,8 @@ try{
    await page.screenshot({path:join(artifactDir,'mobile-block-roundtrip.png'),fullPage:true});
    console.log('PASS mobile/desktop/mobile raw draft, focus, selection and editor/form instance retention',engine);
   }
-  await sheet.getByRole('button',{name:'关闭块编辑',exact:true}).click();
+  await sheet.getByRole('textbox',{name:'块源码'}).focus();
+  await page.keyboard.press('Escape');
   await sheet.waitFor({state:'hidden'});
   await page.screenshot({path:join(artifactDir,'mobile-'+width+'.png'),fullPage:true});
  }

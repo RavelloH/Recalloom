@@ -2,7 +2,6 @@ import {Icon} from '../icon';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {TextArea} from '@astryxdesign/core/TextArea';
-import {Button} from '@astryxdesign/core/Button';
 
 import {parseRmdVisual} from '../rmd-visual';
 import {serializeRmdBlock} from '../rmd-serialize';
@@ -23,7 +22,6 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
 }){
  const [version,setVersion]=useState(0);
  const [open,setOpen]=useState(true);
- const requestClose=()=>setOpen(false);
  const [draft,setDraft]=useState(()=>serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'}));
  const [error,setError]=useState('');
  const canonicalRef=useRef(draft);
@@ -125,16 +123,9 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
    setError(e instanceof Error?e.message:'输入尚未构成有效的完整块；修正后会自动生效');
   }
  };
- return <WorkspacePanel id="block-editor" label="块编辑面板" open={open}
+ return <WorkspacePanel id="block-editor" label="块编辑面板" title={parentKind?'编辑子块':'编辑块'} description={kind==='richContainer'?String(current.attrs.kind??'容器'):kind} open={open}
   onOpenChange={setOpen} onAfterClose={onClose}>
-  <div className="rk-block-editor-panel" data-block-kind={kind}
-   onKeyDown={e=>{
-    if(e.key==='Escape'&&!e.nativeEvent.isComposing){e.stopPropagation();requestClose();}
-   }}>
-  <header className="rk-block-panel-header">
-   <div><strong>{parentKind?'编辑子块':'编辑块'}</strong><span>{kind==='richContainer'?String(current.attrs.kind??'容器'):kind}</span></div>
-   <Button variant="ghost" size="sm" label="关闭块编辑" icon={<Icon name="x" size="sm"/>} onClick={requestClose}/>
-  </header>
+  <div className="rk-block-editor-panel" data-block-kind={kind}>
   <section className="rk-block-panel-preview" aria-label="当前块预览">
    <div className="rk-block-panel-section-heading"><Icon name="eye" size="sm"/><span>实时预览</span></div>
    <div className="rk-block-panel-preview-body record-main">

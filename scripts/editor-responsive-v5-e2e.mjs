@@ -178,7 +178,7 @@ try{
  const drawer=page.getByRole('complementary',{name:'块编辑面板'});await drawer.waitFor();
  await assertBlockMotion('Opening');
  await startBlockMotion();
- await drawer.getByRole('button',{name:'关闭块编辑'}).click();
+ await drawer.getByRole('button',{name:'关闭',exact:true}).click();
  await page.locator('[data-workspace-panel="block-editor"][data-closing="true"]').waitFor();
  await assertBlockMotion('Closing');
  await drawer.waitFor({state:'hidden'});
