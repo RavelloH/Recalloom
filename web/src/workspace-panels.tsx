@@ -1,7 +1,7 @@
 import React,{createContext,useContext,useEffect,useLayoutEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
 import {Icon} from './icon';
-import {calculatePanelLayout,PANEL_MIN_HEIGHT} from './workspace-panel-layout';
+import {calculatePanelLayout,PANEL_MIN_HEIGHT,PANEL_STACK_PEEK} from './workspace-panel-layout';
 import './workspace-panels.css';
 
 const BottomSheet=React.lazy(()=>import('@astryxdesign/core/BottomSheet').then(module=>({default:module.BottomSheet})));
@@ -58,7 +58,7 @@ class PanelStore{
   if(open){
    const others=this.snapshot.panels.filter(p=>p.open&&p.id!==id);
    const shortest=Math.min(...this.layout().filter(p=>!p.collapsed).map(p=>p.height));
-   const height=others.length?Math.max(PANEL_MIN_HEIGHT,Math.min(320,shortest)):Math.max(PANEL_MIN_HEIGHT,this.snapshot.height-112);
+   const height=others.length?Math.max(PANEL_MIN_HEIGHT,Math.min(320,shortest-PANEL_STACK_PEEK)):Math.max(PANEL_MIN_HEIGHT,this.snapshot.height-112);
    this.activeId=id;
    this.update(id,{open:true,present:true,ready:false,collapsed:false,height,sequence:++this.sequence,opener:document.activeElement instanceof HTMLElement?document.activeElement:null});
    if(!this.snapshot.docked)others.forEach(other=>other.change(false));
@@ -156,11 +156,35 @@ function MobilePanel({panel,store}:{panel:Panel;store:PanelStore}){
 }
 
 function DockPanel({panel,store,snapshot}:{panel:Panel;store:PanelStore;snapshot:Snapshot}){
- const layout=store.layout().find(p=>p.id===panel.id)!;
+ const stack=store.layout();
+ const rank=stack.findIndex(p=>p.id===panel.id);
+ const layout=stack[rank];
  const drag=snapshot.drag?.id===panel.id?snapshot.drag:null;
  const pending=useRef<number|null>(null);
  const pointer=useRef<{x:number;y:number}|null>(null);
  const root=useRef<HTMLElement>(null);
+ const previousLayer=useRef<{rank:number;z:number;count:number}|null>(null);
+ const layerMotion=useRef<Animation|null>(null);
+ const z=stack.length-rank;
+ useLayoutEffect(()=>{
+  const previous=previousLayer.current;
+  previousLayer.current={rank,z,count:stack.length};
+  if(!previous||previous.count!==stack.length||previous.rank===rank)return;
+  if(reduced()){layerMotion.current?.cancel();return;}
+  const element=root.current!;
+  // A repeated resize continues from the visible in-flight frame.
+  const current=getComputedStyle(element);
+  const from={zIndex:layerMotion.current?.playState==='running'?current.zIndex:String(previous.z),opacity:current.opacity,translate:current.translate};
+  layerMotion.current?.cancel();
+  // Exchange depth while separated and faded, rather than cutting surfaces
+  // abruptly at the height crossing. Pointer capture survives the exchange.
+  layerMotion.current=element.animate([
+   from,
+   {zIndex:from.zIndex,opacity:.18,translate:'14px',offset:.45},
+   {zIndex:z,opacity:.18,translate:'14px',offset:.5},
+   {zIndex:z,opacity:1,translate:'0px'}
+  ],{duration:260,easing:'ease-in-out'});
+ },[rank,z,stack.length]);
  useEffect(()=>{
   const element=root.current!;
   const activate=(event:FocusEvent)=>{
@@ -176,12 +200,12 @@ function DockPanel({panel,store,snapshot}:{panel:Panel;store:PanelStore;snapshot
   element.addEventListener('keydown',keydown);
   return()=>{element.removeEventListener('focusin',activate);element.removeEventListener('keydown',keydown);};
  },[store,panel.id]);
- useEffect(()=>()=>{if(pending.current!==null)cancelAnimationFrame(pending.current);},[]);
+ useEffect(()=>()=>{if(pending.current!==null)cancelAnimationFrame(pending.current);layerMotion.current?.cancel();},[]);
  const flush=()=>{if(pending.current!==null)cancelAnimationFrame(pending.current);pending.current=null;if(pointer.current)store.moveDrag(pointer.current.x,pointer.current.y);pointer.current=null;};
  const finish=(event:React.PointerEvent,cancel=false)=>{flush();store.endDrag(cancel);if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);};
  return <aside ref={root} id={panel.id} role="complementary" aria-label={panel.label} className="workspace-panel" data-workspace-panel={panel.id}
   data-ready={panel.ready||undefined} data-closing={!panel.open||undefined} data-collapsed={layout.collapsed||undefined} data-dragging={!!drag||undefined}
-  style={{top:drag?.axis==='y'?drag.top+drag.dy:layout.top,height:drag?.axis==='y'?drag.height-drag.dy:layout.height,transform:drag?.axis==='x'?`translateX(${drag.dx}px)`:undefined,zIndex:drag?3:1}}>
+  style={{top:drag?.axis==='y'?drag.top+drag.dy:layout.top,height:drag?.axis==='y'?drag.height-drag.dy:layout.height,transform:drag?.axis==='x'?`translateX(${drag.dx}px)`:undefined,zIndex:z,'--workspace-panel-exposed':layout.exposedHeight+'px'} as React.CSSProperties}>
   <div className="workspace-panel-grip-row">
    <div className="workspace-panel-grip" data-panel-handle role="separator" aria-orientation="horizontal" tabIndex={0}
     aria-label={'调整'+panel.label+'高度；向右拖动关闭'} aria-valuemin={layout.collapsed?44:PANEL_MIN_HEIGHT} aria-valuemax={Math.max(PANEL_MIN_HEIGHT,snapshot.height-112)} aria-valuenow={Math.round(layout.height)}

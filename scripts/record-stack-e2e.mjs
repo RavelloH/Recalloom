@@ -55,36 +55,123 @@ async function trigger(name){
 async function boxes(){
  return page.locator('.workspace-panel-rail [data-workspace-panel]').evaluateAll(elements=>elements
   .filter(element=>element.getBoundingClientRect().height>0)
-  .map(element=>{const r=element.getBoundingClientRect();return {id:element.dataset.workspacePanel,x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};})
-  .sort((a,b)=>a.y-b.y));
+  .map(element=>{const r=element.getBoundingClientRect();return {id:element.dataset.workspacePanel,x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,z:Number(getComputedStyle(element).zIndex),collapsed:element.dataset.collapsed==='true'};})
+  .sort((a,b)=>b.z-a.z));
 }
-async function assertNewTop(id,previous){
+async function assertCoverage(){
+ const current=await boxes();
+ for(let i=0;i<current.length;i++){
+  const front=current[i];
+  assert.ok(Math.abs(front.bottom-current[0].bottom)<=2,'Overlaid cards share the same bottom edge: '+JSON.stringify(current));
+  if(i){
+   const nearer=current[i-1];
+   assert.ok(front.z<nearer.z&&front.height>nearer.height,'Shorter cards must have a higher foreground layer');
+   assert.ok(Math.min(front.right,nearer.right)>Math.max(front.x,nearer.x)&&Math.min(front.bottom,nearer.bottom)>Math.max(front.y,nearer.y)+2,
+    'Card rectangles must actually overlap, rather than form separate rows');
+   assert.ok(nearer.y-front.y>=62,'Every background card exposes at least its title and handle strip');
+  }
+ }
+ const hits=await page.evaluate(()=>{
+  const elements=[...document.querySelectorAll('.workspace-panel-rail [data-workspace-panel]')];
+  const hitAt=(x,y)=>document.elementsFromPoint(x,y).find(el=>el.closest('[data-workspace-panel]'))?.closest('[data-workspace-panel]')?.getAttribute('data-workspace-panel');
+  return elements.map(el=>{
+   const r=el.getBoundingClientRect(),handle=el.querySelector('[data-panel-handle]').getBoundingClientRect();
+   const title=el.querySelector('.panel-heading h2,.rk-block-panel-header strong');
+   const titleRect=title?.getBoundingClientRect();
+   return {id:el.dataset.workspacePanel,handleHit:hitAt(handle.x+handle.width/2,handle.y+handle.height/2),
+    titleHit:titleRect?hitAt(titleRect.x+Math.min(10,titleRect.width/2),titleRect.y+titleRect.height/2):null,
+    bottomHit:hitAt(r.x+r.width/2,r.bottom-20),collapsed:el.dataset.collapsed==='true'};
+  });
+ });
+ for(const hit of hits){
+  assert.equal(hit.handleHit,hit.id,'Each card retains a pointer-accessible handle');
+  if(!hit.collapsed)assert.equal(hit.titleHit,hit.id,'Each card retains an unobscured title');
+  assert.equal(hit.bottomHit,current[0].id,'Hit testing in the overlap must select the frontmost card');
+ }
+ return current;
+}
+async function assertNewFront(id,previous){
  await card(id).waitFor();await settle();
  const current=await boxes(),fresh=current.find(item=>item.id===id);
- assert.equal(current[0]?.id,id,'The new shortest panel should appear above the existing stack: '+JSON.stringify(current));
- assert.ok(fresh.height<=Math.min(...previous.map(item=>item.height))+2,'New panel must start no taller than the shortest open panel');
+ assert.equal(current[0]?.id,id,'The new shortest panel should cover the existing stack in the foreground: '+JSON.stringify(current));
+ assert.ok(fresh.height<=Math.max(160,Math.min(...previous.map(item=>item.height))-64)+2,'New panel should leave a visible header strip above its top');
  assert.equal(current.length,previous.length+1,'Opening a panel preserves its siblings');
+ await assertCoverage();
 }
 async function drag(id,dx,dy,{sample=false}={}){
  const handle=card(id).locator('[data-panel-handle]').first();
  await handle.scrollIntoViewIfNeeded();
  const r=await handle.boundingBox();assert.ok(r,'Panel has a visible drag handle');
  const x=r.x+r.width/2,y=r.y+r.height/2;
- await page.mouse.move(x,y);await page.mouse.down();
- await page.mouse.move(x+dx,y+dy,{steps:15});
  if(sample)await page.evaluate(()=>{
-  window.__stackMotion={frames:[],done:false};
-  document.addEventListener('pointerup',()=>{
-   const state=window.__stackMotion,start=performance.now();
-   const frame=()=>{
-    state.frames.push({time:performance.now(),cards:[...document.querySelectorAll('.workspace-panel-rail [data-workspace-panel]')].map(el=>({id:el.dataset.workspacePanel,y:el.getBoundingClientRect().y}))});
-    if(performance.now()-start<850)requestAnimationFrame(frame);else state.done=true;
-   };frame();
-  },{once:true});
+  const state=window.__stackMotion={frames:[],done:false,releasedAt:null};
+  document.addEventListener('pointerup',()=>{state.releasedAt=performance.now();},{once:true});
+  const frame=()=>{
+   state.frames.push({time:performance.now(),cards:[...document.querySelectorAll('.workspace-panel-rail [data-workspace-panel]')].map(el=>{
+    const r=el.getBoundingClientRect(),style=getComputedStyle(el);
+    return {id:el.dataset.workspacePanel,y:r.y,height:r.height,z:Number(style.zIndex),opacity:Number(style.opacity),translate:style.translate};
+   })});
+   if(state.releasedAt===null||performance.now()-state.releasedAt<850)requestAnimationFrame(frame);else state.done=true;
+  };frame();
  });
+ await page.mouse.move(x,y);await page.mouse.down();
+ await page.mouse.move(x+dx,y+dy,{steps:24});
  await page.mouse.up();
  if(sample)await page.waitForFunction(()=>window.__stackMotion?.done);
  await settle();
+}
+async function dragReveal(frontId,backId){
+ const handle=card(frontId).getByRole('separator');
+ const r=await handle.boundingBox(),coverTop=(await card(frontId).boundingBox()).y;
+ assert.ok(r,'The foreground card exposes its handle');
+ const x=r.x+r.width/2,y=r.y+r.height/2;
+ await page.mouse.move(x,y);await page.mouse.down();
+ await page.mouse.move(x+240,y,{steps:20});
+ const initial=await page.evaluate(({frontId,backId,coverTop})=>{
+  const frontSelector='[data-workspace-panel="'+frontId+'"]',backSelector='[data-workspace-panel="'+backId+'"]';
+  const read=()=>{
+   const front=document.querySelector(frontSelector),back=document.querySelector(backSelector);
+   if(!back)return null;
+   const panel=back.getBoundingClientRect(),body=back.querySelector('.workspace-panel-body').getBoundingClientRect();
+   const content=back.querySelector('.workbench-inspector-content'),frontRect=front?.getBoundingClientRect();
+   const hits=[],walk=content?document.createTreeWalker(content,NodeFilter.SHOW_TEXT):null;
+   let node;
+   while(walk&&(node=walk.nextNode())){
+    const text=node.textContent.trim();if(!text)continue;
+    const range=document.createRange();range.selectNodeContents(node);
+    for(const rect of range.getClientRects()){
+     const px=rect.left+Math.min(6,rect.width/2),py=rect.top+rect.height/2;
+     if(py<coverTop+10||py<body.top||py>=body.bottom||px<body.left||px>=body.right||py>=innerHeight)continue;
+     // Sample the strip actually uncovered by the horizontal drag, rather
+     // than relying on a closing card's disabled pointer events.
+     if(frontRect&&px>=frontRect.left&&px<frontRect.right&&py>=frontRect.top&&py<frontRect.bottom)continue;
+     const hit=document.elementsFromPoint(px,py).find(el=>el.closest('[data-workspace-panel]'));
+     if(hit?.closest('[data-workspace-panel]')===back&&content.contains(hit))hits.push({text:text.slice(0,90),x:px,y:py});
+    }
+   }
+   return {time:performance.now(),frontPresent:!!front,closing:front?.dataset.closing==='true',panelHeight:panel.height,bodyHeight:body.height,
+    frontLeft:frontRect?.left,backLeft:panel.left,hits};
+  };
+  const state=window.__backgroundReveal={frames:[read()],done:false};
+  document.addEventListener('pointerup',()=>{
+   const start=performance.now();
+   const frame=()=>{
+    const value=read();state.frames.push(value);
+    if(value?.frontPresent&&performance.now()-start<800)requestAnimationFrame(frame);else state.done=true;
+   };requestAnimationFrame(frame);
+  },{once:true});
+  return state.frames[0];
+ },{frontId,backId,coverTop});
+ assert.ok(initial.bodyHeight>=initial.panelHeight-26,'The covered background retains a full-height flex body while the foreground is dragged: '+JSON.stringify(initial));
+ assert.ok(initial.hits.length>0,'Moving the front card exposes real background content at text rectangles in the overlap: '+JSON.stringify(initial));
+ await page.screenshot({path:join(artifactDir,'background-body-while-dragged.png'),fullPage:true});
+ await page.mouse.up();
+ await page.waitForFunction(()=>window.__backgroundReveal?.done);
+ const frames=await page.evaluate(()=>window.__backgroundReveal.frames);
+ writeFileSync(join(artifactDir,'background-reveal.json'),JSON.stringify(frames,null,2));
+ assert.ok(frames.some(frame=>frame?.frontPresent&&frame.closing&&frame.bodyHeight>=frame.panelHeight-26&&frame.hits.length>0),
+  'Before the exiting foreground is removed, the uncovered background still renders its full body and visible text');
+ await card(frontId).waitFor({state:'hidden'});await settle();
 }
 async function openBlock(mobile=false){
  const node=page.locator('.tiptap .rk-directive-warning').first();
@@ -122,8 +209,12 @@ try{
  await card(ids.outline).waitFor();await settle();
  assert.equal(await card(ids.outline).getAttribute('role'),'complementary');
  let previous=await boxes();
- await trigger('信息');await assertNewTop(ids.info,previous);
- previous=await boxes();await trigger('历史');await assertNewTop(ids.history,previous);
+ await trigger('信息');await assertNewFront(ids.info,previous);
+ await card(ids.info).locator('.workspace-panel-content').hover();
+ await page.mouse.wheel(0,450);
+ await page.waitForFunction(()=>document.querySelector('[data-workspace-panel="document-panel-info"] .workspace-panel-content')?.scrollTop>60);
+ previous=await boxes();await trigger('历史');await assertNewFront(ids.history,previous);
+ assert.ok(await card(ids.info).locator('.workspace-panel-content').evaluate(el=>el.scrollTop)>60,'Opening the foreground preserves the background info scroll position');
  for(const id of [ids.info,ids.outline,ids.history])assert.equal(await card(id).getAttribute('role'),'complementary');
  const geometry=await page.evaluate(()=>{
   const rail=document.querySelector('.workspace-panel-rail').getBoundingClientRect();
@@ -132,28 +223,33 @@ try{
  });
  assert.ok(geometry.editorRight<=geometry.railLeft+1,'The reserved panel column must not cover document content: '+JSON.stringify(geometry));
  assert.ok(geometry.railRight<=geometry.viewport+1&&geometry.pageWidth<=geometry.viewport+1,'The docked stack must fit the viewport');
+ await page.screenshot({path:join(artifactDir,'overlap-initial.png'),fullPage:true});
  console.log('PASS docked info/outline/history coexistence, new-panel placement and document clearance',engine);
 
- // Shorten the original full-height outline to leave space above the stack,
- // then pull its top handle upwards to enlarge it past its shorter siblings.
- const fullOutline=(await boxes()).find(item=>item.id===ids.outline);
- await drag(ids.outline,0,fullOutline.height-170);
- const before=await boxes(),outlineBefore=before.find(item=>item.id===ids.outline);
- assert.equal(before[0].id,ids.outline,'A shortened outline moves above taller siblings');
- await drag(ids.outline,0,-120,{sample:true});
- const after=await boxes(),outlineAfter=after.find(item=>item.id===ids.outline);
- assert.ok(outlineAfter.height>outlineBefore.height+40,'Pulling the top handle upwards increases panel height');
- assert.notEqual(after[0].id,ids.outline,'A taller panel must move below its shorter siblings');
+ // An exposed background handle accepts a real click without removing peers.
+ await card(ids.outline).getByRole('separator').click();await settle();
+ assert.equal((await boxes()).length,3,'The taller background card remains reachable through its exposed strip');
+ const before=await boxes(),historyBefore=before.find(item=>item.id===ids.history);
+ const infoBefore=before.find(item=>item.id===ids.info);
+ await drag(ids.history,0,-(infoBefore.height-historyBefore.height+100),{sample:true});
+ const after=await assertCoverage(),historyAfter=after.find(item=>item.id===ids.history);
+ assert.ok(historyAfter.height>historyBefore.height+40,'Pulling the top handle upwards increases panel height');
+ assert.ok(historyAfter.z<after.find(item=>item.id===ids.info).z,'Growing through another card height moves the dragged card behind that shorter card');
  const motion=await page.evaluate(()=>window.__stackMotion.frames);
  writeFileSync(join(artifactDir,'reorder-motion.json'),JSON.stringify({before,after,frames:motion},null,2));
  const intermediate=after.some(end=>{
   const points=motion.flatMap(frame=>frame.cards.filter(item=>item.id===end.id));
-  const start=points[0]?.y;
+  const start=before.find(item=>item.id===end.id)?.y;
   return start!==undefined&&Math.abs(start-end.y)>4&&points.some(point=>point.y>Math.min(start,end.y)+1&&point.y<Math.max(start,end.y)-1);
  });
- assert.ok(intermediate,'Panel reordering must show a frame between the released and settled positions');
- await drag(ids.info,125,0);
- await card(ids.info).waitFor({state:'hidden'});
+ assert.ok(intermediate,'Height crossing must show an intermediate position while the overlaid cards move');
+ assert.ok(motion.some(frame=>frame.cards.find(item=>item.id===ids.history)?.z>frame.cards.find(item=>item.id===ids.info)?.z)&&
+  motion.some(frame=>frame.cards.find(item=>item.id===ids.history)?.z<frame.cards.find(item=>item.id===ids.info)?.z),
+  'Height crossing changes the foreground/background layer order during the sampled motion');
+ assert.ok(motion.some(frame=>frame.cards.some(item=>item.opacity>.19&&item.opacity<.98&&Math.abs(parseFloat(item.translate)||0)>.5)),
+  'Depth exchange must have a sampled intermediate fade and translation, rather than only an instantaneous z-index change');
+ await page.screenshot({path:join(artifactDir,'overlap-after-height-crossing.png'),fullPage:true});
+ await dragReveal(ids.info,ids.history);
  assert.ok(await card(ids.history).isVisible()&&await card(ids.outline).isVisible(),'Right drag closes only its target');
  console.log('PASS vertical resizing, animated reorder and individual right-drag close',engine);
 
@@ -183,7 +279,7 @@ try{
 
  await trigger('信息');await trigger('历史');await settle();
  previous=await boxes();
- await openBlock();await assertNewTop(ids.block,previous);
+ await openBlock();await assertNewFront(ids.block,previous);
  const raw=card(ids.block).getByRole('textbox',{name:'块源码'});
  const incomplete='# INCOMPLETE_RAW_DRAFT';
  await raw.fill(incomplete);
@@ -272,29 +368,29 @@ try{
   if(!await card(ids.outline).isVisible())await trigger('目录');
   await trigger('信息');await trigger('历史');await settle();
   assert.equal((await boxes()).length,3,'Short desktop opens the three document panels');
-  const collapsed=page.locator('.workspace-panel-rail [data-workspace-panel][data-collapsed="true"]');
-  assert.ok(await collapsed.count()>0,'Short desktop automatically collapses a panel');
-  const expandedId=await collapsed.first().getAttribute('data-workspace-panel');
-  await card(expandedId).getByRole('button',{name:/^展开/}).click();
-  await settle();
-  assert.notEqual(await card(expandedId).getAttribute('data-collapsed'),'true','One chevron click expands an automatically collapsed panel');
-  assert.ok(await collapsed.count()>0,'Another panel collapses to keep the expanded card readable');
-  const closedId=await collapsed.first().getAttribute('data-workspace-panel');
-  await card(closedId).locator('.workspace-panel-collapsed-title').getByRole('button',{name:/^关闭/}).click();
+  assert.equal((await boxes()).filter(item=>item.collapsed).length,0,'Overlapping cards fit a short viewport without collapsing based on their summed heights');
+  await assertCoverage();
+  await page.screenshot({path:join(artifactDir,'short-desktop-overlap.png'),fullPage:true});
+  await card(ids.info).getByRole('button',{name:'折叠信息',exact:true}).click();await settle();
+  assert.equal(await card(ids.info).getAttribute('data-collapsed'),'true','A manual collapse still works in the overlay stack');
+  await card(ids.info).getByRole('button',{name:'展开信息',exact:true}).click();await settle();
+  assert.notEqual(await card(ids.info).getAttribute('data-collapsed'),'true','One chevron click expands the collapsed card');
+  const closedId=ids.history;
+  await card(closedId).getByRole('button',{name:'关闭',exact:true}).click();
   await card(closedId).waitFor({state:'hidden'});await settle();
   const survivors=await boxes();
-  assert.equal(survivors.length,2,'One close click removes only the selected collapsed card');
-  assert.ok(survivors.some(item=>item.id===expandedId),'Closing the other title bar preserves the expanded card');
+  assert.equal(survivors.length,2,'One close click removes only the selected overlaid card');
+  assert.ok(survivors.some(item=>item.id===ids.info),'Closing history preserves the expanded info card');
   const shortGeometry=await page.evaluate(()=>({width:innerWidth,height:innerHeight,pageWidth:document.documentElement.scrollWidth,
    rail:[...document.querySelectorAll('.workspace-panel-rail [data-workspace-panel]')].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};})}));
   assert.ok(shortGeometry.pageWidth<=shortGeometry.width+1&&shortGeometry.rail.every(r=>r.left>=0&&r.right<=shortGeometry.width+1&&r.top>=0&&r.bottom<=shortGeometry.height+1),
-   'Automatically collapsed stack must remain inside the short viewport: '+JSON.stringify(shortGeometry));
+   'The overlaid stack must remain inside the short viewport: '+JSON.stringify(shortGeometry));
   await page.screenshot({path:join(artifactDir,'short-desktop.png'),fullPage:true});
 
   // Native focus events inside the portaled content must activate the card,
   // and Escape from that body must close that card rather than its sibling.
   const focusId=survivors.find(item=>item.id!==ids.outline)?.id;
-  assert.ok(focusId,'A non-outline inspector survives the collapsed-card close');
+  assert.ok(focusId,'A non-outline inspector survives the overlay close');
   const focusTarget=focusId===ids.info?card(focusId).getByRole('button',{name:'添加标签',exact:true}):card(focusId).getByRole('button',{name:'比较',exact:true}).first();
   await focusTarget.focus();await page.keyboard.press('Escape');
   await card(focusId).waitFor({state:'hidden'});await settle();
@@ -307,7 +403,7 @@ try{
   await outlineHandle.press('ArrowUp');await settle();
   assert.ok((await card(ids.outline).boundingBox()).height>smallerHeight+10,'Handle ArrowUp increases panel height');
   await page.screenshot({path:join(artifactDir,'short-desktop-keyboard.png'),fullPage:true});
-  console.log('PASS short desktop automatic collapse, single-click expand/close, content Escape and handle arrow keys',engine);
+  console.log('PASS short desktop true overlap, manual collapse/expand, individual close, content Escape and handle arrow keys',engine);
  }
  assert.deepEqual(faults,[],'Browser runtime errors');
  console.log('PASS 390/320 single native mobile sheet and no automatic outline popup',engine,'artifacts:',artifactDir);

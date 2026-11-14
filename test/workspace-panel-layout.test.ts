@@ -1,64 +1,72 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {calculatePanelLayout,PANEL_MIN_HEIGHT,PANEL_COLLAPSED_HEIGHT,PANEL_GAP,type PanelLayoutInput} from '../web/src/workspace-panel-layout';
+import {calculatePanelLayout,PANEL_MIN_HEIGHT,PANEL_COLLAPSED_HEIGHT,PANEL_STACK_PEEK,type PanelLayoutInput} from '../web/src/workspace-panel-layout';
 
 const panel=(id:string,height:number,sequence=0):PanelLayoutInput=>({id,height,sequence});
 
-test('panel layout keeps requested heights, puts short panels above tall ones, and aligns the bottom',()=>{
- const layout=calculatePanelLayout([panel('tall',320),panel('short',180),panel('middle',240)],900);
- assert.deepEqual(layout.map(({id,height})=>[id,height]),[['short',180],['middle',240],['tall',320]]);
- assert.equal(layout[0].top,140);
- assert.equal(layout.at(-1)!.top+layout.at(-1)!.height,900);
- assert.equal(layout[1].top-layout[0].top-layout[0].height,PANEL_GAP);
+test('cards overlap against a shared bottom and preserve independent requested heights',()=>{
+ const layout=calculatePanelLayout([panel('tall',600),panel('short',400)],900);
+ assert.deepEqual(layout,[
+  {id:'short',top:500,height:400,collapsed:false,exposedHeight:400},
+  {id:'tall',top:300,height:600,collapsed:false,exposedHeight:200}
+ ]);
+ assert.ok(layout.every(({top,height})=>top+height===900));
+ assert.ok(layout.every(({collapsed})=>!collapsed),'the sum exceeding the viewport must not fold cards');
 });
 
-test('similar heights use opening sequence and have deterministic, immutable ordering',()=>{
- const panels=Object.freeze([Object.freeze(panel('old',200,1)),Object.freeze(panel('new',201,2)),Object.freeze(panel('equal',200,2))]);
+test('equal or similar cards put newer cards in front and raise rear cards to expose their headers',()=>{
+ const panels=Object.freeze([Object.freeze(panel('old',400,1)),Object.freeze(panel('new',401,2)),Object.freeze(panel('equal',400,2))]);
  const layout=calculatePanelLayout(panels,900);
- assert.deepEqual(layout.map(({id})=>id),['new','equal','old']);
+ assert.deepEqual(layout.map(({id,height,exposedHeight})=>[id,height,exposedHeight]),[
+  ['new',401,401],['equal',465,PANEL_STACK_PEEK],['old',529,PANEL_STACK_PEEK]
+ ]);
  assert.deepEqual(calculatePanelLayout(panels,900),layout);
  assert.deepEqual(calculatePanelLayout(panels,901).map(({id})=>id),layout.map(({id})=>id));
- assert.deepEqual(panels.map(({height})=>height),[200,201,200]);
+ assert.deepEqual(panels.map(({height})=>height),[400,401,400]);
 });
 
-test('panels shrink only by their space above the minimum before any collapse',()=>{
- const layout=calculatePanelLayout([panel('short',200),panel('tall',400)],430);
- assert.ok(layout.every(({collapsed})=>!collapsed));
- assert.ok(Math.abs(layout[0].height-174.28571428571428)<1e-8);
- assert.ok(Math.abs(layout[1].height-245.71428571428572)<1e-8);
+test('viewport pressure reserves rear header space while keeping expanded minimums',()=>{
+ const layout=calculatePanelLayout([panel('new',400,2),panel('old',400,1)],450);
+ assert.deepEqual(layout.map(({height,collapsed})=>[height,collapsed]),[[386,false],[450,false]]);
+ assert.equal(layout[1].exposedHeight,PANEL_STACK_PEEK);
  assert.ok(layout.every(({height})=>height>=PANEL_MIN_HEIGHT));
- assert.ok(Math.abs(layout.at(-1)!.top+layout.at(-1)!.height-430)<1e-8);
 });
 
-test('automatic collapse retains active and priority panels and places title bars first',()=>{
+test('automatic folding happens only when minimum bodies and header strips cannot fit',()=>{
  const panels=[panel('old',250,1),{...panel('outline',250,0),priority:true},panel('new',250,3),panel('active',250,2)];
- const layout=calculatePanelLayout(panels,440,'active');
- assert.deepEqual(layout.filter(({collapsed})=>collapsed).map(({id,height})=>[id,height]),[['new',PANEL_COLLAPSED_HEIGHT],['old',PANEL_COLLAPSED_HEIGHT]]);
+ assert.ok(calculatePanelLayout(panels,360,'active').every(({collapsed})=>!collapsed));
+ const layout=calculatePanelLayout(panels,240,'active');
+ assert.deepEqual(layout.filter(({collapsed})=>collapsed).map(({id})=>id),['new','old']);
  assert.deepEqual(layout.filter(({collapsed})=>!collapsed).map(({id})=>id),['active','outline']);
- const smaller=calculatePanelLayout(panels,330,'active');
+ const smaller=calculatePanelLayout(panels,200,'active');
  assert.deepEqual(smaller.filter(({collapsed})=>!collapsed).map(({id})=>id),['active']);
+ assert.ok(smaller.at(-1)!.height>=PANEL_MIN_HEIGHT);
 });
 
-test('explicit collapse is retained and space becoming available restores automatic collapse',()=>{
- const panels=[{...panel('manual',300),collapsed:true},panel('normal',300)];
+test('collapsed cards expose 44px strips and can include covered lower portions',()=>{
+ const panels=[{...panel('manual-old',300,1),collapsed:true},{...panel('manual-new',300,2),collapsed:true},panel('normal',300)];
+ const large=calculatePanelLayout(panels,500);
+ assert.deepEqual(large.map(({id,height,exposedHeight,collapsed})=>[id,height,exposedHeight,collapsed]),[
+  ['manual-new',44,PANEL_COLLAPSED_HEIGHT,true],['manual-old',88,PANEL_COLLAPSED_HEIGHT,true],['normal',300,212,false]
+ ]);
  const small=calculatePanelLayout(panels,150);
  assert.ok(small.every(({collapsed})=>collapsed));
- const large=calculatePanelLayout(panels,500);
- assert.deepEqual(large.map(({id,height,collapsed})=>[id,height,collapsed]),[['manual',44,true],['normal',300,false]]);
+ assert.equal(calculatePanelLayout(panels,500).at(-1)!.collapsed,false,'automatic folding is not persisted into inputs');
 });
 
-test('all viewport sizes stay finite, nonnegative, nonoverlapping, and within the available height',()=>{
+test('every viewport keeps all bottoms equal with finite nonnegative heights and visible header strips',()=>{
  const panels=[panel('first',300,1),panel('second',700,2),{...panel('outline',500),priority:true},panel('active',180,3)];
  for(const available of [0,1,25,44,80,150,200,350,600,1000,2400]){
   const layout=calculatePanelLayout(panels,available,'active');
-  let end=0;
+  let previousHeight=0;
   for(const item of layout){
    assert.ok(Number.isFinite(item.top)&&Number.isFinite(item.height));
-   assert.ok(item.top>=end-1e-8&&item.height>=0);
-   end=item.top+item.height;
-   assert.ok(end<=available+1e-8);
+   assert.ok(item.top>=0&&item.height>=previousHeight&&item.height<=available);
+   assert.ok(Math.abs(item.top+item.height-available)<1e-8);
+   assert.ok(Math.abs(item.exposedHeight-(item.height-previousHeight))<1e-8);
+   if(available>0)assert.ok(item.exposedHeight>0);
+   previousHeight=item.height;
   }
-  assert.ok(Math.abs(end-available)<1e-8);
  }
  assert.deepEqual(calculatePanelLayout([],300),[]);
  assert.ok(calculatePanelLayout([panel('invalid',NaN)],NaN).every(({top,height})=>top===0&&height===0));
