@@ -8,7 +8,7 @@ import {useCompactLayout} from './use-media';
  * a touch-friendly bottom sheet on narrow screens. Both retain focus and
  * scrolling behavior without inserting controls below long documents.
  */
-export function ContextPanel({open,onOpenChange,label,children}:{open:boolean;onOpenChange:(value:boolean)=>void;label:string;children:React.ReactNode}){
+export function ContextPanel({open,onOpenChange,label,children,id,modal=true}:{open:boolean;onOpenChange:(value:boolean)=>void;label:string;children:React.ReactNode;id?:string;modal?:boolean}){
  const mobile=useCompactLayout();
  // Changing native overlay hosts while open reorders the browser top layer:
  // a responsive inspector would cover a comparison opened above it. Choose
@@ -30,6 +30,6 @@ export function ContextPanel({open,onOpenChange,label,children}:{open:boolean;on
  const className='rk-context-panel-'+(compact?'sheet':'drawer')+(open&&!presentation.ready?' rk-context-panel-entering':'');
  const inner=<div className="context-panel-inner">{children}</div>;
  return compact
-  ?<BottomSheet className={className} isOpen={open} onOpenChange={onOpenChange} label={label} height="tall" padding={4}>{inner}</BottomSheet>
-  :<Drawer className={className} isOpen={open} onOpenChange={onOpenChange} label={label} side="end" width={420} padding={4}>{inner}</Drawer>;
+  ?<BottomSheet id={id} className={className} isOpen={open} onOpenChange={onOpenChange} label={label} height="tall" padding={4}>{inner}</BottomSheet>
+  :<Drawer id={id} className={className} isOpen={open} onOpenChange={onOpenChange} label={label} hasScrim={modal} side="end" width={420} padding={4}>{inner}</Drawer>;
 }

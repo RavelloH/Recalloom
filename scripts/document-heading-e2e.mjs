@@ -60,8 +60,8 @@ try{
  await until(async()=>(await read(plain.id)).name==='Renamed file.md','inline rename preserves .md suffix');
  assert.equal((await read(plain.id)).content,'A paragraph.\n\n# Later H1',
   'renaming the file must never change Markdown content');
- await header().getByRole('button',{name:'详细信息'}).click();
- const inspector=page.getByRole('dialog',{name:'文档检查器'});
+ await page.getByRole('button',{name:'信息',exact:true}).click();
+ const inspector=page.locator('#document-panel');
  await inspector.waitFor();
  assert.equal(await inspector.getByRole('textbox',{name:'文件名'}).count(),0,
   'filename editing lives in the top title, not in the metadata inspector');

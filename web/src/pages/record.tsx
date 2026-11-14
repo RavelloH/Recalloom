@@ -10,7 +10,8 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {ApiError,api,mutate,queryString} from '../api';
 import {ContextPanel} from '../context-panel';
-import {DocumentWorkbenchHeader,DocumentWorkbenchInspector,type DocumentInspectorTab,type DocumentPresentation} from '../record-workbench';
+import {DocumentWorkbenchHeader,DocumentWorkbenchPanel,documentPanels,type DocumentPanel,type DocumentPresentation} from '../record-workbench';
+import type {DocumentOutline} from '../document-outline';
 import {markdownCharacterCount} from '../document-heading';
 import {filenameFromDocumentTitle} from '../document-filename';
 import {useConfirmDialog} from '../confirm-dialog';
@@ -24,22 +25,27 @@ import {RecordEditorChunk} from '../editor-chunks';
 import {setFullWidth,useFullWidth} from '../preferences';
 import {recordQuery} from '../queries';
 import {sharedViewTransitionName} from '../shared-view-transition';
+import {useMediaQuery} from '../use-media';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){
- const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[inspectorTab,setInspectorTab]=useState<DocumentInspectorTab|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{line:number;token:number}|null>(null),[error,setError]=useState<unknown>(null);
+ const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[documentPanel,setDocumentPanel]=useState<DocumentPanel|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{key:string;token:number}|null>(null),[outline,setOutline]=useState<DocumentOutline|null>(null),[error,setError]=useState<unknown>(null);
  const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
   prev&&prev.id===next.id&&prev.revision===next.revision&&prev.characters===next.characters?prev:next),[]);
- const lastInspectorTab=useRef<DocumentInspectorTab>('details');
- const openInspector=(tab:DocumentInspectorTab)=>{lastInspectorTab.current=tab;setInspectorTab(tab);};
+ const lastDocumentPanel=useRef<DocumentPanel>('info');
+ const toggleDocumentPanel=(panel:DocumentPanel)=>{
+  lastDocumentPanel.current=panel;
+  if(panel==='outline'&&documentPanel!=='outline')setOutline(null);
+  setDocumentPanel(current=>current===panel?null:panel);
+ };
  const [focusTitle]=useState(()=>consumeTitleFocus(recordId));
  const fullWidth=useFullWidth();
- useEffect(()=>{setMetaOpen(false);lastInspectorTab.current='details';setInspectorTab(null);setOutlineTarget(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
+ const tabletPanelActions=useMediaQuery('(min-width: 721px) and (max-width: 1200px)');
+ useEffect(()=>{setMetaOpen(false);lastDocumentPanel.current='info';setDocumentPanel(null);setOutlineTarget(null);setOutline(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
- const outline=useQuery({queryKey:['outline',recordId,q.data?.revision],queryFn:()=>api<{headings:Array<{title:string;level:number;lineStart:number;lineEnd:number}>;totalHeadings:number}>('/records/'+recordId+'/outline?limit=200'),enabled:Boolean(inspectorTab==='outline'&&q.data&&q.data.kind==='document')});
  const item=q.data;
  const originalPresentation=useMemo(()=>item?.kind==='document'?{
   id:item.id,revision:item.revision,characters:markdownCharacterCount(item.content)
@@ -86,7 +92,10 @@ export function RecordPage(){
  if(q.isPending)return <div className="page record-page"><div className="doc-header"><Skeleton width={56} height={56} radius={3}/><div className="doc-skeleton-title"><Skeleton width="55%" height={40} radius={2}/></div><Skeleton width="38%" height={14} radius={1}/></div></div>;
  if(q.isError||!item)return <div className="page"><ErrorText error={q.error}/></div>;
  const pageActions=<>
-  <IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>item.kind==='document'?openInspector('details'):setMetaOpen(v=>!v)}/>
+  {item.kind==='document'?documentPanels.map(panel=><IconButton key={panel.id} variant={documentPanel===panel.id?'secondary':'ghost'} size="sm"
+   label={panel.label} icon={<Icon name={panel.icon} size="sm"/>} aria-haspopup="dialog" aria-controls="document-panel"
+   aria-expanded={documentPanel===panel.id} onClick={()=>toggleDocumentPanel(panel.id)}/>)
+   :<IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>setMetaOpen(v=>!v)}/>}
   <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
    {label:'复制页面链接',icon:<Icon name="copy" size="sm"/>,onClick:()=>void navigator.clipboard?.writeText(location.origin+'/records/'+item.id)},
    {label:fullWidth?'恢复标准宽度':'全宽显示',icon:<Icon name="arrowsHorizontal" size="sm"/>,onClick:()=>setFullWidth(!fullWidth)},
@@ -103,11 +112,11 @@ export function RecordPage(){
   :null;
  return <div className={'page record-page'+(item.kind==='document'?' workbench-document':'')}>{confirmation}
  <TopbarPortal slot="start"><Breadcrumbs folderId={item.folderId} current={item.name}/></TopbarPortal>
+ {item.kind==='document'&&tabletPanelActions&&<TopbarPortal slot="end"><div className="editor-view-actions">{pageActions}</div></TopbarPortal>}
  {item.kind==='document'
   ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle}
     characters={currentPresentation?.characters??0} editors={editorsQuery.isSuccess?editorNames:null}
-    onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}
-    onDetails={()=>openInspector('details')}/>
+    onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
     <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedRecordName} transitionResource={{kind:'record',id:item.id}}/>
@@ -119,15 +128,16 @@ export function RecordPage(){
     </Properties>
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToLine={outlineTarget}
-  pageActions={pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} onOpenHistory={()=>openInspector('history')} historyTarget={historyTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
+  pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanel==='history'}
+  outlineOpen={documentPanel==='outline'} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
   <dl><dt>记录类型</dt><dd>任务列表</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
  </div></ContextPanel>}
- {item.kind==='document'&&<DocumentWorkbenchInspector open={inspectorTab!==null} tab={inspectorTab??lastInspectorTab.current}
-  onChangeTab={openInspector} onClose={()=>setInspectorTab(null)} item={item} outline={outline}
-  onJump={line=>{setOutlineTarget(prev=>({line,token:(prev?.token??0)+1}));setInspectorTab(null);}}
+ {item.kind==='document'&&<DocumentWorkbenchPanel open={documentPanel!==null} panel={documentPanel??lastDocumentPanel.current}
+  onClose={()=>setDocumentPanel(null)} item={item} outline={outline}
+  onJump={key=>{setOutlineTarget(prev=>({key,token:(prev?.token??0)+1}));setDocumentPanel(null);}}
   onChangeTag={changeTag}
   characters={currentPresentation?.characters??0} editors={editorNames}
   onHistoryTarget={setHistoryTarget}/>}

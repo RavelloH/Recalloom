@@ -99,8 +99,8 @@ try{
 
  // Direct inspector: actual incoming/outgoing links, then a new outgoing link.
  await page.goto(base+'/records/'+A.id,{waitUntil:'networkidle'});
- await page.getByRole('button',{name:'详情与关联'}).click();
- await page.getByRole('dialog',{name:'文档检查器'}).getByRole('tab',{name:'关联'}).click();
+ await page.getByRole('button',{name:'信息',exact:true}).click();
+ await page.locator('.workbench-inspector').waitFor();
  const inspector=page.getByRole('region',{name:'文档关联'});
  await visible(inspector);
  await visible(inspector.getByText(B.name,{exact:true}));
@@ -109,6 +109,7 @@ try{
  assert.equal(relationLayout.display,'grid','Record relation styles must load with its component');
  assert.equal(relationLayout.gap,'13px','Record relation spacing must remain intact');
  // A references B, but another relation type to B must still be possible.
+ await inspector.getByRole('button',{name:'添加关联',exact:true}).click();
  await inspector.getByRole('textbox',{name:'查找文档'}).fill('Graph Beta '+stamp);
  await visible(inspector.locator('.relation-search-item').filter({hasText:B.name}));
  await inspector.getByRole('textbox',{name:'查找文档'}).fill('Graph Delta '+stamp);

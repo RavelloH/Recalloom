@@ -3,9 +3,11 @@ import CodeMirror from '@uiw/react-codemirror';
 import {markdown,markdownLanguage} from '@codemirror/lang-markdown';
 import {HighlightStyle,syntaxHighlighting} from '@codemirror/language';
 import {EditorView} from '@codemirror/view';
+import type {Text} from '@codemirror/state';
 import {autocompletion} from '@codemirror/autocomplete';
 import {rmdCompletionSource} from './rmd-completion';
 import {tags as t} from '@lezer/highlight';
+import {activeDocumentHeading,documentOutline,parseDocumentHeadings,type DocumentOutline} from './document-outline';
 
 /* Obsidian-style source mode: the Markdown stays literal, but it reads like
    the document — same column, typeface and rhythm, soft-wrapped, no gutters.
@@ -43,11 +45,24 @@ const documentTheme=EditorView.theme({
  '.cm-searchMatch.cm-searchMatch-selected':{backgroundColor:'#f5d870'}
 });
 
-export default function SourceEditor({value,onChange,focusLine,focusToken}:{value:string;onChange:(v:string)=>void;focusLine?:number;focusToken?:number}){
+export type SourceEditorHandle={jumpToHeading:(key:string)=>boolean};
+export default React.forwardRef<SourceEditorHandle,{value:string;onChange:(v:string)=>void;focusLine?:number;focusToken?:number;outlineOpen?:boolean;onOutlineChange?:(outline:DocumentOutline)=>void}>(function SourceEditor({value,onChange,focusLine,focusToken,outlineOpen=false,onOutlineChange},ref){
+ const outlineOpenRef=useRef(outlineOpen),outlineCallbackRef=useRef(onOutlineChange);
+ outlineOpenRef.current=outlineOpen;outlineCallbackRef.current=onOutlineChange;
+ const outlineCache=useRef<{doc:unknown;headings:ReturnType<typeof parseDocumentHeadings>}|null>(null);
+ const outlineFor=(doc:Text,position:number)=>{
+  let cached=outlineCache.current;
+  if(cached?.doc!==doc){cached={doc,headings:parseDocumentHeadings(doc.toString())};outlineCache.current=cached;}
+  return documentOutline(cached.headings,activeDocumentHeading(cached.headings,doc.lineAt(position).number-1));
+ };
  const extensions=useMemo(()=>[
   markdown({base:markdownLanguage}),syntaxHighlighting(markdownHighlight),documentTheme,
   EditorView.lineWrapping,
   autocompletion({override:[rmdCompletionSource],activateOnTyping:true,defaultKeymap:true}),
+  EditorView.updateListener.of(update=>{
+   if(!outlineOpenRef.current||(!update.docChanged&&!update.selectionSet))return;
+   outlineCallbackRef.current?.(outlineFor(update.state.doc,update.state.selection.main.head));
+  }),
   EditorView.contentAttributes.of({spellcheck:'false','aria-label':'Markdown 源码编辑器'})
  ],[]);
  const view=useRef<EditorView|null>(null);
@@ -57,9 +72,23 @@ export default function SourceEditor({value,onChange,focusLine,focusToken}:{valu
   v.dispatch({selection:{anchor:line.from},effects:EditorView.scrollIntoView(line.from,{y:'center'})});
   v.focus();
  };
+ React.useImperativeHandle(ref,()=>({jumpToHeading:(key:string)=>{
+  const lineNumber=Number(/^markdown:(\d+)$/.exec(key)?.[1]);
+  const v=view.current;
+  if(!v||!Number.isInteger(lineNumber)||lineNumber<0||lineNumber>=v.state.doc.lines)return false;
+  const line=v.state.doc.line(lineNumber+1);
+  v.dispatch({selection:{anchor:line.from},effects:EditorView.scrollIntoView(line.from,{y:'center'})});
+  v.focus();
+  return true;
+ }}),[]);
  useEffect(()=>{jump(view.current);},[focusLine,focusToken]);
+ useEffect(()=>{
+  if(!outlineOpen)return;
+  const v=view.current;if(!v)return;
+  outlineCallbackRef.current?.(outlineFor(v.state.doc,v.state.selection.main.head));
+ },[outlineOpen]);
  useLayoutEffect(()=>{const v=view.current;if(!v)return;const current=v.state.doc.toString();if(current!==value)v.dispatch({changes:{from:0,to:v.state.doc.length,insert:value}});},[value]);
  return <div className="source-editor"><CodeMirror value={value} extensions={extensions} theme="none"
   basicSetup={{lineNumbers:false,foldGutter:false,highlightActiveLine:false,highlightActiveLineGutter:false,highlightSelectionMatches:false,autocompletion:false,searchKeymap:true}}
-  onCreateEditor={v=>{view.current=v;jump(v);}} onChange={onChange}/></div>;
-}
+  onCreateEditor={v=>{view.current=v;jump(v);if(outlineOpenRef.current)outlineCallbackRef.current?.(outlineFor(v.state.doc,v.state.selection.main.head));}} onChange={onChange}/></div>;
+});

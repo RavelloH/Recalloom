@@ -18,6 +18,10 @@ assert.ok(secret,'A local MCP_AUTH_SECRET is required');
 const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(executable?{executablePath:executable}:{})});
 const context=await browser.newContext({viewport:{width:1365,height:900}});
 const page=await context.newPage();
+// Windows WebKit exits when native dialogs close during viewport-height changes.
+// Keep its phone-width checks at a fixed height; Chromium uses real phone heights.
+const mobileHeight=engine==='webkit'?900:844;
+const narrowHeight=engine==='webkit'?900:740;
 page.setDefaultTimeout(25000);
 const faults=[];
 page.on('pageerror',error=>faults.push(error.message));
@@ -159,14 +163,14 @@ try{
  assert.ok((await sourceValue()).includes('LOCAL_DRAFT'));
 
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const inspector=page.getByRole('dialog',{name:'文档检查器'});
+ const inspector=page.locator('#document-panel');
  await inspector.waitFor();
  const inspectorHostTag=await inspector.evaluate(element=>{
   window.__revisionInspectorHost=element;
   return element.tagName;
  });
  assert.equal(inspectorHostTag,'DIALOG','Inspector must use a stable native dialog host');
- await inspector.getByRole('tab',{name:'版本'}).click();
+ await inspector.getByRole('heading',{name:'历史',exact:true}).waitFor();
  await inspector.getByText('Revision 1').waitFor();
  const revisionRow=inspector.locator('.history-row').filter({hasText:'Revision 1'});
  await revisionRow.getByRole('button',{name:'比较',exact:true}).click();
@@ -275,11 +279,11 @@ try{
  let showingSource=true;
  for(const width of [390,320]){
   if(!showingSource){await sourceMode.click();showingSource=true;}
-  await page.setViewportSize({width,height:844});
+  await page.setViewportSize({width,height:mobileHeight});
   await page.waitForTimeout(80);
   const inspectorHostState=await page.evaluate(()=>{
    const original=window.__revisionInspectorHost;
-   const hosts=[...document.querySelectorAll('dialog[aria-label="文档检查器"]')];
+   const hosts=[...document.querySelectorAll('#document-panel')];
    return {tag:original?.tagName,connected:original?.isConnected,same:hosts.length===1&&hosts[0]===original,count:hosts.length};
   });
   assert.equal(inspectorHostState.tag,inspectorHostTag,'Inspector host tag changed at '+width+'px');
@@ -299,7 +303,7 @@ try{
   if(width===390)await page.screenshot({path:join(screenshotDir,'revision-diff-mobile-390.png'),fullPage:true});
  }
  await page.emulateMedia({colorScheme:'dark'});
- await page.setViewportSize({width:320,height:740});
+ await page.setViewportSize({width:320,height:narrowHeight});
  await page.waitForFunction(()=>document.documentElement.dataset.effectiveTheme==='dark');
  const darkGeometry=await geometry();
  assert.ok(darkGeometry.pageWidth<=darkGeometry.viewport+1,'Dark 320px page overflow: '+JSON.stringify(darkGeometry));

@@ -138,8 +138,8 @@ try{
  assert.equal(afterRestore.content,original);
  await page.locator('.save-status').getByText('已保存').waitFor();
  console.log('PASS explicit history restore advances to R5 without losing editor session semantics',engine);
- await page.getByRole('dialog',{name:'文档检查器'}).getByRole('button',{name:'关闭'}).click();
- await page.getByRole('dialog',{name:'文档检查器'}).waitFor({state:'hidden'});
+ await page.locator('#document-panel').getByRole('button',{name:'关闭'}).click();
+ await page.locator('#document-panel').waitFor({state:'hidden'});
 
  // Visual (ProseMirror) mode must preserve its instance/undo when R6 arrives.
  await page.getByRole('button',{name:'可视化',exact:true}).click();

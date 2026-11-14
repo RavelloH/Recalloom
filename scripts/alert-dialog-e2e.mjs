@@ -36,7 +36,7 @@ try {
  await write('# Second version',3);
  assert.equal((await revision()).revision,3);
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const panel=page.getByRole('dialog',{name:'文档检查器'});
+ const panel=page.locator('#document-panel');
  await panel.waitFor();
  const target=panel.locator('.history-row').filter({hasText:'Revision 2'});
  await target.getByRole('button',{name:'恢复'}).click();

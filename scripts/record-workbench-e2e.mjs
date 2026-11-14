@@ -23,6 +23,7 @@ const mobileHeight=engine==='webkit'?900:844;
 const narrowHeight=engine==='webkit'?900:740;
 page.setDefaultTimeout(25000);
 const errors=[];
+const lazyPanelRequests=[];
 page.on('pageerror',error=>errors.push(error.message));
 const motionSamples=[];
 const motionDiagnosticPath=join('tmp','workbench-inspector-motion-'+engine+'-'+Date.now()+'.json');
@@ -32,18 +33,29 @@ await page.addInitScript(()=>{
  window.__workbenchInspectorSessions=[];
  window.__workbenchMotionSession=null;
  const panelFor=()=>{
-  const host=document.querySelector('dialog[aria-label="文档检查器"]');
-  if(!host)return null;
+  const inspector=document.querySelector('.workbench-inspector');
+  if(!inspector)return null;
+  const host=inspector.closest('dialog')||inspector.closest('#document-panel')||inspector;
   return {host,target:host.querySelector('.astryx-bottom-sheet')||host};
  };
  const rectOf=element=>{
   const rect=element.getBoundingClientRect();
   return {x:rect.x,y:rect.y,width:rect.width,height:rect.height};
  };
+ const translationOf=transform=>{
+  if(!transform||transform==='none')return {x:0,y:0};
+  const match=/^matrix(3d)?\(([^)]+)\)$/.exec(transform);
+  if(!match)return null;
+  const values=match[2].split(',').map(Number);
+  return match[1]?{x:values[12],y:values[13]}:{x:values[4],y:values[5]};
+ };
+ const reachedEndpoint=(translation,opening)=>Boolean(translation&&
+  (opening?Math.hypot(translation.x,translation.y)<=1:Math.hypot(translation.x,translation.y)>1));
  const frame=(session)=>{
-  if(session.target&&session.host?.open){
+  if(session.target&&(session.host?.open||session.host?.matches(':popover-open')||session.host?.matches(':modal'))){
+   const transform=getComputedStyle(session.target).transform;
    session.frames.push({time:performance.now(),target:session.target,host:session.host,
-    transform:getComputedStyle(session.target).transform});
+    transform,translation:translationOf(transform)});
   }
   if(session.endTime!==null){
    session.framesAfterEnd++;
@@ -61,8 +73,9 @@ await page.addInitScript(()=>{
  },true);
  const capture=event=>{
   if(event.propertyName!=='transform'||!(event.target instanceof Element))return;
-  const host=event.target.closest('dialog[aria-label="文档检查器"]');
-  if(!host)return;
+  const dialog=event.target.closest('dialog');
+  const host=dialog?.querySelector('.workbench-inspector')?dialog:event.target.closest('#document-panel');
+  if(!host?.querySelector('.workbench-inspector'))return;
   const nativePanel=event.target===host||event.target.classList.contains('astryx-bottom-sheet');
   if(!nativePanel)return;
   const transition=event.target.getAnimations().find(animation=>animation.transitionProperty==='transform');
@@ -70,15 +83,20 @@ await page.addInitScript(()=>{
   if(session&&session.clickTime!==null&&!session.target){session.host=host;session.target=event.target;}
   const record={
    phase:event.type,time:performance.now(),propertyName:event.propertyName,target:event.target,host,nativePanel,
+   pseudoElement:event.pseudoElement||'',
    targetTag:event.target.tagName,targetClass:typeof event.target.className==='string'?event.target.className:'',
    transform:getComputedStyle(event.target).transform,
    keyframes:transition?.effect?.getKeyframes().map(frame=>frame.transform).filter(value=>typeof value==='string')??[],
    rect:rectOf(event.target)
   };
+  record.translation=translationOf(record.transform);
   window.__workbenchInspectorMotion.push(record);
   if(session&&session.clickTime!==null){
    session.events.push(record);
-   if(event.type==='transitionend'&&event.target===session.events.find(item=>item.phase==='transitionrun')?.target){
+   const matchingRun=[...session.events].reverse().find(item=>item.phase==='transitionrun'&&
+    item.propertyName==='transform'&&item.target===event.target&&!item.pseudoElement);
+   if(event.type==='transitionend'&&!record.pseudoElement&&matchingRun&&
+    reachedEndpoint(record.translation,session.opening)){
     session.endTime=record.time;
     session.framesAfterEnd=0;
    }
@@ -89,7 +107,7 @@ await page.addInitScript(()=>{
  const showModal=HTMLDialogElement.prototype.showModal;
  HTMLDialogElement.prototype.showModal=function(...args){
   const session=window.__workbenchMotionSession;
-  const track=this.getAttribute('aria-label')==='文档检查器'&&session&&session.clickTime!==null;
+  const track=Boolean(this.querySelector('.workbench-inspector'))&&session&&session.clickTime!==null;
   if(track){
    session.showModalBefore=performance.now();
    session.host=this;
@@ -99,14 +117,23 @@ await page.addInitScript(()=>{
   if(track)session.showModalAfter=performance.now();
   return result;
  };
+ const showPopover=HTMLElement.prototype.showPopover;
+ if(showPopover)HTMLElement.prototype.showPopover=function(...args){
+  const session=window.__workbenchMotionSession;
+  const track=this.id==='document-panel'&&session&&session.clickTime!==null;
+  if(track){session.showModalBefore=performance.now();session.host=this;session.target=this.querySelector('.astryx-bottom-sheet')||this;}
+  const result=showPopover.apply(this,args);
+  if(track)session.showModalAfter=performance.now();
+  return result;
+ };
 });
 
-const resetMotionSamples=label=>page.evaluate(label=>{
- const session={label,clickTime:null,showModalBefore:null,showModalAfter:null,endTime:null,host:null,target:null,
+const resetMotionSamples=(label,opening)=>page.evaluate(({label,opening})=>{
+ const session={label,opening,clickTime:null,showModalBefore:null,showModalAfter:null,endTime:null,host:null,target:null,
   framesAfterEnd:0,stopped:false,events:[],frames:[]};
  window.__workbenchMotionSession=session;
  window.__workbenchInspectorSessions.push(session);
-},label);
+},{label,opening});
 const assertInspectorTransformMotion=async(label,viewport)=>{
  await page.waitForFunction(()=>{
   const session=window.__workbenchMotionSession;
@@ -115,25 +142,21 @@ const assertInspectorTransformMotion=async(label,viewport)=>{
  const sample=await page.evaluate(()=>{
   const session=window.__workbenchMotionSession;
   const events=session?.events??[];
+  const reachedEndpoint=translation=>Boolean(translation&&
+   (session?.opening?Math.hypot(translation.x,translation.y)<=1:Math.hypot(translation.x,translation.y)>1));
   for(let index=0;index<events.length;index++){
    const start=events[index];
-   if(start.phase!=='transitionrun'||start.propertyName!=='transform')continue;
-   const end=events.slice(index+1).find(event=>event.phase==='transitionend'&&event.propertyName==='transform'&&event.target===start.target);
+   if(start.phase!=='transitionrun'||start.propertyName!=='transform'||start.pseudoElement)continue;
+   const end=events.slice(index+1).find(event=>event.phase==='transitionend'&&event.propertyName==='transform'&&
+    event.target===start.target&&!event.pseudoElement&&reachedEndpoint(event.translation));
    if(end){
     const frames=session.frames.filter(frame=>frame.target===start.target&&frame.time>start.time&&frame.time<end.time);
-    const point=transform=>{
-     if(!transform||transform==='none')return {x:0,y:0};
-     const match=/^matrix(3d)?\(([^)]+)\)$/.exec(transform);
-     if(!match)return null;
-     const values=match[2].split(',').map(Number);
-     return match[1]?{x:values[12],y:values[13]}:{x:values[4],y:values[5]};
-    };
-    const startPoint=point(start.transform),endPoint=point(end.transform);
+    const startPoint=start.translation,endPoint=end.translation;
     const dx=endPoint&&startPoint?endPoint.x-startPoint.x:end.rect.x-start.rect.x;
     const dy=endPoint&&startPoint?endPoint.y-startPoint.y:end.rect.y-start.rect.y;
     const lengthSquared=dx*dx+dy*dy;
     const intermediateFrame=lengthSquared>1&&startPoint&&endPoint&&frames.some(frame=>{
-     const framePoint=point(frame.transform);
+     const framePoint=frame.translation;
      if(!framePoint)return false;
      const fx=framePoint.x-startPoint.x,fy=framePoint.y-startPoint.y;
      const along=(fx*dx+fy*dy)/lengthSquared;
@@ -181,6 +204,7 @@ try{
  await page.route('**/api/**',async route=>{
   const request=route.request();
   const url=new URL(request.url());
+  if(/\/api\/records\/[^/]+\/(outline|relations|versions)$/.test(url.pathname))lazyPanelRequests.push(url.pathname);
   if(url.pathname.endsWith('/editors'))await new Promise(resolve=>setTimeout(resolve,1100));
   if(engine==='webkit'&&url.pathname==='/api/auth/login'){
    const response=await route.fetch();
@@ -271,24 +295,41 @@ try{
   }
  }
  await page.setViewportSize({width:1440,height:900});
- const inspector=page.locator('dialog[aria-label="文档检查器"]');
- const openInspectorWithMotion=async(trigger,label,viewport)=>{
-  await resetMotionSamples(label);
+ const inspector=page.locator('.workbench-inspector');
+ const waitForNativePanelClosed=()=>page.waitForFunction(()=>{
+  const inspector=document.querySelector('.workbench-inspector');
+  const host=inspector?.closest('dialog')||inspector?.closest('#document-panel')||inspector;
+  return Boolean(host&&!host.open&&!host.matches(':modal')&&!host.matches(':popover-open'));
+ });
+ const openPanelWithMotion=async(trigger,label,viewport)=>{
+  await resetMotionSamples(label,true);
   await trigger.click();
   await assertInspectorTransformMotion(label,viewport);
  };
- const closeInspectorWithMotion=async(label,viewport)=>{
-  await resetMotionSamples(label);
-  await inspector.locator('.workbench-inspector .panel-heading button').click();
+ const closePanelWithMotion=async(label,viewport)=>{
+  await resetMotionSamples(label,false);
+  await inspector.locator('.panel-heading button').click();
   await assertInspectorTransformMotion(label,viewport);
-  await page.waitForFunction(()=>{
-   const host=document.querySelector('dialog[aria-label="文档检查器"]');
-   return host?.open===false&&!host.matches(':modal');
-  });
+  await waitForNativePanelClosed();
  };
- const detailsTrigger=()=>header.locator('button.workbench-details-trigger');
- const historyTrigger=()=>page.locator('.editor-view-actions button[aria-label="历史"]');
- await openInspectorWithMotion(detailsTrigger(),'desktop first details open',1440);
+ const closePanelWithEntryMotion=async(trigger,label,viewport)=>{
+  await resetMotionSamples(label,false);
+  await trigger.click();
+  await assertInspectorTransformMotion(label,viewport);
+  await waitForNativePanelClosed();
+  assert.equal(await trigger.getAttribute('aria-expanded'),'false','Active toolbar entry closes its panel');
+ };
+ const infoTrigger=()=>page.getByRole('button',{name:'信息',exact:true});
+ const outlineTrigger=()=>page.getByRole('button',{name:'目录',exact:true});
+ const historyTrigger=()=>page.getByRole('button',{name:'历史',exact:true});
+ await infoTrigger().waitFor();
+ await outlineTrigger().waitFor();
+ await historyTrigger().waitFor();
+ assert.equal(await infoTrigger().count(),1,'Information has one toolbar entry');
+ assert.equal(await outlineTrigger().count(),1,'Outline has one toolbar entry');
+ assert.equal(await historyTrigger().count(),1,'History has one toolbar entry');
+ assert.deepEqual(lazyPanelRequests,[],'Outline, relations and history data remain unloaded until their panel opens');
+ await openPanelWithMotion(infoTrigger(),'desktop first info open',1440);
  const verifyPropertyLayout=async()=>{
   const layout=await inspector.locator('.workbench-inspector-details .page-properties').evaluate(el=>({
    display:getComputedStyle(el).display,
@@ -304,7 +345,9 @@ try{
   return layout;
  };
  await verifyPropertyLayout();
- assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
+ assert.equal(await inspector.getAttribute('data-document-panel'),'info');
+ assert.equal(await inspector.getByRole('heading',{name:'信息',exact:true}).count(),1);
+ assert.equal(await inspector.getByRole('tab').count(),0,'Document panel has direct entry points instead of an inner tab bar');
  assert.equal(await inspector.getByRole('textbox',{name:'文件名'}).count(),0,'Inspector must not duplicate the filename editor');
  await inspector.getByRole('button',{name:'添加标签'}).click();
  await inspector.getByRole('textbox',{name:'新标签'}).fill('Workbench');
@@ -324,30 +367,74 @@ try{
  assert.ok(tagStyle.background!=='rgba(0, 0, 0, 0)'&&tagStyle.radius>=6&&tagStyle.border>=1&&contrast>=10,
   'Tags must have a visibly distinct filled background: '+JSON.stringify({...tagStyle,contrast}));
  assert.equal(await header.locator('.workbench-tag-line').count(),1,'Tags should occupy their own optional row');
- assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'grid','Metadata details button should align at the far right');
- await inspector.getByRole('tab',{name:'关联'}).click();
- assert.equal(await inspector.getByRole('tab',{name:'关联'}).getAttribute('aria-selected'),'true');
- await inspector.getByRole('tab',{name:'信息'}).click();
- await inspector.getByRole('tab',{name:'目录'}).click();
+ assert.equal(await header.locator('.workbench-details-trigger').count(),0,'Header metadata has no duplicate panel entry');
+ assert.equal(await header.locator('.workbench-summary').evaluate(el=>getComputedStyle(el).display),'block','Document metadata summary is unframed text');
+ assert.equal(await inspector.getByRole('region',{name:'文档关联'}).count(),1,'Relations are grouped under document information');
+ assert.equal(await inspector.getByRole('textbox',{name:'查找文档'}).count(),0,'Relation search starts collapsed');
+ await inspector.getByRole('button',{name:'语义相似',exact:true}).click();
+ await inspector.locator('.relation-hint').waitFor();
+ await inspector.getByRole('button',{name:'语义相似',exact:true}).click();
+ await inspector.getByRole('button',{name:'添加关联',exact:true}).click();
+ await inspector.getByRole('textbox',{name:'查找文档'}).waitFor();
+ await inspector.getByRole('button',{name:'添加关联',exact:true}).click();
+ assert.equal(await inspector.getByRole('textbox',{name:'查找文档'}).count(),0,'Relation search can collapse after use');
+ await inspector.evaluate(element=>{window.__workbenchNativePanel=element;});
+ await outlineTrigger().click();
+ await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='outline');
  await inspector.getByText('暂无 Markdown 标题').waitFor();
- await inspector.getByRole('tab',{name:'信息'}).click();
- await closeInspectorWithMotion('desktop details exit',1440);
- await openInspectorWithMotion(historyTrigger(),
-  'desktop details-to-history open',1440);
- await inspector.getByRole('tab',{name:'版本'}).waitFor();
+ assert.equal(await inspector.getByText('暂无 Markdown 标题').count(),1,'Toolbar can switch directly to the outline');
+ await infoTrigger().click();
+ await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='info');
+ assert.equal(await inspector.evaluate(element=>element===window.__workbenchNativePanel),true,
+  'Desktop panel switches keep the same native host');
+ assert.ok(lazyPanelRequests.some(path=>path.endsWith('/relations')),'Information loads document relations on demand');
+ await closePanelWithEntryMotion(infoTrigger(),'desktop same-entry toggle close',1440);
+ await openPanelWithMotion(outlineTrigger(),'desktop empty outline open',1440);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'outline');
+ await inspector.getByText('暂无 Markdown 标题').waitFor();
+ await closePanelWithMotion('desktop empty outline exit',1440);
+ await openPanelWithMotion(historyTrigger(),
+  'desktop history open',1440);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'history');
+ assert.equal(await inspector.getByRole('heading',{name:'历史',exact:true}).count(),1);
+ assert.equal(await inspector.getByRole('tab').count(),0,'History opens directly without a tab switch');
  await inspector.getByText('Revision 1').waitFor();
- await closeInspectorWithMotion('desktop history exit',1440);
- await openInspectorWithMotion(detailsTrigger(),
-  'desktop history-to-details repeated open',1440);
- assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
- await closeInspectorWithMotion('desktop repeated details exit',1440);
+ assert.ok(lazyPanelRequests.some(path=>path.endsWith('/versions')),'History loads its revision list on demand');
+ await closePanelWithMotion('desktop history exit',1440);
+ await openPanelWithMotion(infoTrigger(),
+  'desktop repeated info open',1440);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'info');
+ await closePanelWithMotion('desktop repeated info exit',1440);
+ await page.setViewportSize({width:820,height:900});
+ await page.locator('.record-main .editor-view-switcher').waitFor();
+ await page.locator('.topbar').getByRole('button',{name:'信息',exact:true}).waitFor();
+ for(const trigger of [infoTrigger(),outlineTrigger(),historyTrigger()]){
+  await trigger.waitFor({state:'visible'});
+  assert.equal(await trigger.evaluate(element=>Boolean(element.closest('.topbar'))),true,
+   'Tablet document panel entries remain in the topbar');
+ }
+ await infoTrigger().click();
+ await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='info');
+ await inspector.evaluate(element=>{window.__workbenchTabletHost=element.closest('dialog');});
+ for(const [trigger,panel] of [[outlineTrigger(),'outline'],[historyTrigger(),'history']]){
+  await trigger.click();
+  await page.waitForFunction(expected=>document.querySelector('.workbench-inspector')?.dataset.documentPanel===expected,panel);
+  assert.equal(await inspector.evaluate(element=>element.closest('dialog')===window.__workbenchTabletHost),true,
+   'Tablet panel switching keeps the same native dialog host');
+ }
+ await inspector.locator('.panel-heading button').click();
+ await inspector.waitFor({state:'hidden'});
+ await page.setViewportSize({width:1440,height:900});
  await page.getByRole('button',{name:'源码',exact:true}).click();
- await page.locator('.cm-content').fill('# Workbench heading\n\nVersioned content.');
+ const navigationFillers=Array.from({length:30},(_,index)=>`Navigation filler ${index+1}.`).join('\n\n');
+ const repeatedHeadingContent='# Workbench heading\n\nVersioned content.\n\n## Repeated\n\nFirst section.\n\n'+
+  navigationFillers+'\n\n## Repeated\n\nSecond section.';
+ await page.locator('.cm-content').fill(repeatedHeadingContent);
  await page.getByRole('button',{name:'保存',exact:true}).click();
  await header.getByText('R2',{exact:true}).waitFor();
  await page.getByRole('button',{name:'历史',exact:true}).click();
  await inspector.waitFor();
- await inspector.getByRole('tab',{name:'版本'}).waitFor();
+ await inspector.getByRole('heading',{name:'历史',exact:true}).waitFor();
  await inspector.getByText('Revision 1').waitFor();
  assert.equal(await page.getByRole('dialog',{name:'版本历史'}).count(),0,'Do not open a second, separate history drawer');
  const revision=inspector.locator('.history-row').filter({hasText:'Revision 1'});
@@ -356,13 +443,115 @@ try{
  await comparison.locator('.revision-diff-block').first().waitFor();
  await comparison.getByRole('button',{name:'关闭版本对比'}).click();
  await comparison.waitFor({state:'hidden'});
- await inspector.getByRole('tab',{name:'目录'}).click();
- await inspector.getByRole('button',{name:'Workbench heading'}).waitFor();
- await inspector.getByRole('button',{name:'Workbench heading'}).click();
+ await inspector.getByRole('button',{name:'关闭'}).click();
  await inspector.waitFor({state:'hidden'});
- await page.locator('.cm-content').waitFor();
+ for(const [mode,button] of [['source','源码'],['visual','可视化'],['preview','预览']]){
+  await page.getByRole('button',{name:button,exact:true}).click();
+  await page.waitForFunction(expected=>document.querySelector('.editor-body')?.dataset.mode===expected,mode);
+  await page.waitForFunction(expected=>expected==='source'?Boolean(document.querySelector('.cm-content')):
+   expected==='visual'?Boolean(document.querySelector('.tiptap')):Boolean(document.querySelector('.markdown-preview')),mode);
+  await outlineTrigger().click();
+  await inspector.waitFor();
+  const duplicateHeadings=inspector.getByRole('button',{name:'Repeated',exact:true});
+  await duplicateHeadings.nth(1).waitFor();
+  await inspector.locator('.outline-item[aria-current="location"]').waitFor();
+  assert.equal(await inspector.locator('.outline-item small').count(),0,'Outline labels stay clean without source line numbers');
+  if(mode==='visual')await page.locator('.tiptap').evaluate(element=>{window.__workbenchVisualBeforeOutline=element;});
+  await duplicateHeadings.nth(1).click();
+  await inspector.waitFor({state:'hidden'});
+  await page.waitForFunction(expected=>document.querySelector('.editor-body')?.dataset.mode===expected,mode);
+  if(mode==='source'||mode==='visual')await page.waitForFunction(expected=>{
+   const headings=expected==='source'
+    ?[...document.querySelectorAll('.cm-line')].filter(line=>line.textContent.trim()==='## Repeated')
+    :[...document.querySelectorAll('.tiptap h1,.tiptap h2,.tiptap h3,.tiptap h4,.tiptap h5,.tiptap h6')]
+      .filter(heading=>heading.textContent.trim()==='Repeated');
+   const node=window.getSelection()?.anchorNode;
+   const anchor=node instanceof Element?node:node?.parentElement;
+   const selected=anchor?.closest(expected==='source'?'.cm-line':'h1,h2,h3,h4,h5,h6');
+   return headings.indexOf(selected)===1;
+  },mode);
+  const navigation=await page.evaluate(expected=>{
+   const allHeadings=expected==='source'
+    ?[...document.querySelectorAll('.cm-line')].filter(line=>line.textContent.trim()==='## Repeated')
+    :[...document.querySelectorAll(expected==='visual'?'.tiptap h1,.tiptap h2,.tiptap h3,.tiptap h4,.tiptap h5,.tiptap h6':
+      '.markdown-preview h1,.markdown-preview h2,.markdown-preview h3,.markdown-preview h4,.markdown-preview h5,.markdown-preview h6')]
+      .filter(heading=>heading.textContent.trim()==='Repeated');
+   if(expected==='preview'){
+    const scroller=document.querySelector('.main-scroll'),target=allHeadings[1];
+    const view=scroller?.getBoundingClientRect(),rect=target?.getBoundingClientRect();
+    return {count:allHeadings.length,scrollTop:scroller?.scrollTop??0,
+     visible:Boolean(view&&rect&&rect.top>=view.top&&rect.bottom<=view.bottom)};
+   }
+   const node=window.getSelection()?.anchorNode;
+   const anchor=node instanceof Element?node:node?.parentElement;
+   const selected=anchor?.closest(expected==='source'?'.cm-line':'h1,h2,h3,h4,h5,h6');
+   return {count:allHeadings.length,selectedIndex:allHeadings.indexOf(selected)};
+  },mode);
+  assert.equal(navigation.count,2,'Both duplicate headings are present in '+mode+' mode');
+  if(mode==='preview'){
+   await page.waitForFunction(()=>{
+    const scroller=document.querySelector('.main-scroll');
+    const headings=[...document.querySelectorAll('.markdown-preview h1,.markdown-preview h2,.markdown-preview h3,.markdown-preview h4,.markdown-preview h5,.markdown-preview h6')]
+     .filter(heading=>heading.textContent.trim()==='Repeated');
+    if(!scroller||!headings[1])return false;
+    const view=scroller.getBoundingClientRect(),rect=headings[1].getBoundingClientRect();
+    return scroller.scrollTop>0&&rect.top>=view.top&&rect.bottom<=view.bottom;
+   });
+  }else assert.equal(navigation.selectedIndex,1,'Outline jumps to the second duplicate in '+mode+' mode');
+  assert.equal(new URL(page.url()).searchParams.get('mode'),mode,'Outline navigation preserves the URL mode in '+mode+' mode');
+  assert.equal(await page.locator('.save-status').getByText('未保存').count(),0,
+   'Heading navigation does not dirty a saved document in '+mode+' mode');
+  if(mode==='visual')assert.equal(await page.locator('.tiptap').evaluate(element=>element===window.__workbenchVisualBeforeOutline),true,
+   'Visual outline navigation preserves the live editor instance');
+  await outlineTrigger().click();
+  await inspector.waitFor();
+  await page.waitForFunction(()=>{
+   const panel=document.querySelector('.workbench-inspector[data-document-panel="outline"]');
+   const current=panel?.querySelector('.outline-item[aria-current="location"]');
+   const repeated=panel?[...panel.querySelectorAll('.outline-item')].filter(item=>item.textContent.trim()==='Repeated'):[];
+   return repeated.indexOf(current)===1;
+  });
+  assert.equal(await inspector.locator('.outline-item[aria-current="location"]').count(),1,
+   'Outline highlights the active duplicate heading in '+mode+' mode');
+  await inspector.locator('.panel-heading button').click();
+  await inspector.waitFor({state:'hidden'});
+ }
  await page.screenshot({path:'tmp/workbench-desktop.png'});
- console.log('PASS Workbench header, metadata summary, single four-tab inspector and history compare');
+ console.log('PASS Workbench header, direct information/outline/history panels and history compare');
+ await page.getByRole('button',{name:'源码',exact:true}).click();
+ const draftEditor=page.locator('.cm-content');
+ const draftContent='# Draft heading\n\nLocal draft marker.\n\n## Draft section\n\nUncommitted body.';
+ await draftEditor.fill(draftContent);
+ await page.locator('.save-status').getByText('未保存').waitFor();
+ await outlineTrigger().click();
+ await inspector.getByRole('button',{name:'Draft section',exact:true}).waitFor();
+ await inspector.getByRole('button',{name:'Draft section',exact:true}).click();
+ await inspector.waitFor({state:'hidden'});
+ await page.waitForFunction(()=>document.querySelector('.editor-body')?.dataset.mode==='source');
+ assert.ok(await draftEditor.innerText().then(value=>value.includes('Local draft marker')),'Outline reads and preserves unsaved source content');
+ await page.locator('.save-status').getByText('未保存').waitFor();
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+ await header.getByText('R3',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'可视化',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="visual"] .tiptap'));
+ const visualDraftParagraph=page.locator('.tiptap p').filter({hasText:'Local draft marker.'});
+ await visualDraftParagraph.click();
+ await page.keyboard.press('End');
+ await page.keyboard.type(' visual-unsaved');
+ await page.locator('.save-status').getByText('未保存').waitFor();
+ await outlineTrigger().click();
+ await inspector.getByRole('button',{name:'Draft section',exact:true}).click();
+ await inspector.waitFor({state:'hidden'});
+ await page.waitForFunction(()=>document.querySelector('.editor-body')?.dataset.mode==='visual');
+ await page.locator('.tiptap').getByText('visual-unsaved',{exact:false}).waitFor();
+ await page.locator('.save-status').getByText('未保存').waitFor();
+ await page.waitForFunction(()=>{
+  const editor=document.querySelector('.tiptap');
+  return Boolean(editor&&document.activeElement&&editor.contains(document.activeElement));
+ });
+ await page.keyboard.press('Control+Z');
+ await page.waitForFunction(()=>!document.querySelector('.tiptap')?.textContent?.includes('visual-unsaved'));
+ await page.locator('.save-status').getByText('未保存').waitFor({state:'hidden'});
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.reload();
  await header.waitFor();
@@ -375,29 +564,73 @@ try{
  assert.ok(measure.width<=measure.viewport+1,'Mobile horizontal overflow '+JSON.stringify(measure));
  assert.ok(measure.header<225,'Mobile header should remain compact '+JSON.stringify(measure));
  assert.equal(measure.hasIcon,false);
- await openInspectorWithMotion(detailsTrigger(),'mobile first details open',390);
+ const modeButtons=await page.locator('.editor-view-switcher [role="group"] > button').evaluateAll(buttons=>buttons.map(button=>{
+  const textNodes=[...button.querySelectorAll('*')].filter(element=>element.childElementCount===0&&element.textContent.trim());
+  const label=textNodes.find(element=>element.textContent.trim()===button.innerText.trim());
+  return {label:button.innerText.trim(),width:button.clientWidth,scrollWidth:button.scrollWidth,
+   labelWidth:label?.clientWidth??null,labelScrollWidth:label?.scrollWidth??null};
+ }));
+ assert.deepEqual(modeButtons.map(button=>button.label),['可视化','源码','预览'],'All editor modes remain named at 390px');
+ assert.ok(modeButtons.every(button=>button.scrollWidth<=button.width+1&&
+  (button.labelScrollWidth===null||button.labelScrollWidth<=button.labelWidth+1)),
+  'Editor mode labels stay fully visible at 390px: '+JSON.stringify(modeButtons));
+ await openPanelWithMotion(infoTrigger(),'mobile first info open',390);
  await verifyPropertyLayout();
  await page.screenshot({path:'tmp/workbench-mobile-details.png'});
- const box=await inspector.boundingBox();
+ const box=await page.locator('dialog:has(.workbench-inspector) .astryx-bottom-sheet').boundingBox();
  assert.ok(box&&box.width>=385,'Touch inspector must remain a bottom sheet');
- await closeInspectorWithMotion('mobile details exit',390);
- await openInspectorWithMotion(historyTrigger(),
-  'mobile details-to-history open',390);
- assert.equal(await inspector.getByRole('tab',{name:'版本'}).getAttribute('aria-selected'),'true');
+ await closePanelWithMotion('mobile info exit',390);
+ await openPanelWithMotion(historyTrigger(),
+  'mobile direct history open',390);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'history');
  await inspector.getByText('Revision 1').waitFor();
  await page.screenshot({path:'tmp/workbench-mobile-inspector.png'});
- await closeInspectorWithMotion('mobile history exit',390);
- await openInspectorWithMotion(detailsTrigger(),
-  'mobile history-to-details repeated open',390);
- assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
+ await closePanelWithMotion('mobile history exit',390);
+ await openPanelWithMotion(infoTrigger(),
+  'mobile repeated info open',390);
+ assert.equal(await inspector.getAttribute('data-document-panel'),'info');
  await verifyPropertyLayout();
- await closeInspectorWithMotion('mobile repeated details exit',390);
+ await closePanelWithMotion('mobile repeated info exit',390);
+ if(await page.locator('.editor-body').getAttribute('data-mode')!=='visual'){
+  await page.getByRole('button',{name:'可视化',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.editor-body')?.dataset.mode==='visual');
+ }
+ assert.equal(await page.locator('.save-status').getByText('未保存').count(),0,
+  'Mobile outline navigation starts from a clean visual document');
+ await outlineTrigger().click();
+ await inspector.getByRole('button',{name:'Draft section',exact:true}).click();
+ await inspector.waitFor({state:'hidden'});
+ await page.waitForFunction(()=>{
+  const host=document.querySelector('.workbench-inspector')?.closest('dialog');
+  return Boolean(host&&!host.open&&!host.matches(':modal'));
+ });
+ await page.waitForFunction(()=>{
+  const editor=document.querySelector('.tiptap');
+  const node=window.getSelection()?.anchorNode;
+  const anchor=node instanceof Element?node:node?.parentElement;
+  return Boolean(editor&&document.activeElement&&editor.contains(document.activeElement)&&
+   anchor?.closest('h1,h2,h3,h4,h5,h6')?.textContent.trim()==='Draft section');
+ });
+ assert.equal(await page.locator('.save-status').getByText('未保存').count(),0,
+  'Mobile outline navigation does not dirty the document');
+ await outlineTrigger().click();
+ await inspector.waitFor();
+ await page.waitForFunction(()=>{
+  const panel=document.querySelector('.workbench-inspector[data-document-panel="outline"]');
+  return panel?.querySelector('.outline-item[aria-current="location"]')?.textContent.trim()==='Draft section';
+ });
+ assert.equal(await inspector.getByRole('button',{name:'Draft section',exact:true}).getAttribute('aria-current'),'location',
+  'Mobile outline marks the heading selected in the visual editor');
+ await inspector.locator('.panel-heading button').click();
+ await inspector.waitFor({state:'hidden'});
+ assert.equal(await page.locator('.save-status').getByText('未保存').count(),0,
+  'Closing the mobile outline preserves the clean document');
  await page.screenshot({path:'tmp/workbench-mobile.png'});
- console.log('PASS 390px mobile layout, bottom-sheet tabs and version history');
+ console.log('PASS 390px mobile layout, bottom-sheet panels and version history');
  await page.setViewportSize({width:320,height:narrowHeight});
- await openInspectorWithMotion(detailsTrigger(),
+ await openPanelWithMotion(infoTrigger(),
   'mobile re-open after closed-width change',320);
- await closeInspectorWithMotion('mobile resized reopen exit',320);
+ await closePanelWithMotion('mobile resized reopen exit',320);
  await page.emulateMedia({colorScheme:'dark'});
  await page.setViewportSize({width:320,height:narrowHeight});
  await page.reload();
@@ -432,44 +665,61 @@ try{
  await longHeader.waitFor();
  await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="visual"]')?.getAttribute('aria-busy')==='false'&&
   document.querySelectorAll('.editor-body[data-mode="visual"] .tiptap [data-type="block-math"]').length===160);
- const longDetails=longHeader.locator('button.workbench-details-trigger');
+ const longInfo=page.getByRole('button',{name:'信息',exact:true});
  const openLongAndClose=async(trigger,label,viewport)=>{
-  await openInspectorWithMotion(trigger,label+' open',viewport);
-  await closeInspectorWithMotion(label+' close',viewport);
+  await openPanelWithMotion(trigger,label+' open',viewport);
+  await closePanelWithMotion(label+' close',viewport);
  };
- await openLongAndClose(longDetails,'long visual 160 math desktop details',1440);
+ await openLongAndClose(longInfo,'long visual 160 math desktop info',1440);
+ await openLongAndClose(outlineTrigger(),'long visual 160 math desktop outline',1440);
  await openLongAndClose(historyTrigger(),'long visual 160 math desktop history',1440);
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.waitForFunction(()=>matchMedia('(max-width: 720px)').matches);
- await openLongAndClose(longDetails,'long visual 160 math mobile details',390);
+ await openLongAndClose(longInfo,'long visual 160 math mobile info',390);
+ await openLongAndClose(outlineTrigger(),'long visual 160 math mobile outline',390);
  await openLongAndClose(historyTrigger(),'long visual 160 math mobile history',390);
  await page.setViewportSize({width:1440,height:900});
  await page.locator('.editor-view-switcher button').nth(2).click();
  await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="preview"]')?.getAttribute('aria-busy')==='false'&&
   document.querySelectorAll('.editor-body[data-mode="preview"] .markdown-preview .katex-display').length===160);
- await openLongAndClose(longDetails,'long preview 160 math desktop details',1440);
+ await openLongAndClose(longInfo,'long preview 160 math desktop info',1440);
+ await openLongAndClose(outlineTrigger(),'long preview 160 math desktop outline',1440);
  await openLongAndClose(historyTrigger(),'long preview 160 math desktop history',1440);
  await page.emulateMedia({reducedMotion:'reduce'});
- await longDetails.click();
- await page.waitForFunction(()=>document.querySelector('dialog[aria-label="文档检查器"]')?.open===true);
- await inspector.locator('.workbench-inspector .panel-heading button').click();
+ await longInfo.click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('dialog')].some(dialog=>dialog.querySelector('.workbench-inspector')&&
+  (dialog.open||dialog.matches(':popover-open'))));
+ await inspector.locator('.panel-heading button').click();
  await page.waitForFunction(()=>{
-  const host=document.querySelector('dialog[aria-label="文档检查器"]');
-  return host?.open===false&&!host.matches(':modal');
+  const host=[...document.querySelectorAll('dialog')].find(dialog=>dialog.querySelector('.workbench-inspector'));
+  return host?.open===false&&!host.matches(':modal')&&!host.matches(':popover-open');
  });
  const released=await page.evaluate(()=>{
-  const host=document.querySelector('dialog[aria-label="文档检查器"]');
-  return {connected:Boolean(host?.isConnected),open:host?.open??null,modal:host?.matches(':modal')??false};
+  const host=[...document.querySelectorAll('dialog')].find(dialog=>dialog.querySelector('.workbench-inspector'));
+  return {connected:Boolean(host?.isConnected),open:host?.open??null,modal:host?.matches(':modal')??false,
+   popover:host?.matches(':popover-open')??false};
  });
- assert.deepEqual(released,{connected:true,open:false,modal:false},
-  'Reduced-motion close must release the inspector from the native modal top layer');
- console.log('PASS 160-math VisualEditor/Preview inspector motion on desktop/mobile and reduced-motion cleanup');
+ assert.deepEqual(released,{connected:true,open:false,modal:false,popover:false},
+  'Reduced-motion close must release the inspector from the native overlay top layer');
+ console.log('PASS 160-math VisualEditor/Preview panel motion on desktop/mobile and reduced-motion cleanup');
  assert.deepEqual(errors,[],'Browser runtime errors');
  await saveMotionDiagnostics();
  console.log('Inspector transform traces:',motionDiagnosticPath);
 }catch(error){
  await saveMotionDiagnostics();
+ const failureUi=await page.evaluate(()=>{
+  const active=document.activeElement,scroller=document.querySelector('.main-scroll');
+  const headings=[...document.querySelectorAll('.markdown-preview h1,.markdown-preview h2,.markdown-preview h3,.markdown-preview h4,.markdown-preview h5,.markdown-preview h6')]
+   .map(heading=>{const rect=heading.getBoundingClientRect();return {text:(heading.innerText||heading.textContent||'').trim().slice(0,60),
+    top:Math.round(rect.top),height:Math.round(rect.height)};});
+  return {mode:document.querySelector('.editor-body')?.dataset.mode??null,
+   activeElement:{tag:active?.tagName??null,text:(active?.innerText||active?.textContent||'').trim().slice(0,80)},
+   mainScroll:scroller?{scrollTop:Math.round(scroller.scrollTop),clientHeight:scroller.clientHeight,scrollHeight:scroller.scrollHeight}:null,
+   previewHeadingCount:headings.length,previewHeadings:headings.length<=6?headings:[...headings.slice(0,3),...headings.slice(-3)]};
+ }).catch(()=>null);
+ const failureScreenshot=join('tmp','workbench-failure-'+engine+'.png');
+ await page.screenshot({path:failureScreenshot,fullPage:true}).catch(()=>undefined);
  console.error('Inspector transform regression diagnostics',JSON.stringify({engine,motionDiagnosticPath,
-  completedSamples:motionSamples.length,error:error.message}));
+  failureScreenshot,failureUi,completedSamples:motionSamples.length,error:error.message}));
  throw error;
 }finally{await browser.close();}

@@ -52,8 +52,8 @@ try{
  assert.equal(await title.innerText(),'Workspace note','invalid title reverts');
 
  // Tags are edited in the unified document inspector, not always visible under the title.
- await page.getByRole('button',{name:'详细信息'}).click();
- const inspector=page.getByRole('dialog',{name:'文档检查器'});
+ await page.getByRole('button',{name:'信息',exact:true}).click();
+ const inspector=page.locator('#document-panel');
  await inspector.getByRole('button',{name:'添加标签'}).click();
  await inspector.getByRole('textbox',{name:'新标签'}).fill('Alpha');
  await page.keyboard.press('Enter');
@@ -135,8 +135,17 @@ try{
  // One column: document title and editable body retain aligned measures.
  await page.goto(base+'/records/'+recordId,{waitUntil:'networkidle'});
  await page.locator('.tiptap').waitFor();
- const edges=await page.evaluate(()=>[...document.querySelectorAll('.workbench-header .page-title, .record-main .tiptap')].map(e=>{const b=e.getBoundingClientRect();return Math.round(b.left)+':'+Math.round(b.width);}));
- assert.equal(new Set(edges).size,1,'shared measure: '+edges);
+ const measures=await page.evaluate(()=>{
+  const bounds=selector=>{const rect=document.querySelector(selector)?.getBoundingClientRect();
+   return rect?{left:Math.round(rect.left),width:Math.round(rect.width)}:null;};
+  return {titleBlock:bounds('.workbench-header .page-title-block'),title:bounds('.workbench-header .page-title'),
+   body:bounds('.record-main .tiptap')};
+ });
+ assert.ok(measures.titleBlock&&measures.title&&measures.body,'Document title and editor geometry must be available');
+ assert.ok(Math.abs(measures.titleBlock.left-measures.body.left)<=1&&
+  Math.abs(measures.titleBlock.width-measures.body.width)<=1,'title block and editor share one column: '+JSON.stringify(measures));
+ assert.ok(Math.abs(measures.title.left-measures.titleBlock.left)<=1&&measures.title.width<=measures.titleBlock.width+1,
+  'document title stays within the shared column: '+JSON.stringify(measures));
  // Native bars are hidden outside Apple WebKit; the page scrolls with the JS scrollbar.
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.scrollbarMode),'overlay');
  assert.ok(await page.locator('.main-scroll-host > .os-scrollbar-vertical').count(),'main area uses the overlay scrollbar');

@@ -4,6 +4,7 @@ import React,{useState} from 'react';
 import {Link} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
+import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -25,7 +26,9 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
  const [relation,setRelation]=useState('related');
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState('');
- const search=useQuery({...searchQuery(query,'metadata',12),enabled:query.trim().length>=2});
+ const [suggestionsOpen,setSuggestionsOpen]=useState(false);
+ const [addOpen,setAddOpen]=useState(false);
+ const search=useQuery({...searchQuery(query,'metadata',12),enabled:addOpen&&query.trim().length>=2});
  // Relations are directional and typed. A reference in one direction must
  // not prevent a different relation (or a reverse link) to the same record.
  const existing=new Set(related.data?.links.filter(e=>e.sourceId===recordId)
@@ -66,34 +69,41 @@ export function RecordRelations({recordId,onNavigate}:{recordId:string;onNavigat
      {link.type==='explicit'?<Button size="sm" variant="ghost" label="解除关系" icon={<Icon name="unlink" size="sm"/>}
       isDisabled={Boolean(busy)} onClick={()=>void apply(link.sourceId,link.targetId,link.relation,'remove')}/>:<span className="muted small" title="请修改源文档中的 Wiki 语法以解除关系">自动</span>}
     </div>)}</div>:<p className="relation-placeholder">尚未建立显式关系。可以在下方搜索文档并关联。</p>}
-    <div className="relation-group-heading"><Icon name="sparkles" size="sm"/>语义相似 <span>{data?.suggestions.length??0}</span></div>
-    <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>
-    {Boolean(data?.suggestions.length)&&<div className="relation-items">{data?.suggestions.map(s=><div className="relation-row relation-suggestion" key={s.id}>
-     <Icon name="sparkles" size="sm"/>
-     <div className="relation-copy">
-      <Link to="/records/$recordId" params={{recordId:s.other.id}} onClick={onNavigate} className="relation-name">{s.other.name}</Link>
-      <small className="muted">{Math.round((s.score??0)*100)}% 相似度{(s.support??0)>1?' · 多段匹配':''}</small>
-      {s.snippet&&<p className="relation-excerpt" title={s.snippet}>{s.snippet}</p>}
-     </div>
-     <Button size="sm" variant="secondary" label="建立关联" isDisabled={Boolean(busy)||existing.has(s.other.id+':related')}
-      onClick={()=>void apply(recordId,s.other.id,'related','add')}/>
-    </div>)}</div>}
-    <div className="relation-add">
-     <h4>添加关联</h4>
-     <Selector label="关系类型" size="sm" width="100%" value={relation} options={choices} onChange={setRelation}/>
-     <TextInput label="查找文档" size="sm" width="100%" value={query} onChange={setQuery}
-      placeholder="输入文档名称，至少两个字"/>
-     {search.isFetching&&<p className="muted small" role="status">正在搜索…</p>}
-     {search.isError&&<p className="muted small">文档搜索暂不可用</p>}
-     {query.trim().length>=2&&<div className="relation-search-results">
-      {search.data?.items.filter(item=>item.id!==recordId&&!existing.has(item.id+':'+relation)).map(item=><div className="relation-search-item" key={item.id}>
-       <span className="truncate">{item.name}</span>
-       <Button variant="secondary" size="sm" label="关联" isDisabled={Boolean(busy)}
-        onClick={()=>void apply(recordId,item.id,relation,'add')}/>
-      </div>)}
-      {search.data?.items.length===0&&!search.isFetching&&<p className="muted small">没有找到匹配记录</p>}
+    <Collapsible className="relation-disclosure" isOpen={suggestionsOpen} onOpenChange={setSuggestionsOpen}
+     trigger={<span className="relation-disclosure-heading"><span className="relation-group-heading"><Icon name="sparkles" size="sm"/>语义相似</span><span className="relation-group-heading-count" aria-hidden="true">{data?.suggestions.length??0}</span></span>}>
+     {suggestionsOpen&&<div className="relation-disclosure-content">
+      <p className="muted relation-hint">{semanticMessage(data?.semanticStatus??'disabled')}</p>
+      {Boolean(data?.suggestions.length)&&<div className="relation-items">{data?.suggestions.map(s=><div className="relation-row relation-suggestion" key={s.id}>
+       <Icon name="sparkles" size="sm"/>
+       <div className="relation-copy">
+        <Link to="/records/$recordId" params={{recordId:s.other.id}} onClick={onNavigate} className="relation-name">{s.other.name}</Link>
+        <small className="muted">{Math.round((s.score??0)*100)}% 相似度{(s.support??0)>1?' · 多段匹配':''}</small>
+        {s.snippet&&<p className="relation-excerpt" title={s.snippet}>{s.snippet}</p>}
+       </div>
+       <Button size="sm" variant="secondary" label="建立关联" isDisabled={Boolean(busy)||existing.has(s.other.id+':related')}
+        onClick={()=>void apply(recordId,s.other.id,'related','add')}/>
+      </div>)}</div>}
      </div>}
-    </div>
+    </Collapsible>
+    <Collapsible className="relation-disclosure relation-add-disclosure" isOpen={addOpen}
+     onOpenChange={next=>{setAddOpen(next);if(!next)setQuery('');}}
+     trigger={<span className="relation-add-title">添加关联</span>}>
+     {addOpen&&<div className="relation-add-fields">
+      <Selector label="关系类型" size="sm" width="100%" value={relation} options={choices} onChange={setRelation}/>
+      <TextInput label="查找文档" size="sm" width="100%" value={query} onChange={setQuery}
+       placeholder="输入文档名称，至少两个字"/>
+      {search.isFetching&&<p className="muted small" role="status">正在搜索…</p>}
+      {search.isError&&<p className="muted small">文档搜索暂不可用</p>}
+      {query.trim().length>=2&&<div className="relation-search-results">
+       {search.data?.items.filter(item=>item.id!==recordId&&!existing.has(item.id+':'+relation)).map(item=><div className="relation-search-item" key={item.id}>
+        <span className="truncate">{item.name}</span>
+        <Button variant="secondary" size="sm" label="关联" isDisabled={Boolean(busy)}
+         onClick={()=>void apply(recordId,item.id,relation,'add')}/>
+       </div>)}
+       {search.data?.items.length===0&&!search.isFetching&&<p className="muted small">没有找到匹配记录</p>}
+      </div>}
+     </div>}
+    </Collapsible>
    </>}
  </section>;
 }

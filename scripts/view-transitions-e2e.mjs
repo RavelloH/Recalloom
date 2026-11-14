@@ -294,10 +294,10 @@ try{
  await assertUnique();
 
  if(!mobileRun){
-  await page.getByRole('button',{name:'详细信息'}).click();
-  const inspector=page.getByRole('dialog',{name:'文档检查器'});
-  await inspector.getByRole('tab',{name:'目录'}).click();
-  assert.equal(await inspector.locator('.workbench-tab-indicator').count(),1);
+  await page.getByRole('button',{name:'目录',exact:true}).click();
+  const inspector=page.locator('#document-panel');
+  assert.equal(await inspector.locator('.workbench-inspector').getAttribute('data-document-panel'),'outline');
+  assert.equal(await inspector.getByRole('tab').count(),0);
   await inspector.getByRole('button',{name:'关闭',exact:true}).click();
   await inspector.waitFor({state:'hidden'});
  }

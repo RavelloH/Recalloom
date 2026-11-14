@@ -1,7 +1,6 @@
 import React from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
-import {motion,useReducedMotion} from 'motion/react';
 import {Button} from '@astryxdesign/core/Button';
 import {ContextPanel} from './context-panel';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
@@ -11,20 +10,14 @@ import type {RecordDetail} from './types';
 import {sharedViewTransitionName} from './shared-view-transition';
 import {documentDisplayName} from './document-filename';
 import {AutoResizer,AutoTransition} from './motion-primitives';
+import type {DocumentOutline} from './document-outline';
 
-export type DocumentInspectorTab='details'|'outline'|'relations'|'history';
-
-const sections=[
- {id:'details',label:'信息'},
- {id:'outline',label:'目录'},
- {id:'relations',label:'关联'},
- {id:'history',label:'版本'}
+export const documentPanels=[
+ {id:'info',label:'信息',icon:'infoCircle'},
+ {id:'outline',label:'目录',icon:'outline'},
+ {id:'history',label:'历史',icon:'versionHistory'}
 ] as const;
-
-type OutlineResult={
- headings:Array<{title:string;level:number;lineStart:number;lineEnd:number}>;
- totalHeadings:number
-};
+export type DocumentPanel=typeof documentPanels[number]['id'];
 
 export type DocumentPresentation={
  id:string;
@@ -32,13 +25,12 @@ export type DocumentPresentation={
  characters:number;
 };
 
-export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename,onDetails}:{
+export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRename}:{
  item:RecordDetail;
  characters:number;
  editors:string[]|null;
  focusTitle:boolean;
  onRename:(name:string)=>Promise<void>;
- onDetails:()=>void;
 }){
  const sharedName=sharedViewTransitionName('record',item.id);
  return <header className="doc-header workbench-header">
@@ -66,51 +58,32 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
      </AutoTransition>
     </div>
    </AutoResizer>
-   <button type="button" className="workbench-details-trigger" onClick={onDetails}>
-    详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
-   </button>
   </div>
  </header>;
 }
 
-export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,outline,onJump,onChangeTag,onHistoryTarget,characters,editors}:{
+export function DocumentWorkbenchPanel({open,panel,onClose,item,outline,onJump,onChangeTag,onHistoryTarget,characters,editors}:{
  open:boolean;
- tab:DocumentInspectorTab;
- onChangeTab:(tab:DocumentInspectorTab)=>void;
+ panel:DocumentPanel;
  onClose:()=>void;
  item:RecordDetail;
- outline:{isPending:boolean;isError:boolean;data?:OutlineResult};
- onJump:(line:number)=>void;
+ outline:DocumentOutline|null;
+ onJump:(key:string)=>void;
  onChangeTag:(tag:string,action:'add'|'remove')=>Promise<void>;
  onHistoryTarget:React.Dispatch<React.SetStateAction<HTMLDivElement|null>>;
  characters:number;
  editors:string[];
 }){
- const currentIndex=sections.findIndex(section=>section.id===tab);
- const reduceMotion=useReducedMotion();
- return <ContextPanel open={open} onOpenChange={next=>{if(!next)onClose();}} label="文档检查器">
-  <div className="record-inspector workbench-inspector">
+ const label=documentPanels.find(section=>section.id===panel)!.label;
+ return <ContextPanel id="document-panel" open={open} onOpenChange={next=>{if(!next)onClose();}} label={label} modal={false}>
+  <div className="record-inspector workbench-inspector" data-document-panel={panel}>
    <div className="panel-heading">
-    <h2>文档检查器</h2>
+    <h2 id="document-panel-title">{label}</h2>
     <IconButton variant="ghost" label="关闭" icon={<Icon name="x" size="sm"/>} onClick={onClose}/>
    </div>
-   <div className="workbench-inspector-tabs" role="tablist" aria-label="文档信息分类">
-    {sections.map((section,index)=><button type="button" key={section.id}
-     role="tab" id={'workbench-tab-'+section.id} aria-selected={tab===section.id}
-     aria-controls="workbench-inspector-panel" tabIndex={tab===section.id?0:-1}
-     onClick={()=>onChangeTab(section.id)}
-     onKeyDown={event=>{
-      let next=-1;
-      if(event.key==='ArrowRight')next=(index+1)%sections.length;
-      else if(event.key==='ArrowLeft')next=(index+sections.length-1)%sections.length;
-      else if(event.key==='Home')next=0;
-      else if(event.key==='End')next=sections.length-1;
-      if(next>=0){event.preventDefault();onChangeTab(sections[next].id);const id=sections[next].id;requestAnimationFrame(()=>document.getElementById('workbench-tab-'+id)?.focus());}
-     }}>{tab===section.id&&<motion.span className="workbench-tab-indicator" layoutId="rk-workbench-selected-tab" aria-hidden="true" transition={reduceMotion?{duration:0}:{type:'spring',stiffness:430,damping:38}}/>}<span className="workbench-tab-label">{section.label}</span></button>)}
-   </div>
-   <section className="workbench-inspector-content" id="workbench-inspector-panel" role="tabpanel"
-    aria-labelledby={'workbench-tab-'+sections[currentIndex].id}>
-    {tab==='details'&&<div className="workbench-inspector-details">
+   <p className="workbench-panel-document">{documentDisplayName(item.name)}</p>
+   <section key={panel} className="workbench-inspector-content" aria-labelledby="document-panel-title">
+    {panel==='info'&&<div className="workbench-inspector-details">
      <Properties>
       <Property label="类型">Markdown 文档</Property>
       <Property label="标签"><TagEditor tags={item.tags??[]} onChange={onChangeTag}/></Property>
@@ -122,21 +95,19 @@ export function DocumentWorkbenchInspector({open,tab,onChangeTab,onClose,item,ou
       <Property label="路径"><span className="workbench-inspector-path">{item.path}</span></Property>
       <Property label="行数">{item.totalLines}</Property>
      </Properties>
+     {open&&<RecordRelations recordId={item.id} onNavigate={onClose}/>}
     </div>}
-    {tab==='outline'&&<div className="outline-panel">
-     {outline.isPending?<p className="muted small">加载目录…</p>:
-      outline.isError?<p className="muted small">文档大纲暂不可用</p>:
-      outline.data?.headings.length?<div className="outline-items">{outline.data.headings.map((heading,index)=>
-       <div className="outline-indent" key={index} style={{paddingInlineStart:(heading.level-1)*12}}>
+    {panel==='outline'&&<div className="outline-panel">
+     {!outline?<p className="muted small" role="status">加载目录…</p>:
+      outline.headings.length?<nav aria-label="文档目录"><ol className="outline-items">{outline.headings.map(heading=>
+       <li className="outline-indent" key={heading.key} style={{paddingInlineStart:(heading.level-1)*12}}>
         <Button className="outline-item" variant="ghost" size="sm" width="100%" label={heading.title}
-         tooltip={'第 '+heading.lineStart+' 行至第 '+heading.lineEnd+' 行'}
-         endContent={<small>L{heading.lineStart}</small>} onClick={()=>onJump(heading.lineStart)}/>
-       </div>)}
-       {outline.data.totalHeadings>outline.data.headings.length&&<p className="muted small">仅显示前 200 个标题</p>}
-      </div>:<p className="muted small">暂无 Markdown 标题</p>}
+         aria-current={outline.activeKey===heading.key?'location':undefined} onClick={()=>onJump(heading.key)}/>
+       </li>)}
+       </ol>{outline.totalHeadings>outline.headings.length&&<p className="muted small">仅显示前 200 个标题</p>}
+      </nav>:<p className="muted small">暂无 Markdown 标题</p>}
     </div>}
-    {tab==='relations'&&<RecordRelations recordId={item.id} onNavigate={onClose}/>}
-    {tab==='history'&&<div className="workbench-history-target" ref={onHistoryTarget}/>}
+    {panel==='history'&&<div className="workbench-history-target" ref={onHistoryTarget}/>}
    </section>
   </div>
  </ContextPanel>;

@@ -7,7 +7,6 @@ import type {VisualEditorHandle} from './visual-editor';
 import {useBlocker} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
-import {IconButton} from '@astryxdesign/core/IconButton';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
 import {Dialog} from '@astryxdesign/core/Dialog';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -27,12 +26,14 @@ import {checkMergeStructure} from './merge-structure-check';
 import {getNavigationTransitionFinished} from './shared-view-transition';
 import type {MergeReview} from './editor-merge-review';
 import {RevisionDiffDrawer,type RevisionComparison} from './revision-diff-drawer';
+import {documentOutline,type DocumentOutline} from './document-outline';
+import type {SourceEditorHandle} from './source-editor';
 
 const EditorMergeReview=React.lazy(()=>import('./editor-merge-review')
  .then(mod=>({default:mod.EditorMergeReview})));
 
 
-export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,onOpenHistory,historyTarget,onDocumentPresentation}:{item:RecordDetail;onSaved:(content?:string)=>void;jumpToLine?:{line:number;token:number}|null;pageActions?:React.ReactNode;archiveNotice?:React.ReactNode;onOpenHistory:()=>void;historyTarget:HTMLDivElement|null;onDocumentPresentation:(value:DocumentPresentation)=>void}){
+export function RecordEditor({item,onSaved,jumpToHeading,outlineOpen,historyOpen,onOutlineChange,pageActions,archiveNotice,historyTarget,onDocumentPresentation}:{item:RecordDetail;onSaved:(content?:string)=>void;jumpToHeading?:{key:string;token:number}|null;outlineOpen:boolean;historyOpen:boolean;onOutlineChange:(outline:DocumentOutline)=>void;pageActions?:React.ReactNode;archiveNotice?:React.ReactNode;historyTarget:HTMLDivElement|null;onDocumentPresentation:(value:DocumentPresentation)=>void}){
  // Keep the title and controls in the new snapshot, then mount the expensive
  // editor after the native morph. Parsing, KaTeX, node views and their layout
  // effects otherwise occupy its first frames and make it appear to jump.
@@ -46,6 +47,20 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  },[openingTransition]);
  const initialMode=new URLSearchParams(location.search).get('mode');
  const visualRef=useRef<VisualEditorHandle>(null);
+ const sourceRef=useRef<SourceEditorHandle>(null);
+ const lastHandledJumpToken=useRef(jumpToHeading?.token??null);
+ const outlineCallbackRef=useRef(onOutlineChange);outlineCallbackRef.current=onOutlineChange;
+ const lastOutline=useRef<DocumentOutline|null>(null);
+ const publishOutline=useCallback((outline:DocumentOutline)=>{
+  const previous=lastOutline.current;
+  if(previous&&previous.activeKey===outline.activeKey&&previous.totalHeadings===outline.totalHeadings&&
+   previous.headings.length===outline.headings.length&&previous.headings.every((heading,index)=>{
+    const next=outline.headings[index]!;
+    return heading.key===next.key&&heading.title===next.title&&heading.level===next.level;
+   }))return;
+  lastOutline.current=outline;outlineCallbackRef.current(outline);
+ },[]);
+ useEffect(()=>{if(!outlineOpen)lastOutline.current=null;},[outlineOpen]);
  const editorSectionRef=useRef<HTMLDivElement>(null);
  useEffect(()=>{
   const root=editorSectionRef.current;
@@ -68,7 +83,6 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  [item.id,base.revision,onDocumentPresentation]);
  useDocumentCharacterCount(draft,reportCharacters);
  const visibleDraft=draft;
- const visibleFocusLine=jumpToLine?.line;
  const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState('');
  const [comparison,setComparison]=useState<RevisionComparison|null>(null);
  const [comparisonOpen,setComparisonOpen]=useState(false);
@@ -90,7 +104,81 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  },[staleRecovery]);
  const changeVisibleDraft=changeDraft;
  const latestVisibleFromEditor=()=>visualRef.current?.flushEditedMarkdown()??latestDraft.current;
- useEffect(()=>{if(!jumpToLine)return;setMode('source');const url=new URL(location.href);url.searchParams.set('mode','source');historyReplace(url);},[jumpToLine]);
+ const updatePreviewOutline=useCallback(()=>{
+  const root=editorSectionRef.current?.querySelector<HTMLElement>('.editor-body[data-mode="preview"] .markdown-preview');
+  if(!root)return;
+  const elements=Array.from(root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'))
+   .filter(element=>element.closest('.markdown-preview')===root);
+  const headings=elements.map((element,index)=>({key:'preview:'+index,title:(element.innerText||element.textContent||'').trim(),level:Number(element.tagName.slice(1))}));
+  const scroller=document.querySelector<HTMLElement>('.main-scroll');
+  const viewport=scroller?.getBoundingClientRect();
+  const threshold=(viewport?.top??0)+48;
+  let activeKey:string|null=null;
+  elements.forEach((element,index)=>{if(element.getBoundingClientRect().top<=threshold)activeKey='preview:'+index;});
+  // The last section may be too short for its heading to reach the top.
+  if(scroller&&elements.length&&scroller.scrollTop>0&&
+   scroller.scrollTop+scroller.clientHeight>=scroller.scrollHeight-2)activeKey='preview:'+(elements.length-1);
+  if(activeKey===null&&(scroller?.scrollTop??window.scrollY)<=1&&elements.length)activeKey='preview:0';
+  publishOutline(documentOutline(headings.map((heading,line)=>({...heading,line})),activeKey));
+ },[publishOutline]);
+ useEffect(()=>{
+  if(!outlineOpen)return;
+  if(mode==='visual'){
+   const outline=visualRef.current?.getOutline();if(outline)publishOutline(outline);
+   return;
+  }
+  if(mode==='preview'){
+   let frame=0;
+   const schedule=()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;updatePreviewOutline();});};
+   schedule();document.addEventListener('scroll',schedule,true);window.addEventListener('resize',schedule);
+   const root=editorSectionRef.current;
+   const observer=root?new MutationObserver(()=>{
+    if(root.querySelector('.editor-body[data-mode="preview"] .markdown-preview')){observer?.disconnect();schedule();}
+   }):null;
+   if(root&&!root.querySelector('.editor-body[data-mode="preview"] .markdown-preview'))observer?.observe(root,{childList:true,subtree:true});
+   else observer?.disconnect();
+   return()=>{if(frame)cancelAnimationFrame(frame);observer?.disconnect();document.removeEventListener('scroll',schedule,true);window.removeEventListener('resize',schedule);};
+  }
+ },[outlineOpen,mode,visibleDraft,editorKey,updatePreviewOutline,publishOutline]);
+ useEffect(()=>{
+  if(!jumpToHeading||outlineOpen||jumpToHeading.token===lastHandledJumpToken.current)return;
+  let frame=0,timer=0,cancelled=false;
+  const panelIsOpen=()=>{
+   const panelElement=document.getElementById('document-panel')??document.querySelector('[data-document-panel]')?.closest('dialog');
+   const panel=panelElement?.closest('dialog')??panelElement??document.querySelector('.rk-context-panel-drawer,.rk-context-panel-sheet');
+   if(!panel)return false;
+   if(panel instanceof HTMLDialogElement&&panel.open)return true;
+   try{if(panel.matches(':modal'))return true;}catch{/* :modal is unavailable in older engines. */}
+   try{if(panel.matches(':popover-open'))return true;}catch{/* :popover-open is unavailable in older engines. */}
+   return panel.getAttribute('data-open')==='true';
+  };
+  const jump=()=>{
+   if(cancelled)return;
+   const activePanel=document.querySelector<HTMLElement>('[data-document-panel]')?.dataset.documentPanel;
+   if(activePanel&&activePanel!=='outline'){lastHandledJumpToken.current=jumpToHeading.token;return;}
+   if(panelIsOpen()){timer=window.setTimeout(jump,40);return;}
+   if(openingTransition){frame=requestAnimationFrame(jump);return;}
+   frame=requestAnimationFrame(()=>{
+    if(cancelled)return;
+    if(mode==='visual'&&jumpToHeading.key.startsWith('visual:'))visualRef.current?.jumpToHeading(jumpToHeading.key);
+    else if(mode==='source'&&jumpToHeading.key.startsWith('markdown:'))sourceRef.current?.jumpToHeading(jumpToHeading.key);
+    else if(mode==='preview'&&jumpToHeading.key.startsWith('preview:')){
+     const index=Number(/^preview:(\d+)$/.exec(jumpToHeading.key)?.[1]);
+     const root=editorSectionRef.current?.querySelector<HTMLElement>('.editor-body[data-mode="preview"] .markdown-preview');
+     const headings=root?Array.from(root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')).filter(element=>element.closest('.markdown-preview')===root):[];
+     const heading=Number.isInteger(index)&&index>=0?headings[index]:undefined;
+     if(heading){
+      heading.tabIndex=-1;
+      heading.focus({preventScroll:true});
+      heading.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+     }
+    }
+    lastHandledJumpToken.current=jumpToHeading.token;
+   });
+  };
+  frame=requestAnimationFrame(jump);
+  return()=>{cancelled=true;cancelAnimationFrame(frame);window.clearTimeout(timer);};
+ },[jumpToHeading?.key,jumpToHeading?.token,outlineOpen,openingTransition,mode]);
  useEffect(()=>{
   if(busy)return;
   if(changed){
@@ -177,7 +265,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
   window.addEventListener('keydown',handler);
   return()=>window.removeEventListener('keydown',handler);
  },[]);
- const versionsQuery=useQuery({queryKey:['versions',item.id],queryFn:()=>versions(item.id),enabled:Boolean(historyTarget)});
+ const versionsQuery=useQuery({queryKey:['versions',item.id],queryFn:()=>versions(item.id),enabled:Boolean(historyOpen&&historyTarget)});
  const showDiff=(from:number)=>{
   setComparison({recordId:item.id,name:item.name,from,to:item.revision});
   setComparisonOpen(true);
@@ -343,7 +431,6 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
     <ButtonGroup label="内容视图" size="sm"><Button label="可视化" icon={<Icon name="typography"/>} variant={mode==='visual'?'secondary':'ghost'} onClick={()=>switchMode('visual')}/><Button label="源码" icon={<Icon name="code"/>} variant={mode==='source'?'secondary':'ghost'} onClick={()=>switchMode('source')}/><Button label="预览" icon={<Icon name="eye"/>} variant={mode==='preview'?'secondary':'ghost'} onClick={()=>switchMode('preview')}/></ButtonGroup>
    </div>
    <div className="editor-view-actions">
-    <IconButton variant="ghost" size="sm" label="历史" icon={<Icon name="versionHistory"/>} onClick={onOpenHistory}/>
     {pageActions}
    </div>
   </PageActions>
@@ -371,7 +458,7 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
    </div>}/>}
   {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   </div></AutoResizer>
-  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy||Boolean(openingTransition)}>{openingTransition?<div className="editor-pending" aria-busy="true"/>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={visibleDraft} onChange={changeVisibleDraft} focusLine={visibleFocusLine} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={visibleDraft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={visibleDraft} recordId={item.id} onChange={changeVisibleDraft}/>}</React.Suspense>}</div></AutoTransition>
+  <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy||Boolean(openingTransition)}>{openingTransition?<div className="editor-pending" aria-busy="true"/>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor ref={sourceRef} value={visibleDraft} onChange={changeVisibleDraft} outlineOpen={outlineOpen} onOutlineChange={publishOutline}/>:mode==='preview'?<PreviewEditor content={visibleDraft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={visibleDraft} recordId={item.id} onChange={changeVisibleDraft} outlineOpen={outlineOpen} onOutlineChange={publishOutline}/>}</React.Suspense>}</div></AutoTransition>
   {historyTarget&&createPortal(<div className="history-panel"><h3 className="workbench-history-title">版本历史</h3>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||remoteAhead||v.revision===base.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}</div>,historyTarget)}
   {comparison&&<RevisionDiffDrawer key={comparison.recordId+':'+comparison.from+':'+comparison.to} comparison={comparison} isOpen={comparisonOpen} onOpenChange={setComparisonOpen}/>}
   <React.Suspense fallback={null}>{mergeReview&&<EditorMergeReview

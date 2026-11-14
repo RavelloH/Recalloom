@@ -39,11 +39,12 @@ import {EditorInlinePopup} from './inline-popup';
 import {OverlayScroll} from '../scrollbars';
 import {createRmdVisualDocumentSerializer} from './document-serializer';
 import type {SlashState,WikiState,InlinePopupItem,InlinePopup,VisualEditorHandle} from './types';
+import type {DocumentOutline} from '../document-outline';
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
 const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
 
 /** Shared RMD AST with Recalloom's authoritative revision/CAS saving. */
-const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;recordId?:string}>(function VisualEditor({value,onChange,recordId},ref){
+const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v:string)=>void;recordId?:string;outlineOpen?:boolean;onOutlineChange?:(outline:DocumentOutline)=>void}>(function VisualEditor({value,onChange,recordId,outlineOpen=false,onOutlineChange},ref){
  const checked=useRef(false);
  const [ready,setReady]=useState(false);
  const applying=useRef(false);
@@ -136,6 +137,28 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   return true;
  };
  const editorRef=useRef<Editor|null>(null);
+ const outlineOpenRef=useRef(outlineOpen),outlineCallbackRef=useRef(onOutlineChange);
+ outlineOpenRef.current=outlineOpen;outlineCallbackRef.current=onOutlineChange;
+ const outlineCache=useRef<{doc:ProseMirrorNode;headings:Array<{key:string;title:string;level:number;pos:number}>}|null>(null);
+ const getOutline=(current:Editor):DocumentOutline=>{
+  let cached=outlineCache.current;
+  if(cached?.doc!==current.state.doc){
+   const headings:Array<{key:string;title:string;level:number;pos:number}>=[];
+   current.state.doc.descendants((node,pos)=>{
+    if(node.type.name!=='heading')return;
+    const title=node.textContent.trim();if(!title)return;
+    headings.push({key:'visual:'+pos,title,level:Number(node.attrs.level)||1,pos});
+   });
+   cached={doc:current.state.doc,headings};outlineCache.current=cached;
+  }
+  const selection=current.state.selection.from;
+  let activeKey:string|null=null;
+  for(const heading of cached.headings){if(heading.pos>selection)break;activeKey=heading.key;}
+  return {headings:cached.headings.slice(0,200).map(({key,title,level})=>({key,title,level})),totalHeadings:cached.headings.length,activeKey};
+ };
+ const publishOutline=(current:Editor)=>{
+  if(outlineOpenRef.current)outlineCallbackRef.current?.(getOutline(current));
+ };
  const detectSlash=(e:Editor)=>{
   const selection=e.state.selection;
   const $from=selection.$from;
@@ -163,8 +186,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const extensions=useVisualEditorExtensions(recordId,setDialog);
  const editor=useEditor({
   extensions,content:{type:'doc',content:[{type:'paragraph'}]},immediatelyRender:false,
-  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(markdownForCurrentDocument(editor));}if(!detectWiki(editor))detectSlash(editor);},
-  onSelectionUpdate:({editor})=>{if(!detectWiki(editor))detectSlash(editor);followTableSelection(editor);},
+  onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(markdownForCurrentDocument(editor));}publishOutline(editor);if(!detectWiki(editor))detectSlash(editor);},
+  onSelectionUpdate:({editor})=>{publishOutline(editor);if(!detectWiki(editor))detectSlash(editor);followTableSelection(editor);},
   // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
   onFocus:({editor})=>followTableSelection(editor),
   onBlur:()=>{setSlash(null);setWiki(null);setTableTarget(false);},
@@ -321,7 +344,16 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const view=editor.view as typeof editor.view&{domObserver?:{flush:()=>void}};
   view.domObserver?.flush();
   return edited.current?markdownForCurrentDocument(editor):null;
+ },getOutline:()=>editor?getOutline(editor):null,
+ jumpToHeading:(key:string)=>{
+  if(!editor)return false;
+  const pos=Number(/^visual:(\d+)$/.exec(key)?.[1]);
+  if(!Number.isInteger(pos)||editor.state.doc.nodeAt(pos)?.type.name!=='heading')return false;
+  editor.chain().setTextSelection(Math.min(pos+1,editor.state.doc.content.size)).scrollIntoView().focus().run();
+  return true;
  }}),[editor]);
+
+ useEffect(()=>{if(editor&&ready&&outlineOpen)outlineCallbackRef.current?.(getOutline(editor));},[editor,ready,outlineOpen]);
 
  chooseWikiRef.current=hit=>{
   const selection=wikiRef.current;
