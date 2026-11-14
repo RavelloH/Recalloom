@@ -110,7 +110,7 @@ export function Shell({children}:{children:React.ReactNode}){
   footer={<div className="sidebar-footer">
    <NavRow to="/settings" icon="settings" label="设置" onClick={closeMobile}/>
    <NavRow icon="sunMoon" label={'主题：'+themeName} title="切换主题：跟随系统 → 浅色 → 深色" onClick={cycleTheme}/>
-   <NavRow icon="logout" label="退出登录" className="is-danger" onClick={()=>void logout()}/>
+   <NavRow icon="logout" label="退出登录" onClick={()=>void logout()}/>
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
