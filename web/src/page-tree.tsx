@@ -4,6 +4,7 @@ import React,{createContext,useContext,useEffect,useState,useSyncExternalStore} 
 import {Link,useLocation,useNavigate} from '@tanstack/react-router';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
+import {IconButton} from '@astryxdesign/core/IconButton';
 import type {DropdownMenuOption} from '@astryxdesign/core/DropdownMenu';
 
 import {browse} from './api';
@@ -57,7 +58,7 @@ function TreeNode({entry,depth}:{entry:Entry;depth:number}){
  return <li>
   <div className={'tree-row'+(active?' is-active':'')} style={{'--tree-depth':depth} as React.CSSProperties}>
    {folder
-    ?<button type="button" className={'tree-toggle'+(open?' is-open':'')} aria-label={(open?'收起 ':'展开 ')+entry.name} aria-expanded={open} onClick={()=>toggleFolder(entry.id)}><Icon name="chevronRight"/></button>
+    ?<IconButton label={(open?'收起 ':'展开 ')+entry.name} variant="ghost" size="sm" className={'tree-toggle'+(open?' is-open':'')} aria-expanded={open} onClick={()=>toggleFolder(entry.id)} icon={<Icon name="chevronRight"/>}/>
     :<span className="tree-toggle is-leaf" aria-hidden="true"/>}
    {folder
     ?<Link to="/library/$folderId" params={{folderId:entry.id}} className="tree-link" onClick={()=>{markSharedNavigationSource('sidebar');onNavigate?.();}} aria-current={active?'page':undefined}>{label}</Link>

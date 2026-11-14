@@ -66,8 +66,8 @@ export const slashCommands:SlashCommand[]=[
   ]}).run()},
  {id:'flashcard',title:'学习闪卡',description:'问题与答案分开编辑，可视化编辑器中折叠答案',keywords:['flashcard','card','study','quiz','fuxi'],icon:"flashcard" as const,
   run:e=>chain(e).insertContent({type:'richContainer',attrs:{kind:'flashcard',title:'知识闪卡'},content:[
-   {type:'richContainer',attrs:{kind:'front',title:'问题'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入问题'}]}]},
-   {type:'richContainer',attrs:{kind:'back',title:'答案'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入答案'}]}]}
+   {type:'richContainer',attrs:{kind:'front'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入问题'}]}]},
+   {type:'richContainer',attrs:{kind:'back'},content:[{type:'paragraph',content:[{type:'text',text:'在此输入答案'}]}]}
   ]}).run()},
  {id:'cloze',title:'复习挖空',description:'插入可在可视化编辑器中揭示答案的 Cloze 提示',keywords:['cloze','blank','fill','study','wankong'],icon:"eyeQuestion" as const,
   run:e=>chain(e).insertContent({type:'richCloze',attrs:{hint:'点击揭示'},content:[{type:'text',text:'答案'}]}).run()},

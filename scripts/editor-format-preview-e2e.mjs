@@ -143,8 +143,10 @@ try{
  await format('strong').first().waitFor();
  assert.equal(await format('.rk-hover-format--bold').count(),0,'Click must clear preview');
  await page.locator('.save-status.is-dirty').waitFor();
- assert.ok((await page.locator('.save-status').innerText()).includes('未保存'),'Click must mark document dirty');
+ assert.ok((await page.locator('.save-status.is-dirty').innerText()).includes('未保存'),'Click must mark document dirty');
+ const savedResponse=page.waitForResponse(response=>response.url().endsWith('/api/records/'+record.id+'/content')&&response.request().method()==='PATCH');
  await page.getByRole('button',{name:'保存',exact:true}).click();
+ assert.equal((await savedResponse).status(),200);
  await page.getByText('已保存',{exact:true}).first().waitFor();
  assert.ok((await getRecord(record.id)).content.includes('**Hover preview target and friends.**'));
  console.log('PASS clicking a previewed format commits exactly once');

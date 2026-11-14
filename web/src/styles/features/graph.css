@@ -246,62 +246,12 @@
   overscroll-behavior: contain;
 }
 
-.graph-neighbor {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border: 0;
-  border-radius: 7px;
-  color: inherit;
-  background: transparent;
-  text-align: start;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12.5px;
-  min-width: 0;
-}
-
+.graph-neighbor,
 .graph-node-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border: 0;
-  border-radius: 7px;
-  color: inherit;
-  background: transparent;
-  text-align: start;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12.5px;
-  min-width: 0;
+  justify-content: flex-start;
 }
 
-.graph-neighbor:hover {
-  background: var(--kg-hover);
-}
-
-.graph-node-option:hover {
-  background: var(--kg-hover);
-}
-
-.graph-neighbor svg {
-  flex: none;
-  color: var(--kg-muted);
-}
-
-.graph-neighbor span {
-  flex: 1;
-  min-width: 0;
-}
-
-.graph-node-option span {
-  flex: 1;
-  min-width: 0;
-}
-
-.graph-neighbor small {
+.graph-neighbor-relation {
   font-size: 10px;
   color: var(--kg-muted);
   flex: none;
@@ -313,12 +263,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   max-height: 260px;
-}
-
-.graph-node-option.is-selected {
-  background: var(--kg-row-active);
-  font-weight: 670;
-  outline: 1px solid var(--kg-node-border);
 }
 
 .graph-inspector .relation-group-heading {

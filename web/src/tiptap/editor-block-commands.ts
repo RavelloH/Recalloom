@@ -72,7 +72,7 @@ export function insertionForRmdChild(editor:Editor,syntax:string):{pos:number;pa
 export function insertRmdChild(editor:Editor,syntax:string):boolean{
  const insertion=insertionForRmdChild(editor,syntax);
  if(!insertion)return false;
- const titles:Readonly<Record<string,string>>={tab:'新标签',message:'Agent',front:'问题',back:'答案',definition:'新术语'};
+ const titles:Readonly<Record<string,string>>={tab:'新标签',message:'Agent',front:'',back:'',definition:'新术语'};
  const node=block(syntax,titles[syntax]??'', [paragraph('在这里直接编辑内容')]);
  if(syntax==='message')node.attrs={...node.attrs,sender:'assistant'};
  return editor.chain().focus().insertContentAt(insertion.pos,node).run();

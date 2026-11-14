@@ -53,13 +53,6 @@ export function assertRmdBlockCandidate(document:ProseMirrorNode,candidate:Prose
   throw new Error('当前内容会改变 RMD 容器结构或标题，请调整后继续。');
 }
 
-export const structuredChildren:Readonly<Record<string,{kind:string;label:string;title:string}>>={
- tabs:{kind:'tab',label:'标签页',title:'新标签'},
- chat:{kind:'message',label:'消息',title:'Agent'},
- glossary:{kind:'definition',label:'术语',title:'新术语'},
- flashcard:{kind:'',label:'闪卡面',title:''}
-};
-
 export function assertVisualField(kind:string,name:string,value:string):void{
  if(kind==='codeBlock'&&name==='language'&&!/^[\w.+#-]*$/.test(value))
   throw new Error('代码语言只能包含字母、数字、点、加号、井号和连字符。');

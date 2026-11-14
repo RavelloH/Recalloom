@@ -5,15 +5,11 @@
 .rk-help-eyebrow{display:inline-flex;align-items:center;gap:.55rem;font-size:12px;font-weight:700;letter-spacing:.045em;color:var(--color-text-secondary)}
 .rk-help-layout{display:grid;grid-template-columns:minmax(210px,248px) minmax(0,1fr);align-items:start;gap:24px;max-width:100%}
 .rk-help-navigation{border:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)));border-radius:12px;padding:13px;max-height:min(78vh,920px);overflow-y:auto;min-width:0;position:sticky;top:10px}
-.rk-help-search{display:flex;align-items:center;gap:7px;border:1px solid var(--rk-document-border,var(--color-border));border-radius:9px;padding:0 9px;margin-bottom:12px;background:var(--color-background-body);color:var(--color-text-secondary)}
-.rk-help-search input{border:none;background:transparent;color:var(--color-text-primary);font:inherit;font-size:13px;outline:none;width:100%;min-width:0;height:37px}
-.rk-help-search button{border:none;background:none;color:inherit;display:grid;place-items:center;padding:4px;cursor:pointer}
+.rk-help-search{display:flex;align-items:center;gap:7px;margin-bottom:12px;min-width:0}
 .rk-help-navigation h2{display:flex;align-items:center;gap:5px;margin:15px 8px 5px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--color-text-secondary)}
 .rk-help-links,.rk-help-navigation section{display:flex;flex-direction:column;gap:2px}
-.rk-help-navigation button:not(.rk-help-search button){display:flex;align-items:center;gap:7px;width:100%;padding:7px 9px;border:0;background:transparent;color:var(--color-text-primary);font:inherit;font-size:13px;border-radius:7px;cursor:pointer;text-align:left;min-width:0}
-.rk-help-navigation button:not(.rk-help-search button):hover{background:var(--rk-document-wash,rgba(128,128,128,.08))}
-.rk-help-navigation button.active:not(.rk-help-search button){background:color-mix(in srgb,var(--color-primary,#3979bd) 10%,transparent);color:var(--color-primary,#3979bd);font-weight:650}
-.rk-help-navigation button span{margin-left:auto;color:var(--color-text-secondary);font-size:11px;opacity:.75}
+.rk-help-nav-action{justify-content:flex-start}
+.rk-help-nav-meta{color:var(--color-text-secondary);font-size:11px;opacity:.75}
 .rk-help-empty{font-size:12px;color:var(--color-text-secondary);margin:15px 6px}
 .rk-help-document{min-width:0;max-width:100%;border:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)));border-radius:12px;overflow:hidden}
 .rk-help-document-head{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 20px;background:var(--rk-document-wash,rgba(128,128,128,.045));border-bottom:1px solid var(--rk-document-border,var(--color-border,rgba(128,128,128,.2)))}

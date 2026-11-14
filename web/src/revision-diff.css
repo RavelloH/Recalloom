@@ -70,8 +70,6 @@
 .revision-diff-raw { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font: var(--rk-font-small)/1.8 var(--rk-font-mono); }
 .revision-diff-hidden { margin: 0; font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
 
-.revision-diff-context { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 16px; margin: 0; border: 0; border-block: 1px solid var(--rk-border-soft); background: var(--rk-hover); color: var(--rk-ink-soft); font: inherit; font-size: var(--rk-font-small); cursor: pointer; }
-.revision-diff-context:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
 .revision-diff-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px 0 0; font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
 .revision-diff-note { padding: 12px 14px; margin: 0 0 16px; border: 1px solid var(--rk-border-soft); border-radius: 6px; font-size: var(--rk-font-small); line-height: 1.7; color: var(--rk-ink-soft); }
 .revision-diff-footnote { margin: 16px 0 0; color: var(--rk-ink-faint); font-size: var(--rk-font-caption); line-height: 1.7; }
@@ -97,10 +95,6 @@
 .revision-diff-source-section > .revision-diff-more { padding: 16px; border-block: 1px solid var(--rk-border-soft); }
 .revision-diff-link-card, .revision-diff-embed { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--rk-border-soft); border-radius: 6px; overflow-wrap: anywhere; font-size: var(--rk-font-small); }
 .revision-diff-link-card > span, .revision-diff-embed > span { color: var(--rk-ink-soft); }
-
-@media (hover: hover) and (pointer: fine) {
-  .revision-diff-context:hover { background: var(--rk-active); color: var(--color-text-primary); }
-}
 
 @media (max-width: 640px) {
   .revision-diff-header { padding: 18px 16px 16px; gap: 10px; }

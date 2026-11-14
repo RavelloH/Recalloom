@@ -2,6 +2,9 @@ import {Icon} from './icon';
 import React,{useMemo,useState} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {Button} from '@astryxdesign/core/Button';
+import {IconButton} from '@astryxdesign/core/IconButton';
+import {TextInput} from '@astryxdesign/core/TextInput';
 
 import {HELP_META,HELP_PAGES,HELP_RMD_COMPONENTS,HELP_RMD_NODES} from '../../src/help/catalog.generated';
 import {RMD_REGISTRY} from './rmd-schema';
@@ -60,30 +63,27 @@ export default function RmdHelpPage(){
   </header>
   <div className="rk-help-layout">
    <nav className="rk-help-navigation" aria-label="RMD 组件导航">
-    <div className="rk-help-search">
-     <Icon name="search" size="sm" aria-hidden="true"/>
-     <input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label="搜索 RMD 语法"
-       placeholder="搜索组件或属性…" spellCheck={false}/>
-     {query&&<button type="button" onClick={()=>setQuery('')} aria-label="清空搜索"><Icon name="x" size="sm"/></button>}
+    <div className="rk-help-search" spellCheck={false}>
+     <TextInput label="搜索 RMD 语法" isLabelHidden role="searchbox" width="100%" value={query} onChange={setQuery}
+       startIcon={<Icon name="search" size="sm" aria-hidden="true"/>} placeholder="搜索组件或属性…"/>
+     {query&&<IconButton label="清空搜索" size="sm" variant="ghost" onClick={()=>setQuery('')} icon={<Icon name="x" size="sm"/>}/>}
     </div>
     <div className="rk-help-links">
-     <button type="button" className={isSelected('intro')?'active':''} aria-current={isSelected('intro')?'page':undefined} onClick={()=>choose('intro')}><Icon name="helpBook" size="sm"/> 使用说明</button>
-     <button type="button" className={isSelected('all')?'active':''} aria-current={isSelected('all')?'page':undefined} onClick={()=>choose('all')}><Icon name="code" size="sm"/> 完整参考手册</button>
+     <Button label="使用说明" variant={isSelected('intro')?'secondary':'ghost'} width="100%" className="rk-help-nav-action" aria-current={isSelected('intro')?'page':undefined} onClick={()=>choose('intro')} icon={<Icon name="helpBook" size="sm"/>}/>
+     <Button label="完整参考手册" variant={isSelected('all')?'secondary':'ghost'} width="100%" className="rk-help-nav-action" aria-current={isSelected('all')?'page':undefined} onClick={()=>choose('all')} icon={<Icon name="code" size="sm"/>}/>
     </div>
     {groups.map(group=>group.items.length>0&&<section key={group.type} aria-label={group.label}>
      <h2>{group.label}</h2>
-     {group.items.map(item=><button key={group.type+item.name} type="button"
-       className={isSelected('component',item.name)?'active':''}
+     {group.items.map(item=><Button key={group.type+item.name} label={item.name} width="100%" className="rk-help-nav-action"
+       variant={isSelected('component',item.name)?'secondary':'ghost'}
        aria-current={isSelected('component',item.name)?'page':undefined}
-       onClick={()=>choose('component',item.name)}>
-       {item.name}<span>{Object.keys(item.attributes).length?'参数 '+Object.keys(item.attributes).length:''}</span>
-      </button>)}
+       onClick={()=>choose('component',item.name)}
+       endContent={<span className="rk-help-nav-meta">{Object.keys(item.attributes).length?'参数 '+Object.keys(item.attributes).length:''}</span>}/>)}
     </section>)}
     {visibleNodes.length>0&&<section aria-label="Markdown 块属性"><h2><Icon name="tags" size="sm" aria-hidden="true"/> @ attrs</h2>
-     {visibleNodes.map(item=><button key={item.node} type="button" className={isSelected('node',item.node)?'active':''}
-       aria-current={isSelected('node',item.node)?'page':undefined} onClick={()=>choose('node',item.node)}>
-       {item.label}<span>{item.node}</span>
-      </button>)}
+     {visibleNodes.map(item=><Button key={item.node} label={item.label} width="100%" className="rk-help-nav-action" variant={isSelected('node',item.node)?'secondary':'ghost'}
+       aria-current={isSelected('node',item.node)?'page':undefined} onClick={()=>choose('node',item.node)}
+       endContent={<span className="rk-help-nav-meta">{item.node}</span>}/>)}
     </section>}
     {!groups.some(group=>group.items.length>0)&&visibleNodes.length===0&&<p className="rk-help-empty">没有符合条件的语法。</p>}
    </nav>

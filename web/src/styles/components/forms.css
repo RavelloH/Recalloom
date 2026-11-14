@@ -106,25 +106,6 @@
   display: inline-flex;
 }
 
-.property-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 26px;
-  padding: 2px 6px;
-  border: 0;
-  border-radius: 5px;
-  background: none;
-  color: var(--rk-ink-faint);
-  font: inherit;
-  font-size: var(--rk-font-body);
-}
-
-.property-add:hover {
-  background: var(--rk-hover);
-  color: var(--rk-ink-soft);
-}
-
 .property-error {
   flex-basis: 100%;
   font-size: var(--rk-font-small);

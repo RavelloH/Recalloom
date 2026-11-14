@@ -323,7 +323,7 @@ try{
  const incomplete='# INCOMPLETE_RAW_DRAFT';
  await card(ids.block).getByRole('tab',{name:'源码',exact:true}).click();
  await raw.fill(incomplete);
- await card(ids.block).getByRole('alert').waitFor();
+ await card(ids.block).locator('textarea[aria-invalid="true"]').waitFor();
  await page.evaluate(()=>{
   window.__stackEditor=document.querySelector('.tiptap');
   window.__stackRaw=document.querySelector('[data-workspace-panel="block-editor"] textarea');

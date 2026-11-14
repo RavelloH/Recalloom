@@ -411,9 +411,7 @@ html[data-effective-theme="dark"] .wysiwyg-toolbar {
 /* Merge review: editable conflict result, structural diagnostics and the
    same read-only Markdown/RMD renderer used by document preview. */
 .rk-merge-custom{display:flex;flex-direction:column;gap:7px;min-width:0;}
-.rk-merge-custom label{font-size:13px;font-weight:600;}
-.rk-merge-custom textarea{box-sizing:border-box;width:100%;min-height:110px;max-height:38vh;resize:vertical;border:1px solid var(--rk-border);border-radius:9px;padding:10px 12px;color:inherit;background:color-mix(in srgb,currentColor 4%,transparent);font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2;}
-.rk-merge-custom textarea:focus-visible{outline:2px solid var(--color-focus,CanvasText);outline-offset:2px;}
+.rk-merge-custom textarea{min-height:110px;max-height:38vh;font-family:var(--rk-font-mono,ui-monospace,Consolas,monospace);tab-size:2;}
 .rk-merge-custom p{font-size:12px;margin:0;}
 .rk-merge-validation{display:flex;flex-direction:column;gap:8px;}
 .rk-merge-section-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}

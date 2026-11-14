@@ -1,5 +1,6 @@
 import {Icon} from '../icon';
 import React from 'react';
+import {IconButton} from '@astryxdesign/core/IconButton';
 import {Node,mergeAttributes} from '@tiptap/core';
 import {NodeViewContent,ReactNodeViewRenderer,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 
@@ -49,12 +50,12 @@ function CriticEditorView({node,editor,getPos}:NodeViewProps){
   <NodeViewContent as={"span" as "div"} className="rk-critic-content"/>
   <span className="rk-critic-actions" contentEditable={false}>
    {kind!=='comment'?<>
-    <button type="button" className="rk-critic-accept" aria-label={'接受'+titles[kind]} title="接受建议"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('accept');}}><Icon name="check" inline/></button>
-    <button type="button" className="rk-critic-reject" aria-label={'拒绝'+titles[kind]} title="拒绝建议"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('reject');}}><Icon name="x" inline/></button>
-   </>:<button type="button" aria-label="解决审阅批注" title="解决批注并移除批注标记"
-      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('resolve');}}><Icon name="check" inline/></button>}
+    <IconButton className="rk-critic-accept" label={'接受'+titles[kind]} variant="ghost" size="sm" icon={<Icon name="check" inline/>}
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('accept');}}/>
+    <IconButton className="rk-critic-reject" label={'拒绝'+titles[kind]} variant="ghost" size="sm" icon={<Icon name="x" inline/>}
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('reject');}}/>
+   </>:<IconButton label="解决审阅批注" variant="ghost" size="sm" icon={<Icon name="check" inline/>}
+      onMouseDown={event=>event.preventDefault()} onClick={event=>{event.preventDefault();event.stopPropagation();decide('resolve');}}/>}
   </span>
  </NodeViewWrapper>;
 }

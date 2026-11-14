@@ -175,28 +175,7 @@
 }
 
 .file-new {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 6px;
-  border: 0;
-  border-radius: 0 0 6px 6px;
-  background: none;
-  color: var(--rk-ink-faint);
-  font: inherit;
-  font-size: var(--rk-font-body);
-  text-align: start;
-}
-
-.file-new:hover:not(:disabled) {
-  background: var(--rk-hover);
-  color: var(--rk-ink-soft);
-}
-
-.file-new:disabled {
-  cursor: progress;
+  justify-content: flex-start;
 }
 
 .archive-filter {

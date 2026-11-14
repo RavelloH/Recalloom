@@ -1,0 +1,4 @@
+.rk-structured-settings{display:grid;gap:14px;min-width:0}
+.rk-structured-child{display:grid;gap:12px;padding:12px;min-width:0;border:1px solid var(--color-border);border-radius:10px;background:var(--color-background)}
+.rk-structured-child>strong{font-size:13px;color:var(--color-text-secondary)}
+.rk-structured-child-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;padding-top:4px}

@@ -49,9 +49,9 @@ try{
   assert.match(await raw.inputValue(),/::: warning 注意/);
   await raw.fill('::: warning 注意\n\nRewritten callout.\n\n:::');
   await callout.getByText('Rewritten callout.').waitFor();
-  await panel.getByLabel('当前块预览').getByText('Rewritten callout.').waitFor();
+  await panel.locator('.rk-block-panel-preview').getByText('Rewritten callout.').waitFor();
   await raw.fill('# 试图转换为标题');
-  await panel.getByRole('alert').waitFor();
+  await panel.locator('textarea[aria-invalid="true"]').waitFor();
   assert.equal(await callout.getByText('Rewritten callout.').count(),1,'invalid draft cannot mutate document');
   await raw.fill('::: warning 注意\n\nFinal callout.\n\n:::');
   await callout.getByText('Final callout.').waitFor();

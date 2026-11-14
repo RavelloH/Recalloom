@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {TextInput} from '@astryxdesign/core/TextInput';
+import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {
  rmdAttrNodeMapping,pmAttrKey,rmdAttributeDefinition,normalizeRmdAttribute
 } from './rmd-schema-attrs-model';
@@ -64,11 +65,8 @@ export function RmdSchemaAttributeFields({editor,pos}:{editor:Editor;pos:number}
   <p className="rk-block-panel-help">合法输入实时作用于文档草稿。无效输入会保留以供修正，但不会覆盖正文。</p>
   {fields.map(field=><div className="rk-block-schema-field" key={field}>
    {definition.attributes[field]==='boolean'?
-    <label className="rk-block-schema-toggle">
-     <input type="checkbox" checked={draft[field]==='true'}
-      onChange={event=>applyField(field,String(event.target.checked))}/>
-     {definition.fieldLabels[field]??field}
-    </label>:
+    <CheckboxInput className="rk-block-schema-toggle" label={definition.fieldLabels[field]??field}
+     value={draft[field]==='true'} width="100%" onChange={checked=>applyField(field,String(checked))}/>:
     <TextInput width="100%" label={definition.fieldLabels[field]??field}
      value={draft[field]??''} onChange={value=>applyField(field,value)}
      placeholder={field==='id'?(definition.editorIdPrefix??'my-section'):

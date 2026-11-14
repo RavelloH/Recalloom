@@ -11,14 +11,15 @@ const browser=await chromium.launch({headless:true,executablePath:binary,args:['
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',err=>errors.push(err.message));
 const source='# Inline extras\n\nalpha beta gamma\n\nanother paragraph';
-async function create(){
+async function create(content=source){
  const result=await page.evaluate(async content=>{
   const r=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'Inline extras '+Date.now()+'.md',kind:'document',content})});
   return {status:r.status,data:await r.json()};
- },source);
+ },content);
  assert.equal(result.status,201);
  await page.goto(base+'/records/'+result.data.id+'?mode=visual');
- await page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first().waitFor();
+ await page.locator('.tiptap p').first().waitFor();
+ return result.data.id;
 }
 async function select(width){
  const line=page.locator('.tiptap p').filter({hasText:'alpha beta gamma'}).first();
@@ -75,6 +76,25 @@ try{
   await dialog.getByRole('button',{name:'插入',exact:true}).click();
   assert.match(await sourceText(),/\[alpha beta gamma\]\(https:\/\/example\.com\/docs\)/);
   console.log('PASS selection-preserving link dialog via shared menu',width);
+  const reviewId=await create('# Review controls\n\n{++新增建议++}\n\n{--删除建议--}\n\n{>>审阅说明<<}');
+  const accept=page.getByRole('button',{name:'接受建议新增',exact:true});
+  const reject=page.getByRole('button',{name:'拒绝建议删除',exact:true});
+  const resolve=page.getByRole('button',{name:'解决审阅批注',exact:true});
+  await accept.waitFor();
+  assert.equal(await page.locator('.rk-critic-actions button:not(.astryx-button)').count(),0,'review actions use library controls');
+  await accept.hover();await resolve.focus();
+  await page.waitForTimeout(350);
+  assert.match(await page.locator('.save-status').innerText(),/已保存/,'control mount/focus cannot edit the document');
+  await accept.click();await reject.click();await resolve.click();
+  assert.equal(await page.locator('.tiptap .rk-critic').count(),0,'explicit decisions resolve all three suggestions');
+  await page.locator('.save-status').getByText('未保存',{exact:true}).waitFor();
+  const savedResponse=page.waitForResponse(response=>response.url().endsWith('/api/records/'+reviewId+'/content')&&response.request().method()==='PATCH');
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  assert.equal((await savedResponse).status(),200);
+  await page.locator('.save-status').getByText('已保存').waitFor();
+  const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,reviewId);
+  assert.match(persisted,/新增建议/);assert.match(persisted,/删除建议/);assert.doesNotMatch(persisted,/审阅说明|\{\+\+|\{--|\{>>/);
+  console.log('PASS library review controls preserve draft until explicit decisions',width);
   if(width===390){
    await create();
    const line=page.locator('.tiptap p').filter({hasText:'another paragraph'}).first();

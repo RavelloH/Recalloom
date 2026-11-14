@@ -429,39 +429,14 @@
 }
 
 .rk-inline-popover-item {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
+  justify-content: flex-start;
   text-align: left;
-  cursor: pointer;
 }
-
-.rk-inline-popover-item:hover:not(:disabled) {
-  background: var(--color-overlay-hover,rgba(128,128,128,.10));
-  outline: none;
-}
-
-.rk-inline-popover-item:focus-visible:not(:disabled) {
-  background: var(--color-overlay-hover,rgba(128,128,128,.10));
-  outline: none;
-}
-
-.rk-inline-popover-item:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-}
-
-.rk-inline-popover-item[data-active="true"] {
-  color:var(--color-text-primary);
-  background:var(--rk-active);
+.rk-inline-popover-item-content {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  width: 100%;
 }
 
 .rk-menu-item-check {

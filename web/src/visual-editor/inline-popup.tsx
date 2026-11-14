@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
+import {Button} from '@astryxdesign/core/Button';
 import type {FormatHoverKind} from '../tiptap/format-hover-preview';
 import type {InlinePopup,InlinePopupItem} from './types';
 
@@ -40,17 +41,19 @@ export function EditorInlinePopup({popup,onEnter,onLeave,onPreview,onChoose}:Pro
   onPointerEnter={!closing?onEnter:undefined}
   onPointerLeave={!closing?()=>{onPreview(null);onLeave();}:undefined}
   onMouseDown={event=>event.preventDefault()}>
-  {menu.items.map(item=><button key={item.id} type="button" role="menuitem"
+  {menu.items.map(item=><Button key={item.id} role="menuitem" label={item.label} width="100%"
+   variant={item.active?'secondary':'ghost'} size="sm"
    className="rk-inline-popover-item" data-active={item.active?'true':undefined}
-   disabled={item.disabled||closing} title={item.description??item.label}
+   isDisabled={item.disabled||closing}
    onPointerEnter={event=>{if(event.pointerType==='mouse'&&!item.disabled)onPreview(item.preview??null);}}
    onPointerLeave={()=>onPreview(null)}
    onFocus={()=>{if(!item.disabled)onPreview(item.preview??null);}}
    onBlur={()=>onPreview(null)}
    onClick={()=>{onPreview(null);onChoose(item);}}>
-    <span className="rk-inline-popover-item-label">{item.label}{item.active&&<span aria-hidden="true" className="rk-menu-item-check">✓</span>}</span>
+    <span className="rk-inline-popover-item-content"><span className="rk-inline-popover-item-label">{item.label}{item.active&&<span aria-hidden="true" className="rk-menu-item-check">✓</span>}</span>
     {item.description&&<span className="rk-inline-popover-item-description">{item.description}</span>}
-   </button>)}
+    </span>
+   </Button>)}
  </div>;
 
  if(!popup&&!outgoing)return null;

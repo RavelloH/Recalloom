@@ -123,7 +123,7 @@ try{
   await page.locator('.rk-directive-message').first().getByText('Rewritten child.').waitFor();
   assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/Updated/);
   await raw.fill('::: message Updated | sender=assistant\n\nRewritten child.\n\n:::\n\n::: message Illegal extra\n\nShould not insert sibling.\n\n:::');
-  await panel.getByRole('alert').waitFor();
+  await panel.locator('textarea[aria-invalid="true"]').waitFor();
   assert.equal(await page.locator('.tiptap .rk-directive-chat .rk-directive-message').count(),2,'a child source edit cannot inject a second sibling');
   await raw.fill('::: message Updated | sender=assistant\n\nRewritten child.\n\n:::');
   await panel.getByRole('button',{name:'关闭',exact:true}).click();

@@ -5,6 +5,7 @@ import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {Token} from '@astryxdesign/core/Token';
 import {TextInput} from '@astryxdesign/core/TextInput';
+import {Button} from '@astryxdesign/core/Button';
 
 import {ApiError,api} from './api';
 import {TopbarPortal} from './topbar-slot';
@@ -127,7 +128,7 @@ export function TagEditor({tags,onChange}:{tags:string[];onChange:(tag:string,ac
    ?<div className="tag-input" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))void submit();}}>
      <TextInput label="新标签" isLabelHidden size="sm" width={160} hasAutoFocus placeholder="输入后回车" value={draft} onChange={setDraft} onEnter={()=>void submit()} onKeyDown={event=>{if(event.key==='Escape'){setDraft('');setAdding(false);}}}/>
     </div>
-   :<button type="button" className="property-add" aria-label="添加标签" disabled={busy} onClick={()=>setAdding(true)}><Icon name="plus" inline/>{tags.length?null:'添加标签'}</button>}
+   :<Button label="添加标签" className="property-add" size="sm" variant="ghost" isIconOnly={tags.length>0} icon={<Icon name="plus" size="sm"/>} isDisabled={busy} onClick={()=>setAdding(true)}/>}
   {error&&<span className="property-error" role="alert">{error}</span>}
  </div>;
 }

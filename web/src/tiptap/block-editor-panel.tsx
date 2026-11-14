@@ -3,11 +3,13 @@ import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {closeHistory} from '@tiptap/pm/history';
 import {TextArea} from '@astryxdesign/core/TextArea';
+import {TabList,Tab} from '@astryxdesign/core/TabList';
+import {Collapsible} from '@astryxdesign/core/Collapsible';
 
 import {parseRmdVisual} from '../rmd-visual';
 import {serializeRmdBlock,serializeRmdInline} from '../rmd-serialize';
 import {blockEditorTargetAt,mapBlockEditorTarget} from './editor-block-actions';
-import {BlockVisualFields} from './block-visual-fields';
+import {BlockSettingsFields} from './block-settings-fields';
 import {createMathTypeTransaction,createRemoveBlockObjectTransaction} from './block-object-operations';
 import {assertRmdBlockCandidate} from './block-visual-model';
 import {EditorInsertFields} from './insert-dialog';
@@ -44,7 +46,7 @@ function BlockInsertPanel({insertion,onClose}:BlockPanelProps&{insertion:NonNull
 function BlockContentPanel({editor,pos,attributePos,onClose,recordId}:BlockPanelProps){
  const [version,setVersion]=useState(0);
  const [open,setOpen]=useState(true);
- const [mode,setMode]=useState<'visual'|'source'>('visual');
+ const [mode,setMode]=useState<'settings'|'source'>('settings');
  const [draft,setDraft]=useState(()=>{const node=blockEditorTargetAt(editor,pos)?.node;return node?blockSource(node):'';});
  const [error,setError]=useState('');
  const [sourceError,setSourceError]=useState('');
@@ -176,32 +178,30 @@ function BlockContentPanel({editor,pos,attributePos,onClose,recordId}:BlockPanel
   }catch(error){setError(error instanceof Error?error.message:'此内容暂时无法删除。');}
  };
  const schemaPos=attributePos??(isRmdAttrsEditable(kind)?pos:null);
- const preview=<details className="rk-block-panel-preview" aria-label="当前块预览" open={previewOpen} onToggle={event=>setPreviewOpen(event.currentTarget.open)}>
-  <summary><Icon name="eye" size="sm"/><span>效果预览</span><Icon name="chevronDown" size="sm"/></summary>
+ const preview=<Collapsible className="rk-block-panel-preview" trigger={<span className="rk-block-panel-preview-label"><Icon name="eye" size="sm"/>效果预览</span>}
+  isOpen={previewOpen} onOpenChange={setPreviewOpen}>
   {previewOpen&&<div className="rk-block-panel-preview-body record-main">
    <React.Suspense fallback={<div className="muted small">准备预览…</div>}>
     <Preview content={previewSource} sourceId={recordId}/>
    </React.Suspense>
   </div>}
- </details>;
+ </Collapsible>;
  return <WorkspacePanel id="block-editor" label="块编辑面板" title={parentKind?'编辑子块':'编辑块'} description={label} open={open}
   onOpenChange={setOpen} onAfterClose={onClose}>
   <div className="rk-block-editor-panel" data-block-kind={kind}>
-  <div className="rk-block-panel-modes" role="tablist" aria-label="块编辑模式">
-   {(['visual','source'] as const).map(value=><button type="button" key={value} role="tab" id={'block-mode-'+value}
-    aria-label={value==='visual'?'可视化':'源码'} aria-selected={mode===value} aria-controls={'block-pane-'+value} tabIndex={mode===value?0:-1}
-    onClick={()=>setMode(value)} onKeyDown={event=>{
-     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-     event.preventDefault();const next=event.key==='Home'?'visual':event.key==='End'?'source':mode==='visual'?'source':'visual';
-     setMode(next);document.getElementById('block-mode-'+next)?.focus();
-    }}><Icon name={value==='visual'?'eye':'code'} size="sm"/>{value==='visual'?'可视化':'源码'}
-    {value==='source'&&sourceError&&<span className="rk-block-source-pending" aria-hidden="true" title="有未应用的源码修改"/>}</button>)}
+  <div className="rk-block-panel-modes">
+   <TabList role="tablist" aria-label="块编辑模式" value={mode} onChange={value=>setMode(value as 'settings'|'source')}
+    size="sm" overflow="visible" hasDivider={false}>
+    <Tab value="settings" label="设置" id="block-mode-settings" panelId="block-pane-settings" icon={<Icon name="settings" size="sm"/>}/>
+    <Tab value="source" label="源码" id="block-mode-source" panelId="block-pane-source" icon={<Icon name="code" size="sm"/>}
+     endContent={sourceError?<span className="rk-block-source-pending" aria-hidden="true" title="有未应用的源码修改"/>:undefined}/>
+   </TabList>
    <span className="rk-block-panel-sync">同步到文档草稿</span>
   </div>
   <section className="rk-block-panel-fields">
    {(current.isLeaf||kind==='codeBlock')&&preview}
-   <div id="block-pane-visual" role="tabpanel" aria-labelledby="block-mode-visual" hidden={mode!=='visual'}>
-   <BlockVisualFields editor={editor} pos={pos} node={current}
+   <div id="block-pane-settings" role="tabpanel" aria-labelledby="block-mode-settings" hidden={mode!=='settings'}>
+   <BlockSettingsFields editor={editor} pos={pos} node={current} mathTypeDisabled={Boolean(sourceError)}
     onMathTypeChange={kind==='blockMath'||kind==='inlineMath'?changeMathType:undefined}
     onRemove={['image','blockMath','inlineMath'].includes(kind)?removeObject:undefined}/>
    {kind==='richContainer'&&<RmdContainerAttributeFields key={'container-'+String(current.attrs.kind)}
@@ -213,8 +213,7 @@ function BlockContentPanel({editor,pos,attributePos,onClose,recordId}:BlockPanel
    </div>
    <div id="block-pane-source" role="tabpanel" aria-labelledby="block-mode-source" hidden={mode!=='source'}>
    <TextArea label="块源码" width="100%" rows={10} value={draft} onChange={commitRaw}
-    placeholder="编辑当前块的 Markdown / RMD"/>
-   {sourceError&&<p className="rk-block-panel-error" role="alert">{sourceError}</p>}
+    placeholder="编辑当前块的 Markdown / RMD" status={sourceError?{type:'error',message:sourceError}:undefined} statusVariant="detached"/>
    <p className="rk-block-panel-help">编辑当前块的完整源码。无效输入会保留在这里，修正后同步到文档。</p>
    </div>
    {!current.isLeaf&&kind!=='codeBlock'&&preview}

@@ -106,10 +106,9 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
      </AutoTransition>
     </div>
    </AutoResizer>
-   <button type="button" className="workbench-details-trigger" onClick={onDetails}
-    aria-controls="document-panel-info" aria-expanded={detailsOpen}>
-    详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
-   </button>
+   <Button label="详细信息" size="sm" variant="ghost" className="workbench-details-trigger" onClick={onDetails}
+    aria-controls="document-panel-info" aria-expanded={detailsOpen}
+    endContent={<Icon name="chevronRight" size="sm" aria-hidden="true"/>}/>
   </div>
  </header>;
 }

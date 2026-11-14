@@ -4,6 +4,8 @@ import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {describeRmdAnchorConflict,findRmdAnchorConflict} from './rmd-anchor-ids';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Selector} from '@astryxdesign/core/Selector';
+import {Button} from '@astryxdesign/core/Button';
+import {Slider} from '@astryxdesign/core/Slider';
 import {RMD_COLORS} from '../rmd-schema';
 import {SKETCH_DEFAULT_COLORS,SKETCH_PALETTE,isSketchKind} from '../sketch-geometry';
 import {CHAT_SENDERS,normalizeRichContainerField,richContainerFields,type RichContainerField} from './rmd-container-attributes';
@@ -79,8 +81,10 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
   </div>}
   {fields.includes('color')&&<div className="rk-block-schema-field">
    <div className="rk-block-color-palette" role="group" aria-label="笔迹颜色快捷选择">
-    {RMD_COLORS.map(value=><button key={value} type="button" aria-label={'使用'+value+'颜色'} aria-pressed={actualColor===value}
-     onClick={()=>set('color',value)}><span style={{background:SKETCH_PALETTE[value as keyof typeof SKETCH_PALETTE]}}/></button>)}
+    {RMD_COLORS.map(value=><Button key={value} label={'使用'+value+'颜色'} aria-pressed={actualColor===value}
+     variant={actualColor===value?'secondary':'ghost'} size="sm" isIconOnly
+     icon={<span className="rk-block-palette-swatch" style={{background:SKETCH_PALETTE[value as keyof typeof SKETCH_PALETTE]}} aria-hidden="true"/>}
+     onClick={()=>set('color',value)}/>)}
    </div>
    <Selector label="笔迹颜色" width="100%" value={inputs.color??''}
     options={[{value:'',label:'默认颜色（'+SKETCH_DEFAULT_COLORS[kind as keyof typeof SKETCH_DEFAULT_COLORS]+'）'},
@@ -95,10 +99,11 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
    <TextInput width="100%" label={labels[field]??field} value={inputs[field]??''}
     onChange={raw=>set(field,raw)} placeholder="默认"/>
    <div className="rk-block-sketch-range">
-    <input type="range" aria-label={'调整'+labels[field]} min={ranges[field].min} max={ranges[field].max} step={ranges[field].step}
-     value={Number.isFinite(Number(inputs[field]))&&inputs[field]!==''?Number(inputs[field]):ranges[field].value}
-     onChange={event=>set(field,event.target.value)}/>
-    <button type="button" onClick={()=>set(field,'')} aria-label={'重置'+labels[field]}>恢复默认</button>
+    <div className="rk-block-sketch-slider"><Slider label={'调整'+labels[field]} isLabelHidden width="100%"
+     min={ranges[field].min} max={ranges[field].max} step={ranges[field].step}
+     value={Math.max(ranges[field].min,Math.min(ranges[field].max,Number.isFinite(Number(inputs[field]))&&inputs[field]!==''?Number(inputs[field]):ranges[field].value))}
+     onChange={(value:number)=>set(field,String(value))}/></div>
+    <Button label={'重置'+labels[field]} variant="ghost" size="sm" onClick={()=>set(field,'')}>恢复默认</Button>
    </div>
    {errors[field]&&<p className="rk-block-panel-error" role="alert">{errors[field]}</p>}
   </div>)}

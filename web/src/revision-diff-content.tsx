@@ -107,14 +107,15 @@ export default function RevisionDiffContent({before,after,sourceId}:{before:stri
      {view==='preview'&&!richChanges&&<p className="revision-diff-note">空白或换行发生了变化，请切换源码核对。</p>}
      <div className={'revision-diff-file is-'+view}>
       <div className="revision-diff-file-heading"><Icon name="document" size="sm"/><span>{view==='preview'?'文档差异':'Markdown 源码'}</span><span>只读</span></div>
-      {start>0&&<button type="button" className="revision-diff-context" onClick={()=>setStart(value=>Math.max(0,value-(view==='source'?300:40)))}><Icon name="arrowUp" size="sm"/>显示更早内容</button>}
-      {visible.map(entry=>entry.type==='context'?<button type="button" key={'context:'+entry.start}
-       className="revision-diff-context" onClick={()=>setExpanded(previous=>{
+      {start>0&&<Button label="显示更早内容" variant="ghost" width="100%" className="revision-diff-context" onClick={()=>setStart(value=>Math.max(0,value-(view==='source'?300:40)))} icon={<Icon name="arrowUp" size="sm"/>}/>}
+      {visible.map(entry=>entry.type==='context'?<Button key={'context:'+entry.start}
+       label={'展开 '+(entry.end-entry.start)+' '+(view==='preview'?'段':'行')+'未修改内容'} variant="ghost" width="100%"
+       className="revision-diff-context" icon={<Icon name="arrowsSort" size="sm"/>} onClick={()=>setExpanded(previous=>{
         const next=new Set(previous);
         // The run begins before its retained leading context.
         let start=entry.start;while(start>0&&rows[start-1]!.kind==='unchanged')start--;
         next.add(view+':'+start);return next;
-       })}><Icon name="arrowsSort" size="sm"/><span>展开 {entry.end-entry.start} {view==='preview'?'段':'行'}未修改内容</span></button>
+       })}/>
        :view==='source'?diff.limited&&(entry.row as RevisionSourceRow).ending===undefined
         ?<ChunkedSource row={entry.row as RevisionSourceRow} index={entry.index} key={entry.index}/>
         :<SourceRow row={entry.row as RevisionSourceRow} index={entry.index} key={entry.index}/>

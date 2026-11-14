@@ -2,6 +2,7 @@ import React,{useMemo,useState} from 'react';
 import {createTwoFilesPatch} from 'diff';
 import {Dialog} from '@astryxdesign/core/Dialog';
 import {Button} from '@astryxdesign/core/Button';
+import {TextArea} from '@astryxdesign/core/TextArea';
 import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Icon} from './icon';
@@ -76,10 +77,10 @@ export function EditorMergeReview({review,busy,onChoose,onEdit,onClose,onApply}:
       <span className="muted">{review.choices[piece.id]==='custom'?'手动结果':review.choices[piece.id]?'已选择':'尚未选择'}</span>
      </div>
      {review.choices[piece.id]==='custom'&&<div className="rk-merge-custom">
-      <label htmlFor={'rk-merge-custom-'+piece.id}>冲突 {i+1} 的最终 Markdown（可修改或留空以删除）</label>
-      <textarea id={'rk-merge-custom-'+piece.id} aria-label={'冲突 '+(i+1)+' 的最终内容'}
-       spellCheck={false} rows={4} value={review.custom[piece.id]??''}
-       onChange={event=>onEdit(piece.id,event.currentTarget.value)}/>
+      <TextArea label={'冲突 '+(i+1)+' 的最终内容'} description="最终 Markdown（可修改或留空以删除）" width="100%"
+       id={'rk-merge-custom-'+piece.id} aria-label={'冲突 '+(i+1)+' 的最终内容'}
+       hasSpellCheck={false} rows={4} value={review.custom[piece.id]??''}
+       onChange={value=>onEdit(piece.id,value)}/>
       <p className="muted">只修改这一处冲突；其余已合并的独立内容保持不变。</p>
      </div>}
     </section>)}

@@ -4,6 +4,7 @@ import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
 import type {RefObject} from 'react';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
+import {IconButton} from '@astryxdesign/core/IconButton';
 
 import {blockCanReorder,blockSiblings,editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,moveBlockTo,topLevelAtDocumentPosition} from './editor-block-actions';
 import {blockMenuItems} from './editor-command-menu';
@@ -343,10 +344,8 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock,enabled}:{
    onDragStart={startDrag} onDragEnd={finishDrag}>
    <Icon name="gripVertical" size="md"/>
   </button>
-  <button type="button" className="rk-block-edit" aria-label="编辑块" title="编辑当前块"
-    onClick={()=>{selectRef.current(hover.pos,hover.element);onEditBlock(hover.pos);setMenuOpen(false);}}>
-    <Icon name="pencil" size="sm"/>
-   </button>
+  <IconButton className="rk-block-edit" label="编辑块" variant="ghost" size="sm" icon={<Icon name="pencil" size="sm"/>}
+    onClick={()=>{selectRef.current(hover.pos,hover.element);onEditBlock(hover.pos);setMenuOpen(false);}}/>
    <MoreMenu label="块操作" icon={<Icon name="dots" size="sm"/>}
    variant="ghost" size="sm" presentation="adaptive"
    isMenuOpen={menuOpen} onOpenChange={setMenuOpen}

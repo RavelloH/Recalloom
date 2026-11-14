@@ -3,6 +3,7 @@ import React,{useMemo} from 'react';
 import {useNavigate} from '@tanstack/react-router';
 import {useQueryClient} from '@tanstack/react-query';
 import {CommandPalette,CommandPaletteFooter,useCommandPaletteContext} from '@astryxdesign/core/CommandPalette';
+import {Button} from '@astryxdesign/core/Button';
 
 import {useRecentPages} from './recent-pages';
 import {menu} from './navigation';
@@ -26,7 +27,7 @@ function PaletteFooter({onOpenSearch}:{onOpenSearch:(q:string)=>void}){
  const term=(useCommandPaletteContext()?.search??'').trim();
  return <CommandPaletteFooter className="palette-footer">
   <span className="palette-hints"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>↵</kbd> 打开 <kbd>Esc</kbd> 关闭</span>
-  <button type="button" className="palette-open-search" onClick={()=>onOpenSearch(term)}>{term?'在搜索页查看全部结果':'打开搜索页'}<Icon name="arrowUpRight" size="sm"/></button>
+  <Button label={term?'在搜索页查看全部结果':'打开搜索页'} className="palette-open-search" size="sm" variant="ghost" endContent={<Icon name="arrowUpRight" size="sm"/>} onClick={()=>onOpenSearch(term)}/>
  </CommandPaletteFooter>;
 }
 

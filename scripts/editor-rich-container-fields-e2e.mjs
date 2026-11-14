@@ -42,7 +42,7 @@ try{
   assert.equal(await panel.getByRole('textbox',{name:'块标题'}).count(),0,'sketch has no legal title');
   assert.equal(await panel.getByRole('region',{name:'手绘块样式'}).count(),1);
   await panel.getByText('效果预览',{exact:true}).click();
-  await panel.getByLabel('当前块预览').getByText('默认荧光笔内容。').waitFor();
+  await panel.locator('.rk-block-panel-preview').getByText('默认荧光笔内容。').waitFor();
   const previewGeometry=await panel.evaluate(el=>{
    const section=el.querySelector('.rk-block-panel-preview');
    const article=section?.querySelector('.markdown-preview');
@@ -74,7 +74,7 @@ try{
   await raw.fill((await raw.inputValue()).replace('color=green','color=purple').replace('stroke=2.25','stroke=1.5'));
   await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='purple');
   await page.waitForFunction(()=>[...document.querySelectorAll('input')].some(input=>input.value==='1.5'));
-  await panel.getByRole('tab',{name:'可视化',exact:true}).click();
+  await panel.getByRole('tab',{name:'设置',exact:true}).click();
   assert.equal(await stroke.inputValue(),'1.5','raw RMD sync updates structured stroke field');
   await color.click();await page.getByRole('option',{name:'green',exact:true}).last().click();
   await stroke.fill('2.25');

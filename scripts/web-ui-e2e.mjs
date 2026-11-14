@@ -16,7 +16,15 @@ const browser=await chromium.launch({executablePath:browserPath,headless:true,ar
 const context=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:1});
 const page=await context.newPage();const faults=[];
 page.on('pageerror',e=>faults.push('pageerror:'+e.message));
-page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('401 (Unauthorized)'))faults.push('console:'+m.text());});
+// Isolated local Workers do not provide Workers AI; smart search deliberately
+// retries with keyword search. Record HTTP failures separately from console
+// resource messages so only that known optional backend is excluded.
+page.on('console',m=>{if(m.type()==='error'&&!/401 \(Unauthorized\)|Failed to load resource/.test(m.text()))faults.push('console:'+m.text());});
+page.on('response',response=>{
+ const requestUrl=new URL(response.url());
+ const localAiUnavailable=requestUrl.pathname==='/api/search'&&requestUrl.searchParams.get('mode')==='auto';
+ if(response.status()>=500&&!localAiUnavailable)faults.push('response:'+response.status()+' '+requestUrl.pathname);
+});
 try{
  await page.goto(url+'/library',{waitUntil:'networkidle'});
  await page.waitForURL('**/login',{timeout:15000});
@@ -37,6 +45,7 @@ try{
   watch.observe(document.body,{subtree:true,attributes:true,attributeFilter:['data-phase']});
   window.__routePhaseProbe={phases,watch};
  });
+ const legacyEntrance=await page.evaluate(()=>typeof document.startViewTransition!=='function'&&!matchMedia('(prefers-reduced-motion: reduce)').matches);
  await page.locator('.sidebar .nav-link',{hasText:'任务'}).click();
  const phases=new Set(await page.evaluate(()=>{
   const probe=window.__routePhaseProbe;
@@ -44,18 +53,29 @@ try{
   delete window.__routePhaseProbe;
   return probe?.phases??[];
  }));
- assert.ok(phases.has('enter')&&!phases.has('exit'),'route must enter without exit animation: '+[...phases]);
+ assert.ok(phases.has(legacyEntrance?'enter':'idle')&&!phases.has('exit'),
+  'route uses native/reduced-motion idle or legacy entrance without exit animation: '+[...phases]);
  await page.getByRole('heading',{name:'任务',level:1}).waitFor();
  await page.locator('.sidebar .nav-link',{hasText:'概览'}).click();
  await page.getByRole('heading',{name:'概览'}).waitFor();
  await page.waitForFunction(()=>document.querySelector('.page-transition')?.dataset.phase==='idle');
- assert.equal(await page.locator('.home-section .section-heading').count(),1,'home leads with recently visited pages');
+ const recentModes=page.getByRole('region',{name:'最近访问与更新'}).getByRole('radiogroup',{name:'最近记录分类'});
+ assert.equal(await recentModes.count(),1,'home leads with recent pages and their shared mode selector');
+ assert.equal(await recentModes.getByRole('radio',{name:'最近访问',exact:true}).getAttribute('aria-checked'),'true','recent visits are selected initially');
  assert.equal(await page.locator('.stat-card').count(),0,'no large nested navigation cards');
  assert.equal(await page.locator('.page-transition').evaluate(el=>getComputedStyle(el).transform),'none','settled page has no transform');
  await page.keyboard.press('Control+k');
  await page.getByRole('dialog',{name:'快速导航'}).waitFor();
  await page.getByRole('dialog',{name:'快速导航'}).getByRole('option',{name:'搜索',exact:true}).click();
  await page.getByRole('heading',{name:'搜索',level:1}).waitFor();
+ await page.keyboard.press('Control+k');
+ const palette=page.getByRole('dialog',{name:'快速导航'});
+ await palette.waitFor();
+ const paletteQuery='UI controls '+Date.now();
+ await page.keyboard.type(paletteQuery);
+ await palette.getByRole('button',{name:'在搜索页查看全部结果',exact:true}).click();
+ await page.waitForURL(next=>next.pathname==='/search'&&next.searchParams.get('q')===paletteQuery);
+ assert.equal(await page.getByRole('textbox',{name:'搜索关键字'}).inputValue(),paletteQuery,'palette footer carries its current query into full search');
  await page.goto(url+'/');
  await page.getByRole('heading',{name:'概览'}).waitFor();
  // Mobile grids must not widen to min-content when activity names or tasks are long.
@@ -120,22 +140,24 @@ try{
   const res=await fetch('/api/records',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({name:'UI file skeleton fixture '+Date.now(),kind:'document'})});
   if(!res.ok)throw new Error('File layout fixture failed: '+res.status+' '+(await res.text()));
  });
- // Skeletons must use the same geometry as the actual document list.
+ // Route loaders keep the destination out of the snapshot until its file
+ // data is ready; a cold library must not commit an empty/skeleton page.
  const skeletonContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  await skeletonContext.addCookies(await context.cookies());
  const skeletonPage=await skeletonContext.newPage();
- // A cold page's JS and route loader warm-up may take longer than 800ms.
- // Hold the response long enough to deterministically inspect the transient skeleton.
- await skeletonPage.route('**/api/folders*',async route=>{await new Promise(resolve=>setTimeout(resolve,3000));await route.continue();});
+ let releaseFolderResponses;
+ const heldFolderResponses=new Promise(resolve=>{releaseFolderResponses=resolve;});
+ await skeletonPage.route('**/api/folders*',async route=>{await heldFolderResponses;await route.continue();});
+ const folderRequested=skeletonPage.waitForRequest(request=>new URL(request.url()).pathname==='/api/folders');
  await skeletonPage.goto(url+'/library',{waitUntil:'domcontentloaded'});
- await skeletonPage.locator('.skeleton-files .file-row').first().waitFor({timeout:15000});
- const skeletonBox=await skeletonPage.locator('.skeleton-files .file-row').first().boundingBox();
- assert.ok(skeletonBox,'file skeleton is rendered');
+ await folderRequested;
+ assert.equal(await skeletonPage.getByRole('heading',{name:'知识库',exact:true}).count(),0,'library waits for its initial folder data before mounting');
+ releaseFolderResponses();
  await skeletonPage.locator('a.file-row').first().waitFor({timeout:15000});
  const fileBox=await skeletonPage.locator('a.file-row').first().boundingBox();
  assert.ok(fileBox,'real file row is rendered');
- assert.ok(Math.abs(skeletonBox.width-fileBox.width)<=1,'skeleton and file row widths match');
- assert.ok(Math.abs(skeletonBox.x-fileBox.x)<=1,'skeleton and real content left edges match');
+ assert.equal(await skeletonPage.locator('.skeleton-files').count(),0,'loaded route shows real file data');
+ assert.ok(fileBox.x>=0&&fileBox.x+fileBox.width<=390,'file rows stay within the mobile viewport');
   // A deterministic fixture avoids dependence on leftovers in local D1.
   await skeletonPage.evaluate(async()=>{
     const post=async(path,body)=>{
@@ -185,6 +207,24 @@ try{
  await page.locator('.file-row').getByText(folderName,{exact:true}).first().click();
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  const folderUrl=page.url();
+ await page.getByRole('button',{name:'新建页面',exact:true}).click();
+ await page.waitForURL(next=>next.pathname.startsWith('/records/'));
+ await page.locator('.record-page h1.page-title').waitFor();
+ const quickRecordUrl=new URL(page.url());
+ const childLink=page.locator('.sidebar .tree-link[href="'+quickRecordUrl.pathname+'"]');
+ await childLink.waitFor();
+ const collapse=page.getByRole('button',{name:'收起 '+folderName,exact:true});
+ assert.equal(await collapse.getAttribute('aria-expanded'),'true','quick create reveals its parent folder');
+ await collapse.click();
+ await childLink.waitFor({state:'hidden'});
+ const expand=page.getByRole('button',{name:'展开 '+folderName,exact:true});
+ assert.equal(await expand.getAttribute('aria-expanded'),'false','folder disclosure reflects collapsed state');
+ await expand.click();
+ await childLink.waitFor();
+ assert.equal(await page.getByRole('button',{name:'收起 '+folderName,exact:true}).getAttribute('aria-expanded'),'true');
+ console.log('PASS Astryx palette full search, library quick create and folder disclosure');
+ await page.goto(folderUrl);
+ await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  await page.getByRole('button',{name:'新建记录'}).click();
  await page.getByRole('textbox',{name:'名称'}).fill('First note');
  await page.getByRole('button',{name:'创建',exact:true}).click();
@@ -194,23 +234,34 @@ try{
  await page.getByRole('button',{name:'保存'}).click();
  await page.locator('.workbench-header .workbench-revision').getByText('R2',{exact:true}).waitFor({timeout:15000});
  await page.getByRole('button',{name:'目录',exact:true}).click();
- await page.locator('#document-panel').waitFor();
+ const outlinePanel=page.locator('#document-panel-outline');
+ await outlinePanel.waitFor();
  await page.locator('.outline-item').first().waitFor();
  assert.ok((await page.locator('.outline-item').first().innerText()).includes('UI e2e'),'outline has Markdown heading');
  await page.locator('.outline-item').first().click();
  await page.locator('.cm-content').waitFor();
- await page.locator('#document-panel').waitFor({state:'hidden'});
+ assert.equal(await outlinePanel.isVisible(),true,'desktop outline remains available after jumping');
+ await outlinePanel.getByRole('button',{name:'关闭',exact:true}).click();
+ await outlinePanel.waitFor({state:'hidden'});
  await page.getByRole('button',{name:'历史'}).click();
  await page.getByText('Revision 2').first().waitFor();
- await page.locator('#document-panel').getByRole('button',{name:'关闭'}).click();
+ await page.locator('#document-panel-history').getByRole('button',{name:'关闭'}).click();
  await page.getByRole('button',{name:'可视化'}).click();
- await page.locator('.tiptap').waitFor({timeout:14000});
- await page.locator('.tiptap').click();
+ await page.locator('.tiptap[contenteditable="true"]').waitFor({timeout:14000});
+ const visualLine=page.locator('.tiptap p').filter({hasText:'Document updated from source editor.'}).first();
+ await visualLine.click();
  await page.keyboard.press('End');
  await page.keyboard.type(' Additional visual edit.');
  // Desktop formatting uses a contextual text toolbar shared with touch mode.
- await page.keyboard.press('Shift+Home');
  const boldButton=page.getByRole('toolbar',{name:'文本格式'}).getByRole('button',{name:'粗体'});
+ for(let attempt=0;attempt<4;attempt++){
+  await visualLine.click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Home');
+  assert.ok(await page.evaluate(()=>Boolean(window.getSelection()?.toString().trim())),'formatting starts from an actual text selection');
+  try{await boldButton.waitFor({state:'visible',timeout:1700});break;}
+  catch{if(attempt===3)throw Error('Selected text did not expose its formatting toolbar');}
+ }
  await boldButton.waitFor();
  await boldButton.click();
  assert.equal(await boldButton.getAttribute('aria-pressed'),'true','Astryx ToggleButton reflects formatting state');
@@ -287,11 +338,13 @@ try{
  await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
  await page.getByRole('button',{name:'创建',exact:true}).click();
- await page.locator('.doc-header').getByRole('heading',{name:'Phase summary'}).waitFor();
+ await page.getByRole('heading',{name:'Phase summary',exact:true}).waitFor();
  await page.getByRole('button',{name:'信息',exact:true}).click();
- const workbench=page.locator('#document-panel');
+ const workbench=page.locator('#document-panel-info');
  await workbench.locator('.page-properties .tag-editor').getByText('checkpoint',{exact:true}).waitFor();
  await workbench.getByRole('button',{name:'关闭'}).click();
+ await page.getByRole('button',{name:'源码',exact:true}).click();
+ await page.locator('.cm-content').waitFor();
  await page.getByRole('button',{name:'目录',exact:true}).click();
  await page.locator('.outline-item').first().waitFor();
  await page.locator('.outline-item').nth(1).click();

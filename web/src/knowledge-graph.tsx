@@ -215,15 +215,14 @@ export default function KnowledgeGraphPage(){
        <div className="relation-group-heading">直接关联 <span>{connections.length}</span></div>
        {connections.length?<div className="graph-neighbors">{connections.slice(0,24).map(e=>{
         const other=nodes.find(n=>n.id===(e.sourceId===selected?e.targetId:e.sourceId));
-        return <button className="graph-neighbor" key={e.id} onClick={()=>other&&setSelected(other.id)}>
-         {e.type==='semantic'?<Icon name="sparkles" size="sm"/>:e.type==='folder'?<Icon name="folder" size="sm"/>:<Icon name="link" size="sm"/>}
-         <span className="truncate">{other?.name??'未知文档'}</span><small>{relationLabel(e.relation)}</small>
-        </button>;
+        return <Button label={other?.name??'未知文档'} variant="ghost" width="100%" className="graph-neighbor" key={e.id} onClick={()=>other&&setSelected(other.id)}
+         icon={<Icon name={e.type==='semantic'?'sparkles':e.type==='folder'?'folder':'link'} size="sm"/>}
+         endContent={<small className="graph-neighbor-relation">{relationLabel(e.relation)}</small>}/>;
        })}</div>:<p className="muted small">当前图中暂无直接关联。可以从记录详情手动建立链接。</p>}
       </>:<div className="graph-inspector-top"><h2>选择文档</h2><p className="muted small">点击关系图中的节点，查看相连文档并展开。</p></div>}
      <div className="relation-group-heading">已加载文档 <span>{list.length}</span></div>
-     <div className="graph-node-list">{list.slice(0,100).map(n=><button className={'graph-node-option'+(selected===n.id?' is-selected':'')}
-      key={n.id} onClick={()=>setSelected(n.id)}>{n.kind==='task_list'?'☑':'◦'} <span className="truncate">{n.name}</span></button>)}</div>
+     <div className="graph-node-list">{list.slice(0,100).map(n=><Button label={n.name} variant={selected===n.id?'secondary':'ghost'} width="100%" className="graph-node-option" aria-pressed={selected===n.id}
+      icon={<Icon name={n.kind==='task_list'?'taskList':'document'} size="sm"/>} key={n.id} onClick={()=>setSelected(n.id)}/>)}</div>
     </aside>
    </div>}
  </div>;
