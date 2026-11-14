@@ -33,6 +33,9 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 | `web/src/record-workbench.tsx` | Markdown 文档工作台顶部：文件名（显示时隐藏 `.md`）、更新时间/编辑者/字数信息、信息/目录/关联/版本统一检查器；文件名仅在顶部编辑（任务列表不受影响） |
 | `web/src/document-heading.ts`、`web/src/document-filename.ts` | Markdown 字数统计与文档文件名显示/重命名规则；所有 H1 均属于正文，不再提升到标题栏 |
 | `web/src/record-editor.tsx` | 源码、预览、可视化三种模式均显示与编辑完整 Markdown 草稿（包括首个 H1）；版本列表通过 Portal 进入检查器 |
+| `web/src/revision-diff-drawer.tsx`、`revision-diff-content.tsx` | 历史比较使用独立只读 Drawer；固定两个 Revision 并行读取，等待入场动画后按需加载预览，增删块与源码行分批呈现，未改内容可展开 |
+| `web/src/revision-diff.ts`、`revision-word-highlight.ts` | 保留原文的 Markdown/RMD 块差异、带行号的源码差异与有界文字高亮；大文档或复杂差异回退完整源码替换，保持所有内容可查看 |
+| `web/src/markdown-preview-pipeline.ts` | 普通预览与差异预览共享 RMD 投影、属性和标题处理及 HTML 清洗；文字高亮发生在清洗后、KaTeX 前，避免改写代码或公式输入 |
 | `web/src/visual-editor.tsx` | 可视化编辑器稳定入口，保持默认组件导出与 `VisualEditorHandle` 类型导出 |
 | `web/src/visual-editor/` | 可视化编辑器装配、Tiptap 扩展组合、选区状态、共享格式工具栏、表格操作、斜杠/引用补全与弹出菜单 |
 | `web/src/tiptap/` | Tiptap 节点、命令、插件与编辑器交互原语，不包含页面级工具栏布局 |

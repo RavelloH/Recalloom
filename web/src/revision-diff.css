@@ -1,0 +1,125 @@
+/* The comparison owns its document review surface; editor chrome stays separate. */
+.revision-diff {
+  --revision-add: var(--color-text-green, #187744);
+  --revision-remove: var(--color-text-red, #bd3434);
+  --revision-add-wash: color-mix(in srgb, var(--revision-add) 8%, var(--rk-canvas));
+  --revision-remove-wash: color-mix(in srgb, var(--revision-remove) 7%, var(--rk-canvas));
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--color-text-primary);
+  background: var(--rk-canvas);
+}
+
+.revision-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--rk-border-soft);
+}
+
+.revision-diff-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.revision-diff-heading > div { min-width: 0; }
+.revision-diff-heading h2 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
+.revision-diff-heading p { margin: 5px 0 0; font-size: var(--rk-font-small); color: var(--rk-ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revision-diff-icon { display: flex; padding: 10px; border: 1px solid var(--rk-border-soft); border-radius: 10px; color: var(--rk-ink-soft); }
+.revision-diff-summary { display: flex; align-items: center; gap: 9px; font-family: var(--rk-font-mono); font-size: var(--rk-font-small); }
+.revision-diff-summary > span { padding: 4px 8px; border: 1px solid var(--rk-border-soft); border-radius: 5px; }
+.revision-diff-summary > svg { color: var(--rk-ink-faint); }
+
+.revision-diff-content { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.revision-diff-toolbar { display: flex; align-items: center; gap: 20px; padding: 12px 28px; flex: none; border-bottom: 1px solid var(--rk-border-soft); }
+.revision-diff-counts { display: flex; gap: 12px; font-size: var(--rk-font-small); font-weight: 600; font-family: var(--rk-font-mono); }
+.revision-diff-counts [data-kind="added"] { color: var(--revision-add); }
+.revision-diff-counts [data-kind="removed"] { color: var(--revision-remove); }
+.revision-diff-navigation { display: flex; align-items: center; gap: 3px; margin-inline-start: auto; }
+.revision-diff-navigation > span { color: var(--rk-ink-soft); font-size: var(--rk-font-small); margin-inline-end: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.revision-diff-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 24px 28px 32px; outline: none; }
+.revision-diff-scroll:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.revision-diff-file { border: 1px solid var(--rk-border-soft); border-radius: 9px; overflow: hidden; }
+.revision-diff-file-heading { display: flex; align-items: center; gap: 8px; padding: 11px 16px; background: var(--rk-hover); border-bottom: 1px solid var(--rk-border-soft); font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
+.revision-diff-file-heading > span:last-child { margin-inline-start: auto; color: var(--rk-ink-faint); font-size: var(--rk-font-caption); }
+
+.revision-diff-block { display: grid; grid-template-columns: 36px minmax(0, 1fr); scroll-margin-block-start: 12px; outline: none; }
+.revision-diff-block + .revision-diff-block { border-top: 1px solid color-mix(in srgb, var(--rk-border-soft) 65%, transparent); }
+.revision-diff-block[data-kind="added"], .revision-source-row[data-kind="added"] { background: var(--revision-add-wash); }
+.revision-diff-block[data-kind="removed"], .revision-source-row[data-kind="removed"] { background: var(--revision-remove-wash); }
+.revision-diff-gutter { display: flex; justify-content: center; align-items: flex-start; padding-top: 37px; font: 600 16px var(--rk-font-mono); border-inline-end: 1px solid var(--rk-border-soft); color: var(--rk-ink-faint); user-select: none; }
+.revision-diff-block[data-kind="added"] > .revision-diff-gutter { color: var(--revision-add); background: color-mix(in srgb, var(--revision-add) 6%, transparent); }
+.revision-diff-block[data-kind="removed"] > .revision-diff-gutter { color: var(--revision-remove); background: color-mix(in srgb, var(--revision-remove) 6%, transparent); }
+.revision-diff-block-body { min-width: 0; padding: 12px 24px 20px; }
+.revision-diff-block-location { font: 10px var(--rk-font-mono); color: var(--rk-ink-faint); margin-bottom: 8px; user-select: none; }
+.revision-diff-block-body .markdown-preview { padding: 0; margin: 0; max-width: none; min-height: 0; }
+.revision-diff-block-body .markdown-preview > :first-child { margin-top: 0; }
+.revision-diff-block-body .markdown-preview > :last-child { margin-bottom: 0; }
+.revision-diff-block-body .markdown-preview :is(pre, .tableWrapper, .rk-rich-code) { max-width: 100%; }
+.revision-diff-block-body .markdown-preview .footnotes { font-size: var(--rk-font-small); }
+.revision-diff-block[data-kind="added"] .rk-revision-word { background: color-mix(in srgb, var(--revision-add) 22%, transparent); border-radius: 2px; box-shadow: 0 1px 0 color-mix(in srgb, var(--revision-add) 30%, transparent); }
+.revision-diff-block[data-kind="removed"] .rk-revision-word { background: color-mix(in srgb, var(--revision-remove) 20%, transparent); border-radius: 2px; box-shadow: 0 1px 0 color-mix(in srgb, var(--revision-remove) 30%, transparent); }
+.revision-diff-block:focus, .revision-source-row:focus { box-shadow: inset 3px 0 0 var(--color-text-primary); }
+.revision-diff-raw { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font: var(--rk-font-small)/1.8 var(--rk-font-mono); }
+.revision-diff-hidden { margin: 0; font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
+
+.revision-diff-context { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 16px; margin: 0; border: 0; border-block: 1px solid var(--rk-border-soft); background: var(--rk-hover); color: var(--rk-ink-soft); font: inherit; font-size: var(--rk-font-small); cursor: pointer; }
+.revision-diff-context:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.revision-diff-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px 0 0; font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
+.revision-diff-note { padding: 12px 14px; margin: 0 0 16px; border: 1px solid var(--rk-border-soft); border-radius: 6px; font-size: var(--rk-font-small); line-height: 1.7; color: var(--rk-ink-soft); }
+.revision-diff-footnote { margin: 16px 0 0; color: var(--rk-ink-faint); font-size: var(--rk-font-caption); line-height: 1.7; }
+.revision-diff-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 16px; color: var(--rk-ink-soft); text-align: center; }
+.revision-diff-empty > svg { color: var(--revision-add); }
+.revision-diff-empty h3 { margin: 20px 0 8px; font-size: var(--rk-font-control); color: var(--color-text-primary); }
+.revision-diff-empty p { margin: 0; font-size: var(--rk-font-small); }
+.revision-diff-message { padding: 24px 28px; }
+.revision-diff-pending { padding: 32px; color: var(--rk-ink-soft); font-size: var(--rk-font-small); }
+.revision-diff-skeleton { display: grid; gap: 18px; padding-top: 32px; }
+.revision-diff-skeleton i { display: block; height: 14px; width: 85%; border-radius: 3px; background: var(--rk-hover); }
+.revision-diff-skeleton i:nth-child(2) { width: 65%; }
+.revision-diff-skeleton i:nth-child(4) { width: 75%; }
+
+.revision-source-row { display: grid; grid-template-columns: calc(4.2ch + 14px) calc(4.2ch + 14px) 24px minmax(0, 1fr); font: 12px/1.9 var(--rk-font-mono); scroll-margin-block-start: 8px; outline: none; }
+.revision-source-old-line, .revision-source-new-line { padding-inline: 6px; text-align: end; color: var(--rk-ink-faint); user-select: none; border-inline-end: 1px solid var(--rk-border-soft); }
+.revision-source-sign { text-align: center; user-select: none; color: var(--rk-ink-soft); }
+.revision-source-row[data-kind="added"] .revision-source-sign { color: var(--revision-add); }
+.revision-source-row[data-kind="removed"] .revision-source-sign { color: var(--revision-remove); }
+.revision-source-text { display: block; min-width: 0; padding-inline-end: 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; tab-size: 2; }
+.revision-source-ending { display: inline-block; margin-inline-start: 10px; padding-inline: 5px; border: 1px solid var(--rk-border-soft); border-radius: 3px; color: var(--rk-ink-soft); font-size: 10px; white-space: nowrap; }
+.revision-diff-source-section { outline: none; scroll-margin-block-start: 8px; }
+.revision-diff-source-section > .revision-diff-more { padding: 16px; border-block: 1px solid var(--rk-border-soft); }
+.revision-diff-link-card, .revision-diff-embed { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--rk-border-soft); border-radius: 6px; overflow-wrap: anywhere; font-size: var(--rk-font-small); }
+.revision-diff-link-card > span, .revision-diff-embed > span { color: var(--rk-ink-soft); }
+
+@media (hover: hover) and (pointer: fine) {
+  .revision-diff-context:hover { background: var(--rk-active); color: var(--color-text-primary); }
+}
+
+@media (max-width: 640px) {
+  .revision-diff-header { padding: 18px 16px 16px; gap: 10px; }
+  .revision-diff-heading { gap: 9px; }
+  .revision-diff-heading h2 { font-size: 17px; }
+  .revision-diff-heading p { max-width: 135px; font-size: 11px; }
+  .revision-diff-icon { display: none; }
+  .revision-diff-summary { gap: 5px; font-size: 11px; }
+  .revision-diff-summary > span { padding: 3px 5px; }
+  .revision-diff-toolbar { padding: 10px 12px; gap: 10px; flex-wrap: wrap; }
+  .revision-diff-counts { gap: 8px; font-size: 11px; }
+  .revision-diff-navigation { gap: 0; }
+  .revision-diff-navigation > span { font-size: 11px; margin-inline-end: 2px; }
+  .revision-diff-scroll { padding: 16px 10px 24px; }
+  .revision-diff-block { grid-template-columns: 24px minmax(0, 1fr); }
+  .revision-diff-block-body { padding: 10px 12px 16px; }
+  .revision-diff-block-location { font-size: 9px; }
+  .revision-source-row { font-size: 10px; grid-template-columns: calc(4.2ch + 10px) calc(4.2ch + 10px) 20px minmax(0, 1fr); }
+  .revision-source-old-line, .revision-source-new-line { padding-inline: 4px; }
+  .revision-diff-file-heading { padding: 10px 12px; }
+  .revision-diff-more { flex-wrap: wrap; }
+}

@@ -26,6 +26,7 @@ import {planThreeWayMerge,resolveThreeWayMerge,preserveUnchangedVisualTerminator
 import {checkMergeStructure} from './merge-structure-check';
 import {getNavigationTransitionFinished} from './shared-view-transition';
 import type {MergeReview} from './editor-merge-review';
+import {RevisionDiffDrawer,type RevisionComparison} from './revision-diff-drawer';
 
 const EditorMergeReview=React.lazy(()=>import('./editor-merge-review')
  .then(mod=>({default:mod.EditorMergeReview})));
@@ -68,7 +69,9 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
  useDocumentCharacterCount(draft,reportCharacters);
  const visibleDraft=draft;
  const visibleFocusLine=jumpToLine?.line;
- const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState(''),[diff,setDiff]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[warning,setWarning]=useState('');
+ const [comparison,setComparison]=useState<RevisionComparison|null>(null);
+ const [comparisonOpen,setComparisonOpen]=useState(false);
  const [mergeBusy,setMergeBusy]=useState(false);
  const [mergeReview,setMergeReview]=useState<MergeReview|null>(null);
  const [mergeBackup,setMergeBackup]=useState(()=>readSessionMergeBackup(sessionId,item.id));
@@ -175,7 +178,10 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
   return()=>window.removeEventListener('keydown',handler);
  },[]);
  const versionsQuery=useQuery({queryKey:['versions',item.id],queryFn:()=>versions(item.id),enabled:Boolean(historyTarget)});
- const showDiff=async(rev:number)=>{try{const value=await api<{diff?:string;patch?:string;changed:boolean}>('/records/'+item.id+'/diff?from='+rev+'&to='+item.revision);setDiff(value.diff||value.patch||JSON.stringify(value,null,2));}catch(e){setError(e);}};
+ const showDiff=(from:number)=>{
+  setComparison({recordId:item.id,name:item.name,from,to:item.revision});
+  setComparisonOpen(true);
+ };
  const restore=async(rev:number)=>{
   if(changed||remoteAhead||busy||!(await askConfirm({title:'恢复历史版本？',description:'这会将所选版本的内容创建为一个新的当前 Revision，不会覆盖已有历史。',actionLabel:'恢复该版本'})))return;
   setBusy(true);setError(null);
@@ -366,7 +372,8 @@ export function RecordEditor({item,onSaved,jumpToLine,pageActions,archiveNotice,
   {warning&&<Banner status="warning" container="section" title="编辑提醒" description={warning}/>}
   </div></AutoResizer>
   <AutoTransition transitionKey={mode+':'+editorKey} duration={.16}><div className="editor-body editor-view" data-mode={mode} aria-busy={busy||Boolean(openingTransition)}>{openingTransition?<div className="editor-pending" aria-busy="true"/>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}>{mode==='source'?<SourceEditor value={visibleDraft} onChange={changeVisibleDraft} focusLine={visibleFocusLine} focusToken={jumpToLine?.token}/>:mode==='preview'?<PreviewEditor content={visibleDraft} sourceId={item.id}/>:<VisualEditor ref={visualRef} value={visibleDraft} recordId={item.id} onChange={changeVisibleDraft}/>}</React.Suspense>}</div></AutoTransition>
-  {historyTarget&&createPortal(<div className="history-panel"><h3 className="workbench-history-title">版本历史</h3>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||remoteAhead||v.revision===base.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}{diff&&<pre className="diff-output">{diff}</pre>}</div>,historyTarget)}
+  {historyTarget&&createPortal(<div className="history-panel"><h3 className="workbench-history-title">版本历史</h3>{versionsQuery.isPending?<p className="muted">加载版本…</p>:versionsQuery.isError?<Banner status="error" container="section" title="历史版本加载失败" description={versionsQuery.error.message}/>:versionsQuery.data?.items.map(v=><div className="history-row" key={v.revision}><div><strong>Revision {v.revision}</strong><p className="muted small">{v.message||'修改'} · {v.actor||''}</p></div><div className="row gap"><Button label="比较" size="sm" icon={<Icon name="arrowsDiff" size="sm"/>} onClick={()=>showDiff(v.revision)} isDisabled={v.revision===item.revision}/><Button label="恢复" size="sm" icon={<Icon name="restore" size="sm"/>} isDisabled={changed||remoteAhead||v.revision===base.revision||busy} onClick={()=>restore(v.revision)}/></div></div>)}</div>,historyTarget)}
+  {comparison&&<RevisionDiffDrawer key={comparison.recordId+':'+comparison.from+':'+comparison.to} comparison={comparison} isOpen={comparisonOpen} onOpenChange={setComparisonOpen}/>}
   <React.Suspense fallback={null}>{mergeReview&&<EditorMergeReview
    review={mergeReview} busy={mergeBusy} onChoose={chooseMerge} onEdit={editMerge}
    onClose={()=>{if(!mergeBusy)setMergeReview(null);}}

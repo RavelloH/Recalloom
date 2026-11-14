@@ -19,7 +19,7 @@ const suite=[
  'editor-interaction-v3-e2e.mjs','editor-toolbar-v4-e2e.mjs','editor-responsive-v5-e2e.mjs','editor-toolbar-selection-v6-e2e.mjs','editor-toolbar-layout-e2e.mjs','editor-format-preview-e2e.mjs','editor-sketch-preview-fragments-e2e.mjs','editor-sketch-drag-sync-v7-e2e.mjs','editor-context-v5-actions-e2e.mjs','editor-rmd-attrs-drawer-e2e.mjs',
  'editor-direct-visible-text-e2e.mjs','editor-rich-container-fields-e2e.mjs',
  'editor-rich-leaf-fields-e2e.mjs','editor-nested-block-handle-e2e.mjs',
- 'editor-nested-block-drag-e2e.mjs','editor-container-id-e2e.mjs'
+ 'editor-nested-block-drag-e2e.mjs','editor-container-id-e2e.mjs','revision-diff-e2e.mjs'
 ];
 // Destructive lifecycle tests are opt-in and only run against the local,
 // temporary Worker/D1 created by this harness.

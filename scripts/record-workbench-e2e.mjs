@@ -156,7 +156,10 @@ try{
  assert.equal(await page.getByRole('dialog',{name:'版本历史'}).count(),0,'Do not open a second, separate history drawer');
  const revision=inspector.locator('.history-row').filter({hasText:'Revision 1'});
  await revision.getByRole('button',{name:'比较'}).click();
- await inspector.locator('.diff-output').waitFor();
+ const comparison=page.getByRole('dialog',{name:'版本对比'});
+ await comparison.locator('.revision-diff-block').first().waitFor();
+ await comparison.getByRole('button',{name:'关闭版本对比'}).click();
+ await comparison.waitFor({state:'hidden'});
  await inspector.getByRole('tab',{name:'目录'}).click();
  await inspector.getByRole('button',{name:'Workbench heading'}).waitFor();
  await inspector.getByRole('button',{name:'Workbench heading'}).click();

@@ -29,7 +29,7 @@
 | features/motion.css | 动画定义、全局运动与过渡 |
 | icons.css | 统一 Icon SVG 方格与 Astryx Banner 图标槽兼容；不再使用包装层 |
 
-编辑器、聊天等组件自身导入的局部 CSS（如 tiptap/editor.css、rmd-chat.css、block-handle.css）继续独立维护，不能用它们当做全局补丁。
+编辑器、聊天等组件自身导入的局部 CSS（如 tiptap/editor.css、rmd-chat.css、block-handle.css）继续独立维护，不能用它们当做全局补丁。revision-diff.css 由版本对比 Drawer 加载，负责只读预览、源码行号与增删配色，不覆盖编辑器本体。
 
 ## 核心规则
 
