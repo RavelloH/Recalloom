@@ -44,8 +44,10 @@ function RecentRail({children,loading=false,itemCount}:{children:ReactNode;loadi
 
 export function HomePage(){
  const [recentMode,setRecentMode]=useState<RecentMode>(initialRecentMode);
+ const recentModeHasSwitched=useRef(false);
  const switchRecentMode=(next:string)=>{
   const mode:RecentMode=next==='updated'?'updated':'visited';
+  recentModeHasSwitched.current=true;
   setRecentMode(mode);
   try{sessionStorage.setItem(recentModeKey,mode);}catch{/* private browsing */}
  };
@@ -79,7 +81,7 @@ export function HomePage(){
    const sourceKey=(recentMode==='visited'?'recent:':'updated:')+page.id;
    const timestamp=recentMode==='visited'?'visitedAt':'updatedAt';
    const meta=timestamp==='visitedAt'&&'visitedAt' in page?page.visitedAt:'updatedAt' in page?page.updatedAt:undefined;
-   return <Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className="recent-page" onClick={()=>markSharedNavigationSource(sourceKey)}>
+   return <Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className={'recent-page'+(recentModeHasSwitched.current?' recent-page-enter':'')} onClick={()=>markSharedNavigationSource(sourceKey)}>
     <span className="recent-page-cover" aria-hidden="true"/>
     <span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span>
     <strong className="recent-page-name"><span className="rk-shared-text" {...sharedSourceAttributes('record',page.id,sourceKey)}>{page.kind==='document'?documentDisplayName(page.name):page.name}</span>{page.kind==='document'&&/\.md$/i.test(page.name)&&<span className="rk-shared-extension">{page.name.slice(-3)}</span>}</strong>

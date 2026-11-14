@@ -7,6 +7,21 @@
   min-width: 0;
 }
 
+/* Let native modal setup finish before spending the panel's entry frames. */
+@media (prefers-reduced-motion: no-preference) {
+  .rk-context-panel-drawer.rk-context-panel-entering {
+    transform: translateX(100%);
+    transition: none;
+  }
+  .rk-context-panel-drawer.rk-context-panel-entering:dir(rtl) {
+    transform: translateX(-100%);
+  }
+  .rk-context-panel-sheet.rk-context-panel-entering {
+    transform: translateY(100%);
+    transition: none;
+  }
+}
+
 .record-inspector dt {
   color: var(--color-text-secondary,#888);
 }

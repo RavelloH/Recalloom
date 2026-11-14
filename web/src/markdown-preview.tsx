@@ -61,7 +61,7 @@ const components:Components={
 };
 
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
-export default function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparison,isRevisionPreview=false,idScope}:{
+function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparison,isRevisionPreview=false,idScope}:{
  content:string;sourceId?:string;trail?:string[];depth?:number;
  referenceIndex?:ReturnType<typeof collectRmdPreviewRefs>;comparison?:{content:string;side:'added'|'removed'}
  isRevisionPreview?:boolean;idScope?:string;
@@ -209,3 +209,6 @@ export default function MarkdownPreview({content,sourceId,trail,depth=0,referenc
    components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
  </article>;
 }
+
+// Inspector state changes must not reparse and rebuild unchanged prose/math.
+export default React.memo(MarkdownPreview);

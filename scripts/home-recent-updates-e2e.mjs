@@ -292,6 +292,34 @@ try{
  await page.locator('.recent-page').filter({hasText:docB.name}).waitFor();
  assert.equal(await cards.count(),payload.items.length);
  console.log('PASS tab selection survives history and reload without duplicating cards');
+ // A record present in both modes must animate again when the populated
+ // carousel is replaced in either direction, including after a full reload.
+ if(mobileRun&&!await page.evaluate(()=>matchMedia('(prefers-reduced-motion: reduce)').matches)){
+  const sameRecord=page.locator('.recent-page').filter({hasText:docB.name});
+  const sampleSameRecordEnter=async(label)=>{
+   assert.ok(await sameRecord.count()>0,'shared record must exist before '+label);
+   await page.evaluate(name=>{
+    window.__rkSameCardMotion=[];
+    const until=performance.now()+700;
+    const sample=()=>{
+     const card=[...document.querySelectorAll('.recent-page-enter')].find(el=>el.textContent.includes(name));
+     if(card)window.__rkSameCardMotion.push(new DOMMatrixReadOnly(getComputedStyle(card).transform).m42);
+     if(performance.now()<until)requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+   },docB.name);
+   await radio(label).click();
+   await page.locator('.home-recent-content .recent-page-enter').filter({hasText:docB.name}).waitFor();
+   await page.waitForTimeout(760);
+   assert.ok(await sameRecord.count()>0,'shared record must remain populated after '+label);
+   const values=await page.evaluate(()=>window.__rkSameCardMotion);
+   assert.ok(values.some(y=>y>0.1&&y<5.9),
+    'shared record must replay its mobile enter motion when switching to '+label+': '+JSON.stringify(values.slice(0,12)));
+  };
+  await sampleSameRecordEnter('最近访问');
+  await sampleSameRecordEnter('最近更新');
+  console.log('PASS mobile populated-to-populated card animation in both directions');
+ }
  // Verify BOTH animations are real: content fades, while its height resizes
  // between an empty local history and populated server results. This catches
  // regressions where a clipping wrapper is present but never animates.
@@ -311,7 +339,9 @@ try{
    const panes=[...document.querySelectorAll('.home-recent-content')];
    window.__rkRecentMotion.push({
     h:box?.getBoundingClientRect().height??0,
-    opacity:panes.map(el=>Number(getComputedStyle(el).opacity))
+    opacity:panes.map(el=>Number(getComputedStyle(el).opacity)),
+    cardY:[...document.querySelectorAll('.recent-page-enter')].map(el=>
+     new DOMMatrixReadOnly(getComputedStyle(el).transform).m42)
    });
    if(performance.now()<until)requestAnimationFrame(sample);
   };
@@ -328,6 +358,10 @@ try{
   'AutoTransition must actually fade swapped content: '+JSON.stringify(motion.slice(0,8)));
  assert.ok(motion.some(sample=>sample.h>emptyHeight+10&&sample.h<finalHeight-10),
   'AutoResizer must interpolate height rather than jump: '+JSON.stringify({emptyHeight,finalHeight,heights:motion.map(item=>item.h).slice(0,15)}));
+ if(mobileRun&&!await page.evaluate(()=>matchMedia('(prefers-reduced-motion: reduce)').matches)){
+  assert.ok(motion.some(sample=>sample.cardY.some(y=>y>0.1&&y<5.9)),
+   'mobile recent cards must animate independently of the masked carousel: '+JSON.stringify(motion.filter(sample=>sample.cardY.length).slice(0,8)));
+ }
  console.log('PASS AutoTransition fade and AutoResizer interpolated height on real content swap');
  assert.deepEqual(faults,[],'recent updates must not introduce runtime errors');
 }finally{await browser.close();}

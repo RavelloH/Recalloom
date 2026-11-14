@@ -1,34 +1,207 @@
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
-import {existsSync,readFileSync} from 'node:fs';
+import {chromium,webkit} from 'playwright-core';
+import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {join} from 'node:path';
 
-const executablePath=[
+const engine=(process.env.RECALLOOM_E2E_BROWSER??process.env.RECALLOOM_TEST_ENGINE)==='webkit'?'webkit':'chromium';
+const executablePath=engine==='chromium'&&[
  process.env.RECALLOOM_BROWSER_PATH,
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'
 ].find(value=>value&&existsSync(value));
 const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
-assert.ok(executablePath&&secretLine,'Isolated browser and local secret required');
-const secret=secretLine.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
+const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
+assert.ok((engine==='webkit'||executablePath)&&secret,'Isolated browser and local secret required');
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Only temporary local Worker is permitted');
-const browser=await chromium.launch({headless:true,executablePath});
-const page=await browser.newPage({viewport:{width:1440,height:900}});
+const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(executablePath?{executablePath}:{})});
+const page=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:'no-preference'});
+// Windows WebKit exits on height changes after dismissing a native sheet.
+// Keep its width/motion matrix at a fixed height; Chromium also exercises
+// the shorter phone viewports. Both still cover the 320px/390px sheet widths.
+const mobileHeight=engine==='webkit'?900:844;
+const narrowHeight=engine==='webkit'?900:740;
 page.setDefaultTimeout(25000);
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
+const motionSamples=[];
+const motionDiagnosticPath=join('tmp','workbench-inspector-motion-'+engine+'-'+Date.now()+'.json');
+
+await page.addInitScript(()=>{
+ window.__workbenchInspectorMotion=[];
+ window.__workbenchInspectorSessions=[];
+ window.__workbenchMotionSession=null;
+ const panelFor=()=>{
+  const host=document.querySelector('dialog[aria-label="文档检查器"]');
+  if(!host)return null;
+  return {host,target:host.querySelector('.astryx-bottom-sheet')||host};
+ };
+ const rectOf=element=>{
+  const rect=element.getBoundingClientRect();
+  return {x:rect.x,y:rect.y,width:rect.width,height:rect.height};
+ };
+ const frame=(session)=>{
+  if(session.target&&session.host?.open){
+   session.frames.push({time:performance.now(),target:session.target,host:session.host,
+    transform:getComputedStyle(session.target).transform});
+  }
+  if(session.endTime!==null){
+   session.framesAfterEnd++;
+   if(session.framesAfterEnd>=2){session.stopped=true;return;}
+  }
+  requestAnimationFrame(()=>frame(session));
+ };
+ document.addEventListener('click',()=>{
+  const session=window.__workbenchMotionSession;
+  if(!session||session.clickTime!==null)return;
+  session.clickTime=performance.now();
+  const panel=panelFor();
+  if(panel){session.host=panel.host;session.target=panel.target;}
+  requestAnimationFrame(()=>frame(session));
+ },true);
+ const capture=event=>{
+  if(event.propertyName!=='transform'||!(event.target instanceof Element))return;
+  const host=event.target.closest('dialog[aria-label="文档检查器"]');
+  if(!host)return;
+  const nativePanel=event.target===host||event.target.classList.contains('astryx-bottom-sheet');
+  if(!nativePanel)return;
+  const transition=event.target.getAnimations().find(animation=>animation.transitionProperty==='transform');
+  const session=window.__workbenchMotionSession;
+  if(session&&session.clickTime!==null&&!session.target){session.host=host;session.target=event.target;}
+  const record={
+   phase:event.type,time:performance.now(),propertyName:event.propertyName,target:event.target,host,nativePanel,
+   targetTag:event.target.tagName,targetClass:typeof event.target.className==='string'?event.target.className:'',
+   transform:getComputedStyle(event.target).transform,
+   keyframes:transition?.effect?.getKeyframes().map(frame=>frame.transform).filter(value=>typeof value==='string')??[],
+   rect:rectOf(event.target)
+  };
+  window.__workbenchInspectorMotion.push(record);
+  if(session&&session.clickTime!==null){
+   session.events.push(record);
+   if(event.type==='transitionend'&&event.target===session.events.find(item=>item.phase==='transitionrun')?.target){
+    session.endTime=record.time;
+    session.framesAfterEnd=0;
+   }
+  }
+ };
+ document.addEventListener('transitionrun',capture,true);
+ document.addEventListener('transitionend',capture,true);
+ const showModal=HTMLDialogElement.prototype.showModal;
+ HTMLDialogElement.prototype.showModal=function(...args){
+  const session=window.__workbenchMotionSession;
+  const track=this.getAttribute('aria-label')==='文档检查器'&&session&&session.clickTime!==null;
+  if(track){
+   session.showModalBefore=performance.now();
+   session.host=this;
+   session.target=this.querySelector('.astryx-bottom-sheet')||this;
+  }
+  const result=showModal.apply(this,args);
+  if(track)session.showModalAfter=performance.now();
+  return result;
+ };
+});
+
+const resetMotionSamples=label=>page.evaluate(label=>{
+ const session={label,clickTime:null,showModalBefore:null,showModalAfter:null,endTime:null,host:null,target:null,
+  framesAfterEnd:0,stopped:false,events:[],frames:[]};
+ window.__workbenchMotionSession=session;
+ window.__workbenchInspectorSessions.push(session);
+},label);
+const assertInspectorTransformMotion=async(label,viewport)=>{
+ await page.waitForFunction(()=>{
+  const session=window.__workbenchMotionSession;
+  return session?.stopped===true;
+ });
+ const sample=await page.evaluate(()=>{
+  const session=window.__workbenchMotionSession;
+  const events=session?.events??[];
+  for(let index=0;index<events.length;index++){
+   const start=events[index];
+   if(start.phase!=='transitionrun'||start.propertyName!=='transform')continue;
+   const end=events.slice(index+1).find(event=>event.phase==='transitionend'&&event.propertyName==='transform'&&event.target===start.target);
+   if(end){
+    const frames=session.frames.filter(frame=>frame.target===start.target&&frame.time>start.time&&frame.time<end.time);
+    const point=transform=>{
+     if(!transform||transform==='none')return {x:0,y:0};
+     const match=/^matrix(3d)?\(([^)]+)\)$/.exec(transform);
+     if(!match)return null;
+     const values=match[2].split(',').map(Number);
+     return match[1]?{x:values[12],y:values[13]}:{x:values[4],y:values[5]};
+    };
+    const startPoint=point(start.transform),endPoint=point(end.transform);
+    const dx=endPoint&&startPoint?endPoint.x-startPoint.x:end.rect.x-start.rect.x;
+    const dy=endPoint&&startPoint?endPoint.y-startPoint.y:end.rect.y-start.rect.y;
+    const lengthSquared=dx*dx+dy*dy;
+    const intermediateFrame=lengthSquared>1&&startPoint&&endPoint&&frames.some(frame=>{
+     const framePoint=point(frame.transform);
+     if(!framePoint)return false;
+     const fx=framePoint.x-startPoint.x,fy=framePoint.y-startPoint.y;
+     const along=(fx*dx+fy*dy)/lengthSquared;
+     const offPath=Math.abs(dx*fy-dy*fx)/Math.sqrt(lengthSquared);
+     return along>0.02&&along<0.98&&offPath<2;
+    });
+    return {targetTag:start.targetTag,targetClass:start.targetClass,sameHost:start.host===end.host,
+    startTransform:start.transform,endTransform:end.transform,keyframes:start.keyframes,
+    startRect:start.rect,endRect:end.rect,runTime:start.time,endTime:end.time,
+    frameCount:session.frames.length,intermediateFrame};
+   }
+  }
+  return null;
+ });
+ assert.ok(sample,'Inspector transform transition was not captured: '+label);
+ assert.ok(sample.sameHost,'Inspector transition changed native host: '+label+' '+JSON.stringify(sample));
+ const expectedTarget=viewport<=720?'astryx-bottom-sheet':'DIALOG';
+ assert.ok(viewport<=720?sample.targetClass.includes(expectedTarget):sample.targetTag===expectedTarget,
+  'Inspector transition must animate its '+(viewport<=720?'BottomSheet panel':'Drawer dialog')+': '+label+' '+JSON.stringify(sample));
+ assert.ok(sample.keyframes.length>=2&&new Set(sample.keyframes).size>1,
+  'Inspector transform must have distinct Web Animations API keyframes: '+label+' '+JSON.stringify(sample));
+ assert.notEqual(sample.startTransform,sample.endTransform,
+  'Inspector transform must visibly change over the transition: '+label+' '+JSON.stringify(sample));
+ const travel=Math.hypot(sample.startRect.x-sample.endRect.x,sample.startRect.y-sample.endRect.y);
+ assert.ok(travel>1,'Inspector panel must travel across frames: '+label+' '+JSON.stringify({travel,...sample}));
+ assert.ok(sample.intermediateFrame,
+  'Inspector must have a sampled animation frame between its start and end positions: '+label+' '+JSON.stringify(sample));
+ motionSamples.push({label,engine,viewport,...sample});
+ return sample;
+};
+
+const saveMotionDiagnostics=async()=>{
+ mkdirSync('tmp',{recursive:true});
+ const observed=await page.evaluate(()=>({events:window.__workbenchInspectorMotion?.map(event=>({phase:event.phase,
+  time:event.time,propertyName:event.propertyName,targetTag:event.targetTag,targetClass:event.targetClass,transform:event.transform,
+  keyframes:event.keyframes,rect:event.rect}))??[],sessions:window.__workbenchInspectorSessions?.map(session=>({label:session.label,
+  clickTime:session.clickTime,showModalBefore:session.showModalBefore,showModalAfter:session.showModalAfter,
+  endTime:session.endTime,stopped:session.stopped,events:session.events.map(event=>({phase:event.phase,time:event.time,
+   targetTag:event.targetTag,targetClass:event.targetClass,transform:event.transform,rect:event.rect})),
+  frames:session.frames.map(frame=>({time:frame.time,transform:frame.transform}))}))??[]})).catch(()=>({events:[],sessions:[]}));
+ writeFileSync(motionDiagnosticPath,JSON.stringify({engine,samples:motionSamples,...observed},null,2));
+};
+let sessionCookie='';
 try{
+ await page.route('**/api/**',async route=>{
+  const request=route.request();
+  const url=new URL(request.url());
+  if(url.pathname.endsWith('/editors'))await new Promise(resolve=>setTimeout(resolve,1100));
+  if(engine==='webkit'&&url.pathname==='/api/auth/login'){
+   const response=await route.fetch();
+   sessionCookie=/^(__Host-recalloom_session=[^;]+)/.exec(response.headers()['set-cookie']??'')?.[1]??'';
+   await route.fulfill({response});
+   return;
+  }
+  if(engine==='webkit'&&sessionCookie){
+   await route.fulfill({response:await route.fetch({headers:{...(await request.allHeaders()),cookie:sessionCookie}})});
+   return;
+  }
+  await route.continue();
+ });
  await page.goto(base+'/login');
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
+ if(engine==='webkit')assert.ok(sessionCookie,'WebKit loopback login cookie must be bridged');
  await page.goto(base+'/library');
  // The editor-author query is independent of the record timestamp. Delay it
  // to prove that no separator, dash or author label leaks during loading.
- await page.route('**/api/records/*/editors',async route=>{
-  await new Promise(resolve=>setTimeout(resolve,1100));
-  await route.continue();
- });
  const name='Knowledge Workbench '+Date.now();
  await page.getByRole('button',{name:'新建记录'}).click();
  await page.getByRole('textbox',{name:'名称'}).fill(name);
@@ -48,7 +221,6 @@ try{
  assert.ok(await header.locator('.workbench-summary-resizer').count()>0,'metadata line must use AutoResizer');
  const metaLabels=await header.locator('.workbench-summary-details').innerText();
  assert.ok(metaLabels.indexOf(' 字')<metaLabels.indexOf('编辑者：'),'editor metadata should appear last');
- await page.unroute('**/api/records/*/editors');
  // All pages share one first-content baseline. At tablet widths editor
  // controls stay in the document flow BELOW the header, while breadcrumbs
  // stay in the anchored shell bar. Phones keep compact in-flow controls.
@@ -99,9 +271,24 @@ try{
   }
  }
  await page.setViewportSize({width:1440,height:900});
- await header.getByRole('button',{name:'详细信息'}).click();
- const inspector=page.getByRole('dialog',{name:'文档检查器'});
- await inspector.waitFor();
+ const inspector=page.locator('dialog[aria-label="文档检查器"]');
+ const openInspectorWithMotion=async(trigger,label,viewport)=>{
+  await resetMotionSamples(label);
+  await trigger.click();
+  await assertInspectorTransformMotion(label,viewport);
+ };
+ const closeInspectorWithMotion=async(label,viewport)=>{
+  await resetMotionSamples(label);
+  await inspector.locator('.workbench-inspector .panel-heading button').click();
+  await assertInspectorTransformMotion(label,viewport);
+  await page.waitForFunction(()=>{
+   const host=document.querySelector('dialog[aria-label="文档检查器"]');
+   return host?.open===false&&!host.matches(':modal');
+  });
+ };
+ const detailsTrigger=()=>header.locator('button.workbench-details-trigger');
+ const historyTrigger=()=>page.locator('.editor-view-actions button[aria-label="历史"]');
+ await openInspectorWithMotion(detailsTrigger(),'desktop first details open',1440);
  const verifyPropertyLayout=async()=>{
   const layout=await inspector.locator('.workbench-inspector-details .page-properties').evaluate(el=>({
    display:getComputedStyle(el).display,
@@ -143,8 +330,17 @@ try{
  await inspector.getByRole('tab',{name:'信息'}).click();
  await inspector.getByRole('tab',{name:'目录'}).click();
  await inspector.getByText('暂无 Markdown 标题').waitFor();
- await inspector.getByRole('button',{name:'关闭'}).click();
- await inspector.waitFor({state:'hidden'});
+ await inspector.getByRole('tab',{name:'信息'}).click();
+ await closeInspectorWithMotion('desktop details exit',1440);
+ await openInspectorWithMotion(historyTrigger(),
+  'desktop details-to-history open',1440);
+ await inspector.getByRole('tab',{name:'版本'}).waitFor();
+ await inspector.getByText('Revision 1').waitFor();
+ await closeInspectorWithMotion('desktop history exit',1440);
+ await openInspectorWithMotion(detailsTrigger(),
+  'desktop history-to-details repeated open',1440);
+ assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
+ await closeInspectorWithMotion('desktop repeated details exit',1440);
  await page.getByRole('button',{name:'源码',exact:true}).click();
  await page.locator('.cm-content').fill('# Workbench heading\n\nVersioned content.');
  await page.getByRole('button',{name:'保存',exact:true}).click();
@@ -167,7 +363,7 @@ try{
  await page.locator('.cm-content').waitFor();
  await page.screenshot({path:'tmp/workbench-desktop.png'});
  console.log('PASS Workbench header, metadata summary, single four-tab inspector and history compare');
- await page.setViewportSize({width:390,height:844});
+ await page.setViewportSize({width:390,height:mobileHeight});
  await page.reload();
  await header.waitFor();
  const measure=await page.evaluate(()=>({
@@ -179,22 +375,31 @@ try{
  assert.ok(measure.width<=measure.viewport+1,'Mobile horizontal overflow '+JSON.stringify(measure));
  assert.ok(measure.header<225,'Mobile header should remain compact '+JSON.stringify(measure));
  assert.equal(measure.hasIcon,false);
- await header.getByRole('button',{name:'详细信息'}).click();
- await inspector.waitFor();
+ await openInspectorWithMotion(detailsTrigger(),'mobile first details open',390);
  await verifyPropertyLayout();
  await page.screenshot({path:'tmp/workbench-mobile-details.png'});
  const box=await inspector.boundingBox();
  assert.ok(box&&box.width>=385,'Touch inspector must remain a bottom sheet');
- await inspector.getByRole('tab',{name:'版本'}).click();
+ await closeInspectorWithMotion('mobile details exit',390);
+ await openInspectorWithMotion(historyTrigger(),
+  'mobile details-to-history open',390);
+ assert.equal(await inspector.getByRole('tab',{name:'版本'}).getAttribute('aria-selected'),'true');
  await inspector.getByText('Revision 1').waitFor();
  await page.screenshot({path:'tmp/workbench-mobile-inspector.png'});
- await inspector.getByRole('button',{name:'关闭'}).click();
- await inspector.waitFor({state:'hidden'});
- await page.waitForTimeout(420); // allow the exit transition to finish before capturing the document
+ await closeInspectorWithMotion('mobile history exit',390);
+ await openInspectorWithMotion(detailsTrigger(),
+  'mobile history-to-details repeated open',390);
+ assert.equal(await inspector.getByRole('tab',{name:'信息'}).getAttribute('aria-selected'),'true');
+ await verifyPropertyLayout();
+ await closeInspectorWithMotion('mobile repeated details exit',390);
  await page.screenshot({path:'tmp/workbench-mobile.png'});
  console.log('PASS 390px mobile layout, bottom-sheet tabs and version history');
+ await page.setViewportSize({width:320,height:narrowHeight});
+ await openInspectorWithMotion(detailsTrigger(),
+  'mobile re-open after closed-width change',320);
+ await closeInspectorWithMotion('mobile resized reopen exit',320);
  await page.emulateMedia({colorScheme:'dark'});
- await page.setViewportSize({width:320,height:740});
+ await page.setViewportSize({width:320,height:narrowHeight});
  await page.reload();
  await header.waitFor();
  await page.waitForFunction(()=>document.documentElement.dataset.effectiveTheme==='dark');
@@ -211,5 +416,60 @@ try{
  assert.ok(darkContrast>=10,'Dark-mode tag must have an evident background: '+JSON.stringify({...darkTag,darkContrast}));
  await page.screenshot({path:'tmp/workbench-dark-320.png'});
  console.log('PASS 320px dark-mode Workbench, no horizontal overflow');
+ await page.emulateMedia({colorScheme:'light'});
+ await page.setViewportSize({width:1440,height:900});
+ const mathContent='# Inspector motion stress fixture\n\n'+Array.from({length:160},(_,index)=>
+  '## Section '+index+'\n\n$$\n\\sum_{k=1}^{n}\\frac{x^{'+index+'}}{1+k^2}=\\int_0^1 \\frac{t^2}{1+t}\\,dt\n$$\n\nBody text.\n\n'
+ ).join('');
+ const longRecord=await page.evaluate(async content=>{
+  const response=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({name:'Inspector motion stress '+Date.now()+'.md',kind:'document',content})});
+  if(!response.ok)throw Error('Cannot create the long VisualEditor fixture: '+response.status);
+  return response.json();
+ },mathContent);
+ await page.goto(base+'/records/'+longRecord.id+'?mode=visual');
+ const longHeader=page.locator('.record-page.workbench-document .workbench-header');
+ await longHeader.waitFor();
+ await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="visual"]')?.getAttribute('aria-busy')==='false'&&
+  document.querySelectorAll('.editor-body[data-mode="visual"] .tiptap [data-type="block-math"]').length===160);
+ const longDetails=longHeader.locator('button.workbench-details-trigger');
+ const openLongAndClose=async(trigger,label,viewport)=>{
+  await openInspectorWithMotion(trigger,label+' open',viewport);
+  await closeInspectorWithMotion(label+' close',viewport);
+ };
+ await openLongAndClose(longDetails,'long visual 160 math desktop details',1440);
+ await openLongAndClose(historyTrigger(),'long visual 160 math desktop history',1440);
+ await page.setViewportSize({width:390,height:mobileHeight});
+ await page.waitForFunction(()=>matchMedia('(max-width: 720px)').matches);
+ await openLongAndClose(longDetails,'long visual 160 math mobile details',390);
+ await openLongAndClose(historyTrigger(),'long visual 160 math mobile history',390);
+ await page.setViewportSize({width:1440,height:900});
+ await page.locator('.editor-view-switcher button').nth(2).click();
+ await page.waitForFunction(()=>document.querySelector('.editor-body[data-mode="preview"]')?.getAttribute('aria-busy')==='false'&&
+  document.querySelectorAll('.editor-body[data-mode="preview"] .markdown-preview .katex-display').length===160);
+ await openLongAndClose(longDetails,'long preview 160 math desktop details',1440);
+ await openLongAndClose(historyTrigger(),'long preview 160 math desktop history',1440);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await longDetails.click();
+ await page.waitForFunction(()=>document.querySelector('dialog[aria-label="文档检查器"]')?.open===true);
+ await inspector.locator('.workbench-inspector .panel-heading button').click();
+ await page.waitForFunction(()=>{
+  const host=document.querySelector('dialog[aria-label="文档检查器"]');
+  return host?.open===false&&!host.matches(':modal');
+ });
+ const released=await page.evaluate(()=>{
+  const host=document.querySelector('dialog[aria-label="文档检查器"]');
+  return {connected:Boolean(host?.isConnected),open:host?.open??null,modal:host?.matches(':modal')??false};
+ });
+ assert.deepEqual(released,{connected:true,open:false,modal:false},
+  'Reduced-motion close must release the inspector from the native modal top layer');
+ console.log('PASS 160-math VisualEditor/Preview inspector motion on desktop/mobile and reduced-motion cleanup');
  assert.deepEqual(errors,[],'Browser runtime errors');
+ await saveMotionDiagnostics();
+ console.log('Inspector transform traces:',motionDiagnosticPath);
+}catch(error){
+ await saveMotionDiagnostics();
+ console.error('Inspector transform regression diagnostics',JSON.stringify({engine,motionDiagnosticPath,
+  completedSamples:motionSamples.length,error:error.message}));
+ throw error;
 }finally{await browser.close();}
