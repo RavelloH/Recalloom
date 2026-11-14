@@ -1,39 +1,5 @@
 /* Recalloom styles — owned by components / search */
 
-.search-trigger kbd {
-  font-size: 10px;
-  padding: 2px 4px;
-  border: 1px solid var(--color-border,#ddd);
-  border-radius: 3px;
-}
-
-.search-box {
-  flex: 1;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 0 12px;
-  border: 1px solid var(--color-border,#ddd);
-  border-radius: 8px;
-}
-
-.search-box input {
-  padding: 12px 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  outline: 0;
-}
-
-.search-form select {
-  font-size: var(--rk-font-small);
-  border: 1px solid var(--color-border,#ddd);
-  border-radius: 7px;
-  background: var(--color-background-body,#fff);
-  color: inherit;
-  padding: 8px;
-}
-
 .search-highlight {
   color: inherit;
   background: var(--rk-search-hit-background);
@@ -219,6 +185,25 @@ html[data-effective-theme="dark"] .search-highlight {
   margin-top: 12px;
 }
 
+/* Keep the former compact button-group geometry on the radio-group control. */
+.search-mode-control.astryx-segmented-control {
+  padding: 0;
+  gap: 0;
+  background: transparent;
+}
+
+.search-mode-control .astryx-segmented-control-item {
+  height: 28px;
+  border-radius: 5px;
+  padding-inline: 8px;
+  font-size: var(--rk-font-small);
+}
+
+.search-mode-control .astryx-segmented-control-item[data-selected="selected"] {
+  background: var(--color-background-muted);
+  box-shadow: none;
+}
+
 .search-initial-hint {
   color: var(--color-text-secondary, #888);
   font-size: var(--rk-font-label);
@@ -237,18 +222,6 @@ html[data-effective-theme="dark"] .search-highlight {
 }
 
 @media (max-width: 720px) {
-
-.search-trigger {
-  display: none;
-}
-
-.search-box {
-  flex-basis: 100%;
-}
-
-.search-form select {
-  flex: 1;
-}
 
 .search-surface {
   margin-bottom: 18px;

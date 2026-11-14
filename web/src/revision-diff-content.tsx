@@ -1,7 +1,8 @@
 import React,{memo,useEffect,useId,useMemo,useRef,useState} from 'react';
 import {Button} from '@astryxdesign/core/Button';
-import {ButtonGroup} from '@astryxdesign/core/ButtonGroup';
+import {SegmentedControl,SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Icon} from './icon';
 import MarkdownPreview from './markdown-preview';
 import {buildRevisionDiff,revisionSourcePage,type RevisionDiffRow,type RevisionSourceRow} from './revision-diff';
@@ -82,12 +83,10 @@ export default function RevisionDiffContent({before,after,sourceId}:{before:stri
 
  return <div className="revision-diff-content">
   <div className="revision-diff-toolbar">
-   <ButtonGroup label="对比视图" size="sm">
-    <Button label="预览" icon={<Icon name="eye" size="sm"/>} variant={view==='preview'?'secondary':'ghost'}
-     isDisabled={diff.limited} aria-pressed={view==='preview'} onClick={()=>switchView('preview')}/>
-    <Button label="源码" icon={<Icon name="code" size="sm"/>} variant={view==='source'?'secondary':'ghost'}
-     aria-pressed={view==='source'} onClick={()=>switchView('source')}/>
-   </ButtonGroup>
+   <SegmentedControl label="对比视图" size="sm" value={view} onChange={value=>switchView(value as View)} className="revision-diff-view-control">
+    <SegmentedControlItem value="preview" label="预览" icon={<Icon name="eye" size="sm"/>} isDisabled={diff.limited}/>
+    <SegmentedControlItem value="source" label="源码" icon={<Icon name="code" size="sm"/>}/>
+   </SegmentedControl>
    <div className="revision-diff-counts" aria-label={'新增 '+diff.addedLines+' 行，删除 '+diff.removedLines+' 行'}>
     <span data-kind="added">+{diff.addedLines}</span><span data-kind="removed">−{diff.removedLines}</span>
    </div>
@@ -100,7 +99,7 @@ export default function RevisionDiffContent({before,after,sourceId}:{before:stri
    </div>
   </div>
   <div className="revision-diff-scroll" ref={scrollRef} tabIndex={0} aria-label="版本差异内容">
-   {!diff.changed?<div className="revision-diff-empty"><Icon name="check" size="lg"/><h3>两个版本的内容相同</h3><p>此次修订没有文稿内容变化。</p></div>
+   {!diff.changed?<EmptyState className="revision-diff-empty" icon={<Icon name="check" size="lg" className="revision-diff-empty-icon"/>} title="两个版本的内容相同" description="此次修订没有文稿内容变化。"/>
     :<>
      {diff.limited&&<p className="revision-diff-note">文档较大或差异较多，使用源码对比并分批展示。内容完整保留。</p>}
      {endingChanged&&<p className="revision-diff-note">换行格式：{lineEnding(before)} → {lineEnding(after)}</p>}

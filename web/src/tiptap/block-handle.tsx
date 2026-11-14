@@ -87,13 +87,14 @@ function makeDragSession(editor:Editor,source:HoverBlock,handle:HTMLElement):Dra
  const floating=document.createElement('div');
  floating.className='rk-block-drag-floating';
  const icon=document.createElement('span');icon.className='rk-block-drag-floating-icon';
- const gripIcon=handle.querySelector('svg')?.cloneNode(true);
+ const gripIcon=handle.querySelector('.rk-icon')?.cloneNode(true);
  if(gripIcon)icon.appendChild(gripIcon);
  const copy=document.createElement('span');copy.className='rk-block-drag-floating-copy';
  const title=document.createElement('strong');
  title.textContent=source.element.querySelector('.rk-directive-title-hit,.rk-link-card-title')?.textContent?.trim()||
   source.element.dataset.rkKind||'RMD 块';
  const summary=document.createElement('span');
+ summary.className='rk-block-drag-floating-summary';
  summary.textContent=source.element.querySelector('.rk-directive-body')?.textContent?.trim().slice(0,94)||'拖动以调整块的位置';
  copy.append(title,summary);floating.append(icon,copy);
  document.body.appendChild(floating);
@@ -337,13 +338,12 @@ export function BlockHandleLayer({editor,surfaceRef,onEditBlock,enabled}:{
  };
  return <>{enabled&&hover&&createPortal(<div className="rk-block-grip" role="group" aria-label="块把手"
   style={{left:hover.x,top:hover.y}} onPointerDown={event=>event.stopPropagation()}>
-  <button type="button" className="rk-block-drag" aria-label="拖动块"
-   title={blockCanReorder(editor,hover.pos)?'拖动调整块顺序；点击打开块操作':'点击打开子块操作（此类块不可拖动）'}
+  <IconButton className="rk-block-drag" label="拖动块" variant="ghost" size="sm"
+   tooltip={blockCanReorder(editor,hover.pos)?'拖动调整块顺序；点击打开块操作':'点击打开子块操作（此类块不可拖动）'}
+   icon={<Icon name="gripVertical" size="md"/>}
    draggable={blockCanReorder(editor,hover.pos)}
    onClick={()=>{selectRef.current(hover.pos,hover.element);setMenuOpen(open=>!open);}}
-   onDragStart={startDrag} onDragEnd={finishDrag}>
-   <Icon name="gripVertical" size="md"/>
-  </button>
+   onDragStart={startDrag} onDragEnd={finishDrag}/>
   <IconButton className="rk-block-edit" label="编辑块" variant="ghost" size="sm" icon={<Icon name="pencil" size="sm"/>}
     onClick={()=>{selectRef.current(hover.pos,hover.element);onEditBlock(hover.pos);setMenuOpen(false);}}/>
    <MoreMenu label="块操作" icon={<Icon name="dots" size="sm"/>}

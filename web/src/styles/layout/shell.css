@@ -31,21 +31,6 @@ a.nav-link.active {
   display: none;
 }
 
-.mobile-close {
-  display: none;
-}
-
-.mobile-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  z-index: 30;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 13vh;
-  display: none;
-}
-
 .sidebar-collapsed .sidebar {
   border: 0;
   min-width: 0;
@@ -177,6 +162,31 @@ a.nav-link {
   overflow: hidden;
   background: var(--rk-canvas);
   --aside: 252px;
+  --rk-nav-surface: var(--color-background-surface);
+}
+
+/* MobileNav owns the modal and motion; SideNav retains its complete original
+   header, scroll and footer. Its close control overlays the existing brand row. */
+.rk-mobile-nav.astryx-mobile-nav {
+  --spacing-12: 0px;
+  --spacing-2: 0px;
+  --border-width: 0px;
+  --color-background-surface: var(--rk-sidebar-bg);
+  --color-overlay: rgba(0,0,0,.4);
+  --duration-medium: 240ms;
+  transition-duration: 500ms;
+}
+
+.rk-mobile-nav::backdrop {
+  backdrop-filter: blur(4px);
+}
+
+.rk-mobile-nav .astryx-button[aria-label="关闭导航"] {
+  --color-background-surface: var(--rk-nav-surface);
+  position: absolute;
+  z-index: 3;
+  inset-inline-end: 16px;
+  top: calc(17px + env(safe-area-inset-top, 0px));
 }
 
 .sidebar {
@@ -318,7 +328,8 @@ a.nav-link {
   background: var(--color-background-surface, rgba(0,0,0,.08));
 }
 
-.nav-kbd {
+.nav-kbd,
+.nav-kbd kbd {
   font-family: inherit;
   font-size: var(--rk-font-caption);
   font-weight: 500;
@@ -327,6 +338,11 @@ a.nav-link {
   border: 0;
   background: none;
   padding: 0;
+}
+
+.nav-kbd kbd {
+  min-width: 0;
+  height: auto;
 }
 
 .sidebar-footer {
@@ -704,11 +720,6 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   display: inline-flex;
 }
 
-.mobile-close {
-  display: inline-flex;
-  margin-left: auto;
-}
-
 .bottom-link {
   display: flex;
   flex-direction: column;
@@ -725,10 +736,6 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   padding-block-end: 16px;
 }
 
-.sidebar-collapsed .sidebar {
-  width: min(290px,85vw);
-}
-
 .topbar-title {
   font-size: var(--rk-font-body);
 }
@@ -737,30 +744,6 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   width: 100%;
   min-width: 0;
   padding-block-end: var(--rk-mobile-tab-bar-height);
-}
-
-.mobile-scrim {
-  z-index: 35;
-  padding: 0;
-  border: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
-                visibility 0s linear 280ms;
-  backdrop-filter: blur(4px);
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.mobile-scrim.is-visible {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
-                visibility 0s;
 }
 
 .topbar-slot-start .crumb:not(.crumb-current) {
@@ -784,26 +767,17 @@ html[data-effective-theme="dark"] .shell[data-scrolled] .topbar {
   display: none;
 }
 
-.sidebar {
-  z-index: 40;
-  transform: translateX(-100%);
-  padding-top: env(safe-area-inset-top,0px);
-  width: min(290px,85vw);
+.rk-mobile-nav .sidebar {
+  --color-background-surface: var(--rk-nav-surface);
+  --spacing-2: 8px;
+  position: relative;
+  top: auto;
+  width: 100%;
   min-width: 0;
-  position: fixed;
-  left: 0;
-  top: 0;
-  transition: transform 280ms cubic-bezier(0.45, 0, 0.15, 1);
+  padding-top: env(safe-area-inset-top, 0px);
+  transform: none;
   box-shadow: none;
-}
-
-html[data-effective-theme="dark"] .sidebar {
-  box-shadow: none;
-}
-
-.sidebar.mobile-open {
-  transform: translateX(0);
-  box-shadow: var(--rk-elev-3);
+  transition: none;
 }
 
 .topbar {
@@ -950,10 +924,6 @@ html[data-effective-theme="dark"] .sidebar-footer .rk-nav-row-action.astryx-butt
 @media (prefers-reduced-motion: reduce) {
 
 .sidebar {
-  transition: none !important;
-}
-
-.mobile-scrim {
   transition: none !important;
 }
 

@@ -1,4 +1,5 @@
 import {Button} from '@astryxdesign/core/Button';
+import {Spinner} from '@astryxdesign/core/Spinner';
 import React from 'react';
 import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation,lazyRouteComponent} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
@@ -43,11 +44,11 @@ function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({
  const scrollbarReady=useScrollbarsReady();
  React.useEffect(()=>{if(!onLogin&&!scrollbarReady)void prepareScrollbars();},[onLogin,scrollbarReady]);
  if(onLogin)return <React.Suspense fallback={<div className="center-screen" role="status">正在加载登录页面…</div>}><Outlet/></React.Suspense>;
- if(state.isPending)return <div className="center-screen"><span className="spin"/>正在连接…</div>;
+ if(state.isPending)return <div className="center-screen"><Spinner size="sm" label="正在连接…"/></div>;
  if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
  // The shell's scroll viewports must initialize before they paint; do not
  // withhold the login page or auth request while the engine chunk downloads.
- if(!scrollbarReady)return <div className="center-screen" role="status"><span className="spin"/>正在准备界面…</div>;
+ if(!scrollbarReady)return <div className="center-screen" role="status"><Spinner size="sm" label="正在准备界面…"/></div>;
  return <Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell>;
 }
 // Wait for critical page data AND lazy component code before committing the

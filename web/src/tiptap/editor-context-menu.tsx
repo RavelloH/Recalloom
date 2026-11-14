@@ -1,12 +1,13 @@
 import {Icon,type IconName} from '../icon';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
 import type {Editor} from '@tiptap/core';
 import {CellSelection} from '@tiptap/pm/tables';
 import {undo,redo,undoDepth,redoDepth} from '@tiptap/pm/history';
 import type {ReactNode} from 'react';
 import {ContextMenu,type ContextMenuOption} from '@astryxdesign/core/ContextMenu';
 import type {DropdownMenuItemData} from '@astryxdesign/core/DropdownMenu';
+import {useToast} from '@astryxdesign/core/Toast';
+import {EditorContextFeedback,editorContextToastContent} from './editor-context-feedback';
 
 import {blockMenuItems,inlineContextItems,runWithTextSelection} from './editor-command-menu';
 import {blockEditorTargetAt,editableBlockFromDocumentPosition,isExplicitRmdBlock} from './editor-block-actions';
@@ -107,16 +108,24 @@ function clickedSelectedText(editor:Editor,event:React.MouseEvent<HTMLElement>,
  }catch{return false;}
 }
 /** Desktop-only: on touch, keep the native OS selection/callout behaviour. */
-export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,children}:{
+type EditorContextMenuProps={
  editor:Editor;onEditBlock:(pos:number)=>void;
  onEditLink:()=>void;onInsert:(pos:number,point:{x:number;y:number})=>void;
  children:ReactNode;
+};
+export function EditorContextMenu(props:EditorContextMenuProps){
+ const [cursor,setCursor]=useState({x:0,y:0});
+ return <EditorContextFeedback point={cursor}>
+  <EditorContextMenuContent {...props} cursor={cursor} setCursor={setCursor}/>
+ </EditorContextFeedback>;
+}
+function EditorContextMenuContent({editor,onEditBlock,onEditLink,onInsert,children,cursor,setCursor}:EditorContextMenuProps&{
+ cursor:{x:number;y:number};setCursor:(point:{x:number;y:number})=>void;
 }){
  const [items,setItems]=useState<ContextMenuOption[]>([]);
- const [cursor,setCursor]=useState({x:0,y:0});
- const [feedback,setFeedback]=useState('');
- useEffect(()=>{if(!feedback)return;const timer=setTimeout(()=>setFeedback(''),3700);return()=>clearTimeout(timer);},[feedback]);
- const notify=(message:string)=>setFeedback(message);
+ const toast=useToast();
+ const notify=(message:string)=>{toast({body:message,uniqueID:'editor-context-feedback',autoHideDuration:3700,
+  renderContent:editorContextToastContent});};
  const rightPointerSelection=useRef<(TextRange&{x:number;y:number})|null>(null);
  const recentTextSelection=useRef<TextRange|null>(null);
  useEffect(()=>{
@@ -324,8 +333,5 @@ export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,childr
    style={{position:'fixed',left:cursor.x,top:cursor.y,right:'auto',bottom:'auto'}}>
    {children}
   </ContextMenu>
-   {feedback&&createPortal(<div className="rk-editor-context-feedback" role="status"
-    style={{left:Math.max(8,Math.min(cursor.x,innerWidth-300)),top:Math.min(cursor.y+18,innerHeight-72)}}>
-    {feedback}</div>,document.body)}
  </div>;
 }

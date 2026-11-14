@@ -40,22 +40,28 @@ try{
  await page.getByRole('menuitem',{name:'编辑块'}).last().click();
  const panel=page.getByRole('complementary',{name:'块编辑面板'});
  await panel.waitFor();
- await page.waitForTimeout(270); // measure the fixed right edge after slide-in
+ await page.waitForTimeout(460); // measure the docked edge after slide-in
  const drawer=await page.evaluate(()=>{
-  const panel=document.querySelector('.rk-block-editor-panel');
+  const panel=document.querySelector('[data-workspace-panel="block-editor"]');
   const workspace=document.querySelector('.rk-editor-block-workspace');
+  const root=panel.closest('.workspace');
   return {position:getComputedStyle(panel).position,
-   bodyParent:panel.parentElement===document.body,
+   railParent:panel.parentElement.classList.contains('workspace-panel-rail'),
+   layout:root.dataset.panelLayout,
    columns:getComputedStyle(workspace).gridTemplateColumns,
    panelRight:panel.getBoundingClientRect().right,
+   panelLeft:panel.getBoundingClientRect().left,
+   rootRight:root.getBoundingClientRect().right,
+   canvasRight:workspace.querySelector('.rk-editor-block-canvas').getBoundingClientRect().right,
    canvasWidth:workspace.querySelector('.rk-editor-block-canvas').getBoundingClientRect().width,
    workspaceWidth:workspace.getBoundingClientRect().width};
  });
- assert.equal(drawer.position,'fixed');assert.equal(drawer.bodyParent,true);
- assert.equal(drawer.canvasWidth,drawer.workspaceWidth,'Drawer must not consume a document column');
- assert.ok(Math.abs(drawer.panelRight-1280)<2,'Drawer should be pinned to viewport right');
+ assert.equal(drawer.position,'absolute');assert.equal(drawer.railParent,true);assert.equal(drawer.layout,'docked');
+ assert.equal(drawer.canvasWidth,drawer.workspaceWidth,'Panel must not consume an editor grid column');
+ assert.ok(Math.abs(drawer.panelRight-(drawer.rootRight-16))<2,'Panel should stay pinned to the workspace rail');
+ assert.ok(drawer.canvasRight<=drawer.panelLeft,'Docked panel must preserve a separate document area');
  await panel.getByRole('button',{name:'关闭',exact:true}).click();
- console.log('PASS true fixed Drawer and external ::: block grip',geometry,drawer);
+ console.log('PASS docked workspace panel and external ::: block grip',geometry,drawer);
  const editable=first.locator('.rk-directive-body p').first();
  for(let attempt=0;attempt<4;attempt++){
   await editable.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');

@@ -99,7 +99,13 @@ function inlineNode(node:AstNode,source:string):JSONContent[]{
     :name==='tooltip'?{content:attributes.dataContent??''}
     :name==='abbr'?{title:attributes.dataTitle??''}
     :name==='cloze'?{hint:attributes.dataHint??''}:{};
-   return [{type,attrs,content:mkText((node.children??[]).map(n=>n.value??'').join(''))}];
+   // These nodes accept marked text, including links. Reading only `.value`
+   // erases nested MDAST phrasing nodes such as strong/link on the first save.
+   const label=children(node,source);
+   // Their schema is text*: unsupported inline atoms must remain canonical
+   // source instead of producing invalid JSON or silently losing content.
+   if(label.some(child=>child.type!=='text'))return [{type:'rawInline',content:mkText(at(node,source))}];
+   return [{type,attrs,content:label}];
   }
   case 'html':{
    const raw=at(node,source)||node.value||'';

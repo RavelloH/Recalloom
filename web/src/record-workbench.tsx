@@ -2,6 +2,7 @@ import React,{useLayoutEffect,useRef,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
+import {Token} from '@astryxdesign/core/Token';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {WorkspacePanel} from './workspace-panels';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
@@ -90,7 +91,7 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
    placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}
    transitionResource={{kind:'record',id:item.id}}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
-   {item.tags.map(tag=><span className="workbench-summary-tag" key={tag}>{tag}</span>)}
+   {item.tags.map(tag=><Token className="workbench-summary-tag" key={tag} label={tag} size="sm"/>)}
   </div>}
   <div className="workbench-summary">
    <AutoResizer className="workbench-summary-resizer">

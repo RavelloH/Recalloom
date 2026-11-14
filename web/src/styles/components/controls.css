@@ -1,9 +1,5 @@
 /* Recalloom styles — owned by components / controls */
 
-.icon-button:hover {
-  background: var(--color-background-muted,#eee);
-}
-
 .center-screen {
   min-height: 100dvh;
   display: flex;
@@ -79,19 +75,6 @@
 [role="button"] {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-}
-
-.icon-button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  min-width: 44px;
-  min-height: 44px;
 }
 
 .semantic-label {
@@ -397,46 +380,6 @@
 .rk-toolbar-state-selected {
   background:var(--rk-active) !important;
   color:var(--color-text-primary) !important;
-}
-
-.rk-inline-popover {
-  position: fixed;
-  z-index: 1600;
-  box-sizing: border-box;
-  width: max-content;
-  min-width: min(156px,calc(100vw - 16px));
-  max-width: min(218px,calc(100vw - 16px));
-  max-height: min(336px,65vh);
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 5px;
-  border: 1px solid var(--color-border,rgba(128,128,128,.19));
-  border-radius: 10px;
-  background: var(--rk-popover,var(--color-background-popover,#fff));
-  color: var(--color-text-primary);
-  box-shadow: var(--rk-pop-shadow,0 8px 28px rgba(0,0,0,.14));
-  transform-origin:top center;
-  animation: rk-inline-menu-enter 170ms var(--rk-ease-out) both;
-}
-.rk-inline-popover[data-state="closing"] {
-  pointer-events:none;
-  animation:rk-inline-menu-exit 160ms ease-in both;
-}
-/* A hover handoff displays the outgoing menu beneath the incoming one,
-   allowing two menus to crossfade rather than hard-switch their content. */
-.rk-inline-popover[data-switching="true"] {
-  animation:rk-inline-menu-enter 170ms var(--rk-ease-out) both;
-}
-
-.rk-inline-popover-item {
-  justify-content: flex-start;
-  text-align: left;
-}
-.rk-inline-popover-item-content {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  width: 100%;
 }
 
 .rk-menu-item-check {
@@ -812,11 +755,6 @@
 }
 
 @media (prefers-reduced-motion:reduce) {
-
-.rk-inline-popover {
-  animation: none !important;
-  transition: none !important;
-}
 
 [role="tooltip"] {
   animation: none !important;

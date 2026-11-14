@@ -7,6 +7,7 @@ import type {Node as PMNode} from '@tiptap/pm/model';
 import type {EditorView} from '@tiptap/pm/view';
 import {ReactNodeViewRenderer,NodeViewWrapper,NodeViewContent,type NodeViewProps} from '@tiptap/react';
 import {IconButton} from '@astryxdesign/core/IconButton';
+import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 
 import {attachLazyBlockScrollbars} from '../block-scrollbars';
@@ -164,12 +165,10 @@ const CodeView=({node,updateAttributes}:NodeViewProps)=>{
        if(e.key==='Enter'){e.preventDefault();e.stopPropagation();finishTitle();}
        else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelTitle();}
       }} onBlur={finishTitle}/>
-     :<span className="rk-code-title-hit" role="button" tabIndex={0}
-       aria-label="编辑代码文件名" title="点击直接编辑代码文件名"
-       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();startTitle();}}
-       onKeyDown={e=>{
-        if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();startTitle();}
-       }}>{String(node.attrs.filename||node.attrs.language||'Text')}</span>}
+     :<Button className="rk-code-title-hit" label="编辑代码文件名" variant="ghost" size="sm"
+       onMouseDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();startTitle();}}>
+       <span className="rk-code-title-label">{String(node.attrs.filename||node.attrs.language||'Text')}</span>
+      </Button>}
    </div>
    <div className="rk-code-actions">
     <IconButton label={node.attrs.wrap?'关闭自动换行':'开启自动换行'} variant="ghost" size="sm"

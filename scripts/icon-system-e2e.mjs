@@ -21,9 +21,12 @@ try{
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:25000});
- const nav=page.locator('.sidebar .nav-list .nav-link');
+ // The URL changes before the lazy Shell has finished mounting.
+ const mainNavigation=page.getByRole('navigation',{name:'主导航',exact:true});
+ await mainNavigation.waitFor({state:'visible'});
+ const nav=mainNavigation.locator('.nav-link');
  assert.ok(await nav.count()>=5,'expected main sidebar navigation');
- const rows=await page.locator('.sidebar .rk-nav-row').evaluateAll(items=>items.map(el=>({icon:el.querySelector('svg.rk-icon')?.getBoundingClientRect().x,label:el.querySelector('.rk-nav-row-label')?.getBoundingClientRect().x})));
+ const rows=await page.locator('.sidebar:visible .rk-nav-row').evaluateAll(items=>items.map(el=>({icon:el.querySelector('svg.rk-icon')?.getBoundingClientRect().x,label:el.querySelector('.rk-nav-row-label')?.getBoundingClientRect().x})));
  assert.ok(rows.length>=9,'navigation, search and footer must share NavRow');
  assert.ok(rows.every(p=>Math.abs(p.icon-rows[0].icon)<1&&Math.abs(p.label-rows[0].label)<1),'NavRow alignment mismatch: '+JSON.stringify(rows));
  const first=nav.first();
@@ -56,7 +59,7 @@ try{
    const rows=await container.locator('.rk-rmd-callout').evaluateAll(elements=>elements.map(el=>{
     const banner=el.querySelector('.astryx-banner');
     const icon=el.querySelector('.astryx-banner-icon svg');
-    const title=banner?.querySelector(':scope > div:nth-child(2) > div');
+    const title=el.querySelector('.rk-rmd-callout-title');
     const iconStyle=icon?getComputedStyle(icon):null;
     const titleStyle=title?getComputedStyle(title):null;
     const bannerStyle=banner?getComputedStyle(banner):null;
@@ -110,33 +113,54 @@ try{
  assert.ok(mobile.icons.every(x=>Math.abs(x.centerOffset)<1),'bottom icons must be centered');
  await page.screenshot({path:'tmp/icon-audit/screens/mobile.png'});
  await page.getByRole('button',{name:'打开导航'}).click();
- await page.locator('.sidebar.mobile-open').waitFor();
+ const mobileDialog=page.locator('dialog.rk-mobile-nav');
+ await page.getByRole('dialog',{name:'侧边栏',exact:true}).waitFor({state:'visible'});
+ assert.equal(await mobileDialog.evaluate(el=>el.open),true,'mobile navigation must be a modal native dialog');
+ const openSidebar=mobileDialog.locator('.sidebar.mobile-open');
+ await openSidebar.waitFor({state:'visible'});
  await page.waitForFunction(()=>{
   const sidebar=document.querySelector('.sidebar.mobile-open');
   return sidebar&&sidebar.getBoundingClientRect().left>=-1;
  },null,{timeout:7000});
- const sidebarBounds=await page.locator('.sidebar.mobile-open').evaluate(el=>{
+ const sidebarBounds=await openSidebar.evaluate(el=>{
   const r=el.getBoundingClientRect();return {left:r.left,right:r.right,viewport:innerWidth};
  });
  assert.ok(sidebarBounds.left>=-1&&sidebarBounds.left<sidebarBounds.viewport&&sidebarBounds.right>0,'sidebar should be visible before measuring icons: '+JSON.stringify(sidebarBounds));
- const mobileSidebar=await page.locator('.sidebar .nav-list .nav-link svg').first().evaluate(el=>{
+ const mobileSidebar=await mobileDialog.getByRole('navigation',{name:'主导航',exact:true}).locator('.nav-link svg').first().evaluate(el=>{
   const icon=el.getBoundingClientRect(),link=el.closest('.nav-link').getBoundingClientRect();
   return {width:icon.width,height:icon.height,centerOffsetY:+(icon.top+icon.height/2-link.top-link.height/2).toFixed(2)};
  });
  assert.ok(mobileSidebar.width>=19&&mobileSidebar.width<=21,'mobile sidebar icons should be 20px: '+JSON.stringify(mobileSidebar));
  assert.ok(Math.abs(mobileSidebar.centerOffsetY)<2,'mobile sidebar icon should be vertically centered: '+JSON.stringify(mobileSidebar));
- const tree=await page.locator('.page-tree svg.tree-icon').first().evaluate(frame=>{
+ const tree=await mobileDialog.locator('.page-tree svg.tree-icon').first().evaluate(frame=>{
   const a=frame.getBoundingClientRect(),b=a,row=frame.closest('.tree-row').getBoundingClientRect();
   return {frame:a.width,icon:b.width,centerOffsetY:+(b.y+b.height/2-row.y-row.height/2).toFixed(2)};
  });
  assert.ok(tree.frame>=19&&tree.frame<=21&&tree.icon===tree.frame,'file tree icon uses its 20px slot: '+JSON.stringify(tree));
  assert.ok(Math.abs(tree.centerOffsetY)<2,'file tree icon vertically centered: '+JSON.stringify(tree));
  await page.screenshot({path:'tmp/icon-audit/screens/mobile-sidebar.png'});
- await page.getByRole('button',{name:'关闭侧栏'}).click();
+ await mobileDialog.getByRole('button',{name:'关闭导航'}).click();
+ // isOpen changes before the closing transition releases native modality.
+ await page.waitForFunction(()=>!document.querySelector('dialog.rk-mobile-nav')?.open);
+ await mobileDialog.waitFor({state:'hidden'});
  await page.goto(base+'/records/'+id+'?mode=visual');
  const textLine=page.locator('.tiptap p').filter({hasText:'组件内容'}).first();
- await textLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
- const textToolbar=page.getByRole('toolbar',{name:'文本格式'});await textToolbar.waitFor();
+ const textToolbar=page.getByRole('toolbar',{name:'文本格式',exact:true});
+ // Match the format-library suite: retry only selection establishment while
+ // the newly mounted editor settles, never the measured control or assertion.
+ let textSelected=false;
+ for(let attempt=0;attempt<4;attempt++){
+  await textLine.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
+  try{
+   await textToolbar.waitFor({state:'visible',timeout:2000});
+   textSelected=await textLine.evaluate(el=>{
+    const selection=getSelection();
+    return !!selection&&!selection.isCollapsed&&!!selection.toString()&&el.contains(selection.anchorNode)&&el.contains(selection.focusNode);
+   });
+   if(textSelected)break;
+  }catch{/* Retry selection setup only. */}
+ }
+ assert.ok(textSelected,'establish a native text selection before measuring its formatting toolbar');
  const toolbar=await textToolbar.locator('button:has(svg.tabler-icon)').first().evaluate(btn=>{
   const icon=btn.querySelector('svg.tabler-icon').getBoundingClientRect(),box=btn.getBoundingClientRect();
   return {width:icon.width,centerOffsetY:+(icon.top+icon.height/2-box.top-box.height/2).toFixed(2)};
@@ -165,4 +189,12 @@ try{
  assert.deepEqual(wide.bottom,[24,24,24,24],'bottom navigation dimensions remain stable at 390px');
  assert.deepEqual(errors,[],'browser JS errors');
  console.log('PASS TABLER ICON SYSTEM',JSON.stringify({navigation:{before,after},callouts:kinds,previewVisual:'matched in light and dark',mobile,mobileSidebar,tree,toolbar,topbar,save,wide}));
+}catch(error){
+ console.error('Icon audit failure state',JSON.stringify(await page.evaluate(()=>({
+  url:location.href,finePointer:matchMedia('(hover: hover) and (pointer: fine)').matches,
+  selected:getSelection()?.toString(),active:document.activeElement?.outerHTML.slice(0,500),
+  toolbars:[...document.querySelectorAll('[role="toolbar"]')].map(el=>({label:el.getAttribute('aria-label'),rect:el.getBoundingClientRect().toJSON(),display:getComputedStyle(el).display}))
+ }))));
+ await page.screenshot({path:'tmp/icon-audit/screens/failure.png',fullPage:true});
+ throw error;
 }finally{await browser.close();}

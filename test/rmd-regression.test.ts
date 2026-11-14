@@ -89,6 +89,26 @@ describe('Only RMD 1.0 is the authoritative Markdown component pipeline',()=>{
    ['unknown','neutral']] as const)
    assert.equal(asAstryBadgeVariant(value),expected);
  });
+ it('preserves marked text and link answers inside text-only inline components',()=>{
+  const src=':: badge **完成** | success :: / :: tooltip *说明* | description=提示 :: / :: abbr **CPU** | description=处理器 :: / :: kbd `Ctrl` :: / :: cloze [链接答案](https://example.com/answer) | hint=显示答案 ::';
+  const {doc,once}=save(src);
+  assert.equal(nodes(doc,'richBadge')[0]?.content?.[0]?.text,'完成');
+  assert.ok(nodes(doc,'richBadge')[0]?.content?.[0]?.marks?.some(mark=>mark.type==='bold'));
+  assert.ok(nodes(doc,'richTooltip')[0]?.content?.[0]?.marks?.some(mark=>mark.type==='italic'));
+  assert.ok(nodes(doc,'richAbbr')[0]?.content?.[0]?.marks?.some(mark=>mark.type==='bold'));
+  assert.ok(nodes(doc,'richKbd')[0]?.content?.[0]?.marks?.some(mark=>mark.type==='code'));
+  const answer=nodes(doc,'richCloze')[0]?.content?.[0];
+  assert.equal(answer?.text,'链接答案');
+  assert.ok(answer?.marks?.some(mark=>mark.type==='link'&&mark.attrs?.href==='https://example.com/answer'));
+  assert.match(once,/\[链接答案\]\(https:\/\/example\.com\/answer\)/);
+ });
+ it('keeps unsupported inline atoms as literal RMD instead of dropping the answer',()=>{
+  const src=':: cloze $x^2$ | hint=公式 ::';
+  const {doc,once}=save(src);
+  assert.equal(nodes(doc,'richCloze').length,0);
+  assert.ok(nodes(doc,'rawInline').some(node=>node.content?.some(child=>child.text===src)));
+  assert.equal(once,src);
+ });
  it('refuses unsupported badge color/icon and tooltip placement instead of partial promotion',()=>{
   const src=':: badge 工作中 | color=green ::\n\n:: tooltip 文档 | description=内容 | placement=top ::';
   const doc=parseRmdVisual(src);

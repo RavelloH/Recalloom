@@ -138,29 +138,57 @@ try{
  // Record the real overlay state when TanStack Router starts its snapshot.
  await page.evaluate(()=>{
   window.__drawerSnapshotTrace=[];
+  window.__drawerFocusTrace=[];
+  document.addEventListener('focusin',event=>window.__drawerFocusTrace.push({type:'focusin',tag:event.target.tagName,label:event.target.getAttribute('aria-label')}));
   const original=document.startViewTransition.bind(document);
   document.startViewTransition=(...args)=>{
    const drawer=document.querySelector('.sidebar').getBoundingClientRect();
-   const scrim=getComputedStyle(document.querySelector('.mobile-scrim'));
+   const dialog=document.querySelector('.rk-mobile-nav');
    window.__drawerSnapshotTrace.push({
     drawerRight:drawer.right,
-    scrimOpacity:parseFloat(scrim.opacity),
+    scrimOpacity:dialog.open?parseFloat(getComputedStyle(dialog,'::backdrop').opacity):0,
+    modal:dialog.matches(':modal'),
     from:location.pathname
    });
    return original(...args);
   };
  });
  const openDrawer=async()=>{
-  await page.getByRole('button',{name:'打开导航'}).click();
+  const opener=page.getByRole('button',{name:'打开导航'});
+  // Safari pointer activation does not retain button focus. Use keyboard
+  // activation here to verify restoration of the actual prior keyboard focus.
+  await opener.focus();
+  await opener.press('Enter');
   await page.locator('.sidebar.mobile-open').waitFor();
   await page.waitForTimeout(340);
  };
  const closedWhenCaptured=async()=>{
   const data=await page.evaluate(()=>window.__drawerSnapshotTrace.at(-1));
-  assert.ok(data&&data.drawerRight<=1&&data.scrimOpacity<=0.06,
+  assert.ok(data&&data.drawerRight<=1&&data.scrimOpacity<=0.06&&!data.modal,
    'View Transition screenshot must not cover an exiting drawer: '+JSON.stringify(data));
  };
  await openDrawer();
+ const modalFocus=await page.evaluate(()=>{
+  const dialog=document.querySelector('.rk-mobile-nav');
+  document.querySelector('.mobile-menu').focus();
+  return {modal:dialog.matches(':modal'),inside:dialog.contains(document.activeElement)};
+ });
+ assert.deepEqual(modalFocus,{modal:true,inside:true},'open navigation keeps background controls inert');
+ for(let index=0;index<18;index++){
+  await page.keyboard.press('Tab');
+  const focus=await page.locator('.rk-mobile-nav').evaluate(el=>({
+   inside:el.contains(document.activeElement),
+   body:document.activeElement===document.body,
+   hasFocus:document.hasFocus(),
+   modal:el.matches(':modal')
+  }));
+  // Native dialogs may yield Tab to browser chrome. The page then has no
+  // focus and exposes BODY as activeElement; background app controls stay inert.
+  assert.ok(focus.modal&&(focus.inside||focus.body&&!focus.hasFocus),
+   'Tab must not reach background app controls: '+JSON.stringify({index,...focus}));
+ }
+ assert.equal(await page.locator('.rk-mobile-nav').evaluate(el=>el.contains(document.activeElement)),true,
+  'Tab returns from browser chrome to the modal navigation');
  let before=await count();
  await page.locator('.sidebar .nav-list a[href="/tasks"]').click();
  await page.waitForTimeout(120);
@@ -187,9 +215,13 @@ try{
  // Pure drawer dismissal is not navigation and must never animate the page.
  await openDrawer();
  before=await count();
- await page.getByRole('button',{name:'关闭侧栏'}).click();
+ await page.getByRole('button',{name:'关闭导航'}).click();
  await page.locator('.sidebar.mobile-open').waitFor({state:'detached'});
  await page.waitForTimeout(330);
+ assert.equal(await page.locator('.rk-mobile-nav').evaluate(el=>el.open||el.matches(':modal')),false,'closed navigation releases the native modal');
+ const restored=await page.getByRole('button',{name:'打开导航'}).evaluate(el=>({restored:el===document.activeElement,
+  active:document.activeElement?.outerHTML.slice(0,250),trace:window.__drawerFocusTrace.slice(-16),hasFocus:document.hasFocus()}));
+ assert.equal(restored.restored,true,'dismissal restores focus to the opener: '+JSON.stringify(restored));
  assert.equal(await count(),before,'drawer close icon must not trigger route transition');
  await page.goBack();
  await page.waitForURL(base+'/tasks');

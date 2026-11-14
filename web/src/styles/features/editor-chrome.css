@@ -163,34 +163,16 @@
   height: 30px !important;
   min-height: 30px !important;
   padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
   line-height: 1 !important;
 }
 
-.bubble-menu-inner button > span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.bubble-menu-inner button svg {
+.bubble-menu-inner .rk-icon {
   width:var(--rk-icon-sm) !important;
   height:var(--rk-icon-sm) !important;
   flex:none;
   stroke-width:1.85;
 }
-/* Astryx ToggleButton adds a hidden duplicate SVG for its pressed animation.
-   Its visible glyph is otherwise 1px higher than regular Button glyphs. */
-.bubble-menu-inner .astryx-toggle-button svg:not([style*="display: none"]) {
-  transform:translateY(1px);
-}
-
-.bubble-menu-inner button:has(.rk-inline-dropdown-icon) {
+.bubble-menu-inner .rk-inline-menu-trigger {
   width: 44px !important;
   min-width: 44px !important;
   max-width: 44px !important;
@@ -231,6 +213,37 @@
   width: max-content;
   max-width: calc(100vw - 18px);
   animation: rk-pop-in 160ms var(--rk-ease-out) both;
+}
+
+/* Toolbar owns roving focus; our content wrappers retain the editor layout.
+   Only public theme classes and locally owned content are styled here. */
+.bubble-menu-inner .astryx-toolbar,
+.rk-editor-touch-toolbar .astryx-toolbar,
+.editor-table-actions .astryx-toolbar {min-height:0;}
+.bubble-menu-inner .astryx-section,
+.rk-editor-touch-toolbar .astryx-section,
+.editor-table-actions .astryx-section {padding:0;}
+.bubble-menu-inner,
+.rk-editor-touch-toolbar,
+.editor-table-actions {
+  --container-padding-inline-start:8px;
+  --container-padding-inline-end:8px;
+}
+.rk-editor-touch-toolbar {width:max-content;flex:none;}
+.rk-editor-touch-tools {display:flex;align-items:center;gap:8px;width:max-content;}
+.rk-editor-table-tools {display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.rk-inline-menu-anchor {display:inline-flex;align-items:center;flex:none;}
+.rk-editor-format-menu {
+  border-radius:10px;
+  background:var(--rk-popover);
+  color:var(--color-text-primary);
+}
+.rk-editor-format-menu-item[data-active="true"] {background:var(--rk-active);}
+@media (hover:hover) and (pointer:fine) {
+ .rk-editor-format-menu-item:not([aria-disabled="true"]):hover {background:var(--rk-hover);}
+}
+@media (max-width:720px) {
+ .rk-editor-table-tools {flex-wrap:nowrap;width:max-content;}
 }
 
 .editor-pending {

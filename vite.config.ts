@@ -18,7 +18,12 @@ const workerProxy:ProxyOptions={
 export default defineConfig({
  root:'web',
  plugins:[react()],
- build:{outDir:'../dist/web',emptyOutDir:true},
+ build:{outDir:'../dist/web',emptyOutDir:true,rollupOptions:{output:{
+  // Keep the shared document motion module independent when new Astryx
+  // primitives change Rollup's automatic shared-chunk grouping.
+  onlyExplicitManualChunks:true,
+  manualChunks:id=>id.replaceAll('\\','/').endsWith('/web/src/motion-primitives.tsx')?'motion-primitives':undefined
+ }}},
  server:{
   host:'127.0.0.1',
   port:5173,

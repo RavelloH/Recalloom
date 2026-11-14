@@ -28,5 +28,6 @@ AGENTS.md
 /scratch/
 /bench/
 /tmp/
+/output/playwright/
 /web/.tanstack/
 /web/public/cap-wasm/

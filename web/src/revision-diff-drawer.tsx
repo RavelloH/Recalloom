@@ -4,6 +4,8 @@ import {Drawer} from '@astryxdesign/core/Drawer';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
+import {Spinner} from '@astryxdesign/core/Spinner';
+import {Skeleton} from '@astryxdesign/core/Skeleton';
 import {api} from './api';
 import {Icon} from './icon';
 import type {RecordDetail} from './types';
@@ -73,8 +75,8 @@ export const RevisionDiffDrawer=memo(function RevisionDiffDrawer({comparison,isO
  </Drawer>;
 });
 function ComparisonPending(){
- return <div className="revision-diff-pending" role="status" aria-live="polite">
-  <span>正在准备版本对比…</span>
-  <div aria-hidden="true" className="revision-diff-skeleton"><i/><i/><i/><i/></div>
+ return <div className="revision-diff-pending">
+  <Spinner size="sm" shade="subtle" label="正在准备版本对比…"/>
+  <div aria-hidden="true" className="revision-diff-skeleton">{['85%','65%','85%','75%'].map((width,index)=><Skeleton key={index} width={width} height={14} radius={1}/>)}</div>
  </div>;
 }

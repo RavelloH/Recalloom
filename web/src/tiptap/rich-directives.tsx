@@ -4,7 +4,6 @@ import {Node,mergeAttributes} from '@tiptap/core';
 import {ReactNodeViewRenderer,NodeViewContent,NodeViewWrapper,type NodeViewProps} from '@tiptap/react';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
-import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Card} from '@astryxdesign/core/Card';
 import {Button} from '@astryxdesign/core/Button';
 import {TabList,Tab} from '@astryxdesign/core/TabList';
@@ -16,6 +15,7 @@ import {isRmdId} from '../rmd-schema';
 import {headingAnchor} from '../wiki-slug';
 import {calloutIcon} from '../callout-icon';
 import {asAstryBadgeVariant} from '../rmd-badge';
+import {EditableDetails,FlashcardSideTitle} from '../rmd-ui';
 export {richTitle} from './rich-schema';
 
 const bannerStatus=(kind:string):'info'|'warning'|'error'|'success'=>
@@ -108,7 +108,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
      </Card>
    :kind==='front'||kind==='back'
    ?<Card variant="muted" padding={3} className={'rk-flashcard-panel rk-flashcard-'+kind}>
-      <div contentEditable={false} className="rk-flashcard-panel-title">{editTitle}</div>
+      <FlashcardSideTitle side={kind}/>
       <NodeViewContent className="rk-directive-body rk-flashcard-content"/>
      </Card>
    :kind==='glossary'
@@ -126,7 +126,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
    :kind==='message'
    ?<RmdChatMessage sender={sender} name={editTitle}><NodeViewContent className="rk-directive-body rk-chat-message"/></RmdChatMessage>
    :kind==='details'
-   ?<Collapsible trigger={editTitle} defaultIsOpen><NodeViewContent className="rk-directive-body"/></Collapsible>
+   ?<EditableDetails title={editTitle} label={richTitle(kind,title)}><NodeViewContent className="rk-directive-body"/></EditableDetails>
    :sketchKind
    ?<section className="rk-sketch-block" data-rk-sketch-kind={kind}
      data-rk-sketch-color={color||undefined}
@@ -143,7 +143,7 @@ function ContainerView({node,updateAttributes}:NodeViewProps){
     </section>
    :kind==='comment'
    ?<section className="rk-rmd-comment-block"><NodeViewContent className="rk-directive-body"/></section>
-   :<Banner status={bannerStatus(kind)} icon={calloutIcon(kind)} title={editTitle} collapsible={false} container="card">
+   :<Banner status={bannerStatus(kind)} icon={calloutIcon(kind)} title={<span className="rk-rmd-callout-title">{editTitle}</span>} collapsible={false} container="card">
       <NodeViewContent className="rk-directive-body"/>
      </Banner>}
  </NodeViewWrapper>;
@@ -162,13 +162,13 @@ function InlineView({node}:NodeViewProps){
  const [clozeOpen,setClozeOpen]=useState(false);
  const inner=<NodeViewContent as={"span" as "div"} className="rk-inline-editable"/>;
  if(kind==='richCloze')return <NodeViewWrapper as="span" className="rk-rich-inline rk-inline-cloze" data-rk-cloze-open={String(clozeOpen)}>
-  <button type="button" className="rk-cloze-trigger" contentEditable={false}
-   aria-expanded={clozeOpen} aria-label={clozeOpen?'隐藏挖空答案':'显示挖空答案'}
-   title={attrs.hint||'点击揭示答案'}
-   onMouseDown={event=>event.preventDefault()}
-   onClick={()=>setClozeOpen(open=>!open)}>
-   {clozeOpen?'隐藏':attrs.hint||'显示答案'}
-  </button>
+  <span contentEditable={false} className="rk-cloze-action">
+   <Button className="rk-cloze-trigger" label={clozeOpen?'隐藏挖空答案':'显示挖空答案'} variant="ghost" size="sm"
+    aria-expanded={clozeOpen}
+    onMouseDown={event=>event.preventDefault()} onClick={()=>setClozeOpen(open=>!open)}>
+    <span className="rk-cloze-trigger-label">{clozeOpen?'隐藏':attrs.hint||'显示答案'}</span>
+   </Button>
+  </span>
   {/* Keep the editable answer DOM mounted across reveal/hide. */}
   <NodeViewContent as={"span" as "div"} className="rk-inline-editable rk-cloze-editor-answer"/>
  </NodeViewWrapper>;

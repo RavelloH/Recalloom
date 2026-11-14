@@ -164,9 +164,12 @@
 .palette-hints kbd {
   display: inline-block;
   min-width: 18px;
+  height: auto;
+  border: 0;
   padding: 1px 5px;
   border-radius: 4px;
   font-family: inherit;
+  font-weight: inherit;
   font-size: var(--rk-font-caption);
   line-height: 16px;
   text-align: center;

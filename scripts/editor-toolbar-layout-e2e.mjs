@@ -74,17 +74,17 @@ try{
  await bubble.getByRole('button',{name:'标题'}).hover();
  const menu=p.getByRole('menu',{name:'标题'});
  await menu.waitFor();
- const openMotion=await menu.evaluate(el=>({state:el.dataset.state,animation:getComputedStyle(el).animationName,duration:getComputedStyle(el).animationDuration}));
- assert.equal(openMotion.state,'open');
- assert.ok(openMotion.animation.includes('rk-inline-menu-enter')&&openMotion.duration!=='0s','Desktop menu should animate opening '+JSON.stringify(openMotion));
+ const openMotion=await menu.evaluate(el=>{
+  const layer=el.closest('[popover]');if(!layer)throw Error('Expected the library popover');
+  return {animation:getComputedStyle(layer).animationName,duration:getComputedStyle(layer).animationDuration};
+ });
+ assert.ok(openMotion.animation!=='none'&&parseFloat(openMotion.duration)>0,'Desktop library menu should animate opening '+JSON.stringify(openMotion));
  const menuWidth=await menu.evaluate(el=>el.getBoundingClientRect().width);
  assert.ok(menuWidth<=219,'Popup should not be excessively wide: '+menuWidth);
  await p.keyboard.press('Escape'); // deterministic close while the hover menu is mounted
- const desktopClosing=p.locator('.rk-inline-popover[data-state="closing"]');
- await desktopClosing.waitFor({state:'attached'});
- const closeMotion=await desktopClosing.evaluate(el=>({animation:getComputedStyle(el).animationName,pointer:getComputedStyle(el).pointerEvents}));
- assert.ok(closeMotion.animation.includes('rk-inline-menu-exit')&&closeMotion.pointer==='none','Desktop menu must animate a pointer-inert exit '+JSON.stringify(closeMotion));
- await desktopClosing.waitFor({state:'detached'});
+ await menu.waitFor({state:'hidden'});
+ assert.equal(await bubble.getByRole('button',{name:'标题',exact:true}).getAttribute('aria-expanded'),'false','Escape closes the library menu');
+ assert.equal(await p.getByRole('menu').count(),0,'Closed menu must not intercept pointer or keyboard input');
  console.log('PASS desktop: exact order, full-height group separators, centered icons, animated hover dropdown');
 
  for(const width of [390,320,1024]){
@@ -126,30 +126,32 @@ try{
    assert.equal(surface.background,surface.toolbar,'Scroll fades must sit on the exact toolbar background');
    assert.ok(surface.start.includes(surface.background)&&surface.end.includes(surface.background),
     'Both fade gradients must start with the exact toolbar surface color '+JSON.stringify(surface));
-   await toolbar.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.dispatchEvent(new Event('scroll'));});
+   await host.locator('.rk-scroll-viewport').evaluate(el=>{el.scrollLeft=el.scrollWidth;el.dispatchEvent(new Event('scroll'));});
    await page.waitForFunction(()=>document.querySelector('.rk-editor-format-scroll')?.hasAttribute('data-edge-start'));
    const last=await host.evaluate(el=>({
     start:el.hasAttribute('data-edge-start'),end:el.hasAttribute('data-edge-end'),
     scrolled:el.querySelector('.rk-scroll-viewport').scrollLeft
    }));
    assert.ok(last.start&&!last.end&&last.scrolled>20,'Expected left-side scroll hint at end '+JSON.stringify(last));
-   await toolbar.evaluate(el=>{el.scrollLeft=0;el.dispatchEvent(new Event('scroll'));});
+   await host.locator('.rk-scroll-viewport').evaluate(el=>{el.scrollLeft=0;el.dispatchEvent(new Event('scroll'));});
    await page.waitForFunction(()=>!document.querySelector('.rk-editor-format-scroll')?.hasAttribute('data-edge-start'));
    const head=toolbar.getByRole('button',{name:'标题'});
    await head.tap();
    const menu=page.getByRole('menu',{name:'标题'});
    await menu.waitFor();
-   const bounds=await page.evaluate(()=>({head:document.querySelector('.wysiwyg-toolbar [aria-label="标题"]')?.getBoundingClientRect().toJSON(),popup:document.querySelector('.rk-inline-popover')?.getBoundingClientRect().toJSON(),innerHeight,visualHeight:visualViewport?.height,scrollY}));
+   await menu.evaluate(async el=>{
+    const layer=el.closest('[popover]');if(!layer)throw Error('Expected the library popover');
+    await Promise.all(layer.getAnimations({subtree:true}).map(animation=>animation.finished.catch(()=>{})));
+   });
+   const bounds={head:await head.evaluate(el=>el.getBoundingClientRect().toJSON()),popup:await menu.evaluate(el=>el.getBoundingClientRect().toJSON()),
+    ...await page.evaluate(()=>({innerHeight,visualHeight:visualViewport?.height,scrollY}))};
    assert.ok(bounds.head&&bounds.popup&&(
     bounds.popup.top>=bounds.head.bottom+3||bounds.popup.bottom<=bounds.head.top-3),
     'Touch popup must not overlap its trigger '+JSON.stringify(bounds));
    await head.tap();
-   const touchClosing=page.locator('.rk-inline-popover[data-state="closing"]');
-   await touchClosing.waitFor({state:'attached'});
-   const touchMotion=await touchClosing.evaluate(el=>({animation:getComputedStyle(el).animationName,pointer:getComputedStyle(el).pointerEvents}));
-   assert.ok(touchMotion.animation.includes('rk-inline-menu-exit')&&touchMotion.pointer==='none',
-    'Touch menu should animate out without intercepting taps '+JSON.stringify(touchMotion));
-   await touchClosing.waitFor({state:'detached'});
+   await menu.waitFor({state:'hidden'});
+   assert.equal(await head.getAttribute('aria-expanded'),'false','A second tap closes the menu');
+   assert.equal(await page.getByRole('menu').count(),0,'Closed touch menu does not intercept taps');
    await head.tap();await menu.waitFor();
    await page.locator('.workbench-header').tap();await menu.waitFor({state:'hidden'});
    const metrics=await page.evaluate(()=>({

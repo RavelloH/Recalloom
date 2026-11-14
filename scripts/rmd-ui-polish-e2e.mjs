@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {readFileSync,existsSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8799';
@@ -76,4 +77,12 @@ try{
  assert.equal((await api('/records/'+id)).body.content,source,'view switching never changes database source');
  console.log('PASS RMD preview HTML, single Banner icon, caption and unchanged D1 body');
  assert.deepEqual(errors,[]);
+}catch(error){
+ const showError=page.getByRole('button',{name:'Show Error',exact:true});
+ if(await showError.count())await showError.click().catch(()=>{});
+ fs.mkdirSync('output/playwright/rmd-ui-polish',{recursive:true});
+ await page.screenshot({path:'output/playwright/rmd-ui-polish/failure.png',fullPage:true}).catch(()=>{});
+ console.error('RMD polish browser errors:',errors);
+ console.error('RMD polish page:',await page.locator('body').innerText().then(text=>text.slice(-2200)).catch(()=>''));
+ throw error;
 }finally{await browser.close().catch(()=>{});}

@@ -39,14 +39,41 @@
 }
 
 .crumbs {
-  display: flex;
-  align-items: center;
-  gap: 1px;
+  display: block;
   min-width: 0;
   font-size: var(--rk-font-body);
 }
 
+.crumbs > ol {
+  flex-wrap: nowrap;
+  gap: 1px;
+  min-width: 0;
+}
+
+.crumbs .astryx-breadcrumb-item {
+  min-width: 0;
+  gap: 0;
+  font-size: inherit;
+}
+
+.crumbs .astryx-breadcrumb-item a {
+  min-width: 0;
+  padding-block: 0;
+  text-decoration: none;
+}
+
+.crumbs [aria-current="page"] {
+  min-width: 0;
+  font-weight: 400;
+}
+
+.crumbs .astryx-breadcrumb-item a:hover .crumb {
+  background: var(--color-background-muted);
+}
+
 .crumb {
+  display: block;
+  min-width: 0;
   flex: 0 1 auto;
   max-width: 220px;
   padding: 3px 6px;
@@ -59,6 +86,7 @@
 
 .crumb-current {
   color: var(--color-text-primary, inherit);
+  font-weight: 400;
 }
 
 .crumb-sep {
@@ -142,6 +170,53 @@
   display: grid;
   gap: 2px;
   margin: 18px 0 0;
+}
+
+/* Navigation mode keeps real links; the public tab targets retain the former
+   rounded settings navigation instead of introducing an underline rail. */
+.settings-nav.astryx-tab-list {
+  gap: 6px;
+  overflow: visible;
+}
+
+.settings-nav .astryx-tab-strip {
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: 6px;
+}
+
+.settings-nav .astryx-tab.settings-tab {
+  flex: none;
+  height: auto;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: var(--rk-font-label);
+  line-height: inherit;
+  font-weight: 400;
+}
+
+.settings-nav .astryx-tab[data-selected="selected"] {
+  background: var(--color-background-muted);
+  color: var(--color-text-secondary);
+}
+
+.settings-nav .astryx-tab-indicator {
+  display: none;
+}
+
+@media (max-width: 720px) {
+ .settings-nav.astryx-tab-list {
+  overflow: visible;
+ }
+ .settings-nav .astryx-tab-strip {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+ }
+ .topbar-slot-start .crumbs .astryx-breadcrumb-item:not(:has(.crumb-current)) {
+  display: none;
+ }
 }
 
 .page-title-copy h1 {

@@ -10,7 +10,7 @@
  box-shadow:0 4px 16px rgba(0,0,0,.13);
  user-select:none;isolation:isolate;
 }
-.rk-block-grip button{display:inline-flex;align-items:center;justify-content:center;
+.rk-block-grip .astryx-button{display:inline-flex;align-items:center;justify-content:center;
  box-sizing:border-box!important;min-width:30px!important;min-height:30px!important;
  width:30px!important;height:30px!important;padding:0!important;flex:none;}
 .rk-block-grip .rk-block-drag{
@@ -69,10 +69,10 @@
  transform:rotate(-1.5deg);
 }
 .rk-block-drag-floating-icon{color:var(--color-text-link,#527cb7);line-height:1;flex:none;display:grid;place-items:center;}
-.rk-block-drag-floating-icon svg{width:20px;height:20px;stroke-width:1.8;}
+.rk-block-drag-floating-icon .rk-icon{width:20px;height:20px;stroke-width:1.8;}
 .rk-block-drag-floating-copy{display:flex;flex-direction:column;gap:3px;min-width:0;}
 .rk-block-drag-floating-copy strong{font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rk-block-drag-floating-copy > span{color:var(--color-text-secondary,#777);font-size:11px;line-height:1.45;max-height:3em;overflow:hidden;}
+.rk-block-drag-floating-summary{color:var(--color-text-secondary,#777);font-size:11px;line-height:1.45;max-height:3em;overflow:hidden;}
 body.rk-block-drag-active,body.rk-block-drag-active *{cursor:grabbing!important;}
 /* Native Tiptap drop indication is styled/suppressed via the explicit
  * .rk-editor-dropcursor class in editor.css. The custom floating ghost and

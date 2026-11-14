@@ -719,8 +719,8 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   color: var(--rk-callout-accent) !important;
 }
 
-.record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) > :first-child {
-  color: inherit !important;
+.record-main .rk-rmd-callout-title {
+  color: var(--rk-callout-accent);
   font-size: var(--rk-callout-label-size) !important;
 }
 
@@ -854,12 +854,6 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   height: var(--rk-icon-sm) !important;
   line-height: 0;
   color: inherit !important;
-}
-
-.record-main .rk-rmd-callout .astryx-banner > :not(.astryx-banner-icon) {
-  color: inherit !important;
-  font-size: var(--rk-callout-label-size) !important;
-  min-width: 0;
 }
 
 @media (max-width: 720px) {

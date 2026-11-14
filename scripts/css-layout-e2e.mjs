@@ -57,12 +57,13 @@ try{
   }else{
    await page.getByRole('button',{name:'打开导航'}).click();
    await page.locator('.sidebar.mobile-open').waitFor();
-   await page.getByRole('button',{name:'关闭侧栏'}).click();
+   await page.getByRole('button',{name:'关闭导航'}).click();
    await page.locator('.sidebar.mobile-open').waitFor({state:'hidden'});
    await page.waitForFunction(()=>document.querySelector('.sidebar')?.getBoundingClientRect().right<=1,{timeout:5000});
    assert.ok(measurements.bottom&&measurements.bottom.h>=45,mode.name+' missing mobile bottom navigation');
-   assert.ok(measurements.scroll.bottom===undefined&&measurements.scroll.y+measurements.scroll.h>=measurements.bottom.y+measurements.bottom.h-1,mode.name+' scroll viewport stops above tab bar');
-   assert.ok(measurements.scrollContentPadding>=measurements.bottom.h-2,mode.name+' missing scroll-content clearance');
+   assert.ok(Math.abs(measurements.scroll.y+measurements.scroll.h-measurements.bottom.y)<=1,
+    mode.name+' route snapshot viewport stops exactly above tab bar: '+JSON.stringify(measurements));
+   assert.equal(measurements.scrollContentPadding,16,mode.name+' retains natural content end inset without duplicating reserved tab height');
    assert.notEqual(measurements.bottomShadow,'none',mode.name+' bottom nav has no overlay shadow');
   }
   await page.screenshot({path:'tmp/css-layout-snapshots/'+mode.name+'.png'});

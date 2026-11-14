@@ -9,6 +9,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Banner} from '@astryxdesign/core/Banner';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
+import {EmptyState} from '@astryxdesign/core/EmptyState';
 
 import {graphQuery} from './queries';
 import {relationLabel,semanticMessage,type KnowledgeEdge,type KnowledgeNode} from './graph-types';
@@ -201,7 +202,7 @@ export default function KnowledgeGraphPage(){
      </div>
      {nodes.length?
       <GraphCanvas nodes={nodes} edges={edges} selected={selected} onSelect={onSelect} cyRef={cy} query={filter}/>:
-      <div className="graph-empty">知识库尚无可显示的记录。添加文档后即可查看关系网。</div>}
+      <EmptyState className="graph-empty" title="知识库尚无可显示的记录。添加文档后即可查看关系网。"/>}
      <p className="graph-bottomline">{data.scope==='recent'?'默认仅显示最近的文档子图；选中文档并设为中心后，才能查询其语义相似候选。':'仅显示当前文档附近的有界子图。'} {data.scope==='local'?semanticMessage(data.semanticStatus):''}</p>
     </div>
     <aside className="graph-inspector" aria-label="选中节点详情">

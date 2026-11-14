@@ -88,7 +88,7 @@ try{
    // A fixed off-canvas sidebar must never consume layout width when closed.
    // Scroll width alone cannot catch a 290px sidebar occupying flex space.
    const shellLayout=await screen.evaluate(()=>{
-     const sidebar=document.querySelector('.sidebar');
+     const sidebar=document.querySelector('.rk-mobile-nav');
      const workspace=document.querySelector('.workspace');
      const main=document.querySelector('.main-content');
      const box=workspace?.getBoundingClientRect();
@@ -101,18 +101,18 @@ try{
    assert.ok((shellLayout.mainWidth??0)>=width-1,'main content remains readable: '+JSON.stringify(shellLayout));
    if(width===390){
      await screen.getByRole('button',{name:'打开导航'}).click();
-     await screen.waitForFunction(()=>document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
+     await screen.locator('.rk-mobile-nav[open]').waitFor();
      assert.ok(await screen.locator('.workspace').evaluate(el=>Math.abs(el.getBoundingClientRect().left)<2),'opening navigation must not shift main workspace');
-     const visible=await screen.locator('.mobile-scrim').evaluate(el=>({
-       opacity:getComputedStyle(el).opacity,
-       transition:getComputedStyle(el).transitionDuration,
-       pointer:getComputedStyle(el).pointerEvents
+     const visible=await screen.locator('.rk-mobile-nav').evaluate(el=>({
+       opacity:getComputedStyle(el,'::backdrop').opacity,
+       transition:getComputedStyle(el,'::backdrop').transitionDuration,
+       modal:el.matches(':modal')
      }));
-     assert.equal(visible.pointer,'auto','scrim intercepts touch when navigation is open');
+     assert.equal(visible.modal,true,'native modal intercepts background interactions');
      assert.ok(parseFloat(visible.transition)>0,'mobile scrim fades in');
-     await screen.locator('.mobile-scrim').click({position:{x:width-8,y:200}});
-     await screen.waitForFunction(()=>!document.querySelector('.mobile-scrim')?.classList.contains('is-visible'));
-     assert.equal(await screen.locator('.mobile-scrim').getAttribute('aria-hidden'),'true','hidden scrim is not a keyboard target');
+     await screen.locator('.rk-mobile-nav').click({position:{x:width-8,y:200}});
+     await screen.waitForFunction(()=>!document.querySelector('.rk-mobile-nav')?.open);
+     assert.equal(await screen.locator('.rk-mobile-nav').evaluate(el=>el.matches(':modal')),false,'dismissed navigation releases the page');
    }
    const result=await screen.evaluate(()=>{
      const longName='LongUnbrokenFileName'.repeat(30);
@@ -300,7 +300,7 @@ try{
  assert.ok((await page.locator('.recent-entry[data-activity-seq]').first().innerText()).includes('本人（Web）'),'activity displays owner');
  await page.goto(url+'/search');
  await page.getByRole('textbox',{name:'搜索关键字'}).fill('UI e2e');
- await page.getByRole('group',{name:'搜索方式'}).getByRole('button',{name:'关键词'}).click();
+ await page.getByRole('radiogroup',{name:'搜索方式'}).getByRole('radio',{name:'关键词'}).click();
  await page.getByRole('region',{name:'页面内容'}).getByRole('button',{name:'搜索',exact:true}).click();
  await page.locator('.search-highlight').first().waitFor({timeout:15000});
  await page.goto(recUrl);
@@ -338,7 +338,7 @@ try{
  await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');
  await page.getByRole('button',{name:'创建',exact:true}).click();
- await page.getByRole('heading',{name:'Phase summary',exact:true}).waitFor();
+ await page.locator('.record-page .page-title').filter({hasText:'Phase summary'}).waitFor();
  await page.getByRole('button',{name:'信息',exact:true}).click();
  const workbench=page.locator('#document-panel-info');
  await workbench.locator('.page-properties .tag-editor').getByText('checkpoint',{exact:true}).waitFor();

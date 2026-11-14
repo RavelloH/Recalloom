@@ -1,11 +1,12 @@
 import {Icon} from './icon';
 import {sharedViewTransitionName,sharedTitleAttributes,type SharedResourceKind} from './shared-view-transition';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {Link} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {Token} from '@astryxdesign/core/Token';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Button} from '@astryxdesign/core/Button';
+import {Breadcrumbs as BreadcrumbTrail,BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
+import {MetadataList,MetadataListItem} from '@astryxdesign/core/MetadataList';
 
 import {ApiError,api} from './api';
 import {TopbarPortal} from './topbar-slot';
@@ -55,12 +56,12 @@ export function useFolderTrail(folderId:string|null|undefined){
 export function Breadcrumbs({folderId,current}:{folderId:string|null|undefined;current?:string}){
  const trail=useFolderTrail(folderId);
  const folders=trail.data??[];
- return <nav className="crumbs" aria-label="页面路径">
-  <Link to="/library" className="crumb">知识库</Link>
-  {folders.map(folder=><React.Fragment key={folder.id}><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><Link to="/library/$folderId" params={{folderId:folder.id}} className="crumb truncate" style={{viewTransitionName:sharedViewTransitionName('folder',folder.id)}}>{folder.name}</Link></React.Fragment>)}
-  {folderId&&trail.isPending&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb muted">…</span></>}
-  {current&&<><Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/><span className="crumb crumb-current truncate" aria-current="page">{current}</span></>}
- </nav>;
+ return <BreadcrumbTrail className="crumbs" label="页面路径" separator={<Icon name="chevronRight" inline className="crumb-sep" aria-hidden="true"/>}>
+  <BreadcrumbItem href="/library" isCurrent={false}><span className="crumb">知识库</span></BreadcrumbItem>
+  {folders.map(folder=><BreadcrumbItem key={folder.id} href={'/library/'+encodeURIComponent(folder.id)} isCurrent={false}><span className="crumb truncate" style={{viewTransitionName:sharedViewTransitionName('folder',folder.id)}}>{folder.name}</span></BreadcrumbItem>)}
+  {folderId&&trail.isPending&&<BreadcrumbItem isCurrent={false}><span className="crumb muted">…</span></BreadcrumbItem>}
+  {current&&<BreadcrumbItem isCurrent><span className="crumb crumb-current truncate">{current}</span></BreadcrumbItem>}
+ </BreadcrumbTrail>;
 }
 
 /** Editable document title: Enter or blur commits a rename, Escape reverts. */
@@ -101,10 +102,10 @@ export function InlineTitle({value,onRename,placeholder='未命名',autoFocus=fa
 }
 
 export function Properties({children}:{children:React.ReactNode}){
- return <dl className="page-properties">{children}</dl>;
+ return <MetadataList className="page-properties" label={{position:'start',width:'var(--rk-property-label-width, 140px)'}}>{children}</MetadataList>;
 }
 export function Property({label,children}:{label:string;children:React.ReactNode}){
- return <div className="property-row"><dt className="property-label">{label}</dt><dd className="property-value">{children}</dd></div>;
+ return <MetadataListItem className="property-label" label={label}><div className="property-value">{children}</div></MetadataListItem>;
 }
 
 export function TagEditor({tags,onChange}:{tags:string[];onChange:(tag:string,action:'add'|'remove')=>Promise<void>}){

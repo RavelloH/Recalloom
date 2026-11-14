@@ -1,5 +1,6 @@
 import React from 'react';
 import type {Editor} from '@tiptap/core';
+import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {Icon} from '../icon';
 import {alignTableColumn} from '../tiptap/editor-actions';
 import type {useVisualEditorSelection} from './use-selection';
@@ -17,7 +18,8 @@ type Props={
 };
 export function EditorTableControls({editor,active,tableTarget,tableToolbarTop,column,editTableCaption,tableCommand,action}:Props){
  return <>
-  <div hidden={!((active?.table&&active.focused)||tableTarget)} className="editor-table-actions" role="toolbar" aria-label="表格操作" style={{top:tableToolbarTop}}>
+  <Toolbar hidden={!((active?.table&&active.focused)||tableTarget)} className="editor-table-actions" label="表格操作" size="sm" gap={0}
+   style={{top:tableToolbarTop,padding:'7px 12px'}} startContent={<div className="rk-editor-table-tools">
    <span className="muted small table-actions-label">表格</span>
    {action('在上方插入行',()=>tableCommand('addRowBefore'),<><Icon name="tableRow" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addRowBefore())}
    {action('在下方插入行',()=>tableCommand('addRowAfter'),<><Icon name="tableRow" size="sm"/><Icon name="plus" size="sm"/></>,!tableTarget&&!editor.can().addRowAfter())}
@@ -33,7 +35,7 @@ export function EditorTableControls({editor,active,tableTarget,tableToolbarTop,c
    <span className="editor-table-sep"/>
    {action('编辑表格图注与 ID',editTableCaption,<><Icon name="pencil" size="sm"/><span>表注</span></>)}
    {action('删除表格',()=>editor.chain().focus().deleteTable().run(),<Icon name="trash" size="sm"/>,!tableTarget&&!editor.can().deleteTable())}
-  </div>
+  </div>}/>
 
  </>;
 }

@@ -206,7 +206,7 @@ try {
  await setScroll(430);
  assert.ok((await measure()).top>=400);
  const queryBefore=await count();
- await page.getByRole('button',{name:'关键词',exact:true}).evaluate(el=>el.click());
+ await page.getByRole('radio',{name:'关键词',exact:true}).evaluate(el=>el.click());
  await page.waitForURL(url=>url.pathname==='/search'&&url.searchParams.get('mode')==='literal');
  await assertRouteTransition(queryBefore);
  console.log('AFTER_SEARCH_MODE '+JSON.stringify(await measure()));

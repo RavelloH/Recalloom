@@ -4,9 +4,11 @@ import {NavRow} from './nav-row';
 import React,{useEffect,useRef,useState} from 'react';
 import {Link,useNavigate,useRouterState} from '@tanstack/react-router';
 import {useQueryClient} from '@tanstack/react-query';
-import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {SideNav} from '@astryxdesign/core/SideNav';
+import {MobileNav} from '@astryxdesign/core/MobileNav';
+import {Spinner} from '@astryxdesign/core/Spinner';
+import {Kbd} from '@astryxdesign/core/Kbd';
 
 import {api} from './api';
 import {useAppearance} from './theme';
@@ -26,16 +28,19 @@ import {useFullWidth} from './preferences';
 import {WorkspacePanels} from './workspace-panels';
 
 const quickLinks=menu.filter(item=>['/','/tasks','/activity','/archive','/graph'].includes(item.to));
-const shortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform)?'⌘K':'Ctrl K';
+const appleShortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform);
 
 export function Shell({children}:{children:React.ReactNode}){
  const [collapsed,setCollapsed]=useState(()=>localStorage.getItem('recalloom:sidebar')==='collapsed');
+ const [viewportWidth,setViewportWidth]=useState(()=>window.innerWidth);
+ const isMobile=viewportWidth<=720;
  const [mobileOpen,setMobileOpen]=useState(false),[commands,setCommands]=useState(false),[paletteActivated,setPaletteActivated]=useState(false),[scrolled,setScrolled]=useState(false);
  const [slotStart,setSlotStart]=useState<HTMLDivElement|null>(null),[slotEnd,setSlotEnd]=useState<HTMLDivElement|null>(null);
  const scroller=useRef<HTMLDivElement|null>(null);
  const pendingSidebarLink=useRef<HTMLAnchorElement|null>(null);
  const replayingSidebarLink=useRef(false);
  const sidebarExitFallback=useRef<number|null>(null);
+ const mobileNavigation=useRef<HTMLDialogElement>(null);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const navigate=useNavigate();const qc=useQueryClient();const {mode,setMode}=useAppearance();
  // Key on the rendered leaf match: the outgoing page stays mounted while the next one loads,
@@ -46,6 +51,11 @@ export function Shell({children}:{children:React.ReactNode}){
  const cycleTheme=()=>setMode(mode==='system'?'light':mode==='light'?'dark':'system');
  const themeName=mode==='system'?'跟随系统':mode==='light'?'浅色':'深色';
  const closeMobile=()=>setMobileOpen(false);
+ useEffect(()=>{
+  const resize=()=>{setViewportWidth(window.innerWidth);if(window.innerWidth>720)setMobileOpen(false);};
+  window.addEventListener('resize',resize);
+  return()=>window.removeEventListener('resize',resize);
+ },[]);
  const finishSidebarNavigation=()=>{
   if(sidebarExitFallback.current!==null){
    window.clearTimeout(sidebarExitFallback.current);
@@ -60,6 +70,12 @@ export function Shell({children}:{children:React.ReactNode}){
   replayingSidebarLink.current=true;
   try{anchor.click();}finally{replayingSidebarLink.current=false;}
  };
+ useEffect(()=>{
+  const dialog=mobileNavigation.current;
+  if(!dialog)return;
+  dialog.addEventListener('close',finishSidebarNavigation);
+  return()=>dialog.removeEventListener('close',finishSidebarNavigation);
+ },[isMobile]);
  const onSidebarClickCapture=(event:React.MouseEvent<HTMLElement>)=>{
   if(!mobileOpen||replayingSidebarLink.current||event.defaultPrevented||
    event.button!==0||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
@@ -72,14 +88,11 @@ export function Shell({children}:{children:React.ReactNode}){
   pendingSidebarLink.current=anchor;
   setMobileOpen(false);
   if(sidebarExitFallback.current!==null)window.clearTimeout(sidebarExitFallback.current);
-  // CSS fires transitionend for transform (280ms). The timeout handles
-  // reduced-motion, interrupted transitions and browsers without the event.
-  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  sidebarExitFallback.current=window.setTimeout(finishSidebarNavigation,reduced?0:420);
- };
- const onSidebarTransitionEnd=(event:React.TransitionEvent<HTMLElement>)=>{
-  if(event.target===event.currentTarget&&event.propertyName==='transform'&&
-   pendingSidebarLink.current&&!mobileOpen)finishSidebarNavigation();
+  // MobileNav owns modal focus, Escape and its exit. Wait for the native
+  // close event before taking a route snapshot; reduced motion follows it too.
+  sidebarExitFallback.current=window.setTimeout(()=>{
+   if(!mobileNavigation.current?.open)finishSidebarNavigation();
+  },520);
  };
  useEffect(()=>()=>{if(sidebarExitFallback.current!==null)window.clearTimeout(sidebarExitFallback.current);},[]);
  // Prewarm the sizeable palette after the shell has painted. On first click
@@ -96,17 +109,16 @@ export function Shell({children}:{children:React.ReactNode}){
   const mod=event.ctrlKey||event.metaKey;
   if(mod&&event.key.toLowerCase()==='k'){event.preventDefault();setPaletteActivated(true);setCommands(v=>!v);}
   if(mod&&event.key==='\\'){event.preventDefault();setCollapsed(v=>!v);}
-  if(event.key==='Escape')setMobileOpen(false);
  };window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[]);
  // The top bar gains its separator only once content scrolls beneath it.
  useEffect(()=>{const el=scroller.current;if(!el)return;const sync=()=>setScrolled(el.scrollTop>2);el.addEventListener('scroll',sync,{passive:true});sync();return()=>el.removeEventListener('scroll',sync);},[]);
  const logout=async()=>{if((hasSessionDrafts()||hasActiveEditorDirty())&&!(await askConfirm({title:'退出并清除草稿？',description:'本标签页仍有未保存草稿。退出登录将删除这些草稿，此操作无法撤销。',actionLabel:'退出并清除',destructive:true})))return;approveLogoutNavigation(true);try{await api('/auth/logout',{method:'POST'});clearAllSessionDrafts();clearRecentPages();qc.clear();await navigate({to:'/login'});}finally{approveLogoutNavigation(false);}};
- return <div className={'shell'+(collapsed?' sidebar-collapsed':'')} data-scrolled={scrolled||undefined} data-width={fullWidth?'full':undefined}>
- <SideNav className={'sidebar'+(mobileOpen?' mobile-open':'')} aria-label="侧边栏"
-  onClickCapture={onSidebarClickCapture} onTransitionEnd={onSidebarTransitionEnd}
-  header={<div className="brand"><BrandMark className="brand-mark"/><span className="brand-name">Recalloom</span>
+ const brand=<div className="brand"><BrandMark className="brand-mark"/><span className="brand-name">Recalloom</span>
    <IconButton className="sidebar-collapse" variant="ghost" size="sm" label="折叠侧边栏" icon={<Icon name="chevronsLeft"/>} onClick={()=>setCollapsed(true)}/>
-   <IconButton className="mobile-close" variant="ghost" label="关闭侧栏" icon={<Icon name="x"/>} onClick={closeMobile}/></div>}
+  </div>;
+ const sidebar=<SideNav className={'sidebar'+(isMobile?' sidebar-mobile':'')+(mobileOpen?' mobile-open':'')} aria-label="侧边栏"
+  onClickCapture={onSidebarClickCapture}
+  header={brand}
   footer={<div className="sidebar-footer">
    <NavRow to="/settings" icon="settings" label="设置" onClick={closeMobile}/>
    <NavRow icon="sunMoon" label={'主题：'+themeName} title="切换主题：跟随系统 → 浅色 → 深色" onClick={cycleTheme}/>
@@ -114,13 +126,15 @@ export function Shell({children}:{children:React.ReactNode}){
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
-    <NavRow icon="search" label="搜索" className="nav-search" trailing={<kbd className="nav-kbd">{shortcut}</kbd>} onPointerEnter={()=>{void loadQuickSwitcher();}} onFocus={()=>{void loadQuickSwitcher();}} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
+    <NavRow icon="search" label="搜索" className="nav-search" trailing={<Kbd className="nav-kbd" keys="mod+k" style={{gap:appleShortcut?0:'.25em'}}/>} onPointerEnter={()=>{void loadQuickSwitcher();}} onFocus={()=>{void loadQuickSwitcher();}} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
     <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon})=><NavRow key={to} to={to} icon={icon} label={name} onClick={closeMobile} exact={to==='/'}/>)}</nav>
    </div>
    <PageTree onNavigate={closeMobile}/>
   </OverlayScroll>
- </SideNav>
- <button className={'mobile-scrim'+(mobileOpen?' is-visible':'')} aria-label="关闭导航" aria-hidden={!mobileOpen} tabIndex={mobileOpen?0:-1} onClick={closeMobile}/>
+ </SideNav>;
+ return <div className={'shell'+(collapsed?' sidebar-collapsed':'')} data-scrolled={scrolled||undefined} data-width={fullWidth?'full':undefined}>
+ {isMobile?<MobileNav className="rk-mobile-nav" ref={mobileNavigation} side="start" label="侧边栏"
+  width={Math.min(290,viewportWidth*.85)} isOpen={mobileOpen} onOpenChange={setMobileOpen}>{sidebar}</MobileNav>:sidebar}
  <WorkspacePanels><header className="topbar">
   <div className="topbar-left">
    <IconButton className="mobile-menu" variant="ghost" label="打开导航" icon={<Icon name="menu2"/>} onClick={()=>{
@@ -142,7 +156,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </OverlayScroll>
  </main></WorkspacePanels>
  <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
- {paletteActivated&&<React.Suspense fallback={commands?<div className="palette-loading" role="status"><span className="spin"/>正在打开搜索…</div>:null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
+ {paletteActivated&&<React.Suspense fallback={commands?<div className="palette-loading" role="status"><Spinner size="sm" label="正在打开搜索…"/></div>:null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
  {confirmation}
  </div>;
 }

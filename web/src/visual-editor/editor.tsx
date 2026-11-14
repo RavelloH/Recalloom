@@ -7,6 +7,7 @@ import '../tiptap/editor.css';
 import {Button} from '@astryxdesign/core/Button';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
+import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {useEditor,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
 import {NodeSelection,type SelectionBookmark} from '@tiptap/pm/state';
@@ -37,7 +38,7 @@ import {EditorCompletions} from './completions';
 import {EditorInlinePopup} from './inline-popup';
 import {OverlayScroll} from '../scrollbars';
 import {createRmdVisualDocumentSerializer} from './document-serializer';
-import type {SlashState,WikiState,InlinePopupItem,InlinePopup,VisualEditorHandle} from './types';
+import type {SlashState,WikiState,InlinePopupItem,VisualEditorHandle} from './types';
 import type {DocumentOutline} from '../document-outline';
 // Inline atoms (math, images) must not be mistaken for whitespace before "/".
 const LEAF_PLACEHOLDER=String.fromCharCode(0xfffc);
@@ -69,22 +70,19 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const [panelOpenCycle,setPanelOpenCycle]=useState(0);
  const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
  const inlineSelectionRef=useRef<{from:number;to:number;doc:ProseMirrorNode}|null>(null);
- const [inlinePopup,setInlinePopup]=useState<InlinePopup|null>(null);
+ const [inlinePopup,setInlinePopup]=useState<string|null>(null);
  const inlinePopupClose=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>{
   if(!inlinePopup)return;
-  const dismiss=(event:PointerEvent)=>{
-   const target=event.target;
-   if(target instanceof Element&&target.closest('.rk-inline-popover,.rk-inline-menu-trigger'))return;
-   setInlinePopup(null);
-  };
   const keydown=(event:KeyboardEvent)=>{
-   if(event.key==='Escape'){setInlinePopup(null);event.stopPropagation();}
+   // Hover leaves focus in the editor, so its Escape cannot reach the menu.
+   // Focused menus use Astryx's own dismissal and keyboard navigation.
+   if(event.key==='Escape'&&editorRef.current?.view.dom.contains(document.activeElement)){
+    setFormatHoverPreview(editorRef.current,null);setInlinePopup(null);event.stopPropagation();
+   }
   };
-  document.addEventListener('pointerdown',dismiss,true);
   document.addEventListener('keydown',keydown,true);
   return()=>{
-   document.removeEventListener('pointerdown',dismiss,true);
    document.removeEventListener('keydown',keydown,true);
   };
  },[inlinePopup]);
@@ -203,7 +201,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   // Focus without a selection change (Tab, programmatic focus) must still place the table toolbar.
   onFocus:({editor})=>followTableSelection(editor),
   onBlur:()=>{setSlash(null);setWiki(null);setTableTarget(false);},
-  editorProps:{handleKeyDown:(_view,event)=>{
+  editorProps:{attributes:{role:'textbox','aria-multiline':'true','aria-label':'文档正文'},handleKeyDown:(_view,event)=>{
    const e=editorRef.current;
    if(event.isComposing||!e)return false;
    const pending=wikiRef.current;
@@ -540,10 +538,10 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   return !kind?null:pressed?('remove:'+kind) as FormatHoverKind:kind;
  };
  const toggle=(name:string,pressed:boolean,run:()=>void,child:React.ReactNode)=>
-  <ToggleButton key={name} label={name} tooltip={name} size="sm" isPressed={pressed}
+  <ToggleButton key={name} label={name} tooltip={name} size="sm" isPressed={pressed} icon={child} isIconOnly
    onPointerEnter={event=>{captureInlineRange();if(finePointer&&event.pointerType==='mouse')applyHoverPreview(previewForToggle(name,pressed));}}
    onPointerLeave={()=>applyHoverPreview(null)} onPointerDown={captureInlineRange}
-   onPressedChange={()=>{applyHoverPreview(null);runCapturedInline(run);}}>{child}</ToggleButton>;
+   onPressedChange={()=>{applyHoverPreview(null);runCapturedInline(run);}}/>;
  const action=(name:string,run:()=>void,child:React.ReactNode,disabled=false)=>
   <Button key={name} label={name} tooltip={name} variant="ghost" size="sm"
    onMouseDown={event=>event.preventDefault()}
@@ -555,31 +553,21 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  };
  const schedulePopupClose=()=>{
   cancelPopupClose();
-  inlinePopupClose.current=setTimeout(()=>setInlinePopup(null),320);
+  inlinePopupClose.current=setTimeout(()=>{applyHoverPreview(null);setInlinePopup(null);},320);
  };
- const showInlinePopup=(anchor:HTMLElement,label:string,items:InlinePopupItem[])=>{
+ const showInlinePopup=(label:string)=>{
   cancelPopupClose();
   applyHoverPreview(null);
   captureInlineRange();
-  const rect=anchor.getBoundingClientRect(),height=Math.min(336,items.length*38+20);
-  setInlinePopup({label,items,
-   left:Math.max(8,Math.min(rect.left,window.innerWidth-226)),
-   top:window.innerHeight-rect.bottom>height+10||rect.top<height+12
-    ?rect.bottom+6:Math.max(8,rect.top-height-6)});
+  setInlinePopup(label);
  };
  const categoryButton=(label:string,child:React.ReactNode,items:InlinePopupItem[],highlightActive=true)=>
-  <Button key={label} label={label} variant="ghost" size="sm"
-   className={'rk-inline-menu-trigger'+(highlightActive&&items.some(item=>item.active)?' rk-toolbar-state-selected':'')} icon={menuIcon(child)} isIconOnly
-   aria-haspopup="menu" aria-expanded={inlinePopup?.label===label}
-   onMouseDown={event=>event.preventDefault()}
-   onPointerDown={captureInlineRange}
-   onPointerEnter={event=>{if(finePointer&&event.pointerType==='mouse')showInlinePopup(event.currentTarget,label,items);}}
-   onPointerLeave={finePointer?()=>{applyHoverPreview(null);schedulePopupClose();}:undefined}
-   onClick={event=>{
-    applyHoverPreview(null);
-    if(!finePointer&&inlinePopup?.label===label){cancelPopupClose();setInlinePopup(null);}
-    else showInlinePopup(event.currentTarget,label,items);
-   }}/>;
+  <EditorInlinePopup key={label} label={label} icon={menuIcon(child)} items={items}
+   isOpen={inlinePopup===label} finePointer={finePointer}
+   selected={highlightActive&&items.some(item=>item.active)} onCapture={captureInlineRange}
+   onOpenChange={open=>{cancelPopupClose();applyHoverPreview(null);if(open)showInlinePopup(label);else setInlinePopup(current=>current===label?null:current);}}
+   onEnter={cancelPopupClose} onLeave={schedulePopupClose} onPreview={applyHoverPreview}
+   onChoose={item=>{applyHoverPreview(null);cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>;
 
  const slashItems=slash?filterSlashCommands(editor,slash.query):[];
  const slashGroups=slash?groupSlashCommands(slashItems):[];
@@ -642,7 +630,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   requestAnimationFrame(()=>setTableTarget(true));
  }}>
   {touchToolbar&&<OverlayScroll axis="x" edges className="rk-hscroll rk-editor-format-scroll"
-   viewportClassName="wysiwyg-toolbar" viewportProps={{role:'toolbar','aria-label':'格式工具栏'}}>
+   viewportClassName="wysiwyg-toolbar">
+   <Toolbar label="格式工具栏" size="sm" gap={0} className="rk-editor-touch-toolbar" style={{padding:0}}
+    startContent={<div className="rk-editor-touch-tools">
    <div className="wysiwyg-tools wysiwyg-tools-leading">
     {action('插入内容',()=>openInsertMenu(),<Icon name="plus" size="sm"/>)}
     {touchBlockPos!==null&&<span className="wysiwyg-block-leading" role="group" aria-label="当前块操作">
@@ -653,6 +643,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     </span>}
    </div>
    <div className="wysiwyg-tools wysiwyg-tools-primary">{sharedFormattingToolbar}</div>
+   </div>}/>
   </OverlayScroll>}
   {finePointer&&<BubbleMenu editor={editor} className="bubble-menu" options={{placement:'top',offset:8}}
    shouldShow={({editor:e,state,from,to})=>{
@@ -662,15 +653,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     if(e.isActive('codeBlock'))return false;
     return from!==to||e.isActive('link');
    }}>
-   <div className="bubble-menu-inner" role="toolbar" aria-label="文本格式" onMouseDown={event=>event.preventDefault()}>
-    {active?.imageSelected
+   <Toolbar className="bubble-menu-inner" label="文本格式" size="sm" gap={0.5}
+    style={{padding:4}} onMouseDown={event=>event.preventDefault()}
+    startContent={active?.imageSelected
      ?action('插入或编辑图片',openImage,<Icon name="photoPlus" size="sm"/>)
      :!active?.textSelection
       ?action('插入或编辑链接',openLink,<Icon name="link" size="sm"/>)
       :<div className="bubble-group">
        {sharedFormattingToolbar}
-      </div>}
-   </div>
+      </div>}/>
   </BubbleMenu>}
   {(tableTarget||(active?.table&&active.focused))&&<EditorTableControls editor={editor} active={active} tableTarget={tableTarget} tableToolbarTop={tableToolbarTop}
    column={lastColumn.current} editTableCaption={editTableCaption}
@@ -678,15 +669,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   {!finePointer?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={editBlock}
    onEditLink={openLink} onInsert={(pos,point)=>openInsertMenu(pos,point)}><EditorContent editor={editor}/></EditorContextMenu>}
   <BlockHandleLayer editor={editor} surfaceRef={surfaceRef} enabled={finePointer} onEditBlock={editBlock}/>
-  <EditorCompletions slash={slash} slashItems={slashItems} slashGroups={slashGroups} slashListRef={slashListRef}
+  <EditorCompletions editor={editor} surfaceRef={surfaceRef} slash={slash} slashItems={slashItems} slashGroups={slashGroups} slashListRef={slashListRef}
    setSlash={setSlash} onRunSlash={command=>runSlashRef.current(command)} wiki={wiki} wikiMatches={wikiMatches}
    wikiFetching={wikiSearch.isFetching} setWiki={setWiki} onChooseWiki={hit=>chooseWikiRef.current(hit)}/>
 
  </div>
  </div>
- <EditorInlinePopup popup={inlinePopup} onEnter={finePointer?cancelPopupClose:()=>{}} onLeave={finePointer?schedulePopupClose:()=>{}}
-  onPreview={kind=>applyHoverPreview(kind)}
-  onChoose={item=>{applyHoverPreview(null);cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
  {(blockPanelPos!==null||dialog!==null)&&createPortal(
   <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos??0} insertion={dialog?{value:dialog,onApply:applyDialog,onRemove:removeDialog}:undefined} attributePos={attributeNodePos} recordId={recordId}
    onClose={closePanel}/>,document.body)}

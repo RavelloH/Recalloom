@@ -3,5 +3,4 @@ export type WikiState=SlashState&{kind:'link'|'embed'};
 import type {FormatHoverKind} from '../tiptap/format-hover-preview';
 import type {DocumentOutline} from '../document-outline';
 export type InlinePopupItem={id:string;label:string;description?:string;disabled?:boolean;active?:boolean;preview?:FormatHoverKind;run:()=>void};
-export type InlinePopup={label:string;left:number;top:number;items:InlinePopupItem[]};
 export type VisualEditorHandle={flushEditedMarkdown:()=>string|null;getOutline:()=>DocumentOutline|null;jumpToHeading:(key:string)=>boolean};

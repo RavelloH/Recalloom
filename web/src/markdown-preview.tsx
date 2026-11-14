@@ -20,6 +20,7 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Card} from '@astryxdesign/core/Card';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
+import {FlashcardSideTitle,RmdReadTooltip} from './rmd-ui';
 import {RmdChatMessage,RmdChatTranscript} from './rmd-chat';
 import {SmartLink} from './link-icons';
 import {LinkCardView} from './tiptap/rich-link-card';
@@ -149,11 +150,11 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
    const content=()=>{
    if(kind==='flashcard')return <FlashcardPreview title={title}>{props.children as React.ReactNode}</FlashcardPreview>;
    if(kind==='front')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-front">
-    <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
+    <FlashcardSideTitle side="front"/>
     <div className="rk-flashcard-content">{props.children as React.ReactNode}</div>
    </Card>;
    if(kind==='back')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-back">
-    <div className="rk-flashcard-panel-title">{richTitle(kind,title)}</div>
+    <FlashcardSideTitle side="back"/>
     <div className="rk-flashcard-content">{props.children as React.ReactNode}</div>
    </Card>;
    if(kind==='glossary')return <Card variant="muted" padding={3} className="rk-glossary-read">
@@ -174,7 +175,7 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
    }
    if(kind==='details')return <Collapsible trigger={richTitle(kind,title)} defaultIsOpen>{props.children as React.ReactNode}</Collapsible>;
    const status=kind==='danger'?'error':kind==='warning'?'warning':kind==='success'?'success':'info';
-   return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={richTitle(kind,title)} collapsible={false} container="card">{props.children as React.ReactNode}</Banner></div>;
+   return <div className="rk-rmd-callout" data-rk-kind={kind}><Banner status={status} icon={calloutIcon(kind)} title={<span className="rk-rmd-callout-title">{richTitle(kind,title)}</span>} collapsible={false} container="card">{props.children as React.ReactNode}</Banner></div>;
    };
    return isRmdId(rawId)?<div id={anchor(rawId)} data-rk-container-id={rawId}>{content()}</div>:content();
   },
@@ -185,13 +186,11 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
   },
   'rk-abbr':({node:_node,...props}:Record<string,unknown>)=>{
    const description=String(props['data-title']??props.dataTitle??'');
-   return <span className="rk-tooltip-inline rk-inline-abbr" tabIndex={0}
-    data-rk-tooltip={description||undefined} aria-label={description?'查看解释：'+description:undefined}>{props.children as React.ReactNode}</span>;
+   return <RmdReadTooltip kind="abbr" description={description}>{props.children as React.ReactNode}</RmdReadTooltip>;
   },
   'rk-tooltip':({node:_node,...props}:Record<string,unknown>)=>{
    const description=String(props['data-content']??props.dataContent??'');
-   return <span className="rk-tooltip-inline rk-inline-tooltip" tabIndex={0}
-    data-rk-tooltip={description||undefined} aria-label={description?'查看解释：'+description:undefined}>{props.children as React.ReactNode}</span>;
+   return <RmdReadTooltip kind="tooltip" description={description}>{props.children as React.ReactNode}</RmdReadTooltip>;
   },
   'rk-kbd':({node:_node,...props}:Record<string,unknown>)=><kbd className="rk-keycap">{props.children as React.ReactNode}</kbd>,
   'rk-cloze':({node:_node,...props}:Record<string,unknown>)=><ClozeReveal hint={String(props['data-hint']??props.dataHint??'')}>{props.children as React.ReactNode}</ClozeReveal>,

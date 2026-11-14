@@ -6,13 +6,8 @@ import ts from 'typescript';
 const nativeTags=new Set(['button','input','select','textarea','summary']);
 const interactiveRoles=new Set(['button','checkbox','combobox','radio','slider','switch']);
 const exceptions=new Map([
- ['web/src/cloze-reveal.tsx:button:rk-cloze-reveal','Inline document cloze answer uses document typography and arbitrary inline children.'],
- ['web/src/shell.tsx:button:mobile-scrim','Navigation backdrop is an invisible dismiss surface.'],
- ['web/src/tiptap/block-handle.tsx:button:rk-block-drag','Native HTML drag source owns browser drag data and drag lifecycle.'],
- ['web/src/tiptap/rich-directives.tsx:button:rk-cloze-trigger','Inline document reveal preserves the mounted ProseMirror answer contentDOM.'],
  ['web/src/tiptap/rich-image.tsx:button:rk-rmd-attrs-decoration','Document attribute annotation matches the non-React ProseMirror widget.'],
- ['web/src/tiptap/rmd-attrs-decoration.ts:dom:button','ProseMirror decoration owns this non-React document annotation.'],
- ['web/src/tiptap/scroll-blocks.tsx:role:rk-code-title-hit','Direct code caption editing is a document text affordance.']
+ ['web/src/tiptap/rmd-attrs-decoration.ts:dom:button','ProseMirror decoration owns this non-React document annotation.']
 ]);
 const observed=new Set(),errors=[];
 function walkFiles(directory){

@@ -247,7 +247,8 @@ try{
  assert.match(await dialog.locator('.revision-diff-summary').innerText(),/R1[\s\S]*R2|R2[\s\S]*R1/,
   'An open comparison must remain pinned after the record head advances to R3');
 
- await dialog.getByRole('button',{name:'源码',exact:true}).click();
+ await dialog.getByRole('radio',{name:'源码',exact:true}).click();
+ assert.equal(await dialog.getByRole('radio',{name:'源码',exact:true}).getAttribute('aria-checked'),'true');
  const foldedSourceContext=dialog.getByRole('button',{name:/展开.*行未修改内容/});
  await foldedSourceContext.first().waitFor();
  assert.ok(await foldedSourceContext.count()>0,'Unchanged source context must be folded by default');
@@ -273,8 +274,8 @@ try{
   return {left:rect.left,right:rect.right,width:rect.width,clientWidth:element.clientWidth,scrollWidth:element.scrollWidth,
    viewport:innerWidth,pageWidth:document.documentElement.scrollWidth};
  });
- const sourceMode=dialog.getByRole('button',{name:'源码',exact:true});
- const previewMode=dialog.getByRole('button',{name:'预览',exact:true});
+ const sourceMode=dialog.getByRole('radio',{name:'源码',exact:true});
+ const previewMode=dialog.getByRole('radio',{name:'预览',exact:true});
  let showingSource=true;
  for(const width of [390,320]){
   if(!showingSource){await sourceMode.click();showingSource=true;}
@@ -293,6 +294,7 @@ try{
   assert.ok(measure.left>=-1&&measure.right<=measure.viewport+1,'Source dialog is outside '+width+'px viewport: '+JSON.stringify(measure));
   assert.ok(measure.scrollWidth<=measure.clientWidth+1,'Source dialog has horizontal overflow at '+width+': '+JSON.stringify(measure));
   await previewMode.click();showingSource=false;
+  assert.equal(await previewMode.getAttribute('aria-checked'),'true');
   measure=await geometry();
   assert.ok(measure.pageWidth<=measure.viewport+1,'Preview comparison page overflow at '+width+': '+JSON.stringify(measure));
   assert.ok(measure.left>=-1&&measure.right<=measure.viewport+1,'Preview dialog is outside '+width+'px viewport: '+JSON.stringify(measure));

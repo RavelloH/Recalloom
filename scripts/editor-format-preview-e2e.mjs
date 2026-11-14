@@ -76,26 +76,30 @@ try{
  await clean();
  console.log('PASS heading H2/H3 preview is block decoration and never writes');
 
- const headingMenu=page.locator('.rk-inline-popover[data-state="open"]');
  await bubble.getByRole('button',{name:'列表'}).hover();
  const listMenu=page.getByRole('menu',{name:'列表'});
  await listMenu.waitFor();
- await page.locator('.rk-inline-popover[data-state="closing"]').waitFor();
- const crossfade=await page.locator('.rk-inline-popover').evaluateAll(menus=>menus.map(el=>({
-  name:el.getAttribute('aria-label'),state:el.dataset.state,
-  animation:getComputedStyle(el).animationName,
-  pointer:getComputedStyle(el).pointerEvents
- })));
- assert.ok(crossfade.some(x=>x.name==='标题'&&x.state==='closing'&&x.animation.includes('rk-inline-menu-exit')&&x.pointer==='none'));
- assert.ok(crossfade.some(x=>x.name==='列表'&&x.state==='open'&&x.animation.includes('rk-inline-menu-enter')));
- await page.locator('.rk-inline-popover[data-state="closing"]').waitFor({state:'detached'});
+ await menu.waitFor({state:'hidden'});
+ assert.equal(await headingTrigger.getAttribute('aria-expanded'),'false','Switching categories closes the previous menu');
+ assert.equal(await bubble.getByRole('button',{name:'列表',exact:true}).getAttribute('aria-expanded'),'true');
+ assert.equal(await page.getByRole('menu').count(),1,'Only the current menu remains exposed');
+ // Astryx owns the native popover and its entry animation. Its public menu
+ // contract hides the old layer immediately; it has no exit/crossfade API.
+ const menuMotion=await listMenu.evaluate(element=>{
+  const layer=element.closest('[popover]');
+  if(!layer)throw Error('Menu must use a native popover layer');
+  const css=getComputedStyle(layer);
+  return {animation:css.animationName,duration:css.animationDuration};
+ });
+ assert.notEqual(menuMotion.animation,'none','The library layer retains its entry motion');
+ assert.ok(menuMotion.duration.split(',').some(value=>parseFloat(value)>0),'Menu entry motion has a nonzero duration');
  await listMenu.getByRole('menuitem',{name:'项目列表'}).hover();
  await format('.rk-hover-format--list-bullet').first().waitFor();
  await bubble.getByRole('button',{name:'对齐方式'}).hover();
  await page.getByRole('menu',{name:'对齐方式'}).getByRole('menuitem',{name:'居中对齐'}).hover();
  await format('.rk-hover-format--align-center').first().waitFor();
  await clean();
- console.log('PASS dropdown hover crossfade and list/alignment non-mutating preview');
+ console.log('PASS library dropdown hover handoff, entry motion and list/alignment non-mutating preview');
 
  await bubble.getByRole('button',{name:'更多'}).hover();
  const more=page.getByRole('menu',{name:'更多'});
@@ -158,7 +162,15 @@ try{
  assert.equal(outline.outline,'1px');assert.equal(outline.offset,'0px');assert.ok(outline.padding==='0px');
  await page.screenshot({path:'tmp/format-hover-mode-ring.png'});
  await para.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Home');
- await bubble.waitFor();
+ await bubble.waitFor().catch(async error=>{
+  const diagnostic=await page.locator('.tiptap').evaluate(element=>({
+   nativeSelection:getSelection()?.toString(),focused:element===document.activeElement,
+   active:document.activeElement?.getAttribute('aria-label'),
+   from:element.editor?.state.selection.from,to:element.editor?.state.selection.to,
+   source:element.textContent,
+  }));
+  console.error('RESELECT_AFTER_SAVE',JSON.stringify(diagnostic));throw error;
+ });
  const neutral=await bubble.getByRole('button',{name:'粗体'}).evaluate(el=>({
   pressed:el.getAttribute('aria-pressed'),background:getComputedStyle(el).backgroundColor,
   color:getComputedStyle(el).color
