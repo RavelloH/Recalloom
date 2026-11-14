@@ -39,7 +39,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   }
  };
  resize.observe(root);
- const make=(kind:string,rect:DOMRect,anchor:DOMRect,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0,groupText?:string)=>{
+ const make=(fragment:DocumentFragment,kind:string,rect:DOMRect,anchor:DOMRect,scrollLeft:number,scrollTop:number,element:HTMLElement,index:number,hasMath:boolean,inkOffset=0,groupText?:string)=>{
   if(!isSketchKind(kind)||rect.width<1||rect.height<1)return;
   const stroke=parseSketchNumber(element.dataset.rkSketchStroke,'stroke')??2;
   const padding=parseSketchNumber(element.dataset.rkSketchPadding,'padding')??(kind==='circle'||kind==='box'||kind==='bracket'?5:3);
@@ -58,12 +58,12 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   svg.setAttribute('width',String(width));
   svg.setAttribute('height',String(height));
   svg.setAttribute('viewBox','0 0 '+width+' '+height);
-  svg.style.left=(rect.left-anchor.left-padding+root.scrollLeft)+'px';
+  svg.style.left=(rect.left-anchor.left-padding+scrollLeft)+'px';
   // Align block outlines with the actual text ink center, not an arbitrary
   // line-height offset. The clamped, measured correction varies with fonts.
   const proseOutline=!hasMath&&(kind==='box'||kind==='circle'||kind==='bracket');
   const opticalShift=proseOutline?Math.max(-4,Math.min(4,inkOffset)):0;
-  svg.style.top=(rect.top-anchor.top-padding+root.scrollTop-opticalShift)+'px';
+  svg.style.top=(rect.top-anchor.top-padding+scrollTop-opticalShift)+'px';
   for(const p of paths){
    const path=document.createElementNS(SVG_NS,'path');
    path.setAttribute('d',p.d);
@@ -76,7 +76,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    if(p.dash)path.setAttribute('stroke-dasharray',p.dash);
    svg.appendChild(path);
   }
-  layer.appendChild(svg);
+  fragment.appendChild(svg);
   // The geometry already includes any ancestor transform at draw time.
   // Keep that offset as a baseline to avoid applying the same shift twice
   // if a scroll/theme/font repaint occurs during an active drag.
@@ -90,9 +90,14 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
   // Drop/cancel schedules a fresh geometry pass once temporary transforms
   // have gone; while dragging we only adjust the existing SVG transforms.
   // Reuse the same outside-editor SVG layer while changing its children.
-  drawings.clear();layer.replaceChildren();
+  // Measure against one unchanged document. Appending each SVG between the
+  // next getClientRects()/scrollTop read forced a full layout for every mark,
+  // starving View Transition frames on formula-heavy documents.
+  drawings.clear();
+  const fragment=document.createDocumentFragment();
   const currentlyVisible=new Set<HTMLElement>();
   const base=root.getBoundingClientRect();
+  const scrollLeft=root.scrollLeft,scrollTop=root.scrollTop;
   let count=0;
   const previewGroups=new Map<string,HTMLElement[]>();
   for(const element of root.querySelectorAll<HTMLElement>(SELECTOR)){
@@ -117,7 +122,7 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    const lines=element.classList.contains('rk-sketch-block')
     ?[measureBlockSketchLine(element)]
     :measureInlineSketchLines(element);
-   lines.forEach((line,index)=>make(kind,line.rect,base,element,index,line.hasMath,
+   lines.forEach((line,index)=>make(fragment,kind,line.rect,base,scrollLeft,scrollTop,element,index,line.hasMath,
     'inkOffset' in line&&typeof line.inkOffset==='number'?line.inkOffset:0));
   }
   // One sketch per physical line, not per ProseMirror DOM fragment. This
@@ -127,11 +132,12 @@ export function installSketchAnnotations(root:HTMLElement):()=>void{
    const kind=owner.dataset.rkSketchKind??'';
    const text=group.map(element=>element.textContent??'').join('');
    measureInlineSketchLines(group).forEach((line,index)=>
-    make(kind,line.rect,base,owner,index,line.hasMath,0,text));
+    make(fragment,kind,line.rect,base,scrollLeft,scrollTop,owner,index,line.hasMath,0,text));
   }
   for(const old of observed)if(!currentlyVisible.has(old)){
    resize.unobserve(old);observed.delete(old);
   }
+  layer.replaceChildren(fragment);
   syncDragPreview();
  };
  const schedule=()=>{

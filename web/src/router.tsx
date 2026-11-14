@@ -71,8 +71,8 @@ const list=[
   loader:async({params,deps})=>{
    const chunk=importRecord();
    const item=await queryClient.ensureQueryData(recordQuery(params.recordId)).catch(()=>null);
-   // The editor is part of a document's first fully rendered view, not a
-   // second-stage placeholder. Task lists instead need their initial tasks.
+   // Warm editor code before capturing the title. Its expensive body mounts
+   // after the native animation; task lists instead need their initial tasks.
    await ready(chunk,...(item?[item.kind==='task_list'
     ?queryClient.ensureQueryData(tasksQuery(params.recordId))
     :preloadEditor(deps.mode??'visual')]:[]));

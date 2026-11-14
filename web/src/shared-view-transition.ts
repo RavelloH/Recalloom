@@ -18,6 +18,10 @@ let active:Pair|null=null;
 let previous:PreviousPair|null=null;
 let selectedKey:string|null=null;
 let sequence=0;
+let navigationFinished:Promise<void>|null=null;
+
+/** Expensive editor mounting must not consume the native animation frames. */
+export function getNavigationTransitionFinished(){return navigationFinished;}
 
 export function resourceViewTransitionIdentity(kind:SharedResourceKind,id:string):string{
  return 'rk-'+kind+'-'+Array.from(id,char=>
@@ -196,8 +200,14 @@ export function installPairedTransitionLifecycle(){
  document.startViewTransition=((...args:Parameters<Document['startViewTransition']>)=>{
   const token=active?.token;
   const transition=native(args[0] as typeof args[0]);
+  const finished=transition.finished;
+  navigationFinished=finished;
+  const settle=()=>{
+   if(navigationFinished===finished)navigationFinished=null;
+   if(token!==undefined)stop(token);
+  };
+  void finished.then(settle,settle);
   if(token!==undefined){
-   void transition.finished.then(()=>stop(token),()=>stop(token));
    void transition.ready.catch(()=>stop(token));
   }
   return transition;

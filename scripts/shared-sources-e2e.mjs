@@ -18,7 +18,7 @@ const browser=await (engine==='webkit'?webkit:chromium).launch({
  headless:true,...(executable?{executablePath:executable}:{})
 });
 const mobileRun=process.env.RECALLOOM_TEST_MOBILE==='1';
-const page=await browser.newPage({viewport:mobileRun?{width:390,height:844}:{width:1365,height:900}});
+const page=await browser.newPage({viewport:mobileRun?{width:390,height:844}:{width:1365,height:900},hasTouch:mobileRun,isMobile:mobileRun});
 page.setDefaultTimeout(25000);
 // WebKit refuses production __Host- Secure cookies over plain HTTP.
 // For this isolated 127.0.0.1 test only, retain the login response cookie
@@ -48,6 +48,16 @@ await page.addInitScript(()=>{
  const names=()=>[...document.querySelectorAll('*')].map(el=>getComputedStyle(el).viewTransitionName)
   .filter(n=>n!=='none'&&n!=='root');
  window.__rkVTLog=[];
+ window.__rkSketchPublications=[];
+ new MutationObserver(records=>{
+  const layers=new Map();
+  for(const record of records){
+   if(record.target instanceof Element&&record.target.matches('.rk-sketch-overlay'))
+    layers.set(record.target,(layers.get(record.target)??0)+1);
+  }
+  for(const [layer,writes] of layers)
+   window.__rkSketchPublications.push({writes,drawings:layer.children.length});
+ }).observe(document,{childList:true,subtree:true});
  if(typeof document.startViewTransition==='function'){
   const original=document.startViewTransition.bind(document);
   document.startViewTransition=(...args)=>{
@@ -66,12 +76,27 @@ await page.addInitScript(()=>{
    },error=>{record.error=String(error);});
    transition.ready.then(()=>{
     record.ready=true;
+    if(window.__rkTrackFrames){
+     record.sharedFrameTimes=[];
+     const animation=document.getAnimations().find(animation=>
+      animation.effect?.pseudoElement==='::view-transition-group(rk-shared-title)');
+     const sample=()=>{
+      if(record.finished||record.error)return;
+      record.sharedFrameTimes.push(Number(animation?.currentTime));
+      requestAnimationFrame(sample);
+     };
+     requestAnimationFrame(sample);
+    }
     record.sharedAnimation=document.getAnimations().find(animation=>
      animation.effect?.pseudoElement==='::view-transition-group(rk-shared-title)')?.effect.getKeyframes();
     record.sharedImageFit=['old','new'].map(part=>getComputedStyle(document.documentElement,
      '::view-transition-'+part+'(rk-shared-title)').objectFit);
    },error=>{record.error=String(error);});
    transition.finished.then(()=>{record.finished=true;},error=>{record.error=String(error);});
+   if(window.__rkSkipNextTransition){
+    window.__rkSkipNextTransition=false;
+    transition.skipTransition();
+   }
    return transition;
   };
  }
@@ -225,6 +250,59 @@ try{
  await page.waitForURL(base+'/');
  await assertRouteTransition(before,{expectPair:true});
  console.log('PASS cold home recent titles, wrapped/clipped snapshots and history pairing');
+
+ // Formula-heavy documents used to append each annotation between layout
+ // reads. The resulting long animation-frame task consumed the title morph.
+ // A short filename must still paint intermediate shared-title positions.
+ const formulaContent=Array.from({length:48},(_,index)=>[
+  '## Formula '+(index+1),'',
+  'Mixed text :: circle $\\frac{P^2+Q^2}{U^2}R$ | color=blue :: and '+
+   ':: wavy check voltage, power and units ::.','',
+  '$$','\\dot U_1=\\dot U_2+\\frac{P R+Q X}{U_2}','$$','',
+  'A formula can contain tall glyphs and still share a line with ordinary text.',''
+ ].join('\n')).join('\n');
+ const formula=await create('/records',{name:'Math '+suffix.slice(-4)+'.md',kind:'document',folderId:folder.id,content:formulaContent});
+ await stableGoto(base+'/records/'+formula.id);
+ await recordPage(formula);
+ await page.waitForFunction(()=>window.__rkSketchPublications.some(batch=>batch.drawings>=96));
+ const publications=await page.evaluate(()=>window.__rkSketchPublications);
+ assert.ok(publications.every(batch=>batch.writes===1),
+  'annotations must become visible together, without intervening layout reads: '+JSON.stringify(publications));
+ await stableGoto(base+'/');
+ for(const mode of ['visited','updated']){
+  if(mode==='updated')await page.getByRole('radio',{name:'最近更新',exact:true}).click();
+  const card=page.locator('.recent-page').filter({hasText:formula.name});
+  await card.waitFor();
+  await page.waitForTimeout(450);
+  await page.evaluate(()=>{window.__rkTrackFrames=true;});
+  before=await count();
+  if(mobileRun)await card.tap();else await card.click();
+  await recordPage(formula);
+  await assertRouteTransition(before,{expectPair:true});
+  const frames=await page.evaluate(()=>window.__rkVTLog.at(-1).sharedFrameTimes);
+  assert.ok(frames.some(time=>time>0&&time<260),
+   'the shared title must actually paint during its morph: '+JSON.stringify(frames));
+  await page.evaluate(()=>{window.__rkTrackFrames=false;});
+  before=await count();
+  await page.goBack();
+  await page.waitForURL(base+'/');
+  await assertRouteTransition(before,{expectPair:true});
+ }
+ await page.getByRole('radio',{name:'最近访问',exact:true}).click();
+ console.log('PASS atomic annotation drawing and visible title motion for formula-heavy home cards');
+
+ // A skipped native animation must still release the waiting editor body.
+ await page.waitForTimeout(450);
+ await page.evaluate(()=>{window.__rkSkipNextTransition=true;});
+ await page.locator('.recent-page').filter({hasText:formula.name}).click();
+ await recordPage(formula);
+ await page.locator('.tiptap').waitFor();
+ await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.finished===true);
+ await assertUnique();
+ await page.goBack();
+ await page.waitForURL(base+'/');
+ await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.finished===true);
+ console.log('PASS editor initialization resumes after a skipped native transition');
 
  // Home todo links target the exact embedded task, not the record filename.
  await page.reload();
