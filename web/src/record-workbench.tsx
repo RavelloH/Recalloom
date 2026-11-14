@@ -3,7 +3,7 @@ import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
-import {ContextPanel} from './context-panel';
+import {WorkspacePanel} from './workspace-panels';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
 import {RecordRelations} from './record-relations';
 import {ago,statusNames} from './pages/shared';
@@ -21,8 +21,8 @@ export const documentPanels=[
 ] as const;
 export type DocumentPanel=typeof documentPanels[number]['id'];
 
-export function DocumentWorkbenchActions({panel,onToggle,moreItems}:{
- panel:DocumentPanel|null;
+export function DocumentWorkbenchActions({panels,onToggle,moreItems}:{
+ panels:readonly DocumentPanel[];
  onToggle:(panel:DocumentPanel)=>void;
  moreItems:React.ComponentProps<typeof MoreMenu>['items'];
 }){
@@ -55,8 +55,8 @@ export function DocumentWorkbenchActions({panel,onToggle,moreItems}:{
  const overflowPanels=overflow?documentPanels.filter(entry=>entry.id!=='outline'):[];
  return <div className="document-panel-actions" ref={ref}>
   {documentPanels.filter(entry=>!overflow||entry.id==='outline').map(entry=><IconButton key={entry.id}
-   variant={panel===entry.id?'secondary':'ghost'} size="sm" label={entry.label} icon={<Icon name={entry.icon} size="sm"/>}
-   aria-haspopup="dialog" aria-controls="document-panel" aria-expanded={panel===entry.id} onClick={()=>onToggle(entry.id)}/>)}
+   variant={panels.includes(entry.id)?'secondary':'ghost'} size="sm" label={entry.label} icon={<Icon name={entry.icon} size="sm"/>}
+   aria-controls={'document-panel-'+entry.id} aria-expanded={panels.includes(entry.id)} aria-pressed={panels.includes(entry.id)} onClick={()=>onToggle(entry.id)}/>)}
   <MoreMenu size="sm" variant="ghost" label="更多操作" items={[
    ...overflowPanels.map(entry=>({label:entry.label,icon:<Icon name={entry.icon} size="sm"/>,onClick:()=>onToggle(entry.id)})),
    ...(overflowPanels.length?[{type:'divider' as const}]:[]),
@@ -107,7 +107,7 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
     </div>
    </AutoResizer>
    <button type="button" className="workbench-details-trigger" onClick={onDetails}
-    aria-haspopup="dialog" aria-controls="document-panel" aria-expanded={detailsOpen}>
+    aria-controls="document-panel-info" aria-expanded={detailsOpen}>
     详细信息 <Icon name="chevronRight" size="sm" aria-hidden="true"/>
    </button>
   </div>
@@ -127,14 +127,14 @@ export function DocumentWorkbenchPanel({open,panel,onClose,item,outline,onJump,o
  editors:string[];
 }){
  const label=documentPanels.find(section=>section.id===panel)!.label;
- return <ContextPanel id="document-panel" open={open} onOpenChange={next=>{if(!next)onClose();}} label={label} modal={false}>
+ return <WorkspacePanel id={'document-panel-'+panel} open={open} onOpenChange={next=>{if(!next)onClose();}} label={label}>
   <div className="record-inspector workbench-inspector" data-document-panel={panel}>
    <div className="panel-heading">
-    <h2 id="document-panel-title">{label}</h2>
+    <h2 id={'document-panel-title-'+panel}>{label}</h2>
     <IconButton variant="ghost" label="关闭" icon={<Icon name="x" size="sm"/>} onClick={onClose}/>
    </div>
    <p className="workbench-panel-document">{documentDisplayName(item.name)}</p>
-   <section key={panel} className="workbench-inspector-content" aria-labelledby="document-panel-title">
+   <section key={panel} className="workbench-inspector-content" aria-labelledby={'document-panel-title-'+panel}>
     {panel==='info'&&<div className="workbench-inspector-details">
      <Properties>
       <Property label="类型">Markdown 文档</Property>
@@ -162,5 +162,5 @@ export function DocumentWorkbenchPanel({open,panel,onClose,item,outline,onJump,o
     {panel==='history'&&<div className="workbench-history-target" ref={onHistoryTarget}/>}
    </section>
   </div>
- </ContextPanel>;
+ </WorkspacePanel>;
 }

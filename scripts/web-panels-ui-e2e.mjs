@@ -27,7 +27,7 @@ try{
  await page.locator('.tiptap').waitFor();
  const scrollBefore=await page.evaluate(()=>scrollY);
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const dh=page.getByRole('dialog',{name:'历史',exact:true});
+ const dh=page.getByRole('complementary',{name:'历史',exact:true});
  await dh.waitFor();
  await dh.getByText(/Revision \d+/).first().waitFor({timeout:15000});
  assert.ok((await dh.boundingBox()).x>850,'desktop history opens at inline end');
@@ -35,7 +35,7 @@ try{
  await dh.waitFor({state:'hidden'});
  assert.equal(await page.evaluate(()=>scrollY),scrollBefore,'history should not jump main document');
  await page.getByRole('button',{name:'信息',exact:true}).click();
- const di=page.getByRole('dialog',{name:'信息',exact:true});
+ const di=page.getByRole('complementary',{name:'信息',exact:true});
  await di.waitFor();
  assert.ok(await di.getByText('类型',{exact:true}).count());
  // Renaming lives in the inline title; the panel shows facts only, without duplicate controls.
@@ -64,5 +64,5 @@ try{
  await page.keyboard.press('Escape');
  await mh.waitFor({state:'hidden'});
  await page.screenshot({path:'tmp/ux-panels-mobile.png'});
- console.log('PASS Astryx desktop drawers, mobile bottom sheets and long-document controls');
+ console.log('PASS desktop docked panels, mobile bottom sheets and long-document controls');
 }finally{await browser.close();}

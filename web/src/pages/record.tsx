@@ -22,7 +22,8 @@ import {revealFolder} from '../page-tree';
 import {consumeTitleFocus} from '../create-page';
 import {AutoResizer} from '../motion-primitives';
 import {RecordEditorChunk} from '../editor-chunks';
-import {setFullWidth,useFullWidth} from '../preferences';
+import {setFullWidth,useFullWidth,setOutlineOpen,useOutlineOpen} from '../preferences';
+import {useWorkspaceDocked} from '../workspace-panels';
 import {recordQuery} from '../queries';
 import {sharedViewTransitionName} from '../shared-view-transition';
 import {useMediaQuery} from '../use-media';
@@ -30,21 +31,32 @@ import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
 
 export function RecordPage(){
- const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[documentPanel,setDocumentPanel]=useState<DocumentPanel|null>(null),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{key:string;token:number}|null>(null),[outline,setOutline]=useState<DocumentOutline|null>(null),[error,setError]=useState<unknown>(null);
+ const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[localPanels,setLocalPanels]=useState<DocumentPanel[]>([]),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{key:string;token:number}|null>(null),[outline,setOutline]=useState<DocumentOutline|null>(null),[error,setError]=useState<unknown>(null);
+ const docked=useWorkspaceDocked(),outlinePinned=useOutlineOpen();
+ const documentPanels:DocumentPanel[]=docked
+  ?[...localPanels.filter(panel=>panel!=='outline'),...(outlinePinned?['outline' as const]:[])]
+  :localPanels.slice(-1);
+ const closeDocumentPanel=(panel:DocumentPanel)=>{
+  if(panel==='outline'&&docked)setOutlineOpen(false);
+  setLocalPanels(current=>current.filter(value=>value!==panel));
+ };
  const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
   prev&&prev.id===next.id&&prev.revision===next.revision&&prev.characters===next.characters?prev:next),[]);
- const lastDocumentPanel=useRef<DocumentPanel>('info');
  const toggleDocumentPanel=(panel:DocumentPanel)=>{
-  lastDocumentPanel.current=panel;
-  if(panel==='outline'&&documentPanel!=='outline')setOutline(null);
-  setDocumentPanel(current=>current===panel?null:panel);
+  if(documentPanels.includes(panel)){closeDocumentPanel(panel);return;}
+  if(panel==='outline'){
+   setOutline(null);
+   if(docked){setOutlineOpen(true);return;}
+  }
+  setLocalPanels(current=>docked?[...current,panel]:[panel]);
  };
  const [focusTitle]=useState(()=>consumeTitleFocus(recordId));
  const fullWidth=useFullWidth();
  const tabletPanelActions=useMediaQuery('(min-width: 721px) and (max-width: 1200px)');
- useEffect(()=>{setMetaOpen(false);lastDocumentPanel.current='info';setDocumentPanel(null);setOutlineTarget(null);setOutline(null);setError(null);},[recordId]);const [archiving,setArchiving]=useState(false);
+ useEffect(()=>{setMetaOpen(false);setLocalPanels([]);setOutlineTarget(null);setOutline(null);setError(null);},[recordId]);
+ const [archiving,setArchiving]=useState(false);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const item=q.data;
  const originalPresentation=useMemo(()=>item?.kind==='document'?{
@@ -100,7 +112,7 @@ export function RecordPage(){
    ...(item.status==='archived'?[{label:'永久删除归档记录',icon:<Icon name="trash" size="sm"/>,variant:'destructive' as const,isDisabled:archiving,onClick:()=>void deleteArchived()}]:[])
  ];
  const pageActions=item.kind==='document'
-  ?<DocumentWorkbenchActions panel={documentPanel} onToggle={toggleDocumentPanel} moreItems={moreItems}/>
+  ?<DocumentWorkbenchActions panels={documentPanels} onToggle={toggleDocumentPanel} moreItems={moreItems}/>
   :<><IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>setMetaOpen(v=>!v)}/>
     <MoreMenu size="sm" variant="ghost" label="更多操作" items={moreItems}/></>;
  const archiveNotice=item.status==='archived'
@@ -114,7 +126,7 @@ export function RecordPage(){
  {item.kind==='document'
   ?<DocumentWorkbenchHeader item={item} focusTitle={focusTitle}
     characters={currentPresentation?.characters??0} editors={editorsQuery.isSuccess?editorNames:null}
-    onDetails={()=>toggleDocumentPanel('info')} detailsOpen={documentPanel==='info'}
+    onDetails={()=>toggleDocumentPanel('info')} detailsOpen={documentPanels.includes('info')}
     onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}/>
   :<header className="doc-header">
     <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
@@ -128,17 +140,17 @@ export function RecordPage(){
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
  <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
-  pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanel==='history'}
-  outlineOpen={documentPanel==='outline'} onOutlineChange={setOutline}
+  pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanels.includes('history')}
+  outlineOpen={documentPanels.includes('outline')} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
   <dl><dt>记录类型</dt><dd>任务列表</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
  </div></ContextPanel>}
- {item.kind==='document'&&<DocumentWorkbenchPanel open={documentPanel!==null} panel={documentPanel??lastDocumentPanel.current}
-  onClose={()=>setDocumentPanel(null)} item={item} outline={outline}
-  onJump={key=>{setOutlineTarget(prev=>({key,token:(prev?.token??0)+1}));setDocumentPanel(null);}}
+ {item.kind==='document'&&(['info','outline','history'] as const).map(panel=><DocumentWorkbenchPanel key={panel} open={documentPanels.includes(panel)} panel={panel}
+  onClose={()=>closeDocumentPanel(panel)} item={item} outline={outline}
+  onJump={key=>{setOutlineTarget(prev=>({key,token:(prev?.token??0)+1}));if(!docked)closeDocumentPanel('outline');}}
   onChangeTag={changeTag}
   characters={currentPresentation?.characters??0} editors={editorNames}
-  onHistoryTarget={setHistoryTarget}/>}
+  onHistoryTarget={setHistoryTarget}/>)}
  </div></div>;
 }

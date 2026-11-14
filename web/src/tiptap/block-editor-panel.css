@@ -1,23 +1,13 @@
-/* A genuine viewport Drawer, completely outside the ProseMirror document flow.
- * Opening it never creates an editor column or changes the article's width. */
+/* Content is sized by the shared workspace panel shell. */
 .rk-editor-block-workspace{display:block;min-width:0;width:100%;}
 .rk-editor-block-canvas{min-width:0;width:100%;}
-.rk-block-editor-panel{display:flex;flex-direction:column;min-width:0;
- position:fixed;inset-block:0;right:0;z-index:1100;
- width:min(420px,calc(100vw - 28px));max-width:100vw;max-height:100dvh;height:100dvh;
- background:var(--color-background-body,#fff);
- border:0;border-left:1px solid var(--color-border,rgba(128,128,128,.23));border-radius:0;
- box-shadow:-12px 0 38px rgba(0,0,0,.14);overflow:hidden;
- animation:rk-block-drawer-enter .28s cubic-bezier(.16,1,.3,1) both;}
-@keyframes rk-block-drawer-enter{from{opacity:.65;transform:translateX(104%)}to{opacity:1;transform:translateX(0)}}
-@keyframes rk-block-drawer-exit{from{opacity:1;transform:translateX(0)}to{opacity:.65;transform:translateX(104%)}}
-.rk-block-editor-panel[data-closing="true"]{pointer-events:none;animation:rk-block-drawer-exit .23s cubic-bezier(.4,0,1,1) both;}
+.rk-block-editor-panel{display:flex;flex-direction:column;min-width:0;min-height:0;width:100%;height:100%;overflow:hidden;}
 .rk-block-panel-header{display:flex;justify-content:space-between;align-items:center;gap:8px;
  border-bottom:1px solid var(--color-border,rgba(128,128,128,.23));padding:11px 15px;flex:none;}
 .rk-block-panel-header>div{display:flex;flex-direction:column;min-width:0;}
 .rk-block-panel-header strong{font-size:15px;}
 .rk-block-panel-header span{font-size:12px;color:var(--color-text-secondary,#777);}
-.rk-block-panel-preview{flex:none;max-height:min(30dvh,228px);min-height:75px;
+.rk-block-panel-preview{flex:none;max-height:min(28%,180px);min-height:44px;
  padding:12px 14px;overflow:auto;border-bottom:1px solid var(--color-border,rgba(128,128,128,.22));
  background:var(--color-background-muted,rgba(128,128,128,.035));}
 .rk-block-panel-section-heading{display:flex;align-items:center;gap:7px;color:var(--color-text-secondary,#777);
@@ -39,7 +29,7 @@
 .rk-block-panel-preview-body.record-main .markdown-preview > :last-child{margin-block-end:0!important;}
 .rk-block-panel-preview-body.record-main .markdown-preview :is(.rk-rmd-callout,.rk-rmd-block-mark,.rk-sketch-block){max-width:100%;}
 .rk-block-panel-preview-body.record-main .markdown-preview :is(pre,table,.tableWrapper,figure){max-width:100%;}
-.rk-block-panel-fields{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:auto;gap:11px;padding:14px;}
+.rk-block-panel-fields{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;overflow:auto;gap:11px;padding:14px;}
 .rk-block-panel-fields textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.65;}
 .rk-block-panel-desc,.rk-block-panel-help{font-size:12px;line-height:1.65;color:var(--color-text-secondary,#777);margin:0;}
 .rk-block-panel-error{margin:0;padding:8px 10px;border-radius:6px;
@@ -54,15 +44,3 @@
 .rk-block-schema-toggle input{width:16px;height:16px;accent-color:var(--color-text-primary,#333);}
 .rk-block-color-current{display:flex;align-items:center;gap:8px;color:var(--color-text-secondary,#777);font-size:12px;min-height:24px;}
 .rk-block-color-swatch{display:inline-flex;width:18px;height:18px;flex:none;border-radius:6px;border:1px solid var(--color-border,rgba(128,128,128,.24));}
-@media(max-width:720px){
- .rk-block-editor-panel{inset:0;width:100vw;height:100dvh;max-height:none;
-  border:0;border-radius:0;box-shadow:none;padding-top:env(safe-area-inset-top);
-  animation:rk-block-sheet-enter .28s cubic-bezier(.16,1,.3,1) both;}
- .rk-block-panel-header{min-height:52px;}
- .rk-block-panel-preview{position:sticky;top:0;z-index:1;max-height:30dvh;}
- .rk-block-panel-fields{padding-bottom:max(16px,env(safe-area-inset-bottom));}
-}
-@keyframes rk-block-sheet-enter{from{opacity:.6;transform:translateY(104%)}to{opacity:1;transform:translateY(0)}}
-@keyframes rk-block-sheet-exit{from{opacity:1;transform:translateY(0)}to{opacity:.6;transform:translateY(104%)}}
-@media(max-width:720px){.rk-block-editor-panel[data-closing="true"]{animation:rk-block-sheet-exit .23s cubic-bezier(.4,0,1,1) both;}}
-@media(prefers-reduced-motion:reduce){.rk-block-editor-panel{animation:none!important;}}

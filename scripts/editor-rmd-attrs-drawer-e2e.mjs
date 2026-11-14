@@ -38,12 +38,19 @@ try{
   const close=async()=>{await panel.getByRole('button',{name:'关闭块编辑'}).click();await panel.waitFor({state:'hidden'});};
   await badge('image').click();
   await panel.waitFor();
-  await page.waitForFunction(()=>Math.abs(document.querySelector('.rk-block-editor-panel')?.getBoundingClientRect().top??100)<1);
-  const geometry=await panel.evaluate(e=>{
+  const sheet=panel.locator('.workspace-panel-sheet');
+  await page.waitForFunction(()=>{
+   const element=document.getElementById('block-editor');
+   return element&&Math.abs(new DOMMatrix(getComputedStyle(element).transform).m42)<=1;
+  });
+  await sheet.evaluate(async element=>{await Promise.allSettled(element.getAnimations().map(animation=>animation.finished));});
+  const geometry=await sheet.evaluate(e=>{
    const r=e.getBoundingClientRect(),preview=e.querySelector('.rk-block-panel-preview')?.getBoundingClientRect();
    return {left:r.left,top:r.top,width:r.width,height:r.height,previewHeight:preview?.height??0};
   });
-  assert.ok(geometry.width>=width-1&&Math.abs(geometry.left)<1,'full-screen mobile Drawer '+JSON.stringify(geometry));
+  assert.ok(geometry.width>=width-1&&Math.abs(geometry.left)<1,'mobile bottom sheet fills the available width '+JSON.stringify(geometry));
+  assert.ok(geometry.top>0&&geometry.height<(width===390?844:700),
+   'mobile block editor retains the bottom sheet presentation '+JSON.stringify(geometry));
   assert.ok(geometry.previewHeight>40&&geometry.previewHeight<=Math.round((width===390?844:700)*.31),
    'sticky live preview limited to 30% '+JSON.stringify(geometry));
   assert.equal(await panel.getByRole('region',{name:'图片 Markdown 属性'}).count(),1);

@@ -163,13 +163,11 @@ try{
  assert.ok((await sourceValue()).includes('LOCAL_DRAFT'));
 
  await page.getByRole('button',{name:'历史',exact:true}).click();
- const inspector=page.locator('#document-panel');
+ const inspector=page.locator('#document-panel-history');
  await inspector.waitFor();
- const inspectorHostTag=await inspector.evaluate(element=>{
-  window.__revisionInspectorHost=element;
-  return element.tagName;
- });
- assert.equal(inspectorHostTag,'DIALOG','Inspector must use a stable native dialog host');
+ const inspectorHostTag=await inspector.evaluate(element=>element.tagName);
+ assert.notEqual(inspectorHostTag,'DIALOG','Desktop history must use a docked panel');
+ assert.equal(await inspector.getAttribute('role'),'complementary');
  await inspector.getByRole('heading',{name:'历史',exact:true}).waitFor();
  await inspector.getByText('Revision 1').waitFor();
  const revisionRow=inspector.locator('.history-row').filter({hasText:'Revision 1'});
@@ -177,6 +175,7 @@ try{
 
  const dialog=page.getByRole('dialog',{name:'版本对比'});
  await dialog.waitFor();
+ await dialog.evaluate(element=>{window.__revisionComparisonHost=element;});
  await Promise.race([failedRevisionOne,wait(8000).then(()=>{throw Error('Revision R1 request was not made');})]);
  const retry=dialog.getByRole('button',{name:/重试/});
  await retry.waitFor();
@@ -281,14 +280,12 @@ try{
   if(!showingSource){await sourceMode.click();showingSource=true;}
   await page.setViewportSize({width,height:mobileHeight});
   await page.waitForTimeout(80);
-  const inspectorHostState=await page.evaluate(()=>{
-   const original=window.__revisionInspectorHost;
-   const hosts=[...document.querySelectorAll('#document-panel')];
-   return {tag:original?.tagName,connected:original?.isConnected,same:hosts.length===1&&hosts[0]===original,count:hosts.length};
-  });
-  assert.equal(inspectorHostState.tag,inspectorHostTag,'Inspector host tag changed at '+width+'px');
-  assert.ok(inspectorHostState.connected&&inspectorHostState.same,
-   'Inspector native host changed when resizing to '+width+'px: '+JSON.stringify(inspectorHostState));
+  const comparisonHostState=await dialog.evaluate(element=>({
+   same:element===window.__revisionComparisonHost,connected:element.isConnected,
+   tag:element.tagName,open:element.open,modal:element.matches(':modal')
+  }));
+  assert.deepEqual(comparisonHostState,{same:true,connected:true,tag:'DIALOG',open:true,modal:true},
+   'Comparison must retain its native top-layer host across responsive history migration at '+width+'px');
   await dialog.getByRole('button',{name:'下一个差异',exact:true}).click();
   await dialog.getByRole('button',{name:'上一个差异',exact:true}).click();
   let measure=await geometry();

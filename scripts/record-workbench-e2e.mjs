@@ -35,7 +35,7 @@ await page.addInitScript(()=>{
  const panelFor=()=>{
   const inspector=document.querySelector('.workbench-inspector');
   if(!inspector)return null;
-  const host=inspector.closest('dialog')||inspector.closest('#document-panel')||inspector;
+  const host=inspector.closest('[data-workspace-panel]')||inspector.closest('dialog')||inspector;
   return {host,target:host.querySelector('.astryx-bottom-sheet')||host};
  };
  const rectOf=element=>{
@@ -52,7 +52,7 @@ await page.addInitScript(()=>{
  const reachedEndpoint=(translation,opening)=>Boolean(translation&&
   (opening?Math.hypot(translation.x,translation.y)<=1:Math.hypot(translation.x,translation.y)>1));
  const frame=(session)=>{
-  if(session.target&&(session.host?.open||session.host?.matches(':popover-open')||session.host?.matches(':modal'))){
+  if(session.target&&session.host?.isConnected&&(session.host?.open||session.host?.matches('[data-workspace-panel]')||session.host?.matches(':modal')||session.host?.matches(':popover-open'))){
    const transform=getComputedStyle(session.target).transform;
    session.frames.push({time:performance.now(),target:session.target,host:session.host,
     transform,translation:translationOf(transform)});
@@ -63,18 +63,21 @@ await page.addInitScript(()=>{
   }
   requestAnimationFrame(()=>frame(session));
  };
- document.addEventListener('click',()=>{
+ document.addEventListener('click',event=>{
   const session=window.__workbenchMotionSession;
   if(!session||session.clickTime!==null)return;
   session.clickTime=performance.now();
-  const panel=panelFor();
+  const button=event.target.closest('button,[role=menuitem]');
+  const id=button?.getAttribute('aria-controls');
+  const host=(id?document.getElementById(id):null)||event.target.closest('[data-workspace-panel],dialog');
+  const panel=host?.querySelector('.workbench-inspector')?{host,target:host.querySelector('.astryx-bottom-sheet')||host}:panelFor();
   if(panel){session.host=panel.host;session.target=panel.target;}
   requestAnimationFrame(()=>frame(session));
  },true);
  const capture=event=>{
   if(event.propertyName!=='transform'||!(event.target instanceof Element))return;
   const dialog=event.target.closest('dialog');
-  const host=dialog?.querySelector('.workbench-inspector')?dialog:event.target.closest('#document-panel');
+  const host=dialog?.querySelector('.workbench-inspector')?dialog:event.target.closest('[data-workspace-panel]');
   if(!host?.querySelector('.workbench-inspector'))return;
   const nativePanel=event.target===host||event.target.classList.contains('astryx-bottom-sheet');
   if(!nativePanel)return;
@@ -120,7 +123,7 @@ await page.addInitScript(()=>{
  const showPopover=HTMLElement.prototype.showPopover;
  if(showPopover)HTMLElement.prototype.showPopover=function(...args){
   const session=window.__workbenchMotionSession;
-  const track=this.id==='document-panel'&&session&&session.clickTime!==null;
+  const track=this.id.startsWith('document-panel-')&&session&&session.clickTime!==null;
   if(track){session.showModalBefore=performance.now();session.host=this;session.target=this.querySelector('.astryx-bottom-sheet')||this;}
   const result=showPopover.apply(this,args);
   if(track)session.showModalAfter=performance.now();
@@ -172,10 +175,10 @@ const assertInspectorTransformMotion=async(label,viewport)=>{
   return null;
  });
  assert.ok(sample,'Inspector transform transition was not captured: '+label);
- assert.ok(sample.sameHost,'Inspector transition changed native host: '+label+' '+JSON.stringify(sample));
- const expectedTarget=viewport<=720?'astryx-bottom-sheet':'DIALOG';
- assert.ok(viewport<=720?sample.targetClass.includes(expectedTarget):sample.targetTag===expectedTarget,
-  'Inspector transition must animate its '+(viewport<=720?'BottomSheet panel':'Drawer dialog')+': '+label+' '+JSON.stringify(sample));
+ assert.ok(sample.sameHost,'Inspector transition changed host: '+label+' '+JSON.stringify(sample));
+ const docked=await page.locator('.workspace').getAttribute('data-panel-layout')==='docked';
+ assert.ok(docked?sample.targetTag==='ASIDE'&&sample.targetClass.split(' ').includes('workspace-panel'):sample.targetClass.includes('astryx-bottom-sheet'),
+  'Inspector transition must animate its '+(docked?'docked card':'BottomSheet panel')+': '+label+' '+JSON.stringify(sample));
  assert.ok(sample.keyframes.length>=2&&new Set(sample.keyframes).size>1,
   'Inspector transform must have distinct Web Animations API keyframes: '+label+' '+JSON.stringify(sample));
  assert.notEqual(sample.startTransform,sample.endTransform,
@@ -295,11 +298,11 @@ try{
   }
  }
  await page.setViewportSize({width:1440,height:900});
- const inspector=page.locator('.workbench-inspector');
+ const inspector=page.locator('.workbench-inspector:visible');
  const waitForNativePanelClosed=()=>page.waitForFunction(()=>{
   const inspector=document.querySelector('.workbench-inspector');
-  const host=inspector?.closest('dialog')||inspector?.closest('#document-panel')||inspector;
-  return Boolean(host&&!host.open&&!host.matches(':modal')&&!host.matches(':popover-open'));
+  const host=inspector?.closest('[data-workspace-panel]')||inspector?.closest('dialog')||inspector;
+  return !host||(!host.matches('[data-workspace-panel]')&&!host.open&&!host.matches(':modal')&&!host.matches(':popover-open'));
  });
  const openPanelWithMotion=async(trigger,label,viewport)=>{
   await resetMotionSamples(label,true);
@@ -388,15 +391,16 @@ try{
  await inspector.getByRole('textbox',{name:'查找文档'}).waitFor();
  await inspector.getByRole('button',{name:'添加关联',exact:true}).click();
  assert.equal(await inspector.getByRole('textbox',{name:'查找文档'}).count(),0,'Relation search can collapse after use');
- await inspector.evaluate(element=>{window.__workbenchNativePanel=element;});
+ const informationPanel=page.locator('.workbench-inspector[data-document-panel="info"]');
+ await informationPanel.evaluate(element=>{window.__workbenchInformationPanel=element;});
  await outlineTrigger().click();
- await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='outline');
- await inspector.getByText('暂无 Markdown 标题').waitFor();
- assert.equal(await inspector.getByText('暂无 Markdown 标题').count(),1,'Toolbar can switch directly to the outline');
- await infoTrigger().click();
- await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='info');
- assert.equal(await inspector.evaluate(element=>element===window.__workbenchNativePanel),true,
-  'Desktop panel switches keep the same native host');
+ const outlinePanel=page.locator('.workbench-inspector[data-document-panel="outline"]');
+ await outlinePanel.getByText('暂无 Markdown 标题').waitFor();
+ assert.equal(await informationPanel.isVisible(),true,'Opening the outline keeps desktop information visible');
+ assert.equal(await informationPanel.evaluate(element=>element===window.__workbenchInformationPanel),true,
+  'Opening another desktop panel preserves the information instance');
+ await outlinePanel.getByRole('button',{name:'关闭',exact:true}).click();
+ await outlinePanel.waitFor({state:'hidden'});
  assert.ok(lazyPanelRequests.some(path=>path.endsWith('/relations')),'Information loads document relations on demand');
  await closePanelWithEntryMotion(infoTrigger(),'desktop same-entry toggle close',1440);
  await openPanelWithMotion(outlineTrigger(),'desktop empty outline open',1440);
@@ -424,13 +428,16 @@ try{
    'Tablet document panel entries remain in the topbar');
  }
  await infoTrigger().click();
- await page.waitForFunction(()=>document.querySelector('.workbench-inspector')?.dataset.documentPanel==='info');
- await inspector.evaluate(element=>{window.__workbenchTabletHost=element.closest('dialog');});
+ await inspector.waitFor();
+ assert.equal(await inspector.evaluate(element=>Boolean(element.closest('dialog')&&element.closest('.workspace-panel-sheet'))),true,
+  'Tablet workspace below docking width uses a native bottom sheet');
  for(const [trigger,panel] of [[outlineTrigger(),'outline'],[historyTrigger(),'history']]){
+  await inspector.locator('.panel-heading button').click();
+  await inspector.waitFor({state:'hidden'});
   await trigger.click();
-  await page.waitForFunction(expected=>document.querySelector('.workbench-inspector')?.dataset.documentPanel===expected,panel);
-  assert.equal(await inspector.evaluate(element=>element.closest('dialog')===window.__workbenchTabletHost),true,
-   'Tablet panel switching keeps the same native dialog host');
+  await page.waitForFunction(expected=>[...document.querySelectorAll('.workbench-inspector')].some(element=>
+   element.dataset.documentPanel===expected&&element.getClientRects().length>0),panel);
+  assert.equal(await page.locator('dialog[open]:has(.workspace-panel-sheet)').count(),1,'Tablet panel switching keeps one native sheet open');
  }
  await inspector.locator('.panel-heading button').click();
  await inspector.waitFor({state:'hidden'});
@@ -468,7 +475,7 @@ try{
   assert.equal(await inspector.locator('.outline-item small').count(),0,'Outline labels stay clean without source line numbers');
   if(mode==='visual')await page.locator('.tiptap').evaluate(element=>{window.__workbenchVisualBeforeOutline=element;});
   await duplicateHeadings.nth(1).click();
-  await inspector.waitFor({state:'hidden'});
+  assert.equal(await inspector.isVisible(),true,'Desktop outline remains open after navigation');
   await page.waitForFunction(expected=>document.querySelector('.editor-body')?.dataset.mode===expected,mode);
   if(mode==='source'||mode==='visual')await page.waitForFunction(expected=>{
    const headings=expected==='source'
@@ -513,7 +520,6 @@ try{
    'Heading navigation does not dirty a saved document in '+mode+' mode');
   if(mode==='visual')assert.equal(await page.locator('.tiptap').evaluate(element=>element===window.__workbenchVisualBeforeOutline),true,
    'Visual outline navigation preserves the live editor instance');
-  await outlineTrigger().click();
   await inspector.waitFor();
   await page.waitForFunction(()=>{
    const panel=document.querySelector('.workbench-inspector[data-document-panel="outline"]');
@@ -536,7 +542,7 @@ try{
  await outlineTrigger().click();
  await inspector.getByRole('button',{name:'Draft section',exact:true}).waitFor();
  await inspector.getByRole('button',{name:'Draft section',exact:true}).click();
- await inspector.waitFor({state:'hidden'});
+ assert.equal(await inspector.isVisible(),true,'Desktop source outline remains open after draft navigation');
  await page.waitForFunction(()=>document.querySelector('.editor-body')?.dataset.mode==='source');
  assert.ok(await draftEditor.innerText().then(value=>value.includes('Local draft marker')),'Outline reads and preserves unsaved source content');
  await page.locator('.save-status').getByText('未保存').waitFor();
@@ -549,9 +555,8 @@ try{
  await page.keyboard.press('End');
  await page.keyboard.type(' visual-unsaved');
  await page.locator('.save-status').getByText('未保存').waitFor();
- await outlineTrigger().click();
  await inspector.getByRole('button',{name:'Draft section',exact:true}).click();
- await inspector.waitFor({state:'hidden'});
+ assert.equal(await inspector.isVisible(),true,'Desktop visual outline remains open after draft navigation');
  await page.waitForFunction(()=>document.querySelector('.editor-body')?.dataset.mode==='visual');
  await page.locator('.tiptap').getByText('visual-unsaved',{exact:false}).waitFor();
  await page.locator('.save-status').getByText('未保存').waitFor();
@@ -562,6 +567,8 @@ try{
  await page.keyboard.press('Control+Z');
  await page.waitForFunction(()=>!document.querySelector('.tiptap')?.textContent?.includes('visual-unsaved'));
  await page.locator('.save-status').getByText('未保存').waitFor({state:'hidden'});
+ await inspector.locator('.panel-heading button').click();
+ await inspector.waitFor({state:'hidden'});
  await page.setViewportSize({width:390,height:mobileHeight});
  await page.reload();
  await header.waitFor();
@@ -655,7 +662,7 @@ try{
  await inspector.waitFor({state:'hidden'});
  await page.waitForFunction(()=>{
   const host=document.querySelector('.workbench-inspector')?.closest('dialog');
-  return Boolean(host&&!host.open&&!host.matches(':modal'));
+  return !host||(!host.open&&!host.matches(':modal'));
  });
  await page.waitForFunction(()=>{
   const editor=document.querySelector('.tiptap');
@@ -745,21 +752,22 @@ try{
  await openLongAndClose(longInfo,'long preview 160 math desktop info',1440);
  await openLongAndClose(outlineTrigger(),'long preview 160 math desktop outline',1440);
  await openLongAndClose(historyTrigger(),'long preview 160 math desktop history',1440);
+ await page.setViewportSize({width:390,height:mobileHeight});
  await page.emulateMedia({reducedMotion:'reduce'});
- await longInfo.click();
+ await (await panelEntry('信息')).click();
  await page.waitForFunction(()=>[...document.querySelectorAll('dialog')].some(dialog=>dialog.querySelector('.workbench-inspector')&&
   (dialog.open||dialog.matches(':popover-open'))));
  await inspector.locator('.panel-heading button').click();
  await page.waitForFunction(()=>{
   const host=[...document.querySelectorAll('dialog')].find(dialog=>dialog.querySelector('.workbench-inspector'));
-  return host?.open===false&&!host.matches(':modal')&&!host.matches(':popover-open');
+  return !host||(!host.open&&!host.matches(':modal')&&!host.matches(':popover-open'));
  });
  const released=await page.evaluate(()=>{
   const host=[...document.querySelectorAll('dialog')].find(dialog=>dialog.querySelector('.workbench-inspector'));
   return {connected:Boolean(host?.isConnected),open:host?.open??null,modal:host?.matches(':modal')??false,
    popover:host?.matches(':popover-open')??false};
  });
- assert.deepEqual(released,{connected:true,open:false,modal:false,popover:false},
+ assert.ok(!released.open&&!released.modal&&!released.popover,
   'Reduced-motion close must release the inspector from the native overlay top layer');
  console.log('PASS 160-math VisualEditor/Preview panel motion on desktop/mobile and reduced-motion cleanup');
  assert.deepEqual(errors,[],'Browser runtime errors');

@@ -10,3 +10,14 @@ export function setFullWidth(value:boolean){
  listeners.forEach(fn=>fn());
 }
 export const useFullWidth=()=>useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn);},()=>fullWidth,()=>fullWidth);
+
+const outlineListeners=new Set<()=>void>();
+const outlineKey='recalloom:outline-open';
+let outlineOpen=(()=>{try{return localStorage.getItem(outlineKey)==='1';}catch{return false;}})();
+export function setOutlineOpen(value:boolean){
+ if(outlineOpen===value)return;
+ outlineOpen=value;
+ try{localStorage.setItem(outlineKey,value?'1':'0');}catch{ /* storage may be unavailable */ }
+ outlineListeners.forEach(fn=>fn());
+}
+export const useOutlineOpen=()=>useSyncExternalStore(fn=>{outlineListeners.add(fn);return()=>outlineListeners.delete(fn);},()=>outlineOpen,()=>outlineOpen);

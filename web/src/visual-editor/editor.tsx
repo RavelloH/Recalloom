@@ -651,7 +651,7 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   onPreview={kind=>applyHoverPreview(kind)}
   onChoose={item=>{applyHoverPreview(null);cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
  {blockPanelPos!==null&&createPortal(
-  <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId} mobile={compact}
+  <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId}
    onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}
  </div>;
 });

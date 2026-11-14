@@ -13,29 +13,23 @@ import {RmdLeafAttributeFields} from './rmd-leaf-fields';
 import type {RichContainerField} from './rmd-container-attributes';
 import {isRmdAttrsEditable} from './rmd-schema-attrs-model';
 import {describeRmdAnchorConflict,findRmdAnchorConflictForNode} from './rmd-anchor-ids';
+import {WorkspacePanel} from '../workspace-panels';
 import './block-editor-panel.css';
 
 const Preview=React.lazy(()=>import('../markdown-preview'));
 const safeTitle=(s:string)=>s.replace(/[\r\n]/g,' ').slice(0,180);
-export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobile=false}:{
- editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;mobile?:boolean;
+export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
+ editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;
 }){
  const [version,setVersion]=useState(0);
- const [closing,setClosing]=useState(false);
- const closeTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
- const requestClose=()=>{
-  if(closing)return;
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){onClose();return;}
-  setClosing(true);
-  closeTimer.current=setTimeout(onClose,240);
- };
- useEffect(()=>()=>{if(closeTimer.current!==null)clearTimeout(closeTimer.current);},[]);
+ const [open,setOpen]=useState(true);
+ const requestClose=()=>setOpen(false);
  const [draft,setDraft]=useState(()=>serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'}));
  const [error,setError]=useState('');
  const canonicalRef=useRef(draft);
  useEffect(()=>{
   const source=serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'});
-  canonicalRef.current=source;setDraft(source);setError('');
+  if(canonicalRef.current!==source){canonicalRef.current=source;setDraft(source);setError('');}
  },[editor,pos]);
  useEffect(()=>{
   const update=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
@@ -55,12 +49,6 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
   editor.on('transaction',update);
   return()=>{editor.off('transaction',update);};
  },[editor,pos]);
- useEffect(()=>{
-  if(!mobile)return;
-  const previous=document.body.style.overflow;
-  document.body.style.overflow='hidden';
-  return()=>{document.body.style.overflow=previous;};
- },[mobile]);
  const block=editableBlockAt(editor,pos);
  const current=block?.node;
  const kind=current?.type.name??'';
@@ -137,12 +125,12 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
    setError(e instanceof Error?e.message:'输入尚未构成有效的完整块；修正后会自动生效');
   }
  };
- return <aside className="rk-block-editor-panel" role={mobile?'dialog':'complementary'}
-  data-closing={closing?'true':undefined}
-  aria-modal={mobile?true:undefined} aria-label="块编辑面板" data-block-kind={kind}
-  onKeyDown={e=>{
-   if(e.key==='Escape'&&!e.nativeEvent.isComposing){e.stopPropagation();requestClose();}
-  }}>
+ return <WorkspacePanel id="block-editor" label="块编辑面板" open={open}
+  onOpenChange={setOpen} onAfterClose={onClose}>
+  <div className="rk-block-editor-panel" data-block-kind={kind}
+   onKeyDown={e=>{
+    if(e.key==='Escape'&&!e.nativeEvent.isComposing){e.stopPropagation();requestClose();}
+   }}>
   <header className="rk-block-panel-header">
    <div><strong>{parentKind?'编辑子块':'编辑块'}</strong><span>{kind==='richContainer'?String(current.attrs.kind??'容器'):kind}</span></div>
    <Button variant="ghost" size="sm" label="关闭块编辑" icon={<Icon name="x" size="sm"/>} onClick={requestClose}/>
@@ -168,5 +156,6 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId,mobil
    {error&&<p className="rk-block-panel-error" role="alert">{error}</p>}
    <p className="rk-block-panel-help">这里编辑当前块的完整 RMD。普通文字也可以直接在左侧正文中编辑。输入暂时不符合完整块语法时，保留表单内容，不破坏原文。</p>
   </section>
- </aside>;
+  </div>
+ </WorkspacePanel>;
 }

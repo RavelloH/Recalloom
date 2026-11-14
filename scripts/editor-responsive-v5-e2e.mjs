@@ -153,13 +153,36 @@ try{
  await grip.waitFor();
  for(const label of ['拖动块','编辑块','块操作'])assert.ok(await grip.getByRole('button',{name:label}).count()>0,'grip '+label);
  const geometry=await grip.boundingBox();assert.ok(geometry&&geometry.width<52&&geometry.height>95);
+ const startBlockMotion=()=>page.evaluate(()=>{
+  const sample={frames:[],run:null,end:null};window.__blockPanelMotion=sample;
+  const capture=event=>{
+   if(event.propertyName!=='transform'||event.target.id!=='block-editor')return;
+   const x=()=>new DOMMatrix(getComputedStyle(event.target).transform).m41;
+   if(event.type==='transitionrun'){
+    sample.run=x();
+    const frame=()=>{sample.frames.push(x());if(sample.end===null)requestAnimationFrame(frame);};
+    requestAnimationFrame(frame);
+   }else{sample.end=x();document.removeEventListener('transitionrun',capture,true);document.removeEventListener('transitionend',capture,true);}
+  };
+  document.addEventListener('transitionrun',capture,true);document.addEventListener('transitionend',capture,true);
+ });
+ const assertBlockMotion=async label=>{
+  await page.waitForFunction(()=>window.__blockPanelMotion?.end!==null);
+  const sample=await page.evaluate(()=>window.__blockPanelMotion);
+  assert.ok(Math.abs(sample.run-sample.end)>1,label+' block panel must translate visibly: '+JSON.stringify(sample));
+  assert.ok(sample.frames.some(x=>x>Math.min(sample.run,sample.end)+1&&x<Math.max(sample.run,sample.end)-1),
+   label+' block panel must render an intermediate transition frame: '+JSON.stringify(sample));
+ };
+ await startBlockMotion();
  await grip.getByRole('button',{name:'编辑块'}).click();
  const drawer=page.getByRole('complementary',{name:'块编辑面板'});await drawer.waitFor();
- assert.notEqual(await drawer.evaluate(el=>getComputedStyle(el).animationName),'none');
+ await assertBlockMotion('Opening');
+ await startBlockMotion();
  await drawer.getByRole('button',{name:'关闭块编辑'}).click();
- await page.locator('.rk-block-editor-panel[data-closing="true"]').waitFor();
+ await page.locator('[data-workspace-panel="block-editor"][data-closing="true"]').waitFor();
+ await assertBlockMotion('Closing');
  await drawer.waitFor({state:'hidden'});
- console.log('PASS vertical grip and animated Drawer enter/exit',geometry);
+ console.log('PASS vertical grip and animated docked block panel enter/exit',geometry);
 
  await page.locator('.tiptap p').filter({hasText:'最后一段'}).first().click({button:'right'});
  context=page.getByRole('menu',{name:'编辑器右键菜单'});await context.waitFor();

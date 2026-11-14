@@ -23,6 +23,7 @@ import {clearRecentPages} from './recent-pages';
 import {OverlayScroll} from './scrollbars';
 import {PageTransition} from './page-transition';
 import {useFullWidth} from './preferences';
+import {WorkspacePanels} from './workspace-panels';
 
 const quickLinks=menu.filter(item=>['/','/tasks','/activity','/archive','/graph'].includes(item.to));
 const shortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform)?'⌘K':'Ctrl K';
@@ -120,7 +121,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </OverlayScroll>
  </SideNav>
  <button className={'mobile-scrim'+(mobileOpen?' is-visible':'')} aria-label="关闭导航" aria-hidden={!mobileOpen} tabIndex={mobileOpen?0:-1} onClick={closeMobile}/>
- <div className="workspace"><header className="topbar">
+ <WorkspacePanels><header className="topbar">
   <div className="topbar-left">
    <IconButton className="mobile-menu" variant="ghost" label="打开导航" icon={<Icon name="menu2"/>} onClick={()=>{
     if(sidebarExitFallback.current!==null)window.clearTimeout(sidebarExitFallback.current);
@@ -139,7 +140,7 @@ export function Shell({children}:{children:React.ReactNode}){
     <PageTransition><div key={pathname} className="route-stage">{children}</div></PageTransition>
    </TopbarSlotProvider>
   </OverlayScroll>
- </main></div>
+ </main></WorkspacePanels>
  <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
  {paletteActivated&&<React.Suspense fallback={commands?<div className="palette-loading" role="status"><span className="spin"/>正在打开搜索…</div>:null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
  {confirmation}

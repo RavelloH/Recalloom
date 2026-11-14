@@ -141,11 +141,10 @@ export function RecordEditor({item,onSaved,jumpToHeading,outlineOpen,historyOpen
   }
  },[outlineOpen,mode,visibleDraft,editorKey,updatePreviewOutline,publishOutline]);
  useEffect(()=>{
-  if(!jumpToHeading||outlineOpen||jumpToHeading.token===lastHandledJumpToken.current)return;
+  if(!jumpToHeading||jumpToHeading.token===lastHandledJumpToken.current)return;
   let frame=0,timer=0,cancelled=false;
   const panelIsOpen=()=>{
-   const panelElement=document.getElementById('document-panel')??document.querySelector('[data-document-panel]')?.closest('dialog');
-   const panel=panelElement?.closest('dialog')??panelElement??document.querySelector('.rk-context-panel-drawer,.rk-context-panel-sheet');
+   const panel=document.getElementById('document-panel-outline')?.closest('dialog');
    if(!panel)return false;
    if(panel instanceof HTMLDialogElement&&panel.open)return true;
    try{if(panel.matches(':modal'))return true;}catch{/* :modal is unavailable in older engines. */}
@@ -154,7 +153,7 @@ export function RecordEditor({item,onSaved,jumpToHeading,outlineOpen,historyOpen
   };
   const jump=()=>{
    if(cancelled)return;
-   const activePanel=document.querySelector<HTMLElement>('[data-document-panel]')?.dataset.documentPanel;
+   const activePanel=document.querySelector<HTMLElement>('dialog[open] [data-document-panel]')?.dataset.documentPanel;
    if(activePanel&&activePanel!=='outline'){lastHandledJumpToken.current=jumpToHeading.token;return;}
    if(panelIsOpen()){timer=window.setTimeout(jump,40);return;}
    if(openingTransition){frame=requestAnimationFrame(jump);return;}

@@ -7,12 +7,6 @@
   min-width: 0;
 }
 
-/* Leave the document's persistent toolbar accessible beside a modeless panel. */
-#document-panel.rk-context-panel-drawer {
-  inset-block-start: 46px;
-  height: calc(100dvh - 46px);
-}
-
 /* Let native modal setup finish before spending the panel's entry frames. */
 @media (prefers-reduced-motion: no-preference) {
   .rk-context-panel-drawer.rk-context-panel-entering {
