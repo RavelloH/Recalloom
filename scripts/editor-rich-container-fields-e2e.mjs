@@ -41,6 +41,7 @@ try{
   let panel=await openBlock('highlight',width);
   assert.equal(await panel.getByRole('textbox',{name:'块标题'}).count(),0,'sketch has no legal title');
   assert.equal(await panel.getByRole('region',{name:'手绘块样式'}).count(),1);
+  await panel.getByText('效果预览',{exact:true}).click();
   await panel.getByLabel('当前块预览').getByText('默认荧光笔内容。').waitFor();
   const previewGeometry=await panel.evaluate(el=>{
    const section=el.querySelector('.rk-block-panel-preview');
@@ -51,7 +52,7 @@ try{
   });
   assert.ok(previewGeometry.section.height<=120,'compact block preview must not inherit full-document min-height: '+JSON.stringify(previewGeometry));
   console.log('PREVIEW_GEOMETRY',width,JSON.stringify(previewGeometry));
-  const raw=panel.getByRole('textbox',{name:'块源码'});
+  const raw=panel.getByRole('textbox',{name:'块源码',includeHidden:true});
   assert.doesNotMatch(await raw.inputValue(),/color=/,'default yellow must not serialize');
   const color=panel.getByRole('combobox',{name:'笔迹颜色'});
   await color.click();
@@ -69,9 +70,11 @@ try{
   assert.match(await raw.inputValue(),/stroke=2.25/);
   assert.match(await raw.inputValue(),/opacity=0.6/);
   // Editing the raw block must also update the visible structured fields.
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
   await raw.fill((await raw.inputValue()).replace('color=green','color=purple').replace('stroke=2.25','stroke=1.5'));
   await page.waitForFunction(()=>document.querySelector('.tiptap .rk-directive-highlight .rk-sketch-block')?.getAttribute('data-rk-sketch-color')==='purple');
   await page.waitForFunction(()=>[...document.querySelectorAll('input')].some(input=>input.value==='1.5'));
+  await panel.getByRole('tab',{name:'可视化',exact:true}).click();
   assert.equal(await stroke.inputValue(),'1.5','raw RMD sync updates structured stroke field');
   await color.click();await page.getByRole('option',{name:'green',exact:true}).last().click();
   await stroke.fill('2.25');
@@ -85,7 +88,7 @@ try{
   await panel.getByRole('combobox',{name:'笔迹颜色'}).click();
   await page.getByRole('option',{name:/默认颜色/}).last().click();
   await page.waitForFunction(()=>!document.querySelector('.tiptap .rk-directive-circle .rk-sketch-block')?.getAttribute('data-rk-sketch-color'));
-  assert.doesNotMatch(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/color=/);
+  assert.doesNotMatch(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/color=/);
   await panel.getByRole('button',{name:'关闭',exact:true}).click();
   const persisted=await page.evaluate(async id=>(await(await fetch('/api/records/'+id)).json()).content,rec.data.id);
   assert.equal(persisted,content,'panel editing does not save to D1 without explicit Save');

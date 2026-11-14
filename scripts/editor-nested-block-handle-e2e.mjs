@@ -112,15 +112,16 @@ try{
   },source);assert.equal(created.status,201);
   await page.goto(base+'/records/'+created.data.id+'?mode=visual');
   let panel=await open('message',width,0);
-  const raw=panel.getByRole('textbox',{name:'块源码'});
+  const raw=panel.getByRole('textbox',{name:'块源码',includeHidden:true});
   assert.match(await raw.inputValue(),/First message/);
   assert.doesNotMatch(await raw.inputValue(),/Second message/,'must inspect child not entire chat');
   const role=panel.getByRole('combobox',{name:'消息身份'});
   await role.click();await page.getByRole('option',{name:'Agent / 助手'}).last().click();
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('sender=assistant')));
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
   await raw.fill('::: message Updated | sender=assistant\n\nRewritten child.\n\n:::');
   await page.locator('.rk-directive-message').first().getByText('Rewritten child.').waitFor();
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/Updated/);
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/Updated/);
   await raw.fill('::: message Updated | sender=assistant\n\nRewritten child.\n\n:::\n\n::: message Illegal extra\n\nShould not insert sibling.\n\n:::');
   await panel.getByRole('alert').waitFor();
   assert.equal(await page.locator('.tiptap .rk-directive-chat .rk-directive-message').count(),2,'a child source edit cannot inject a second sibling');
@@ -132,7 +133,7 @@ try{
    await page.getByRole('menuitem',{name:'编辑块'}).last().click();
    const contextual=page.getByRole('complementary',{name:'块编辑面板'});
    await contextual.getByText('编辑子块').waitFor();
-   assert.match(await contextual.getByRole('textbox',{name:'块源码'}).inputValue(),/Rewritten child/);
+   assert.match(await contextual.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/Rewritten child/);
    await contextual.getByRole('button',{name:'关闭',exact:true}).click();
    console.log('PASS desktop context menu resolves nested child rather than parent');
   }
@@ -147,7 +148,7 @@ try{
   await page.getByRole('menuitem',{name:'删除块'}).last().click();
   assert.equal(await page.locator('.tiptap .rk-directive-chat .rk-directive-message').count(),2);
   panel=await open('tab',width,0);
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/First tab/);
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/First tab/);
   const title=panel.getByRole('textbox',{name:'块标题'});
   await title.fill('Primary');
   await page.locator('.tiptap .rk-directive-tab').first().getByText('Primary').waitFor();
@@ -155,7 +156,8 @@ try{
   panel=await open('definition',width,0);
   assert.equal(await panel.getByRole('textbox',{name:'术语名称'}).inputValue(),'Voltage');
   await panel.getByRole('textbox',{name:'术语名称'}).fill('Potential');
-  await panel.getByRole('textbox',{name:'块源码'}).fill('::: definition Potential\n\nUpdated definition.\n\n:::');
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
+  await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).fill('::: definition Potential\n\nUpdated definition.\n\n:::');
   await page.locator('.tiptap .rk-directive-definition').first().getByText('Updated definition.').waitFor();
   await panel.getByRole('button',{name:'关闭',exact:true}).click();
   await menu('front',width,0);
@@ -164,8 +166,9 @@ try{
   await page.getByRole('menuitem',{name:'编辑块'}).last().click();
   panel=page.getByRole(width===1280?'complementary':'dialog',{name:'块编辑面板'});
   await panel.getByText('编辑子块').waitFor();
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/Original question/);
-  await panel.getByRole('textbox',{name:'块源码'}).fill('::: front\n\nRevised question.\n\n:::');
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/Original question/);
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
+  await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).fill('::: front\n\nRevised question.\n\n:::');
   await page.locator('.tiptap .rk-directive-front').first().getByText('Revised question.').waitFor();
   await panel.getByRole('button',{name:'关闭',exact:true}).click();
   await page.getByRole('button',{name:'源码'}).click();

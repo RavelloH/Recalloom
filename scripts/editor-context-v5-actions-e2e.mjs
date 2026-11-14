@@ -52,7 +52,7 @@ try{
  await create();
  await page.locator('.tiptap a[href*="example.com/start"]').first().click({button:'right'});
  await menu().getByRole('menuitem',{name:'编辑链接'}).click();
- const dialog=page.getByRole('dialog',{name:/链接/});await dialog.waitFor();
+ const dialog=page.getByRole('complementary',{name:'块编辑面板'});await dialog.waitFor();
  assert.equal(await dialog.getByRole('textbox',{name:'链接地址'}).inputValue(),'https://example.com/start');
  await dialog.getByRole('textbox',{name:'链接地址'}).fill('https://example.org/updated');
  await dialog.getByRole('button',{name:'更新',exact:true}).click();

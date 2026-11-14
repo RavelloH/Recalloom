@@ -49,7 +49,7 @@ try{
   assert.match(await url.inputValue(),/github.com/);
   await url.fill('javascript:alert(1)');
   assert.match(await panel.getByRole('alert').innerText(),/HTTP/);
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/github.com/);
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/github.com/);
   await url.fill('https://example.com/docs');
   await panel.getByRole('textbox',{name:'卡片标题'}).fill('Updated Card');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('https://example.com/docs')&&el.value.includes('Updated Card')));

@@ -9,7 +9,7 @@ import {ContextMenu,type ContextMenuOption} from '@astryxdesign/core/ContextMenu
 import type {DropdownMenuItemData} from '@astryxdesign/core/DropdownMenu';
 
 import {blockMenuItems,inlineContextItems,runWithTextSelection} from './editor-command-menu';
-import {editableBlockFromDocumentPosition,isExplicitRmdBlock} from './editor-block-actions';
+import {blockEditorTargetAt,editableBlockFromDocumentPosition,isExplicitRmdBlock} from './editor-block-actions';
 import {inlineCommandsByGroup} from './editor-inline-commands';
 import {pasteFromClipboard,linkContextItems,imageContextItems,tableContextItems,codeContextItems} from './editor-context-actions';
 import './editor-context-menu.css';
@@ -44,6 +44,31 @@ function grouped(title:string,items:ContextMenuOption[]):ContextMenuOption|null{
 function getMenuPos(editor:Editor,event:React.MouseEvent<HTMLElement>):number{
  if(event.detail===0&&event.clientX===0&&event.clientY===0)return editor.state.selection.from;
  return editor.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos??editor.state.selection.from;
+}
+/** Inspect nested objects themselves, while structural actions keep their owner. */
+function objectEditorTarget(editor:Editor,position:number,element:Element|null){
+ const object=element?.closest('img,figure[data-rk-rich-figure],pre,table');
+ const type=object?.matches('img,figure')?'image':object?.matches('pre')?'codeBlock':object?.matches('table')?'table':null;
+ if(!type){
+  const direct=blockEditorTargetAt(editor,position);
+  return direct?.node.type.name==='inlineMath'?direct:null;
+ }
+ const positions=[position];
+ if(object){try{positions.unshift(editor.view.posAtDOM(object,0));}catch{/* Use the pointer position. */}}
+ for(const pos of positions){
+  if(pos<0||pos>editor.state.doc.content.size)continue;
+  const direct=blockEditorTargetAt(editor,pos);
+  if(direct?.node.type.name===type)return direct;
+  if(type==='image'&&pos>0){
+   const before=blockEditorTargetAt(editor,pos-1);
+   if(before?.node.type.name===type)return before;
+  }
+  const resolved=editor.state.doc.resolve(pos);
+  for(let depth=resolved.depth;depth>0;depth--){
+   if(resolved.node(depth).type.name===type)return blockEditorTargetAt(editor,resolved.before(depth));
+  }
+ }
+ return null;
 }
 /** A selection is contextual ONLY when the pointer is over its glyph rects.
  * A non-empty document selection elsewhere is not enough: right-clicking a
@@ -207,7 +232,9 @@ export function EditorContextMenu({editor,onEditBlock,onEditLink,onInsert,childr
     id:cmd.id,label:cmd.title,isDisabled:!cmd.isAvailable(editor),icon:<Icon name="footnote" size="sm"/>,
     onClick:()=>runWithTextSelection(editor,selection,()=>cmd.run(editor))
    }));
-  const actions=current?blockMenuItems({editor,pos:current.pos,onEditBlock}):[];
+  const inspected=objectEditorTarget(editor,position,contextTarget);
+  const actions=current?blockMenuItems({editor,pos:current.pos,onEditBlock}).map(item=>
+   isAction(item)&&item.id==='edit-block'&&inspected?{...item,onClick:()=>onEditBlock(inspected.pos)}:item):[];
   const history=actions.filter(item=>isAction(item)&&['undo','redo'].includes(item.id??''));
   const blockActions=selected?[]:actions.filter(item=>isAction(item)&&!['undo','redo'].includes(item.id??''));
   const fallbackHistory:ContextMenuOption[]=history.length?history:[

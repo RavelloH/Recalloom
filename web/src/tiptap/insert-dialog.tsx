@@ -1,6 +1,5 @@
 import {Icon} from '../icon';
 import React,{useMemo,useState} from 'react';
-import {Dialog} from '@astryxdesign/core/Dialog';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {Button} from '@astryxdesign/core/Button';
@@ -16,7 +15,7 @@ export type InsertDialogState=
  |{kind:'image';src:string;alt:string;title:string;existing:boolean}
  |{kind:'math';latex:string;type:'inline'|'block';position?:number;existing:boolean;equationId?:string};
 
-export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:InsertDialogState;onClose:()=>void;onApply:(state:InsertDialogState)=>void;onRemove:()=>void}){
+export function EditorInsertFields({value,onClose,onApply,onRemove}:{value:InsertDialogState;onClose:()=>void;onApply:(state:InsertDialogState)=>void;onRemove:()=>void}){
  const [draft,setDraft]=useState<InsertDialogState>(value);
  const update=(fields:Record<string,unknown>)=>setDraft(prev=>({...prev,...fields}) as InsertDialogState);
  const valid=draft.kind==='link'?validLink(draft.url):draft.kind==='image'?validImage(draft.src):!!draft.latex.trim()&&(draft.type!=='block'||!draft.equationId?.trim()||validCrossRefId(draft.equationId.trim().toLowerCase(),'eq'));
@@ -26,7 +25,7 @@ export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:Inser
   catch{return '';}
  },[draft]);
  const title=draft.kind==='link'?'链接':draft.kind==='image'?'图片':'数学公式';
- return <Dialog isOpen onOpenChange={open=>{if(!open)onClose();}} purpose="form" width={480} padding={4} aria-label={(draft.existing?'编辑':'插入')+title}>
+ return <section aria-label={(draft.existing?'编辑':'插入')+title}>
   <form className="editor-insert-form" onSubmit={event=>{event.preventDefault();if(valid)onApply(draft);}}>
    <header className="editor-insert-heading"><span className="editor-insert-icon">{draft.kind==='link'?<Icon name="link" size="md"/>:draft.kind==='image'?<Icon name="photo" size="md"/>:<Icon name="math" size="md"/>}</span><div><h2>{draft.existing?'编辑':'插入'}{title}</h2><p className="muted small">{draft.kind==='link'?'添加或修改 Markdown 超链接':draft.kind==='image'?'使用网络图片地址并添加替代文本':'支持行内公式和独立块级 LaTeX'}</p></div></header>
    {draft.kind==='link'&&<>
@@ -48,5 +47,5 @@ export function EditorInsertDialog({value,onClose,onApply,onRemove}:{value:Inser
    {!valid&&((draft.kind==='link'&&draft.url)||(draft.kind==='image'&&draft.src))&&<p className="muted small" role="status">仅支持安全的 HTTP(S) 地址，以及适用的相对路径或协议。</p>}
    <footer className="editor-insert-actions">{draft.existing&&<Button label={'删除'+title} variant="destructive" size="sm" onClick={onRemove}/>}<span className="editor-insert-spacer"/><Button label="取消" variant="secondary" size="sm" onClick={onClose}/><Button label={draft.existing?'更新':'插入'} type="submit" variant="primary" size="sm" isDisabled={!valid}/></footer>
   </form>
- </Dialog>;
+ </section>;
 }

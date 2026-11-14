@@ -68,7 +68,7 @@ try{
 
   await create();await select(width);
   await toolbar().getByRole('button',{name:'插入或编辑链接'}).click();
-  const dialog=page.getByRole('dialog',{name:/链接/});
+  const dialog=page.getByRole(width===1280?'complementary':'dialog',{name:'块编辑面板'});
   await dialog.waitFor();
   assert.equal(await dialog.getByRole('textbox',{name:'链接文字'}).inputValue(),'alpha beta gamma');
   await dialog.getByRole('textbox',{name:'链接地址'}).fill('https://example.com/docs');

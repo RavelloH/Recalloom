@@ -319,8 +319,9 @@ try{
  await trigger('信息');await trigger('历史');await settle();
  previous=await boxes();
  await openBlock();await assertNewFront(ids.block,previous);
- const raw=card(ids.block).getByRole('textbox',{name:'块源码'});
+ const raw=card(ids.block).getByRole('textbox',{name:'块源码',includeHidden:true});
  const incomplete='# INCOMPLETE_RAW_DRAFT';
+ await card(ids.block).getByRole('tab',{name:'源码',exact:true}).click();
  await raw.fill(incomplete);
  await card(ids.block).getByRole('alert').waitFor();
  await page.evaluate(()=>{
@@ -376,7 +377,8 @@ try{
   const sheet=page.locator('dialog[open]');
   assert.equal(await sheet.count(),1,'Block editor shares the single mobile sheet');
   assert.equal(await sheet.locator('.astryx-bottom-sheet').count(),1);
-  const mobileRaw=sheet.getByRole('textbox',{name:'块源码'});
+  const mobileRaw=sheet.getByRole('textbox',{name:'块源码',includeHidden:true});
+  await sheet.getByRole('tab',{name:'源码',exact:true}).click();
   await mobileRaw.fill(incomplete);
   if(width===390){
    await mobileRaw.evaluate(el=>{
@@ -403,7 +405,7 @@ try{
    await page.screenshot({path:join(artifactDir,'mobile-block-roundtrip.png'),fullPage:true});
    console.log('PASS mobile/desktop/mobile raw draft, focus, selection and editor/form instance retention',engine);
   }
-  await sheet.getByRole('textbox',{name:'块源码'}).focus();
+  await sheet.getByRole('textbox',{name:'块源码',includeHidden:true}).focus();
   await page.keyboard.press('Escape');
   await sheet.waitFor({state:'hidden'});
   await page.screenshot({path:join(artifactDir,'mobile-'+width+'.png'),fullPage:true});

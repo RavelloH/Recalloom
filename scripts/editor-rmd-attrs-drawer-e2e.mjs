@@ -51,8 +51,8 @@ try{
   assert.ok(geometry.width>=width-1&&Math.abs(geometry.left)<1,'mobile bottom sheet fills the available width '+JSON.stringify(geometry));
   assert.ok(geometry.top>0&&geometry.height<(width===390?844:700),
    'mobile block editor retains the bottom sheet presentation '+JSON.stringify(geometry));
-  assert.ok(geometry.previewHeight>40&&geometry.previewHeight<=Math.round((width===390?844:700)*.31),
-   'sticky live preview limited to 30% '+JSON.stringify(geometry));
+  assert.ok(geometry.previewHeight>40&&geometry.previewHeight<=370,
+   'expanded effect preview has a bounded height '+JSON.stringify(geometry));
   assert.equal(await panel.getByRole('region',{name:'图片 Markdown 属性'}).count(),1);
   assert.equal(await page.locator('.rk-rmd-attrs-editor').count(),0,'old floating attrs dialog must be gone');
   const field=panel.getByRole('textbox',{name:'宽度 px'});
@@ -64,7 +64,7 @@ try{
   await field.fill('480');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-rmd-attrs-decoration')].some(el=>el.textContent.includes('width=480')));
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('width=480')));
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/width=480/,'structured node attrs must refresh raw RMD in the same panel');
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/width=480/,'structured node attrs must refresh raw RMD in the same panel');
   await panel.getByRole('textbox',{name:'图注'}).fill('更新后的图注');
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-rmd-attrs-decoration')].some(el=>el.textContent.includes('更新后的图注')));
   await close();

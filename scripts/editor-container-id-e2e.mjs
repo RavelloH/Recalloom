@@ -46,8 +46,9 @@ try{
   await stableId.fill('Block-Caution');
   await page.waitForFunction(()=>!!document.querySelector('.tiptap #user-content-block-caution'));
   await page.waitForFunction(()=>[...document.querySelectorAll('.rk-block-editor-panel textarea')].some(el=>el.value.includes('id=block-caution')));
-  const rawSource=panel.getByRole('textbox',{name:'块源码'});
+  const rawSource=panel.getByRole('textbox',{name:'块源码',includeHidden:true});
   const duplicateRaw=(await rawSource.inputValue()).replace('id=block-caution','id=shared-anchor');
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
   await rawSource.fill(duplicateRaw);
   await panel.getByRole('alert').filter({hasText:'标题'}).waitFor();
   assert.equal(await page.locator('.rk-editor-block-canvas #user-content-block-caution').count(),1,'invalid raw source must leave the editable canvas anchor unchanged');
@@ -55,7 +56,7 @@ try{
   panel=await open('highlight');
   await panel.getByRole('textbox',{name:'容器锚点 ID（可选）'}).fill('marker-one');
   await page.waitForFunction(()=>!!document.querySelector('.tiptap #user-content-marker-one'));
-  assert.match(await panel.getByRole('textbox',{name:'块源码'}).inputValue(),/id=marker-one/);
+  assert.match(await panel.getByRole('textbox',{name:'块源码',includeHidden:true}).inputValue(),/id=marker-one/);
   await panel.getByRole('button',{name:'关闭',exact:true}).click();
   if(width===1280){
    const block=page.locator('.tiptap .rk-directive-warning').first();await block.hover();

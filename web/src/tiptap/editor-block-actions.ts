@@ -1,6 +1,8 @@
 /** Transaction-only actions for top-level and legally nested RMD blocks. */
 import type {Editor,JSONContent} from '@tiptap/core';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
+import type {Transaction} from '@tiptap/pm/state';
+import {isHistoryTransaction} from '@tiptap/pm/history';
 
 export type TopLevelBlock={pos:number;index:number;node:ProseMirrorNode};
 export function topLevelBlocks(editor:Editor):TopLevelBlock[]{
@@ -36,6 +38,40 @@ export function editableBlockAt(editor:Editor,pos:number):EditableBlock|null{
  const index=resolved.index();
  if(parent.child(index)!==node)return null;
  return {pos,node,index,parentKind,parentPos:resolved.before(resolved.depth)};
+}
+/** Inspect an exact node without granting structural move/delete capabilities. */
+export function blockEditorTargetAt(editor:Editor,pos:number):EditableBlock|null{
+ const structural=editableBlockAt(editor,pos);
+ if(structural)return structural;
+ if(pos<0||pos>=editor.state.doc.content.size)return null;
+ const node=editor.state.doc.nodeAt(pos);
+ if(!node||(!node.isBlock&&node.type.name!=='inlineMath'))return null;
+ const resolved=editor.state.doc.resolve(pos);
+ return {pos,node,index:resolved.index(),parentPos:null,parentKind:null};
+}
+/** Follow an inspected node through edits, including whole-node undo/redo. */
+export function mapBlockEditorTarget(editor:Editor,transaction:Transaction,pos:number,previous:ProseMirrorNode):EditableBlock|null{
+ const fromPanel=transaction.getMeta('rk-block-panel-edit')===true;
+ const mapped=transaction.mapping.mapResult(pos,fromPanel?-1:1);
+ let targetPos=mapped.pos;
+ if(!fromPanel&&mapped.deleted){
+  const start=transaction.mapping.map(pos,-1),end=transaction.mapping.map(pos+previous.nodeSize,-1);
+  const replacement=editor.state.doc.nodeAt(start);
+  // A genuine deletion collapses the extent. Only recover a complete
+  // replacement, so the next sibling cannot silently become the target.
+  if(end<=start||replacement?.nodeSize!==end-start)return null;
+  // Native NodeView updateAttributes calls setNodeMarkup without panel metadata.
+  // For leaf atoms PM implements that as a plain ReplaceStep. Retain an
+  // attribute-only edit, but reject external replacement of the block body.
+  const markupOnly=replacement.type===previous.type&&replacement.content.eq(previous.content)&&
+   replacement.marks.length===previous.marks.length&&replacement.marks.every((mark,index)=>mark.eq(previous.marks[index]!));
+  if(!isHistoryTransaction(transaction)&&!markupOnly)return null;
+  targetPos=start;
+ }
+ const current=blockEditorTargetAt(editor,targetPos);
+ if(!current||current.node.type!==previous.type||
+  current.node.type.name==='richContainer'&&current.node.attrs.kind!==previous.attrs.kind)return null;
+ return current;
 }
 export function editableBlockFromDocumentPosition(editor:Editor,pos:number):EditableBlock|null{
  const doc=editor.state.doc;

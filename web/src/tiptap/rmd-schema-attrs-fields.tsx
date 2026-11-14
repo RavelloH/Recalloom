@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {
@@ -24,6 +24,15 @@ export function RmdSchemaAttributeFields({editor,pos}:{editor:Editor;pos:number}
   }));
  });
  const [errors,setErrors]=useState<Record<string,string>>({});
+ const canonical=node&&mapping?Object.fromEntries(fields.map(field=>[field,String(node.attrs[pmAttrKey(field,mapping)]??'')])):{};
+ const previous=useRef(canonical);
+ useEffect(()=>{
+  const changed=fields.filter(field=>previous.current[field]!==canonical[field]);
+  previous.current=canonical;
+  if(!changed.length)return;
+  setDraft(values=>({...values,...Object.fromEntries(changed.map(field=>[field,canonical[field]]))}));
+  setErrors(values=>({...values,...Object.fromEntries(changed.map(field=>[field,'']))}));
+ },[node,type]);
  if(!node||!mapping||!definition)return null;
 
  const applyField=(field:string,raw:string)=>{

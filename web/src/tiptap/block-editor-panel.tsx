@@ -1,11 +1,17 @@
 import {Icon} from '../icon';
-import React,{useEffect,useMemo,useRef,useState} from 'react';
+import React,{useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import type {Editor} from '@tiptap/core';
+import {closeHistory} from '@tiptap/pm/history';
 import {TextArea} from '@astryxdesign/core/TextArea';
 
 import {parseRmdVisual} from '../rmd-visual';
-import {serializeRmdBlock} from '../rmd-serialize';
-import {editableBlockAt} from './editor-block-actions';
+import {serializeRmdBlock,serializeRmdInline} from '../rmd-serialize';
+import {blockEditorTargetAt,mapBlockEditorTarget} from './editor-block-actions';
+import {BlockVisualFields} from './block-visual-fields';
+import {createMathTypeTransaction,createRemoveBlockObjectTransaction} from './block-object-operations';
+import {assertRmdBlockCandidate} from './block-visual-model';
+import {EditorInsertFields} from './insert-dialog';
+import {richTitle} from './rich-schema';
 import {RmdSchemaAttributeFields} from './rmd-schema-attrs-fields';
 import {RmdContainerAttributeFields} from './rmd-container-fields';
 import {RmdLeafAttributeFields} from './rmd-leaf-fields';
@@ -17,41 +23,64 @@ import './block-editor-panel.css';
 
 const Preview=React.lazy(()=>import('../markdown-preview'));
 const safeTitle=(s:string)=>s.replace(/[\r\n]/g,' ').slice(0,180);
-export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
- editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;
-}){
+type BlockPanelProps={editor:Editor;pos:number;attributePos?:number|null;onClose:()=>void;recordId?:string;
+ insertion?:Omit<React.ComponentProps<typeof EditorInsertFields>,'onClose'>};
+const blockSource=(node:import('@tiptap/pm/model').Node)=>node.isInline?serializeRmdInline([node.toJSON()]):serializeRmdBlock(node.toJSON());
+const wrapSource=(kind:string,body:string)=>{const fence=':'.repeat(Math.max(3,...(body.match(/^:{3,}/gm)??[]).map(value=>value.length+1)));return fence+' '+kind+'\n\n'+body+'\n\n'+fence;};
+const typeLabels:Record<string,string>={paragraph:'段落',heading:'标题',blockquote:'引用',bulletList:'无序列表',orderedList:'有序列表',taskList:'任务列表',table:'表格',codeBlock:'代码',image:'图片',blockMath:'块级公式',inlineMath:'行内公式',richLinkCard:'链接卡片',wikiEmbed:'引用文档',horizontalRule:'分隔线',rawMarkdown:'原始内容',richFootnoteDefinition:'脚注'};
+export function BlockEditorPanel(props:BlockPanelProps){
+ return props.insertion?<BlockInsertPanel {...props} insertion={props.insertion}/>:<BlockContentPanel {...props}/>;
+}
+function BlockInsertPanel({insertion,onClose}:BlockPanelProps&{insertion:NonNullable<BlockPanelProps['insertion']>}){
+ const [open,setOpen]=useState(true);
+ const {value}=insertion;
+ const title=(value.existing?'编辑':'插入')+(value.kind==='link'?'链接':value.kind==='image'?'图片':'数学公式');
+ return <WorkspacePanel id="block-editor" label="块编辑面板" title={title} open={open} onOpenChange={setOpen} onAfterClose={onClose}>
+  <div className="rk-block-editor-panel"><div className="rk-block-panel-fields rk-block-insert-fields">
+   <EditorInsertFields {...insertion} onClose={()=>setOpen(false)}/>
+  </div></div>
+ </WorkspacePanel>;
+}
+function BlockContentPanel({editor,pos,attributePos,onClose,recordId}:BlockPanelProps){
  const [version,setVersion]=useState(0);
  const [open,setOpen]=useState(true);
- const [draft,setDraft]=useState(()=>serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'}));
+ const [mode,setMode]=useState<'visual'|'source'>('visual');
+ const [draft,setDraft]=useState(()=>{const node=blockEditorTargetAt(editor,pos)?.node;return node?blockSource(node):'';});
  const [error,setError]=useState('');
+ const [sourceError,setSourceError]=useState('');
+ const invalidSource=useRef(false);
  const canonicalRef=useRef(draft);
+ const inspectedPos=useRef(pos);
  useEffect(()=>{
-  const source=serializeRmdBlock(editableBlockAt(editor,pos)?.node.toJSON()??{type:'paragraph'});
-  if(canonicalRef.current!==source){canonicalRef.current=source;setDraft(source);setError('');}
+  const node=blockEditorTargetAt(editor,pos)?.node;
+  const source=node?blockSource(node):'';
+  if(canonicalRef.current!==source){canonicalRef.current=source;if(!invalidSource.current)setDraft(source);setError('');}
  },[editor,pos]);
  useEffect(()=>{
   const update=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
    if(!transaction.docChanged)return;
    setVersion(value=>value+1);
-   const mapped=transaction.mapping.mapResult(pos,1);
-   const current=editableBlockAt(editor,mapped.pos);
+   const previous=transaction.before.nodeAt(inspectedPos.current);
+   const current=previous?mapBlockEditorTarget(editor,transaction,inspectedPos.current,previous):null;
    if(!current)return;
-   const canonical=serializeRmdBlock(current.node.toJSON());
+   inspectedPos.current=current.pos;
+   const canonical=blockSource(current.node);
    if(canonical!==canonicalRef.current){
     canonicalRef.current=canonical;
     // An external direct edit of the selected block updates the sidebar.
     // Editing the sidebar itself must not overwrite incomplete text inputs.
-    if(transaction.getMeta('rk-block-panel-edit')!==true||transaction.getMeta('rk-block-panel-field-edit')===true)setDraft(canonical);
+    if(!invalidSource.current&&(transaction.getMeta('rk-block-panel-edit')!==true||transaction.getMeta('rk-block-panel-field-edit')===true))setDraft(canonical);
    }
   };
   editor.on('transaction',update);
   return()=>{editor.off('transaction',update);};
  },[editor,pos]);
- const block=editableBlockAt(editor,pos);
+ const block=blockEditorTargetAt(editor,pos);
  const current=block?.node;
  const kind=current?.type.name??'';
  const subkind=kind==='richContainer'?String(current?.attrs.kind??''):'';
  const parentKind=block?.parentKind??null;
+ const [previewOpen,setPreviewOpen]=useState(()=>Boolean(current?.isLeaf||kind==='codeBlock'));
  const nestedSource=(source:string)=>{
   if(!parentKind)return source;
   if(parentKind==='flashcard'&&block&&block.parentPos!==null){
@@ -59,12 +88,13 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
    if(parent){
     const siblings:string[]=[];
     parent.forEach((node,_offset,index)=>siblings.push(index===block.index?source:serializeRmdBlock(node.toJSON())));
-    return ':::: flashcard\n\n'+siblings.join('\n\n')+'\n\n::::';
+    return wrapSource('flashcard',siblings.join('\n\n'));
    }
   }
-  return ':::: '+parentKind+'\n\n'+source+'\n\n::::';
+  return wrapSource(parentKind,source);
  };
- const presentation=useMemo(()=>current?nestedSource(serializeRmdBlock(current.toJSON())):'', [current,version,parentKind]);
+ const presentation=useMemo(()=>current?nestedSource(blockSource(current)):'', [current,version,parentKind]);
+ const previewSource=useDeferredValue(presentation);
  if(!current)return null;
  const attr=(name:RichContainerField,value:string|number|null)=>{
   const node=editor.state.doc.nodeAt(pos);
@@ -72,10 +102,11 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
   if(name==='title'&&typeof value==='string')value=safeTitle(value);
   if(node.attrs[name]===value)return;
   try{
+   assertRmdBlockCandidate(editor.state.doc,node.type.create({...node.attrs,[name]:value},node.content,node.marks),pos);
    const tr=editor.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,[name]:value});
    tr.doc.check();
    editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true).setMeta('rk-block-panel-field-edit',true));
-   setDraft(serializeRmdBlock(editor.state.doc.nodeAt(pos)!.toJSON()));
+   if(!invalidSource.current)setDraft(blockSource(editor.state.doc.nodeAt(pos)!));
    setError('');
   }catch{setError('当前属性未能写入，请确认内容是否有效');}
  };
@@ -87,7 +118,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
    const tr=editor.state.tr.setNodeMarkup(pos,undefined,{...node.attrs,...attrs});
    tr.doc.check();
    editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true).setMeta('rk-block-panel-field-edit',true));
-   setDraft(serializeRmdBlock(editor.state.doc.nodeAt(pos)!.toJSON()));
+   if(!invalidSource.current)setDraft(blockSource(editor.state.doc.nodeAt(pos)!));
    setError('');
   }catch{setError('当前属性未能写入，请确认格式');}
  };
@@ -95,7 +126,12 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
   setDraft(value);
   try{
    const parsed=parseRmdVisual(nestedSource(value));
-   let parsedBlock=parsed.content?.[0];
+   let parsedBlock=parsed.content?.[0]??(kind==='paragraph'&&!value.trim()?{type:'paragraph'}:undefined);
+   if(current.isInline){
+    if(parsed.content?.length!==1||parsedBlock?.type!=='paragraph'||parsedBlock.content?.length!==1)
+     throw new Error('请保留一个完整的行内公式。');
+    parsedBlock=parsedBlock.content[0];
+   }else if(!parentKind&&parsed.content?.length!==1&&!(kind==='paragraph'&&!value.trim()))throw new Error('每次只能编辑一个完整块。');
    if(parentKind){
     const siblings=parsedBlock?.content??[],parent=block&&block.parentPos!==null?editor.state.doc.nodeAt(block.parentPos):null;
     const expected=parentKind==='flashcard'?parent?.childCount:1;
@@ -111,6 +147,7 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
    if(parsedBlock?.type!==kind||kind==='richContainer'&&parsedBlock.attrs?.kind!==subkind)
     throw new Error('每次只能编辑一个同类型块。转换块类型请使用块操作菜单。');
    const candidate=editor.state.schema.nodeFromJSON(parsedBlock);
+   assertRmdBlockCandidate(editor.state.doc,candidate,pos);
    const anchorConflict=findRmdAnchorConflictForNode(editor.state.doc,candidate,pos);
    if(anchorConflict)throw new Error(describeRmdAnchorConflict(anchorConflict));
    const existing=editor.state.doc.nodeAt(pos);
@@ -118,34 +155,71 @@ export function BlockEditorPanel({editor,pos,attributePos,onClose,recordId}:{
    const tr=editor.state.tr.replaceWith(pos,pos+existing.nodeSize,candidate);
    tr.doc.check();
    if(!existing.eq(candidate))editor.view.dispatch(tr.setMeta('rk-block-panel-edit',true));
-   setError('');
+   invalidSource.current=false;setSourceError('');setError('');
   }catch(e){
-   setError(e instanceof Error?e.message:'输入尚未构成有效的完整块；修正后会自动生效');
+   invalidSource.current=true;setSourceError(e instanceof Error?e.message:'输入尚未构成有效的完整块；修正后会自动生效');
   }
  };
- return <WorkspacePanel id="block-editor" label="块编辑面板" title={parentKind?'编辑子块':'编辑块'} description={kind==='richContainer'?String(current.attrs.kind??'容器'):kind} open={open}
+ const label=kind==='richContainer'?richTitle(subkind):typeLabels[kind]??'内容块';
+ const changeMathType=(type:'inline'|'block')=>{
+  if(invalidSource.current){setError('请先修正源码，再切换公式类型。');return;}
+  try{
+   const next=createMathTypeTransaction(editor,pos,type);
+   editor.view.dispatch(closeHistory(next.transaction));
+   editor.view.dom.dispatchEvent(new CustomEvent('rmd-open-block-editor',{detail:{pos:next.pos}}));
+  }catch(error){setError(error instanceof Error?error.message:'公式类型暂时无法转换。');}
+ };
+ const removeObject=()=>{
+  try{
+   editor.view.dispatch(closeHistory(createRemoveBlockObjectTransaction(editor,pos)));
+   editor.view.focus();
+  }catch(error){setError(error instanceof Error?error.message:'此内容暂时无法删除。');}
+ };
+ const schemaPos=attributePos??(isRmdAttrsEditable(kind)?pos:null);
+ const preview=<details className="rk-block-panel-preview" aria-label="当前块预览" open={previewOpen} onToggle={event=>setPreviewOpen(event.currentTarget.open)}>
+  <summary><Icon name="eye" size="sm"/><span>效果预览</span><Icon name="chevronDown" size="sm"/></summary>
+  {previewOpen&&<div className="rk-block-panel-preview-body record-main">
+   <React.Suspense fallback={<div className="muted small">准备预览…</div>}>
+    <Preview content={previewSource} sourceId={recordId}/>
+   </React.Suspense>
+  </div>}
+ </details>;
+ return <WorkspacePanel id="block-editor" label="块编辑面板" title={parentKind?'编辑子块':'编辑块'} description={label} open={open}
   onOpenChange={setOpen} onAfterClose={onClose}>
   <div className="rk-block-editor-panel" data-block-kind={kind}>
-  <section className="rk-block-panel-preview" aria-label="当前块预览">
-   <div className="rk-block-panel-section-heading"><Icon name="eye" size="sm"/><span>实时预览</span></div>
-   <div className="rk-block-panel-preview-body record-main">
-    <React.Suspense fallback={<div className="muted small">准备预览…</div>}>
-     <Preview content={presentation} sourceId={recordId}/>
-    </React.Suspense>
-   </div>
-  </section>
+  <div className="rk-block-panel-modes" role="tablist" aria-label="块编辑模式">
+   {(['visual','source'] as const).map(value=><button type="button" key={value} role="tab" id={'block-mode-'+value}
+    aria-label={value==='visual'?'可视化':'源码'} aria-selected={mode===value} aria-controls={'block-pane-'+value} tabIndex={mode===value?0:-1}
+    onClick={()=>setMode(value)} onKeyDown={event=>{
+     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+     event.preventDefault();const next=event.key==='Home'?'visual':event.key==='End'?'source':mode==='visual'?'source':'visual';
+     setMode(next);document.getElementById('block-mode-'+next)?.focus();
+    }}><Icon name={value==='visual'?'eye':'code'} size="sm"/>{value==='visual'?'可视化':'源码'}
+    {value==='source'&&sourceError&&<span className="rk-block-source-pending" aria-hidden="true" title="有未应用的源码修改"/>}</button>)}
+   <span className="rk-block-panel-sync">同步到文档草稿</span>
+  </div>
   <section className="rk-block-panel-fields">
-   <p className="rk-block-panel-desc">有效修改立即同步文档；保存仍使用页面顶部的「保存」操作。</p>
-   {kind==='richContainer'&&<RmdContainerAttributeFields key={'container-'+pos+'-'+String(current.attrs.kind)}
+   {(current.isLeaf||kind==='codeBlock')&&preview}
+   <div id="block-pane-visual" role="tabpanel" aria-labelledby="block-mode-visual" hidden={mode!=='visual'}>
+   <BlockVisualFields editor={editor} pos={pos} node={current}
+    onMathTypeChange={kind==='blockMath'||kind==='inlineMath'?changeMathType:undefined}
+    onRemove={['image','blockMath','inlineMath'].includes(kind)?removeObject:undefined}/>
+   {kind==='richContainer'&&<RmdContainerAttributeFields key={'container-'+String(current.attrs.kind)}
      editor={editor} pos={pos} node={current} onApply={attr}/>}
-   {(kind==='richLinkCard'||kind==='wikiEmbed')&&<RmdLeafAttributeFields key={kind+'-'+pos} node={current} onApply={applyLeaf}/>}
-   {attributePos!==undefined&&attributePos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(attributePos)?.type.name??'')&&
-    <RmdSchemaAttributeFields key={attributePos} editor={editor} pos={attributePos}/>}
-   <div className="rk-block-panel-section-heading"><Icon name="code" size="sm"/><span>当前块 RMD 正文与属性</span></div>
+   {(kind==='richLinkCard'||kind==='wikiEmbed')&&<RmdLeafAttributeFields key={kind} node={current} onApply={applyLeaf}/>}
+   {schemaPos!==null&&isRmdAttrsEditable(editor.state.doc.nodeAt(schemaPos)?.type.name??'')&&
+    <RmdSchemaAttributeFields editor={editor} pos={schemaPos}/>}
+   {kind==='horizontalRule'&&<p className="rk-block-panel-help">分隔线在文档中显示为一条横线，无需填写内容。</p>}
+   </div>
+   <div id="block-pane-source" role="tabpanel" aria-labelledby="block-mode-source" hidden={mode!=='source'}>
    <TextArea label="块源码" width="100%" rows={10} value={draft} onChange={commitRaw}
     placeholder="编辑当前块的 Markdown / RMD"/>
+   {sourceError&&<p className="rk-block-panel-error" role="alert">{sourceError}</p>}
+   <p className="rk-block-panel-help">编辑当前块的完整源码。无效输入会保留在这里，修正后同步到文档。</p>
+   </div>
+   {!current.isLeaf&&kind!=='codeBlock'&&preview}
    {error&&<p className="rk-block-panel-error" role="alert">{error}</p>}
-   <p className="rk-block-panel-help">这里编辑当前块的完整 RMD。普通文字也可以直接在左侧正文中编辑。输入暂时不符合完整块语法时，保留表单内容，不破坏原文。</p>
+   <p className="rk-block-panel-help">修改会实时同步到文档，点击页面「保存」后保存。</p>
   </section>
   </div>
  </WorkspacePanel>;

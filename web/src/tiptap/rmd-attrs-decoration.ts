@@ -46,7 +46,9 @@ function itemsInRange(doc:ProseMirrorNode,from=0,to=doc.content.size):Decoration
       if(currentPos!==null)view.dom.dispatchEvent(new CustomEvent('rmd-edit-attrs',{bubbles:true,detail:{pos:currentPos}}));
      });
      return el;
-    },{side:1,key:'rk-attrs-'+pos+'-'+value,stopEvent:()=>true}));
+    // A block widget at the boundary belongs to the preceding block. Keep it
+    // attached there when the next sibling is replaced in its entirety.
+    },{side:node.isTextblock?1:-1,key:'rk-attrs-'+pos+'-'+value,stopEvent:()=>true}));
    }
   }
   if(!node.isText||!node.text)return;
@@ -103,7 +105,8 @@ export const RmdAttrsDecorations=Extension.create({
      if(!ranges)return rebuild(tr.doc);
      let mapped=current.map(tr.mapping,tr.doc);
      for(const range of ranges){
-      const existing=mapped.find(range.from,range.to);
+      // Widgets at the start boundary belong to the unchanged prior block.
+      const existing=mapped.find(range.from,range.to).filter(item=>item.from!==range.from||item.to!==range.from);
       if(existing.length)mapped=mapped.remove(existing);
       const added=itemsInRange(tr.doc,range.from,range.to);
       if(added.length)mapped=mapped.add(tr.doc,added);

@@ -151,7 +151,7 @@ function PanelHeader({panel,store,collapsed=false,docked=false}:{panel:Panel;sto
    {panel.description&&<span className="workspace-panel-description">{panel.description}</span>}</div>
   <div className="workspace-panel-actions">
    {docked&&<IconButton className="workspace-panel-fold" variant="ghost" label={(collapsed?'展开':'折叠')+panel.label} aria-expanded={!collapsed}
-    icon={<Icon name={collapsed?'chevronDown':'chevronUp'} size="sm"/>} onClick={()=>store.setCollapsed(panel.id,!collapsed)}/>}
+    icon={<Icon name={collapsed?'chevronUp':'chevronDown'} size="sm"/>} onClick={()=>store.setCollapsed(panel.id,!collapsed)}/>}
    <IconButton variant="ghost" label="关闭" icon={<Icon name="x" size="sm"/>} onClick={()=>store.close(panel.id)}/>
   </div>
  </div>;

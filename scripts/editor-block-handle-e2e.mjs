@@ -38,12 +38,14 @@ try{
    return {position:getComputedStyle(pane).position,
     canvas:workspace.querySelector('.rk-editor-block-canvas').getBoundingClientRect().toJSON(),
     workspace:workspace.getBoundingClientRect().toJSON(),
-    panel:pane.getBoundingClientRect().toJSON(),bodyParent:pane.parentElement===document.body};
+    panel:pane.getBoundingClientRect().toJSON(),sharedShell:!!pane.closest('.workspace-panel-content')};
   });
-  assert.equal(layout.position,'fixed');assert.equal(layout.bodyParent,true);
-  if(width===1280)assert.ok(Math.abs(layout.canvas.width-layout.workspace.width)<1,'Drawer must never occupy a document column');
-  else assert.ok(Math.abs(layout.panel.width-390)<1,'mobile Drawer must be full width');
-  const raw=panel.getByRole('textbox',{name:'块源码'});
+  assert.equal(layout.sharedShell,true,'block content uses the shared workspace panel shell');
+  if(width===1280)assert.ok(Math.abs(layout.canvas.width-layout.workspace.width)<1,'panel content must not create a second editor column');
+  else assert.ok(layout.panel.width<=390&&layout.panel.width>=360,'mobile panel content fits the bottom sheet');
+  await panel.getByRole('tab',{name:'源码',exact:true}).click();
+  await panel.getByText('效果预览',{exact:true}).click();
+  const raw=panel.getByRole('textbox',{name:'块源码',includeHidden:true});
   assert.match(await raw.inputValue(),/::: warning 注意/);
   await raw.fill('::: warning 注意\n\nRewritten callout.\n\n:::');
   await callout.getByText('Rewritten callout.').waitFor();

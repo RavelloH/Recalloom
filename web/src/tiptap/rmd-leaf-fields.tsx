@@ -22,7 +22,10 @@ export function RmdLeafAttributeFields({node,onApply}:{
  useEffect(()=>{
   const changed=Object.fromEntries(fields.filter(field=>canonical[field]!==prior.current[field]).map(field=>[field,canonical[field]]));
   prior.current=canonical;
-  if(Object.keys(changed).length)setInputs(old=>({...old,...changed}));
+  if(Object.keys(changed).length){
+   setInputs(old=>({...old,...changed}));
+   setErrors(old=>({...old,...Object.fromEntries(Object.keys(changed).map(field=>[field,'']))}));
+  }
  },[node]);
  const apply=(field:'url'|'title'|'target',value:string)=>{
   setInputs(old=>({...old,[field]:value}));

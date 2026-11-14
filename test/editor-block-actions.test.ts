@@ -1,17 +1,71 @@
 import {describe,it} from 'node:test';
 import assert from 'node:assert/strict';
 import type {Editor} from '@tiptap/core';
-import {Schema} from '@tiptap/pm/model';
-import {EditorState} from '@tiptap/pm/state';
-import {duplicateBlock,moveBlockBy,moveBlockTo,removeBlock,topLevelBlocks,withoutBlockIdentity} from '../web/src/tiptap/editor-block-actions';
+import {Schema,type Node as ProseMirrorNode} from '@tiptap/pm/model';
+import {EditorState,type Transaction} from '@tiptap/pm/state';
+import {history,undo,redo} from '@tiptap/pm/history';
+import {duplicateBlock,mapBlockEditorTarget,moveBlockBy,moveBlockTo,removeBlock,topLevelBlocks,withoutBlockIdentity} from '../web/src/tiptap/editor-block-actions';
 
 const schema=new Schema({
  nodes:{
   doc:{content:'block+'},
   paragraph:{group:'block',content:'text*',attrs:{blockId:{default:null}}},
   richContainer:{group:'block',content:'block+',attrs:{kind:{default:'note'},title:{default:''}}},
+  image:{group:'block',atom:true,attrs:{src:{default:''},alt:{default:''}}},
   text:{group:'inline'}
  }
+});
+
+describe('inspected block anchors',()=>{
+ const paragraph=(text:string)=>schema.nodes.paragraph.create(null,schema.text(text));
+ function inspected(first:ProseMirrorNode=paragraph('A')){
+  let state=EditorState.create({schema,plugins:[history()],doc:schema.nodes.doc.create(null,[first,paragraph('B')])});
+  const editor={get state(){return state}} as Editor;
+  let target:{pos:number;node:typeof state.doc}|null={pos:0,node:state.doc.firstChild!};
+  const dispatch=(tr:Transaction)=>{
+   state=state.apply(tr);
+   if(target)target=mapBlockEditorTarget(editor,tr,target.pos,target.node);
+  };
+  return {editor,dispatch,get target(){return target;}};
+ }
+ it('keeps the inspected block through a panel replacement and its undo/redo',()=>{
+  const d=inspected();
+  d.dispatch(d.editor.state.tr.replaceWith(0,3,paragraph('Longer content')).setMeta('rk-block-panel-edit',true));
+  assert.equal(d.target?.node.textContent,'Longer content');
+  assert.equal(undo(d.editor.state,d.dispatch),true);
+  assert.equal(d.target?.node.textContent,'A');
+  assert.equal(redo(d.editor.state,d.dispatch),true);
+  assert.equal(d.target?.node.textContent,'Longer content');
+ });
+ it('follows insertion before the block and undo without adopting the new sibling',()=>{
+  const d=inspected();
+  d.dispatch(d.editor.state.tr.insert(0,paragraph('Before')));
+  assert.equal(d.target?.node.textContent,'A');
+  assert.equal(d.target?.pos,8);
+  undo(d.editor.state,d.dispatch);
+  assert.equal(d.target?.node.textContent,'A');
+  assert.equal(d.target?.pos,0);
+ });
+ it('closes for a deleted block and an unrelated replacement of the same type',()=>{
+  const removed=inspected();
+  removed.dispatch(removed.editor.state.tr.delete(0,3));
+  assert.equal(removed.target,null);
+  const replaced=inspected();
+  replaced.dispatch(replaced.editor.state.tr.replaceWith(0,3,paragraph('External replacement')));
+  assert.equal(replaced.target,null);
+ });
+ it('keeps native container title edits anchored without panel metadata',()=>{
+  const d=inspected(schema.nodes.richContainer.create({kind:'note',title:'Before'},paragraph('Body')));
+  d.dispatch(d.editor.state.tr.setNodeMarkup(0,undefined,{kind:'note',title:'After'}));
+  assert.equal(d.target?.node.attrs.title,'After');
+  assert.equal(d.target?.node.textContent,'Body');
+ });
+ it('keeps native image property edits anchored without accepting unrelated replacements',()=>{
+  const d=inspected(schema.nodes.image.create({src:'/before.png',alt:'Before'}));
+  d.dispatch(d.editor.state.tr.setNodeMarkup(0,undefined,{src:'/after.png',alt:'After'}));
+  assert.equal(d.target?.node.attrs.src,'/after.png');
+  assert.equal(d.target?.node.attrs.alt,'After');
+ });
 });
 function build(labels:string[]){
  let state=EditorState.create({schema,doc:schema.nodes.doc.create(null,labels.map((label,i)=>

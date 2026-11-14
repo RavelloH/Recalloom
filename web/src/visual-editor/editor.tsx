@@ -9,7 +9,7 @@ import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {useEditor,EditorContent} from '@tiptap/react';
 import {BubbleMenu} from '@tiptap/react/menus';
-import {NodeSelection} from '@tiptap/pm/state';
+import {NodeSelection,type SelectionBookmark} from '@tiptap/pm/state';
 import type {Editor} from '@tiptap/core';
 import {parseRmdVisual} from '../rmd-visual';
 import {useSketchAnnotations} from '../sketch-annotations';
@@ -17,17 +17,16 @@ import {isRmdAttrsEditable} from '../tiptap/rmd-schema-attrs-model';
 import {rawMarkdownBlock} from '../tiptap/raw-markdown';
 import {decorateEditorLinks} from '../link-metadata-client';
 import {selectedLink} from '../tiptap/editor-actions';
-import {EditorInsertDialog,type InsertDialogState} from '../tiptap/insert-dialog';
+import {type InsertDialogState} from '../tiptap/insert-dialog';
 import {filterSlashCommands,groupSlashCommands,matchSlashQuery,type SlashCommand} from '../tiptap/slash-commands';
 import {BlockHandleLayer} from '../tiptap/block-handle';
 import {BlockEditorPanel} from '../tiptap/block-editor-panel';
 import {EditorContextMenu} from '../tiptap/editor-context-menu';
-import {editableBlockAt,editableBlockFromDocumentPosition,isExplicitRmdBlock,topLevelAtDocumentPosition} from '../tiptap/editor-block-actions';
+import {blockEditorTargetAt,mapBlockEditorTarget,editableBlockFromDocumentPosition} from '../tiptap/editor-block-actions';
 import {blockMenuItems} from '../tiptap/editor-command-menu';
 import type {Node as ProseMirrorNode} from '@tiptap/pm/model';
 import {type InlineCommand} from '../tiptap/editor-inline-commands';
 import {useCompactLayout,useFinePointer} from '../use-media';
-import {safeTableId,cleanTableCaption} from '../table-caption';
 import {useVisualEditorExtensions} from './use-extensions';
 import {useVisualEditorSelection} from './use-selection';
 import {setFormatHoverPreview,type FormatHoverKind} from '../tiptap/format-hover-preview';
@@ -63,11 +62,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const lastColumn=useRef<number|null>(null);
  const lastCellPos=useRef<number|null>(null);
  const [tableTarget,setTableTarget]=useState(false);
- const [tableCaptionOpen,setTableCaptionOpen]=useState(false);
- const [tableCaptionDraft,setTableCaptionDraft]=useState('');
- const [tableIdDraft,setTableIdDraft]=useState('');
  const [tableToolbarTop,setTableToolbarTop]=useState(58);
  const [dialog,setDialog]=useState<InsertDialogState|null>(null);
+ const insertionRef=useRef<{value:InsertDialogState;selection:SelectionBookmark}|null>(null);
  const [blockPanelPos,setBlockPanelPos]=useState<number|null>(null);
  const [panelOpenCycle,setPanelOpenCycle]=useState(0);
  const [attributeNodePos,setAttributeNodePos]=useState<number|null>(null);
@@ -137,6 +134,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   return true;
  };
  const editorRef=useRef<Editor|null>(null);
+ const stageInsertion=(next:InsertDialogState|null)=>{
+  const current=editorRef.current;
+  insertionRef.current=next&&current?{value:next,selection:current.state.selection.getBookmark()}:null;
+  blockPanelRef.current=null;attributeNodeRef.current=null;
+  setBlockPanelPos(null);setAttributeNodePos(null);
+  setPanelOpenCycle(n=>n+1);
+  setDialog(next);
+ };
  const outlineOpenRef=useRef(outlineOpen),outlineCallbackRef=useRef(onOutlineChange);
  outlineOpenRef.current=outlineOpen;outlineCallbackRef.current=onOutlineChange;
  const outlineCache=useRef<{doc:ProseMirrorNode;headings:Array<{key:string;title:string;level:number;pos:number}>}|null>(null);
@@ -183,7 +188,14 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const surface=surfaceRef.current;
   if(cell&&surface)setTableToolbarTop(tableToolbarOffset(cell,surface,compactRef.current));
  };
- const extensions=useVisualEditorExtensions(recordId,setDialog);
+ const extensions=useVisualEditorExtensions(recordId,next=>{
+  if(next?.kind==='math'&&next.existing&&next.position!==undefined){
+   const target=editorRef.current;
+   target?.view.dom.dispatchEvent(new CustomEvent('rmd-open-block-editor',{detail:{pos:next.position}}));
+   return;
+  }
+  stageInsertion(next);
+ });
  const editor=useEditor({
   extensions,content:{type:'doc',content:[{type:'paragraph'}]},immediatelyRender:false,
   onUpdate:({editor})=>{if(!applying.current){edited.current=true;onChange(markdownForCurrentDocument(editor));}publishOutline(editor);if(!detectWiki(editor))detectSlash(editor);},
@@ -257,11 +269,12 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    if(!Number.isInteger(position))return;
    const node=editor.state.doc.nodeAt(position);
    if(node&&isRmdAttrsEditable(node.type.name)){
-    const owner=topLevelAtDocumentPosition(editor,position);
+    const owner=blockEditorTargetAt(editor,position);
     if(!owner)return;
     blockPanelRef.current={pos:owner.pos,node:owner.node};
     attributeNodeRef.current={pos:position,type:node.type.name};
     setPanelOpenCycle(n=>n+1);
+    insertionRef.current=null;setDialog(null);
     setBlockPanelPos(owner.pos);
     setAttributeNodePos(position);
    }
@@ -269,12 +282,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   const openDirectBlock=(event:Event)=>{
    const pos=(event as CustomEvent<{pos:number}>).detail?.pos;
    if(!Number.isInteger(pos))return;
-   const target=editableBlockAt(editor,pos);
+   const target=blockEditorTargetAt(editor,pos);
    if(!target)return;
    blockPanelRef.current={pos,node:target.node};
    attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
    setAttributeNodePos(attributeNodeRef.current?.pos??null);
    setPanelOpenCycle(n=>n+1);
+   insertionRef.current=null;setDialog(null);
    setBlockPanelPos(pos);
   };
   root.addEventListener('rmd-edit-attrs',open);
@@ -284,22 +298,32 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    root.removeEventListener('rmd-open-block-editor',openDirectBlock);
   };
  },[editor,ready]);
- // Keep the inspected top-level block anchored as unrelated edits shift its
+ // Keep staged insertions and inspected blocks anchored as unrelated edits shift their
  // position. Close safely if an external transaction replaces/deletes it.
  useEffect(()=>{
   if(!editor)return;
   const listener=({transaction}:{transaction:import('@tiptap/pm/state').Transaction})=>{
-   if(!transaction.docChanged||!blockPanelRef.current)return;
+   if(!transaction.docChanged)return;
+   const insertion=insertionRef.current;
+   if(insertion){
+    const value=insertion.value;
+    insertion.selection=insertion.selection.map(transaction.mapping);
+    if(value.kind==='link'){
+     const from=transaction.mapping.mapResult(value.from,1);
+     const to=transaction.mapping.mapResult(value.to,value.from===value.to?1:-1);
+     if(from.pos>to.pos||(value.from<value.to&&from.pos===to.pos)){
+      insertionRef.current=null;setDialog(null);
+     }else insertion.value={...value,from:from.pos,to:to.pos};
+    }else if(value.kind==='math'&&value.position!==undefined){
+     const position=transaction.mapping.mapResult(value.position,1);
+     if(position.deleted){insertionRef.current=null;setDialog(null);}
+     else insertion.value={...value,position:position.pos};
+    }
+   }
+   if(!blockPanelRef.current)return;
    const previous=blockPanelRef.current;
-   // External edits: association +1 follows the block when content is
-   // inserted at its former start. Our panel explicitly replaces its own
-   // node, which mapping marks deleted; association -1 retains that anchor.
-   const fromPanel=transaction.getMeta('rk-block-panel-edit')===true;
-   const mapped=transaction.mapping.mapResult(previous.pos,fromPanel?-1:1);
-   const current=editableBlockAt(editor,mapped.pos);
-   if(!current||current.node.type!==previous.node.type||
-    current.node.type.name==='richContainer'&&current.node.attrs.kind!==previous.node.attrs.kind||
-    (!fromPanel&&mapped.deleted)){
+   const current=mapBlockEditorTarget(editor,transaction,previous.pos,previous.node);
+   if(!current){
     blockPanelRef.current=null;attributeNodeRef.current=null;
     setBlockPanelPos(null);setAttributeNodePos(null);return;
    }
@@ -307,9 +331,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    if(current.pos!==previous.pos)setBlockPanelPos(current.pos);
    const attrs=attributeNodeRef.current;
    if(attrs){
-    const next=transaction.mapping.mapResult(attrs.pos,fromPanel?-1:1);
-    const nextNode=editor.state.doc.nodeAt(next.pos);
-    if(!nextNode||nextNode.type.name!==attrs.type||(!fromPanel&&next.deleted)){
+    const priorNode=transaction.before.nodeAt(attrs.pos);
+    const next=priorNode?mapBlockEditorTarget(editor,transaction,attrs.pos,priorNode):null;
+    if(!next||next.node.type.name!==attrs.type){
      attributeNodeRef.current=null;setAttributeNodePos(null);
     }else if(next.pos!==attrs.pos){
      attributeNodeRef.current={pos:next.pos,type:attrs.type};setAttributeNodePos(next.pos);
@@ -367,20 +391,28 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
  const openLink=()=>{
   if(!editor)return;
   const info=selectedLink(editor);
-  setDialog({kind:'link',from:info.from,to:info.to,text:info.text,url:info.href,existing:!!info.href});
+  stageInsertion({kind:'link',from:info.from,to:info.to,text:info.text,url:info.href,existing:!!info.href});
  };
  const openImage=()=>{
   if(!editor)return;
-  const existing=editor.isActive('image'),attrs=editor.getAttributes('image');
-  setDialog({kind:'image',src:existing?String(attrs.src??''):'',alt:existing?String(attrs.alt??''):'',title:existing?String(attrs.title??''):'',existing});
+  if(editor.isActive('image')){editBlock(editor.state.selection.from);return;}
+  stageInsertion({kind:'image',src:'',alt:'',title:'',existing:false});
  };
- const openMath=(type:'inline'|'block')=>setDialog({kind:'math',type,latex:'',existing:false});
+ const openMath=(type:'inline'|'block')=>stageInsertion({kind:'math',type,latex:'',existing:false});
  const openWikiEmbed=()=>{
   // Reuse the existing UUID-pinned Wiki document selector.
   editor?.chain().focus().insertContent('::: embed ').run();
  };
  const applyDialog=(item:InsertDialogState)=>{
   if(!editor)return;
+  const insertion=insertionRef.current;
+  if(!insertion||insertion.value.kind!==item.kind)return;
+  if(item.kind==='link'&&insertion.value.kind==='link')item={...item,from:insertion.value.from,to:insertion.value.to};
+  else if(item.kind==='math'&&insertion.value.kind==='math')item={...item,position:insertion.value.position};
+  const selection=insertion.selection.resolve(editor.state.doc);
+  // Restore the insertion anchor even if the canvas cursor moved while the panel was open.
+  editor.commands.command(({tr})=>{tr.setSelection(selection);return true;});
+  insertionRef.current=null;
   if(item.kind==='link'){
    const label=item.text.trim()||item.url.trim();
    const current=editor.state.doc.textBetween(item.from,item.to);
@@ -412,7 +444,9 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   setDialog(null);
  };
  const removeDialog=()=>{
-  if(!editor||!dialog)return;
+  if(!editor||!insertionRef.current)return;
+  const dialog=insertionRef.current.value;
+  insertionRef.current=null;
   if(dialog.kind==='link'){
    editor.chain().focus().setTextSelection({from:dialog.from,to:dialog.to}).unsetLink().run();
   }else if(dialog.kind==='image'){
@@ -422,23 +456,26 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   }
   setDialog(null);
  };
+ const closePanel=()=>{
+  const insertion=insertionRef.current;
+  insertionRef.current=null;setDialog(null);
+  blockPanelRef.current=null;attributeNodeRef.current=null;
+  setAttributeNodePos(null);setBlockPanelPos(null);
+  if(editor&&insertion){
+   const selection=insertion.selection.resolve(editor.state.doc);
+   editor.chain().command(({tr})=>{tr.setSelection(selection);return true;}).focus().run();
+  }
+ };
  const editTableCaption=()=>{
   if(!editor)return;
-  const attrs=editor.getAttributes('table');
-  setTableCaptionDraft(String(attrs.caption??''));
-  setTableIdDraft(String(attrs.tableId??''));
-  setTableCaptionOpen(true);
- };
- const applyTableCaption=()=>{
-  if(!editor)return;
-  const tableId=tableIdDraft.trim().toLowerCase(),caption=cleanTableCaption(tableCaptionDraft);
-  if((tableId&&!safeTableId(tableId))||Boolean(tableId)!==Boolean(caption))return;
-  const attrs=editor.getAttributes('table');
-  if(String(attrs.tableId??'')===tableId&&String(attrs.caption??'')===caption){setTableCaptionOpen(false);return;}
-  const chain=editor.chain().focus();
-  if(lastCellPos.current!==null)chain.setTextSelection(lastCellPos.current);
-  chain.updateAttributes('table',{tableId:tableId||null,caption}).run();
-  setTableCaptionOpen(false);
+  const position=lastCellPos.current??editor.state.selection.from;
+  const resolved=editor.state.doc.resolve(position);
+  for(let depth=resolved.depth;depth>0;depth--){
+   if(resolved.node(depth).type.name==='table'){
+    editor.view.dom.dispatchEvent(new CustomEvent('rmd-edit-attrs',{detail:{pos:resolved.before(depth)}}));
+    return;
+   }
+  }
  };
  const tableCommand=(name:'addRowBefore'|'addRowAfter'|'deleteRow'|'addColumnBefore'|'addColumnAfter'|'deleteColumn')=>{
   if(!editor)return;
@@ -557,16 +594,18 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
     moreInlineItems:buildMoreInlineItems(editor,active,runCapturedInline,runInlineFromMenu),touchToolbar})
   :null;
  const editBlock=(pos:number)=>{
-  const target=editableBlockAt(editor,pos);
+  const target=blockEditorTargetAt(editor,pos);
   if(!target)return;
   blockPanelRef.current={pos,node:target.node};
   attributeNodeRef.current=isRmdAttrsEditable(target.node.type.name)?{pos,type:target.node.type.name}:null;
   setAttributeNodePos(attributeNodeRef.current?.pos??null);
   setPanelOpenCycle(n=>n+1);
+  insertionRef.current=null;
+  setDialog(null);
   setBlockPanelPos(pos);
  };
  const touchBlock=touchToolbar?editableBlockFromDocumentPosition(editor,active?.position??editor.state.selection.from):null;
- const touchBlockPos=touchBlock&&isExplicitRmdBlock(editor,touchBlock.pos)?touchBlock.pos:null;
+ const touchBlockPos=touchBlock?.pos??null;
  const openInsertMenu=(targetPos?:number,point?:{x:number;y:number})=>{
   setInlinePopup(null);
   const surface=surfaceRef.current;
@@ -586,13 +625,13 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
    offset:above?bounds.bottom-y+8:y-bounds.top+8,
    left:Math.max(0,Math.min(x-bounds.left,bounds.width-SLASH_MENU_WIDTH))});
  };
- return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null?'true':'false'}>
+ return <div className="rk-editor-block-workspace" data-panel-open={blockPanelPos!==null||dialog!==null?'true':'false'}>
   <div className="rk-editor-block-canvas">
   <div className="wysiwyg" ref={surfaceRef} onClickCapture={event=>{
   const target=event.target;
   if(!(target instanceof Element))return;
   const cell=target.closest('.tiptap td, .tiptap th') as HTMLTableCellElement|null;
-  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;setTableCaptionOpen(false);requestAnimationFrame(()=>setTableTarget(false));}return;}
+  if(!cell){if(target.closest('.tiptap')){lastColumn.current=null;requestAnimationFrame(()=>setTableTarget(false));}return;}
   const row=cell.parentElement as HTMLTableRowElement;
   lastColumn.current=Array.from(row.cells).slice(0,cell.cellIndex).reduce((count,sibling)=>count+Math.max(1,sibling.colSpan),0);
   lastCellPos.current=editor.view.posAtDOM(cell,0);
@@ -633,10 +672,8 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
       </div>}
    </div>
   </BubbleMenu>}
-  {(tableTarget||(active?.table&&active.focused)||tableCaptionOpen)&&<EditorTableControls editor={editor} active={active} tableTarget={tableTarget} tableToolbarTop={tableToolbarTop}
-   tableCaptionOpen={tableCaptionOpen} tableCaptionDraft={tableCaptionDraft} tableIdDraft={tableIdDraft}
-   column={lastColumn.current} onTableCaptionDraftChange={setTableCaptionDraft} onTableIdDraftChange={setTableIdDraft}
-   onCloseCaption={()=>setTableCaptionOpen(false)} applyTableCaption={applyTableCaption} editTableCaption={editTableCaption}
+  {(tableTarget||(active?.table&&active.focused))&&<EditorTableControls editor={editor} active={active} tableTarget={tableTarget} tableToolbarTop={tableToolbarTop}
+   column={lastColumn.current} editTableCaption={editTableCaption}
    tableCommand={tableCommand} action={action}/>}
   {!finePointer?<EditorContent editor={editor}/>:<EditorContextMenu editor={editor} onEditBlock={editBlock}
    onEditLink={openLink} onInsert={(pos,point)=>openInsertMenu(pos,point)}><EditorContent editor={editor}/></EditorContextMenu>}
@@ -644,15 +681,15 @@ const VisualEditor=React.forwardRef<VisualEditorHandle,{value:string;onChange:(v
   <EditorCompletions slash={slash} slashItems={slashItems} slashGroups={slashGroups} slashListRef={slashListRef}
    setSlash={setSlash} onRunSlash={command=>runSlashRef.current(command)} wiki={wiki} wikiMatches={wikiMatches}
    wikiFetching={wikiSearch.isFetching} setWiki={setWiki} onChooseWiki={hit=>chooseWikiRef.current(hit)}/>
-  {dialog&&<EditorInsertDialog key={dialog.kind+'-'+(dialog.kind==='math'?dialog.position??'new':dialog.kind==='link'?dialog.from:'image')} value={dialog} onClose={()=>setDialog(null)} onApply={applyDialog} onRemove={removeDialog}/>}
+
  </div>
  </div>
  <EditorInlinePopup popup={inlinePopup} onEnter={finePointer?cancelPopupClose:()=>{}} onLeave={finePointer?schedulePopupClose:()=>{}}
   onPreview={kind=>applyHoverPreview(kind)}
   onChoose={item=>{applyHoverPreview(null);cancelPopupClose();setInlinePopup(null);if(!item.disabled)item.run();}}/>
- {blockPanelPos!==null&&createPortal(
-  <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos} attributePos={attributeNodePos} recordId={recordId}
-   onClose={()=>{blockPanelRef.current=null;attributeNodeRef.current=null;setAttributeNodePos(null);setBlockPanelPos(null);}}/>,document.body)}
+ {(blockPanelPos!==null||dialog!==null)&&createPortal(
+  <BlockEditorPanel key={panelOpenCycle} editor={editor} pos={blockPanelPos??0} insertion={dialog?{value:dialog,onApply:applyDialog,onRemove:removeDialog}:undefined} attributePos={attributeNodePos} recordId={recordId}
+   onClose={closePanel}/>,document.body)}
  </div>;
 });
 // Draft changes still render normally. Character-count replies and surrounding

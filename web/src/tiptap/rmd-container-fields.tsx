@@ -30,7 +30,10 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
   const changed=Object.fromEntries(fields.filter(field=>lastCanonical.current[field]!==canonical[field])
    .map(field=>[field,canonical[field]]));
   lastCanonical.current=canonical;
-  if(Object.keys(changed).length)setInputs(previous=>({...previous,...changed}));
+  if(Object.keys(changed).length){
+   setInputs(previous=>({...previous,...changed}));
+   setErrors(previous=>({...previous,...Object.fromEntries(Object.keys(changed).map(field=>[field,'']))}));
+  }
  },[node,kind]);
  if(!fields.length)return null;
  const set=(field:RichContainerField,raw:string)=>{
@@ -53,6 +56,7 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
   stroke:'笔画宽度（0.5–6）',padding:'内边距（0–24）',
   roughness:'手绘粗糙度（0–3）',opacity:'荧光笔透明度（0.1–0.85）'
  };
+ const ranges:Record<string,{min:number;max:number;step:number;value:number}>={stroke:{min:.5,max:6,step:.1,value:2},padding:{min:0,max:24,step:.5,value:['circle','box','bracket'].includes(kind)?5:3},roughness:{min:0,max:3,step:.1,value:1},opacity:{min:.1,max:.85,step:.01,value:.42}};
  return <section className="rk-block-schema-attrs" aria-label={sketch?'手绘块样式':'容器属性'}>
   <strong>{sketch?'手绘标记样式':'容器属性'}</strong>
   {sketch&&<p className="rk-block-panel-help">修改即时更新图形与源码。留空代表 RMD 默认参数，不产生冗余属性。</p>}
@@ -74,6 +78,10 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
    {errors.sender&&<p className="rk-block-panel-error" role="alert">{errors.sender}</p>}
   </div>}
   {fields.includes('color')&&<div className="rk-block-schema-field">
+   <div className="rk-block-color-palette" role="group" aria-label="笔迹颜色快捷选择">
+    {RMD_COLORS.map(value=><button key={value} type="button" aria-label={'使用'+value+'颜色'} aria-pressed={actualColor===value}
+     onClick={()=>set('color',value)}><span style={{background:SKETCH_PALETTE[value as keyof typeof SKETCH_PALETTE]}}/></button>)}
+   </div>
    <Selector label="笔迹颜色" width="100%" value={inputs.color??''}
     options={[{value:'',label:'默认颜色（'+SKETCH_DEFAULT_COLORS[kind as keyof typeof SKETCH_DEFAULT_COLORS]+'）'},
      ...RMD_COLORS.map(color=>({value:color,label:color}))]}
@@ -86,6 +94,12 @@ export function RmdContainerAttributeFields({editor,pos,node,onApply}:{
   {numericFields.map(field=><div className="rk-block-schema-field" key={field}>
    <TextInput width="100%" label={labels[field]??field} value={inputs[field]??''}
     onChange={raw=>set(field,raw)} placeholder="默认"/>
+   <div className="rk-block-sketch-range">
+    <input type="range" aria-label={'调整'+labels[field]} min={ranges[field].min} max={ranges[field].max} step={ranges[field].step}
+     value={Number.isFinite(Number(inputs[field]))&&inputs[field]!==''?Number(inputs[field]):ranges[field].value}
+     onChange={event=>set(field,event.target.value)}/>
+    <button type="button" onClick={()=>set(field,'')} aria-label={'重置'+labels[field]}>恢复默认</button>
+   </div>
    {errors[field]&&<p className="rk-block-panel-error" role="alert">{errors[field]}</p>}
   </div>)}
  </section>;
