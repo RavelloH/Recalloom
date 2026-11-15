@@ -16,8 +16,7 @@ import {useConfirmDialog} from '../confirm-dialog';
 import {isLogoutNavigationApproved,setActiveEditorDirty} from '../session-drafts';
 import {sharedTitleAttributes} from '../shared-view-transition';
 import {ErrorText,ago} from '../pages/shared';
-import {findTaskItemInCache,taskItemQuery,statusLabels,taskStatuses,type TaskItem,type TaskList,type TaskListsPage,type TaskStatus} from './data';
-import type {Paged} from '../types';
+import {findTaskItemInCache,taskItemQuery,statusLabels,taskStatuses,type TaskItem,type TaskItemsPage,type TaskList,type TaskListsPage,type TaskStatus} from './data';
 import type {TaskActions} from './actions';
 import {TaskStatusIcon} from './items';
 import {hydrateTaskEditor,taskEditorChanges,taskEditorDirty,taskEditorDraft,taskItemFromMutation,type TaskEditorDraft} from './editor-state';
@@ -36,7 +35,7 @@ export function taskEditorKey(selection:TaskSelection){
 async function orderAnchor(item:TaskItem,direction:'up'|'down'){
  let cursor:string|null=null,previous:string|null=null,found=false,following=0;
  do{
-  const page=await api<Paged<TaskItem>>('/tasks/view?'+queryString({recordId:item.recordId,statuses:item.status,limit:200,cursor}));
+  const page=await api<TaskItemsPage>('/tasks/view?'+queryString({recordId:item.recordId,statuses:item.status,order:'board',limit:200,cursor}));
   for(const task of page.items){
    if(task.id===item.id){if(direction==='up')return previous===null?undefined:previous;found=true;continue;}
    if(found&&++following===2)return task.id;
@@ -95,7 +94,7 @@ function TaskEditorForm({item,selection,lists,fixedRecordId,actions,detailsPendi
     const result=await actions.write({action:'update',taskId:base.id,recordId:base.recordId,expectedRevision:base.list.revision,changes});
     const updated=result.tasks.find(task=>task.id===base.id);
     if(!updated)throw new Error('任务已保存，但响应中没有更新后的任务。');
-    const saved=taskItemFromMutation(updated,result.tasks,base.list,result.revision);
+    const saved=taskItemFromMutation(updated,result.tasks,base.list,result.revision,undefined,result.boardOrder,base);
     setBase(saved);setDraft(taskEditorDraft(saved));detailsTouched.current=false;setNotice('已保存');onSaved(saved);
    }else{
     let list=(createdList?.id===listId?createdList:undefined)??lists.find(list=>list.id===listId)??(selection.id===null&&selection.list?.id===listId?selection.list:undefined);
@@ -108,7 +107,7 @@ function TaskEditorForm({item,selection,lists,fixedRecordId,actions,detailsPendi
     const result=await actions.write({action:'add',recordId:list.id,expectedRevision:list.revision,changes:{...draft,title:draft.title.trim()}});
     const created=result.tasks.at(-1);
     if(!created)throw new Error('任务已保存，但响应中没有新任务。');
-    onSaved(taskItemFromMutation(created,result.tasks,list,result.revision));
+    onSaved(taskItemFromMutation(created,result.tasks,list,result.revision,undefined,result.boardOrder));
    }
   }catch(error){setError(error);}finally{setBusy(false);}
  };

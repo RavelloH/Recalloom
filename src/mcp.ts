@@ -5,6 +5,8 @@ import { StorageError } from './types.js';
 import * as store from './storage.js';
 import * as lifecycle from './lifecycle.js';
 import * as agent from './agent-tools.js';
+import {queryTasks,readTasks} from './storage/tasks.js';
+import {mutateTasks} from './storage/task-mutations.js';
 import { processIndexJobs, search } from './search.js';
 import {processVectorDeleteJobs} from './lifecycle.js';
 import {recordRelations,graphView} from './graph.js';
@@ -19,9 +21,27 @@ const expectedMetadataRevision=z.number().int().positive().describe('Current met
 const statuses=z.enum(['draft','active','completed','superseded','archived']);
 const taskStatuses=z.enum(['todo','in_progress','blocked','done','cancelled']);
 const taskFields=z.object({
-  title:z.string().max(500).describe('Task title; required for add.').optional(),details:z.string().max(50000).describe('Task details, acceptance criteria and progress evidence.').optional(),
-  status:taskStatuses.describe('Current task workflow state.').optional(),priority:z.number().int().min(-10).max(10).describe('Priority: larger numbers are more urgent.').optional()
+  title:z.string().trim().min(1).max(500).optional(),details:z.string().max(50000).describe('Task details, acceptance criteria and progress evidence.').optional(),
+  status:taskStatuses.describe('Current task workflow state.').optional()
 }).strict();
+const taskScope=z.object({recordId:uuid.optional(),status:taskStatuses.optional()}).strict();
+const taskRef=z.string().min(1).max(100).describe('Existing task UUID, or the clientId of a create earlier in this batch.');
+const taskMutation=z.discriminatedUnion('op',[
+  z.object({op:z.literal('create'),recordId:uuid,title:z.string().trim().min(1).max(500),details:z.string().max(50000).optional(),status:taskStatuses.optional(),clientId:z.string().min(1).max(100).optional()}).strict(),
+  z.object({op:z.literal('update'),taskId:taskRef,changes:taskFields.refine(x=>Object.keys(x).length>0,'Provide at least one changed field')}).strict(),
+  z.object({op:z.literal('delete'),taskId:taskRef}).strict(),
+  z.object({op:z.literal('place'),taskId:taskRef,beforeTaskId:taskRef.nullable().describe('Place before this task in the global order. null means the end of scope; an empty scope appends globally.'),scope:taskScope.optional()}).strict(),
+  z.object({op:z.literal('transfer'),taskId:taskRef,targetRecordId:uuid.describe('New owning task-list UUID. Preserves the task UUID and global order.')}).strict()
+]);
+// Legacy priority and JSON array positions are internal historical fields.
+const taskResult=(value:unknown):unknown=>{
+  if(Array.isArray(value))return value.map(taskResult);
+  if(!value||typeof value!=='object')return value;
+  const row=value as Record<string,unknown>;
+  return Object.fromEntries(Object.entries(row)
+    .filter(([key])=>key!=='priority'&&!(key==='position'&&'boardPosition'in row))
+    .map(([key,item])=>[key==='boardPosition'?'position':key,taskResult(item)]));
+};
 const editSchema=z.object({
   id:uuid,expectedRevision,
   mode:z.enum(['rewrite','append','replace','replace_many','patch','lines']).describe('Choose full rewrite, append, exact replacement, unified patch, or positional line edits.'),
@@ -67,7 +87,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
       description:guidance.description,
       inputSchema:schema as any,
       // Tool annotations are advisory. Auth scope checks and revision controls remain authoritative.
-      annotations:{readOnlyHint:!write,destructiveHint:write&&guidance.destructive,idempotentHint:!write}
+      annotations:{readOnlyHint:!write,destructiveHint:write&&guidance.destructive,idempotentHint:!write||name==='mutate_tasks'}
     },async (raw:any)=>{
       try {
         if(!scopes.includes('notes:read')||(write&&!scopes.includes('notes:write')))
@@ -78,8 +98,8 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
       }catch(error) {
         const message=error instanceof Error?error.message:String(error);
         const code=error instanceof StorageError?error.code:error instanceof z.ZodError?'INVALID_ARGUMENT':/PATH_CONFLICT|UNIQUE constraint failed: (?:records|folders)\./.test(message)?'PATH_CONFLICT':/FOREIGN KEY constraint failed/.test(message)?'REFERENTIAL_CONFLICT':'OPERATION_FAILED';
-        const retryable=['VERSION_CONFLICT','METADATA_CONFLICT','SNAPSHOT_CHANGED'].includes(code);
-        const details=error instanceof z.ZodError?error.issues.map(issue=>({path:issue.path.join('.'),message:issue.message})):undefined;
+        const retryable=['VERSION_CONFLICT','METADATA_CONFLICT','TASK_ORDER_CONFLICT','ORDER_VERSION_CONFLICT','SNAPSHOT_CHANGED'].includes(code);
+        const details=error instanceof z.ZodError?error.issues.map(issue=>({path:issue.path.join('.'),message:issue.message})):error instanceof StorageError?error.details:undefined;
         const body={code,message,retryable,...(details?{details}:{})};
         return {content:[{type:'text' as const,text:JSON.stringify(body)}],structuredContent:body,isError:true};
       }
@@ -139,18 +159,19 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   }),true,(x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor));
   register('tag_record',z.object({id:uuid,tag:z.string().min(1).max(64),action:z.enum(['add','remove'])}),true,
     (x)=>store.tagRecord(env,x.id,x.tag,x.action,actor));
-  register('list_tasks',z.object({
-    recordId:uuid.describe('Task-list record UUID; omit for all active task lists.').optional(),status:taskStatuses.describe('Task status filter.').optional(),limit,cursor:pageCursor
-  }),false,(x)=>store.getTasks(env,x.recordId,x.status,x.limit,x.cursor));
-  register('mutate_task',z.object({
-    action:z.enum(['add','update','remove','reorder']).describe('Add, update, remove, or reorder a task within its owning list.'),recordId:uuid,taskId:uuid.describe('Task UUID, required for update/remove/reorder; omit for add.').optional(),
-    expectedRevision,changes:taskFields.optional(),beforeTaskId:uuid.nullable().describe('Reorder only: same-list anchor UUID; null places the task at the end. changes.status may change its board column in this same revision.').optional()
-  }).strict().superRefine((v,ctx)=>{
-    if(v.action==='add'&&!v.changes?.title?.trim())ctx.addIssue({code:'custom',path:['changes','title'],message:'Required for add'});
-    if(v.action!=='add'&&!v.taskId)ctx.addIssue({code:'custom',path:['taskId'],message:'Required for update/remove/reorder'});
-    if(v.action==='reorder'&&v.beforeTaskId===undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Required for reorder; null means end of list'});
-    if(v.action!=='reorder'&&v.beforeTaskId!==undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Only allowed for reorder'});
-  }),true,(x)=>store.taskOperation(env,x.recordId,x.expectedRevision,x.action,x.taskId,x.changes??{},actor,x.action==='reorder'?{beforeTaskId:x.beforeTaskId!}:undefined));
+  register('query_tasks',z.object({
+    recordId:uuid.optional(),folderId:uuid.describe('Folder subtree; cannot be combined with recordId.').optional(),query:z.string().max(200).optional(),
+    statuses:z.array(taskStatuses).max(5).describe('Selected workflow states; omitted means all five, [] means none.').optional(),
+    order:z.enum(['manual','updated']).describe('Default manual: the same global order used by every task view. updated sorts by most recently edited.').optional(),limit,cursor:pageCursor
+  }).strict().refine(x=>!(x.recordId&&x.folderId),'Choose recordId or folderId'),false,async(x)=>taskResult(await queryTasks(env,x)));
+  register('read_tasks',z.object({ids:z.array(uuid).min(1).max(100).describe('Exact task UUIDs; returns full details, owner metadata, revisions and the current order version. Missing IDs are reported separately.')}).strict(),false,
+    async(x)=>taskResult(await readTasks(env,x.ids)));
+  register('mutate_tasks',z.object({
+    requestId:z.string().min(1).max(100).describe('Unique idempotency key. Retrying identical input returns its original result; never reuse it for different input.'),
+    expectedRevisions:z.record(z.string().uuid(),z.number().int().positive()).describe('Current content revisions for all involved task lists, including source, placement anchors/scopes, and both owners of a transfer. Pure place operations do not create content revisions.'),
+    expectedOrderVersion:z.number().int().nonnegative().describe('Current orderVersion from query_tasks/read_tasks. Required for placement; conflicts apply nothing.').optional(),
+    operations:z.array(taskMutation).min(1).max(50).describe('Sequential operations applied in one atomic transaction. A content-changing list receives one revision for the entire batch.')
+  }).strict(),true,async(x)=>taskResult(await mutateTasks(env,x,actor)));
   register('version_history',z.object({id:uuid,limit,cursor:z.number().int().positive().describe('Older revision from page.nextCursor; omit for latest revisions.').optional()}),false,
     (x)=>store.listVersions(env,x.id,x.limit,x.cursor));
   register('restore_record',z.object({id:uuid,targetRevision:z.number().int().positive().describe('Historical revision to restore as a new current revision.'),expectedRevision}),true,
@@ -201,7 +222,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     z.object({cursor:z.string().nullable().describe('Export page.nextCursor from the previous page; omit to start.').optional(),limit:z.number().int().min(1).max(5).describe('Maximum record entries in a backup page.').optional()}),false,
     (x)=>agent.exportSnapshot(env,x.cursor??null,x.limit));
   register('import_snapshot',
-    z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v2 object shaped {pages:[...all pages...]}; not a single page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()}),true,
+    z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v3 object shaped {pages:[...all pages...]}; v2 bundles remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()}),true,
     (x)=>agent.importSnapshot(env,x.bundle,x.dryRun??true,actor));
   return mcp;
 }

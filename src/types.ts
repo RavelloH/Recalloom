@@ -65,5 +65,5 @@ export type EditInput =
   | { mode: 'lines'; operations: Array<{action: 'insert' | 'replace' | 'delete'; start: number; end?: number; content?: string}> };
 
 export class StorageError extends Error {
-  constructor(public code: string, message = code) { super(message); this.name = 'StorageError'; }
+  constructor(public code:string,message=code,public details?:unknown){super(message);this.name='StorageError';}
 }

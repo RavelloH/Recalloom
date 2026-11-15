@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {getTaskLists,getTaskView,getTaskItem,getTasks,taskOperation} from '../src/storage/tasks.js';
+import {mutateTasks} from '../src/storage/task-mutations.js';
 import {getRecord} from '../src/storage/record-core.js';
 import {commitContent,restoreRecord} from '../src/storage/record-revisions.js';
+import {updateMeta} from '../src/storage/record-metadata.js';
 import {initialVersion,sha256} from '../src/version.js';
 import {webApi} from '../src/web-api.js';
 import {webHmacHex} from '../src/web-keys.js';
@@ -53,8 +55,7 @@ function fixture(){
     db.prepare("INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,1,?,'Created','test','2026-11-15')").run(id,digest);
     tasks.forEach((t,position)=>db.prepare('INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at) VALUES(?,?,?,?,?,?,?,?)')
       .run(t.id,id,t.title,t.details,t.status,t.priority,position,'2026-11-15'));
-    const boardTasks=manual?tasks:tasks.map((item,position)=>({item,position})).sort((a,b)=>b.item.priority-a.item.priority||a.position-b.position).map(x=>x.item);
-    boardTasks.forEach(item=>db.prepare('INSERT INTO task_board_order(task_id,record_id,position) SELECT ?,?,COALESCE(MAX(position),0)+1024 FROM task_board_order').run(item.id,id));
+    tasks.forEach(item=>db.prepare('INSERT INTO task_board_order(task_id,record_id,position) SELECT ?,?,COALESCE(MAX(position),0)+1024 FROM task_board_order').run(item.id,id));
     return id;
   };
   const request=async(path:string,body?:unknown)=>{
@@ -160,14 +161,14 @@ test('global board order crosses task lists without changing ownership or canoni
   assert.equal((await getRecord(f.env,first)).content,before);
   assert.equal((await getTaskItem(f.env,a.id)).item.recordId,first);
   assert.deepEqual((await getTaskView(f.env,{statuses:['todo'],order:'board'})).items.map(item=>item.id),[c.id,b.id,a.id,d.id]);
-  assert.deepEqual((await getTaskView(f.env,{recordId:first})).items.map(item=>item.id),[a.id,c.id]);
+  assert.deepEqual((await getTaskView(f.env,{recordId:first})).items.map(item=>item.id),[c.id,a.id]);
   const page1=await getTaskView(f.env,{statuses:['todo'],order:'board',limit:2});
   const page2=await getTaskView(f.env,{statuses:['todo'],order:'board',limit:2,cursor:page1.page.nextCursor!});
   assert.deepEqual([...page1.items,...page2.items].map(item=>item.id),[c.id,b.id,a.id,d.id]);
   assert.equal(new Set([...page1.items,...page2.items].map(item=>item.boardPosition)).size,4);
   assert.equal(second,(await getTaskItem(f.env,d.id)).item.recordId);
   const canonical=await taskOperation(f.env,first,1,'reorder',c.id,{},'test',{beforeTaskId:a.id});
-  assert.equal(canonical.revision,2);
+  assert.equal(canonical.revision,1);
   assert.deepEqual((await getTaskView(f.env,{statuses:['todo'],order:'board'})).items.map(item=>item.id),[b.id,c.id,a.id,d.id]);
 });
 
@@ -196,18 +197,18 @@ test('board batch guards reject gap, anchor and revision races after the rank pl
   const contenderRank=(f.db.prepare('SELECT position FROM task_board_order WHERE task_id=?').get(contender.id) as {position:number}).position;
   const originalBatch=f.env.DB.batch.bind(f.env.DB);let raced=false;
   (f.env.DB as any).batch=async(statements:D1PreparedStatement[])=>{
-    if(!raced){raced=true;f.db.prepare('UPDATE task_board_order SET position=? WHERE task_id=?').run(anchorRank-512,contender.id);}
+    if(!raced){raced=true;f.db.prepare('UPDATE task_board_order SET position=? WHERE task_id=?').run(anchorRank-512,contender.id);f.db.exec('UPDATE task_order_state SET version=version+1 WHERE id=1');}
     return originalBatch(statements);
   };
-  await assert.rejects(taskOperation(f.env,first,1,'board_reorder',source.id,{status:'in_progress'},'test',{beforeTaskId:anchor.id}),code('TASK_ORDER_CONFLICT'));
+  await assert.rejects(taskOperation(f.env,first,1,'board_reorder',source.id,{status:'in_progress'},'test',{beforeTaskId:anchor.id}),code('ORDER_VERSION_CONFLICT'));
   assert.equal((f.db.prepare('SELECT position FROM task_board_order WHERE task_id=?').get(source.id) as {position:number}).position,sourceRank);
 
   f.db.prepare('UPDATE task_board_order SET position=? WHERE task_id=?').run(contenderRank,contender.id);raced=false;
   (f.env.DB as any).batch=async(statements:D1PreparedStatement[])=>{
-    if(!raced){raced=true;f.db.prepare("UPDATE tasks SET status='done' WHERE id=?").run(anchor.id);}
+    if(!raced){raced=true;f.db.prepare("UPDATE tasks SET status='done' WHERE id=?").run(anchor.id);f.db.exec('UPDATE task_order_state SET version=version+1 WHERE id=1');}
     return originalBatch(statements);
   };
-  await assert.rejects(taskOperation(f.env,first,1,'board_reorder',source.id,{status:'in_progress'},'test',{beforeTaskId:anchor.id}),code('TASK_ORDER_CONFLICT'));
+  await assert.rejects(taskOperation(f.env,first,1,'board_reorder',source.id,{status:'in_progress'},'test',{beforeTaskId:anchor.id}),code('ORDER_VERSION_CONFLICT'));
   assert.equal((await getRecord(f.env,first)).revision,1);
   assert.equal((await getTaskItem(f.env,source.id)).item.status,'todo');
   assert.equal((f.db.prepare('SELECT position FROM task_board_order WHERE task_id=?').get(source.id) as {position:number}).position,sourceRank);
@@ -240,23 +241,86 @@ test('board rank precision exhaustion rebalances the target status and reports i
   assert.ok(ranks.every((row,index)=>index===0||row.position>ranks[index-1]!.position));
 });
 
-test('reorder freezes legacy priority order, changes status atomically and survives edits and history restore',async(t)=>{
+test('legacy pure reorder checks the content revision inside its rank transaction',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const first=task('First'),second=task('Second');const id=await f.list('Race',[first,second]);
+  const originalRank=(f.db.prepare('SELECT position FROM task_board_order WHERE task_id=?').get(first.id) as {position:number}).position;
+  const originalBatch=f.env.DB.batch.bind(f.env.DB);let raced=false;
+  const racingBatch=async(statements:D1PreparedStatement[])=>{
+    if(!raced){
+      raced=true;(f.env.DB as any).batch=originalBatch;
+      try{
+        const row=await getRecord(f.env,id),parsed=JSON.parse(row.content) as {tasks:Task[]};
+        parsed.tasks[1]={...parsed.tasks[1]!,title:'Concurrent title'};
+        await commitContent(f.env,row,JSON.stringify(parsed,null,2),1,'Concurrent edit','test',parsed.tasks);
+      }finally{(f.env.DB as any).batch=racingBatch;}
+    }
+    return originalBatch(statements);
+  };
+  (f.env.DB as any).batch=racingBatch;
+  await assert.rejects(taskOperation(f.env,id,1,'reorder',first.id,{},'test',{beforeTaskId:null}),code('VERSION_CONFLICT'));
+  assert.equal((f.db.prepare('SELECT position FROM task_board_order WHERE task_id=?').get(first.id) as {position:number}).position,originalRank);
+});
+
+test('task-list visibility races invalidate rank plans and batch owner snapshots',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const source=task('Source'),anchor=task('Anchor');const first=await f.list('First',[source]),second=await f.list('Second',[anchor]);
+  const before=(await getTaskView(f.env)).orderVersion,originalBatch=f.env.DB.batch.bind(f.env.DB);let raced=false;
+  const archiveAnchor=async(statements:D1PreparedStatement[])=>{
+    if(!raced){
+      raced=true;(f.env.DB as any).batch=originalBatch;
+      try{await updateMeta(f.env,second,{status:'archived',expectedMetadataRevision:1},'test');}
+      finally{(f.env.DB as any).batch=archiveAnchor;}
+    }
+    return originalBatch(statements);
+  };
+  (f.env.DB as any).batch=archiveAnchor;
+  await assert.rejects(taskOperation(f.env,first,1,'board_reorder',source.id,{status:'todo'},'test',{beforeTaskId:anchor.id}),code('ORDER_VERSION_CONFLICT'));
+  assert.equal((await getTaskView(f.env)).orderVersion,before+1);
+
+  const thirdTask=task('Third'),third=await f.list('Third',[thirdTask]);raced=false;let batchCalls=0;
+  const archiveOwner=async(statements:D1PreparedStatement[])=>{
+    batchCalls++;
+    if(!raced&&batchCalls===2){
+      raced=true;(f.env.DB as any).batch=originalBatch;
+      try{await updateMeta(f.env,third,{status:'archived',expectedMetadataRevision:1},'test');}
+      finally{(f.env.DB as any).batch=archiveOwner;}
+    }
+    return originalBatch(statements);
+  };
+  (f.env.DB as any).batch=archiveOwner;
+  await assert.rejects(mutateTasks(f.env,{requestId:'archive-race',expectedRevisions:{[third]:1},operations:[
+    {op:'update',taskId:thirdTask.id,changes:{title:'Must not write archived'}}
+  ]},'test'),code('METADATA_CONFLICT'));
+  assert.equal((await getRecord(f.env,third)).revision,1);
+});
+
+test('independent legacy task creates append concurrently without false path conflicts',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const lists=await Promise.all(Array.from({length:5},(_,index)=>f.list('Concurrent '+index)));
+  const results=await Promise.all(lists.map((id,index)=>taskOperation(f.env,id,1,'add',undefined,{title:'Task '+index},'test')));
+  assert.ok(results.every(result=>result.revision===2));
+  const view=await getTaskView(f.env);
+  assert.equal(view.items.length,5);assert.equal(new Set(view.items.map(item=>item.boardPosition)).size,5);
+});
+
+test('the unified rank ignores legacy priority and survives edits and history restore',async(t)=>{
   const f=fixture();t.after(()=>f.db.close());
   const low=task('Low','todo',-3),high=task('High','todo',8),middle=task('Middle','blocked',2);
   const id=await f.list('Ordering',[low,high,middle]);
-  assert.deepEqual((await getTaskView(f.env,{recordId:id})).items.map(x=>x.id),[high.id,middle.id,low.id]);
+  assert.deepEqual((await getTaskView(f.env,{recordId:id})).items.map(x=>x.id),[low.id,high.id,middle.id]);
   const moved=await taskOperation(f.env,id,1,'reorder',low.id,{status:'in_progress'},'test',{beforeTaskId:middle.id});
-  assert.equal(moved.revision,2);assert.deepEqual(moved.tasks.map(x=>x.id),[high.id,low.id,middle.id]);
-  assert.equal(moved.tasks[1]!.status,'in_progress');
+  assert.equal(moved.revision,2);assert.deepEqual(moved.tasks.map(x=>x.id),[low.id,high.id,middle.id]);
+  assert.equal(moved.tasks[0]!.status,'in_progress');
   assert.deepEqual((await getTaskView(f.env,{statuses:['in_progress'],order:'board'})).items.map(x=>x.id),[low.id]);
-  const saved=JSON.parse((await getRecord(f.env,id)).content);assert.equal(saved.taskOrder,'manual');
-  assert.deepEqual(f.db.prepare('SELECT id,position FROM tasks WHERE record_id=? ORDER BY position').all(id).map(x=>[x.id,x.position]),[[high.id,0],[low.id,1],[middle.id,2]]);
+  const saved=JSON.parse((await getRecord(f.env,id)).content);assert.equal(saved.taskOrder,undefined);
+  assert.deepEqual(f.db.prepare('SELECT id,position FROM tasks WHERE record_id=? ORDER BY position').all(id).map(x=>[x.id,x.position]),[[low.id,0],[high.id,1],[middle.id,2]]);
   await taskOperation(f.env,id,2,'update',middle.id,{title:'Renamed',details:'Keep this',priority:10},'test');
   assert.deepEqual((await getTaskView(f.env,{recordId:id})).items.map(x=>x.id),[high.id,low.id,middle.id]);
   const added=await taskOperation(f.env,id,3,'add',undefined,{title:'New','priority':10},'test');
   assert.equal((await getTaskView(f.env,{recordId:id})).items.at(-1)!.id,added.tasks.at(-1)!.id);
   await restoreRecord(f.env,id,1,4,'test');
-  assert.equal((await getTaskLists(f.env,{recordId:id})).items[0]!.order,'priority');
+  assert.equal((await getTaskLists(f.env,{recordId:id})).items[0]!.order,'manual');
   await restoreRecord(f.env,id,2,5,'test');
   assert.equal((await getTaskLists(f.env,{recordId:id})).items[0]!.order,'manual');
   assert.deepEqual((await getTaskView(f.env,{recordId:id})).items.map(x=>x.id),[high.id,low.id,middle.id]);
@@ -309,21 +373,87 @@ test('manual ordering preserves imported priority values and deleting a task rem
   const f=fixture();t.after(()=>f.db.close());
   const imported=task('Imported','todo',100,'x'.repeat(50001)),normal=task('Normal');const id=await f.list('Compatible',[normal,imported]);
   await taskOperation(f.env,id,1,'reorder',normal.id,{},'test',{beforeTaskId:null});
-  const unchanged=await taskOperation(f.env,id,2,'reorder',normal.id,{},'test',{beforeTaskId:null});
-  assert.equal(unchanged.changed,false);assert.equal(unchanged.revision,2);
-  const removed=await taskOperation(f.env,id,2,'remove',imported.id,{},'test');assert.equal(removed.revision,3);
+  const unchanged=await taskOperation(f.env,id,1,'reorder',normal.id,{},'test',{beforeTaskId:null});
+  assert.equal(unchanged.changed,false);assert.equal(unchanged.revision,1);
+  const removed=await taskOperation(f.env,id,1,'remove',imported.id,{},'test');assert.equal(removed.revision,2);
   assert.equal(f.db.prepare('SELECT task_id FROM task_board_order WHERE task_id=?').get(imported.id),undefined);
   await assert.rejects(getTaskItem(f.env,imported.id),code('TASK_NOT_FOUND'));
-  await restoreRecord(f.env,id,2,3,'test');
+  await restoreRecord(f.env,id,1,2,'test');
   const item=(await getTaskItem(f.env,imported.id)).item;
   assert.ok(Number.isFinite(item.boardPosition));
-  assert.equal(item.priority,100);assert.equal(item.position,0);assert.equal(item.list.order,'manual');
+  assert.equal(item.priority,100);assert.equal(item.position,1);assert.equal(item.list.order,'manual');
   assert.equal(item.details.length,50001,'imported content outside current edit limits is not discarded by a reorder');
 });
 
-test('MCP reorder requires a same-list anchor, rejects stale writes and commits status/order together',async(t)=>{
+test('mutateTasks stages cross-owner projection swaps and keeps retries idempotent',async(t)=>{
   const f=fixture();t.after(()=>f.db.close());
-  const a=task('First'),b=task('Second');const id=await f.list('MCP',[a,b]);
+  const a=task('A'),b=task('B');const first=await f.list('First',[a]),second=await f.list('Second',[b]);
+  const before=await getTaskView(f.env);
+  const input={requestId:'swap-owners',expectedRevisions:{[first]:1,[second]:1},expectedOrderVersion:before.orderVersion,operations:[
+    {op:'update' as const,taskId:b.id,changes:{title:'B updated'}},
+    {op:'transfer' as const,taskId:a.id,targetRecordId:second},
+    {op:'transfer' as const,taskId:b.id,targetRecordId:first}
+  ]};
+  const result=await mutateTasks(f.env,input,'test');
+  assert.deepEqual(result.revisions,{[second]:2,[first]:2});
+  assert.equal(result.orderVersion,before.orderVersion+1);
+  assert.equal((await getTaskItem(f.env,a.id)).item.recordId,second);
+  assert.equal((await getTaskItem(f.env,b.id)).item.recordId,first);
+  assert.equal((await getTaskItem(f.env,b.id)).item.title,'B updated');
+  assert.deepEqual(await mutateTasks(f.env,input,'test'),result);
+  await assert.rejects(mutateTasks(f.env,{...input,operations:[{op:'delete',taskId:a.id}]},'test'),code('IDEMPOTENCY_CONFLICT'));
+
+  const failed={requestId:'partial-failure',expectedRevisions:{[second]:2},operations:[
+    {op:'update' as const,taskId:a.id,changes:{title:'Must roll back'}},
+    {op:'transfer' as const,taskId:a.id,targetRecordId:crypto.randomUUID()}
+  ]};
+  await assert.rejects(mutateTasks(f.env,failed,'test'),code('RECORD_NOT_FOUND'));
+  assert.equal((await getTaskItem(f.env,a.id)).item.title,'A');
+  assert.equal((await getRecord(f.env,second)).revision,2);
+});
+
+test('restoring a historical UUID transferred to another owner returns a task conflict',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const moved=task('Moved');const first=await f.list('First',[moved]),second=await f.list('Second');
+  const orderVersion=(await getTaskView(f.env)).orderVersion;
+  await mutateTasks(f.env,{requestId:'transfer-before-restore',expectedRevisions:{[first]:1,[second]:1},expectedOrderVersion:orderVersion,operations:[
+    {op:'transfer',taskId:moved.id,targetRecordId:second}
+  ]},'test');
+  await assert.rejects(restoreRecord(f.env,first,1,2,'test'),code('TASK_ID_CONFLICT'));
+  assert.equal((await getTaskItem(f.env,moved.id)).item.recordId,second);
+  assert.equal((await getRecord(f.env,first)).revision,2);
+});
+
+test('mutateTasks guards pure placement revisions and task query cursors track content changes',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const a=task('A'),b=task('B');const first=await f.list('First',[a]),second=await f.list('Second',[b]);
+  const page=await getTaskView(f.env,{limit:1,order:'updated'});
+  const titled=await mutateTasks(f.env,{requestId:'title-only',expectedRevisions:{[second]:1},operations:[
+    {op:'update',taskId:b.id,changes:{title:'B renamed'}}
+  ]},'test');
+  assert.equal(titled.orderVersion,page.orderVersion);
+  await assert.rejects(getTaskView(f.env,{limit:1,order:'updated',cursor:page.page.nextCursor!}),code('ORDER_VERSION_CONFLICT'));
+  assert.deepEqual((await getTaskView(f.env,{statuses:[]})).items,[]);
+
+  const current=await getTaskView(f.env);
+  await assert.rejects(mutateTasks(f.env,{requestId:'missing-anchor-owner-version',expectedRevisions:{[first]:1},expectedOrderVersion:current.orderVersion,operations:[
+    {op:'place',taskId:a.id,beforeTaskId:b.id}
+  ]},'test'),code('VERSION_CONFLICT'));
+
+  const originalBatch=f.env.DB.batch.bind(f.env.DB);let raced=false;
+  (f.env.DB as any).batch=async(statements:D1PreparedStatement[])=>{
+    if(!raced){raced=true;f.db.prepare('UPDATE record_contents SET revision=revision+1 WHERE record_id=?').run(first);}
+    return originalBatch(statements);
+  };
+  await assert.rejects(mutateTasks(f.env,{requestId:'place-race',expectedRevisions:{[first]:1,[second]:2},expectedOrderVersion:current.orderVersion,operations:[
+    {op:'place',taskId:a.id,beforeTaskId:b.id}
+  ]},'test'),code('VERSION_CONFLICT'));
+  assert.deepEqual((await getTaskView(f.env)).items.map(item=>item.id),[a.id,b.id]);
+});
+
+test('MCP task tools query, read and atomically transfer/update/place without legacy priority',async(t)=>{
+  const f=fixture();t.after(()=>f.db.close());
+  const a=task('First'),b=task('Second');const first=await f.list('MCP A',[a]),second=await f.list('MCP B',[b]);
   const server=createRecalloomServer(f.env,['notes:read','notes:write'],'task-test');
   const [serverTransport,client]=InMemoryTransport.createLinkedPair();
   const pending=new Map<number,(value:any)=>void>();let sequence=0;
@@ -336,15 +466,34 @@ test('MCP reorder requires a same-list anchor, rejects stale writes and commits 
   try {
     await request('initialize',{protocolVersion:LATEST_PROTOCOL_VERSION,capabilities:{},clientInfo:{name:'tasks-test',version:'1'}});
     await client.send({jsonrpc:'2.0',method:'notifications/initialized'});
-    const base={action:'reorder',recordId:id,taskId:a.id,expectedRevision:1};
-    const invalid=await request('tools/call',{name:'mutate_task',arguments:base});
-    assert.ok(invalid.error||invalid.result?.isError);
-    const moved=await request('tools/call',{name:'mutate_task',arguments:{...base,beforeTaskId:null,changes:{status:'blocked'}}});
+    const queryResponse=await request('tools/call',{name:'query_tasks',arguments:{order:'manual'}});
+    const queried=JSON.parse(queryResponse.result.content[0].text);
+    assert.deepEqual(queried.items.map((item:any)=>item.id),[a.id,b.id]);
+    assert.ok(queried.items.every((item:any)=>!('priority'in item)&&typeof item.position==='number'));
+    const readResponse=await request('tools/call',{name:'read_tasks',arguments:{ids:[b.id,a.id,crypto.randomUUID()]}});
+    const read=JSON.parse(readResponse.result.content[0].text);
+    assert.deepEqual(read.items.map((item:any)=>item.id),[b.id,a.id]);assert.equal(read.missingIds.length,1);
+    assert.ok(read.items.every((item:any)=>!('priority'in item)));
+
+    const mutation={requestId:'mcp-transfer',expectedRevisions:{[first]:1,[second]:1},expectedOrderVersion:queried.orderVersion,operations:[
+      {op:'transfer',taskId:a.id,targetRecordId:second},
+      {op:'update',taskId:a.id,changes:{title:'Moved and done',status:'done'}},
+      {op:'place',taskId:a.id,beforeTaskId:b.id,scope:{recordId:second}}
+    ]};
+    const moved=await request('tools/call',{name:'mutate_tasks',arguments:mutation});
     assert.equal(moved.error,undefined);assert.equal(moved.result.isError,undefined);
     const result=JSON.parse(moved.result.content[0].text);
-    assert.equal(result.revision,2);assert.deepEqual(result.tasks.map((x:Task)=>x.id),[b.id,a.id]);
-    assert.equal(result.tasks[1].status,'blocked');
-    const stale=await request('tools/call',{name:'mutate_task',arguments:{...base,beforeTaskId:b.id}});
-    assert.equal(stale.result.isError,true);assert.equal(JSON.parse(stale.result.content[0].text).code,'VERSION_CONFLICT');
+    assert.deepEqual(result.revisions,{[first]:2,[second]:2});assert.equal(result.orderVersion,queried.orderVersion+1);
+    assert.equal(result.items[0].recordId,second);assert.equal(result.items[0].title,'Moved and done');
+    assert.equal(result.items[0].status,'done');assert.equal(typeof result.items[0].position,'number');assert.equal('priority'in result.items[0],false);
+    const retry=await request('tools/call',{name:'mutate_tasks',arguments:mutation});
+    assert.deepEqual(JSON.parse(retry.result.content[0].text),result);
+
+    const failed=await request('tools/call',{name:'mutate_tasks',arguments:{requestId:'mcp-partial',expectedRevisions:{[second]:2},operations:[
+      {op:'update',taskId:b.id,changes:{title:'Should not persist'}},
+      {op:'transfer',taskId:a.id,targetRecordId:crypto.randomUUID()}
+    ]}});
+    assert.equal(failed.result.isError,true);
+    assert.equal((await getTaskItem(f.env,b.id)).item.title,'Second');assert.equal((await getRecord(f.env,second)).revision,2);
   } finally {await client.close();await server.close();}
 });

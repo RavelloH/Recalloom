@@ -370,9 +370,47 @@
 }
 
 .home-card .recent-entry .activity-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  min-width: 0;
   overflow: hidden;
   overflow-wrap: normal;
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-card .recent-entry .activity-actor,
+.home-card .recent-entry .activity-verb {
+  flex: none;
+}
+
+.home-card .recent-entry .activity-resource {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* The resource link owns the available width. Its transition title keeps an
+   intrinsic box for short names, but may shrink and ellipsize long names. */
+.home-card .recent-entry .activity-resource .rk-shared-text {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-card .recent-entry .activity-resource .rk-shared-extension {
+  flex: none;
+}
+
+.home-card .recent-entry span.activity-resource {
+  display: block;
   text-overflow: ellipsis;
 }
 

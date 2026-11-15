@@ -40,7 +40,7 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
-    assert.equal(tools.length,32);
+    assert.equal(tools.length,33);
     assert.equal(tools.length,Object.keys(TOOL_GUIDANCE).length);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){
@@ -131,9 +131,9 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     }
     assert.match(tool('browse').inputSchema.properties?.cursor?.description??'',/page\.nextCursor/);
     assert.match(tool('edit_record').inputSchema.properties?.expectedRevision?.description??'',/concurrent/);
-    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v2/);
+    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v3/);
     assert.match(tool('read_many').inputSchema.properties?.maxChars?.description??'',/budget/);
-    assert.match(tool('export_snapshot').description,/snapshot-v2/);
+    assert.match(tool('export_snapshot').description,/snapshot-v3/);
     assert.match(tool('import_snapshot').description,/complete/);
     assert.ok(tool('get_overview').description.includes('folder'));
     assert.ok(tool('get_outline').description.includes('heading'));
@@ -141,7 +141,11 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     assert.equal(tool('related_records').annotations?.readOnlyHint,true);
     assert.equal(tool('get_knowledge_graph').annotations?.readOnlyHint,true);
     assert.match(tool('related_records').description,/semantic candidates/);
-    assert.equal(tool('mutate_task').annotations?.destructiveHint,true);
+    assert.equal(tool('mutate_tasks').annotations?.destructiveHint,true);
+    for(const name of ['query_tasks','read_tasks'])assert.equal(tool(name).annotations?.readOnlyHint,true);
+    for(const name of ['requestId','expectedRevisions','operations'])assert.ok(tool('mutate_tasks').inputSchema.required?.includes(name));
+    assert.equal(tools.some(t=>t.name==='mutate_task'||t.name==='list_tasks'),false);
+    assert.equal(tool('query_tasks').inputSchema.properties?.priority,undefined);
     assert.equal(tool('manage_record').annotations?.destructiveHint,true);
     assert.equal(tool('index_pending').annotations?.destructiveHint,false);
     assert.equal(tool('read_record').annotations?.readOnlyHint,true);

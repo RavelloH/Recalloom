@@ -5,9 +5,11 @@ import type {Paged,Task} from '../types';
 export type TaskStatus=Task['status'];
 export type TaskCounts=Record<TaskStatus,number>;
 export type TaskList={id:string;name:string;path:string;folderId:string|null;status:string;revision:number;order:'priority'|'manual';counts:TaskCounts;total:number};
-export type TaskItem=Task&{position:number;boardPosition?:number;updatedAt:string;list:TaskList};
+export type TaskItem=Task&{position:number;boardPosition:number;updatedAt:string;list:TaskList};
 export type TaskScope={recordId?:string;query?:string;order?:'board'};
-export type TaskListsPage=Paged<TaskList>&{counts:TaskCounts};
+export type TaskListsPage=Paged<TaskList>&{counts:TaskCounts;orderVersion:number};
+export type TaskItemsPage=Paged<TaskItem>&{orderVersion:number};
+export type TaskItemResponse={item:TaskItem;orderVersion:number};
 export const taskStatuses:TaskStatus[]=['todo','in_progress','blocked','done','cancelled'];
 export const statusLabels:Record<TaskStatus,string>={todo:'待开始',in_progress:'进行中',blocked:'阻塞',done:'已完成',cancelled:'取消'};
 export const emptyCounts:TaskCounts={todo:0,in_progress:0,blocked:0,done:0,cancelled:0};
@@ -19,17 +21,17 @@ export const taskListPages=(scope:TaskScope={})=>infiniteQueryOptions({
  staleTime:15000
 });
 export const taskPages=(scope:TaskScope,statuses:TaskStatus[])=>infiniteQueryOptions({
- queryKey:['task-workspace','view',scope.recordId??null,scope.query??'',statuses.join(','),scope.order??'list'],
+ queryKey:['task-workspace','view',scope.recordId??null,scope.query??'',statuses.join(','),'board'],
  initialPageParam:null as string|null,
- queryFn:({pageParam,signal})=>api<Paged<TaskItem>>('/tasks/view?'+queryString({...scope,statuses:statuses.join(','),limit:40,cursor:pageParam}),{signal}),
- getNextPageParam:(page:Paged<TaskItem>)=>page.page.nextCursor as string|null,
+ queryFn:({pageParam,signal})=>api<TaskItemsPage>('/tasks/view?'+queryString({...scope,order:'board',statuses:statuses.join(','),limit:40,cursor:pageParam}),{signal}),
+ getNextPageParam:(page:TaskItemsPage)=>page.page.nextCursor as string|null,
  staleTime:15000
 });
-export const taskItemQuery=(id:string)=>queryOptions({queryKey:['task-workspace','item',id],queryFn:({signal})=>api<{item:TaskItem}>('/tasks/'+encodeURIComponent(id),{signal}),staleTime:0});
+export const taskItemQuery=(id:string)=>queryOptions({queryKey:['task-workspace','item',id],queryFn:({signal})=>api<TaskItemResponse>('/tasks/'+encodeURIComponent(id),{signal}),staleTime:0});
 
 /** Reuse list/view metadata while the exact task request fills in current details. */
 export function findTaskItemInCache(queryClient:QueryClient,id:string):TaskItem|undefined{
- const exact=queryClient.getQueryData<{item:TaskItem}>(['task-workspace','item',id]);
+ const exact=queryClient.getQueryData<TaskItemResponse>(['task-workspace','item',id]);
  if(exact?.item)return exact.item;
  for(const [,data] of queryClient.getQueriesData<InfiniteData<Paged<TaskItem>>>({queryKey:['task-workspace','view']})){
   const item=data?.pages.flatMap(page=>page.items).find(candidate=>candidate.id===id);
@@ -39,7 +41,7 @@ export function findTaskItemInCache(queryClient:QueryClient,id:string):TaskItem|
  if(!legacy)return;
  for(const [,data] of queryClient.getQueriesData<InfiniteData<TaskListsPage>>({queryKey:['task-workspace','lists']})){
   const list=data?.pages.flatMap(page=>page.items).find(candidate=>candidate.id===legacy.recordId);
-  if(list)return {...legacy,position:0,updatedAt:'',list};
+  if(list)return {...legacy,position:0,boardPosition:0,updatedAt:'',list};
  }
 }
 

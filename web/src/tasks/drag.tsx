@@ -272,17 +272,16 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
   const current=session.current;if(!current||current.committing)return;
   if(!current.target){cleanup('unchanged');return;}
   current.committing=true;
-  document.body.classList.add('tasks-drag-committing');
-  setAnnouncement('正在保存“'+current.item.title+'”的新位置');
   const target=current.target;
-  void (async()=>{
-   try{
-    if(target.kind==='board')await actionsRef.current.onBoardDrop(target.beforeTaskId,target.status);
-    else if(target.kind==='item')await actionsRef.current.onDrop(target.item);
-    else await actionsRef.current.onColumnDrop(target.status);
-    if(session.current===current)cleanup('success');
-   }catch{if(session.current===current)cleanup('failure');}
-  })();
+  let request:Promise<void>;
+  try{
+   request=target.kind==='board'?actionsRef.current.onBoardDrop(target.beforeTaskId,target.status):
+    target.kind==='item'?actionsRef.current.onDrop(target.item):actionsRef.current.onColumnDrop(target.status);
+  }catch{
+   cleanup('failure');return;
+  }
+  cleanup('success');
+  void request.catch(()=>setAnnouncement('任务移动失败，已恢复原位置'));
  },[cleanup]);
  const cancel=useCallback(()=>cleanup('cancel'),[cleanup]);
 

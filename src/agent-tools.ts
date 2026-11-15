@@ -98,17 +98,19 @@ export async function links(env:Env,id:string,action:'list'|'add'|'remove'='list
   await env.DB.batch([stmt.bind(id,targetId,relation),event]);
   return {id,targetId,relation,changed:true};
 }
-type OverviewCursor={folderId:string|null;depth:number;recordDone:boolean;taskDone:boolean;record?:{rank:number;updatedAt:string;id:string};task?:{priority:number;id:string}};
+type OverviewCursor={folderId:string|null;depth:number;recordDone:boolean;taskDone:boolean;record?:{rank:number;updatedAt:string;id:string};orderVersion?:number;task?:{position:number;id:string}};
 export async function getOverview(env:Env,folderId:string|null=null,depth=2,budget=12000,cursor?:string){
   const maxDepth=Math.min(5,Math.max(0,depth)),maxBudget=Math.min(30000,Math.max(1000,budget));
   if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
-  let state:OverviewCursor={folderId,depth:maxDepth,recordDone:false,taskDone:false};
+  const orderVersion=Number((await env.DB.prepare('SELECT version FROM task_order_state WHERE id=1').first<{version:number}>())?.version??0);
+  let state:OverviewCursor={folderId,depth:maxDepth,recordDone:false,taskDone:false,orderVersion};
   if(cursor){
     try{
       const parsed=JSON.parse(cursor) as OverviewCursor;
       if(parsed.folderId!==folderId||parsed.depth!==maxDepth||typeof parsed.recordDone!=='boolean'||typeof parsed.taskDone!=='boolean')throw Error();
       state=parsed;
     }catch{throw new StorageError('INVALID_CURSOR');}
+    if(state.orderVersion!==orderVersion)throw new StorageError('TASK_ORDER_CONFLICT','Task order changed; restart the overview');
   }
   const tree="WITH RECURSIVE tree(id,depth) AS (SELECT id,CASE WHEN ? IS NULL THEN 1 ELSE 0 END FROM folders WHERE (? IS NULL AND parent_id IS NULL) OR id=? UNION ALL SELECT f.id,t.depth+1 FROM folders f JOIN tree t ON f.parent_id=t.id WHERE t.depth<?) ";
   const membership="((? IS NULL AND r.folder_id IS NULL) OR r.folder_id IN (SELECT id FROM tree))";
@@ -126,9 +128,9 @@ export async function getOverview(env:Env,folderId:string|null=null,depth=2,budg
       " AND (? IS NULL OR "+rank+">? OR ("+rank+"=? AND (r.updated_at<? OR (r.updated_at=? AND r.id>?)))) ORDER BY rank,r.updated_at DESC,r.id LIMIT 81")
         .bind(...args,recCursor?.id??null,recCursor?.rank??0,recCursor?.rank??0,recCursor?.updatedAt??'',recCursor?.updatedAt??'',recCursor?.id??'').all(),
     state.taskDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
-      env.DB.prepare(tree+"SELECT t.id,t.record_id AS recordId,substr(t.title,1,400) AS title,t.status,t.priority FROM tasks t JOIN records r ON r.id=t.record_id WHERE r.status!='archived' AND "+membership+
-      " AND t.status NOT IN ('done','cancelled') AND (? IS NULL OR t.priority<? OR (t.priority=? AND t.id>?)) ORDER BY t.priority DESC,t.id LIMIT 81")
-        .bind(...args,taskCursor?.id??null,taskCursor?.priority??0,taskCursor?.priority??0,taskCursor?.id??'').all()
+      env.DB.prepare(tree+"SELECT t.id,t.record_id AS recordId,substr(t.title,1,400) AS title,t.status,bo.position FROM tasks t JOIN records r ON r.id=t.record_id JOIN task_board_order bo ON bo.task_id=t.id WHERE r.status!='archived' AND "+membership+
+      " AND t.status NOT IN ('done','cancelled') AND (? IS NULL OR bo.position>? OR (bo.position=? AND t.id>?)) ORDER BY bo.position,t.id LIMIT 81")
+        .bind(...args,taskCursor?.id??null,taskCursor?.position??0,taskCursor?.position??0,taskCursor?.id??'').all()
   ]);
   const records:Array<Record<string,unknown>>=[],openTasks:Array<Record<string,unknown>>=[];
   const rs=recRows.results,ts=taskRows.results;
@@ -153,11 +155,11 @@ export async function getOverview(env:Env,folderId:string|null=null,depth=2,budg
   const lastRecord=records.at(-1),lastTask=openTasks.at(-1);
   const recordDone=state.recordDone||records.length===rs.length,taskDone=state.taskDone||openTasks.length===ts.length;
   const next:OverviewCursor={
-    folderId,depth:maxDepth,recordDone,taskDone,
+    folderId,depth:maxDepth,recordDone,taskDone,orderVersion,
     record:lastRecord?{rank:Number(lastRecord.rank),updatedAt:String(lastRecord.updatedAt),id:String(lastRecord.id)}:state.record,
-    task:lastTask?{priority:Number(lastTask.priority),id:String(lastTask.id)}:state.task
+    task:lastTask?{position:Number(lastTask.position),id:String(lastTask.id)}:state.task
   };
   const hasMore=!recordDone||!taskDone;
-  return {folder,folderId,depth:maxDepth,records,openTasks,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null},budgetChars:maxBudget,usedChars:maxBudget-remaining};
+  return {folder,folderId,depth:maxDepth,records,openTasks,orderVersion,page:{hasMore,nextCursor:hasMore?JSON.stringify(next):null},budgetChars:maxBudget,usedChars:maxBudget-remaining};
 }
 export { exportSnapshot, importSnapshot } from './backup.js';

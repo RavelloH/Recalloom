@@ -56,9 +56,11 @@ const requireApi=async(path,method='GET',body,expected=200)=>{
  assert.equal(response.status,expected,path+' '+method+' failed: '+JSON.stringify(response.data).slice(0,500));
  return response.data;
 };
-const taskPath=listId=>'/tasks/view?'+new URLSearchParams({recordId:listId,statuses:'todo,in_progress,blocked,done,cancelled',limit:'20'});
+const allStatuses='todo,in_progress,blocked,done,cancelled';
+const taskPath=listId=>'/tasks/view?'+new URLSearchParams({recordId:listId,statuses:allStatuses,order:'board',limit:'20'});
 const readTasks=async listId=>(await requireApi(taskPath(listId))).items;
 const readBoard=async status=>(await requireApi('/tasks/view?'+new URLSearchParams({query:prefix,statuses:status,order:'board',limit:'100'}))).items;
+const readGlobal=async()=>(await requireApi('/tasks/view?'+new URLSearchParams({query:prefix,statuses:allStatuses,order:'board',limit:'100'}))).items;
 const waitForMutation=()=>page.waitForResponse(response=>new URL(response.url()).pathname==='/api/tasks/mutate'&&
  response.request().method()==='POST',{timeout:10000});
 const waitForDragCleanup=()=>page.waitForFunction(()=>!document.body.classList.contains('tasks-drag-active')&&
@@ -224,7 +226,9 @@ async function beginMouseDrag(sourceId){
  await waitForStableHandle(sourceId);
  await handle.hover();
  await waitForStableHandle(sourceId);
- const bounds=await handle.boundingBox();assert.ok(bounds,'Source drag handle is visible');
+ const settledHandle=page.locator('[data-task-id="'+sourceId+'"] [data-task-drag]').first();
+ await settledHandle.scrollIntoViewIfNeeded();await waitForStableHandle(sourceId);
+ const bounds=await settledHandle.boundingBox();assert.ok(bounds,'Source drag handle is visible');
  await startMotionProbe(sourceId);
  const start={x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
  await page.mouse.move(start.x,start.y);await page.mouse.down();
@@ -245,6 +249,33 @@ async function moveDrag(start,destination){
 
 async function moveHeld(destination){
  await page.mouse.move(destination.x,destination.y,{steps:28});
+}
+
+async function holdNextMutation({failure=false}={}){
+ let releaseGate,captured;
+ const gate=new Promise(resolve=>{releaseGate=resolve;});
+ const capturedRequest=new Promise(resolve=>{captured=resolve;});
+ const request=new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(new Error('Timed out waiting for the held task mutation')),10000);
+  capturedRequest.then(value=>{clearTimeout(timer);resolve(value);},reject);
+ });
+ await page.route('**/api/tasks/mutate',async route=>{
+  const input=route.request().postDataJSON();captured(input);await gate;
+  if(failure){await route.fulfill({status:503,contentType:'application/json',body:'{"error":"DRAG_TEST_FAILURE"}'});return;}
+  await route.fallback();
+ },{times:1});
+ return {request,release:()=>releaseGate()};
+}
+
+async function releaseHeld(destination){
+ await page.mouse.move(destination.x+1,destination.y+1,{steps:2});await page.mouse.up();
+}
+
+async function assertDragTransientCleared(sourceId,label){
+ const state=await page.evaluate(id=>({active:document.body.classList.contains('tasks-drag-active'),
+  committing:document.body.classList.contains('tasks-drag-committing'),preview:Boolean(document.querySelector('.tasks-drag-preview')),
+  slot:Boolean(document.querySelector('.tasks-drop-slot')),floating:Boolean(document.querySelector('[data-task-id="'+CSS.escape(id)+'"][data-task-drag-source], [data-task-id="'+CSS.escape(id)+'"].is-dragging'))}),sourceId);
+ assert.deepEqual(state,{active:false,committing:false,preview:false,slot:false,floating:false},label+' clears all transient drag UI before the response');
 }
 
 async function waitForStableTarget(target){
@@ -280,7 +311,7 @@ async function moveHeldToTarget(target,yRatio){
 
 async function commitHeld(destination){
  const mutation=waitForMutation();
- await page.mouse.move(destination.x+1,destination.y+1,{steps:2});await page.mouse.up();
+ await releaseHeld(destination);
  return mutation;
 }
 
@@ -317,6 +348,11 @@ async function waitForBoardDom(status,expected){
   const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
   return JSON.stringify(actual)===JSON.stringify(expected);
  },{status,expected});
+}
+
+async function waitForBoardCounts(expected){
+ await page.waitForFunction(values=>Object.entries(values).every(([status,count])=>
+  document.querySelector('[data-task-column="'+CSS.escape(status)+'"] .tasks-column-count')?.textContent?.trim()===String(count)),expected);
 }
 
 try{
@@ -491,12 +527,20 @@ try{
  const crossSlot=await liveSlot();assert.equal(crossSlot?.next?.id,doneTarget.id,'Held cross-column drag places slot before the same-list target');
  assert.equal(crossSlot?.status,'done');assert.ok(crossSlot.rect.height>40&&crossSlot.position==='relative','Cross-column slot remains in flow');
  await page.screenshot({path:join(artifactDir,'held-cross-column.png'),fullPage:true});
- const crossMutation=await commitHeld(doneDestination);
- const crossResponse=await crossMutation;assert.ok(crossResponse.ok(),'Foreign cross-column board mutation succeeds');
+ const crossControl=await holdNextMutation(),crossResponsePromise=waitForMutation();
+ await releaseHeld(doneDestination);
+ const pendingCrossRequest=await crossControl.request;
+ assert.equal(pendingCrossRequest.action,'board_reorder');assert.equal(pendingCrossRequest.changes?.status,'done');
+ await waitForDragCleanup();await waitForBoardDom('done',doneExpected);
+ await page.waitForFunction(id=>!document.querySelector('[data-task-column="in_progress"] [data-task-id="'+CSS.escape(id)+'"]')&&
+  Boolean(document.querySelector('[data-task-column="done"] [data-task-id="'+CSS.escape(id)+'"]')),foreignSource.id);
+ await assertDragTransientCleared(foreignSource.id,'Pending cross-column board drop');await stopMotionProbe();
+ crossControl.release();
+ const crossResponse=await crossResponsePromise;assert.ok(crossResponse.ok(),'Foreign cross-column board mutation succeeds');
  const crossRequest=crossResponse.request().postDataJSON(),crossResult=await crossResponse.json();
  assert.equal(crossRequest.action,'board_reorder');assert.equal(crossRequest.changes?.status,'done');
  assert.equal(crossResult.boardOrder?.taskId,foreignSource.id);assert.equal(typeof crossResult.boardOrder?.position,'number');
- await crossResponse.finished();await waitForDragCleanup();await stopMotionProbe();
+ await crossResponse.finished();
  assert.deepEqual((await readBoard('done')).map(task=>task.id),doneExpected,'Foreign cross-column board rank persists at the pointer position');
  await waitForBoardDom('done',doneExpected);
  const inProgressAfterCross=foreignExpected.filter(id=>id!==foreignSource.id);
@@ -576,13 +620,46 @@ try{
  assert.deepEqual((await readBoard('blocked')).map(task=>task.id),blockedExpected,'Mixed board pointer rank persists across records');
  await waitForBoardDom('blocked',blockedExpected);
 
- // List: move the last canonical task before the first and assert the exact
- // API order, in addition to the same live geometry/motion contract.
+ // A rejected cross-column board move must expose its optimistic status and
+ // counts before the response, then restore both columns after the failure.
+ const boardFailureSource=boardSource.id,boardFailureTarget=doneTarget.id;
+ const boardFailureBlockedBefore=(await readBoard('blocked')).map(task=>task.id),boardFailureDoneBefore=(await readBoard('done')).map(task=>task.id);
+ const boardFailureBlockedOptimistic=boardFailureBlockedBefore.filter(id=>id!==boardFailureSource);
+ const boardFailureDoneOptimistic=beforeTarget(boardFailureDoneBefore,boardFailureSource,boardFailureTarget);
+ const boardFailureTargetRow=page.locator('[data-task-column="done"] [data-task-id="'+boardFailureTarget+'"]');
+ await boardFailureTargetRow.scrollIntoViewIfNeeded();await beginMouseDrag(boardFailureSource);
+ const boardFailureDestination=await moveHeldToTarget(boardFailureTargetRow,.2);
+ await page.waitForFunction(targetId=>{
+  const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
+  if(!slot||!target||slot.parentElement?.getAttribute('data-task-drop-status')!=='done')return false;
+  let next=slot.nextElementSibling;while(next&&!next.matches('[data-task-id][data-task-record-id]'))next=next.nextElementSibling;
+  return next===target&&slot.getBoundingClientRect().height>40;
+ },boardFailureTarget);
+ const boardFailureControl=await holdNextMutation({failure:true}),boardFailureResponsePromise=waitForMutation();
+ await releaseHeld(boardFailureDestination);
+ const pendingBoardFailureRequest=await boardFailureControl.request;
+ assert.equal(pendingBoardFailureRequest.action,'board_reorder');assert.equal(pendingBoardFailureRequest.changes?.status,'done');
+ await waitForDragCleanup();await waitForBoardDom('blocked',boardFailureBlockedOptimistic);await waitForBoardDom('done',boardFailureDoneOptimistic);
+ await waitForBoardCounts({blocked:boardFailureBlockedOptimistic.length,done:boardFailureDoneOptimistic.length});
+ await assertDragTransientCleared(boardFailureSource,'Pending rejected board drop');
+ assert.equal(await page.locator('[data-task-workspace]').getByText('操作失败',{exact:true}).count(),0,'Board failure UI waits for the rejected response');
+ await stopMotionProbe();boardFailureControl.release();
+ const boardFailureResponse=await boardFailureResponsePromise;assert.equal(boardFailureResponse.status(),503,'Rejected board drag receives the injected failure');
+ await waitForBoardDom('blocked',boardFailureBlockedBefore);await waitForBoardDom('done',boardFailureDoneBefore);
+ await waitForBoardCounts({blocked:boardFailureBlockedBefore.length,done:boardFailureDoneBefore.length});
+ await page.waitForFunction(()=>document.querySelector('.tasks-drag-live')?.textContent==='任务移动失败，已恢复原位置');
+ await page.locator('[data-task-workspace]').getByText('操作失败',{exact:true}).waitFor();
+ assert.deepEqual((await readBoard('blocked')).map(task=>task.id),boardFailureBlockedBefore,'Rejected board drag restores the source status order');
+ assert.deepEqual((await readBoard('done')).map(task=>task.id),boardFailureDoneBefore,'Rejected board drag restores the destination status order');
+
+ // List: move the last task before the first and assert the optimistic DOM
+ // order before the delayed response, then the shared total order afterward.
  await listMode.click();
  const group=page.locator('[data-task-list-id="'+list.id+'"]');await group.waitFor();
  await page.waitForFunction(id=>document.querySelector('[data-task-list-id="'+CSS.escape(id)+'"]')?.querySelectorAll('[data-task-id]').length===5,list.id);
- const beforeList=await readTasks(list.id),beforeIds=beforeList.map(item=>item.id);
+ const beforeList=await readTasks(list.id),beforeIds=beforeList.map(item=>item.id),beforeGlobal=(await readGlobal()).map(item=>item.id);
  const listSource=beforeIds.at(-1),listTarget=beforeIds[0];assert.ok(listSource&&listTarget&&listSource!==listTarget);
+ const expectedList=[listSource,...beforeIds.filter(id=>id!==listSource)],expectedGlobal=beforeTarget(beforeGlobal,listSource,listTarget);
  const targetRow=group.locator('[data-task-id="'+listTarget+'"]');
  await targetRow.scrollIntoViewIfNeeded();
  const rowBounds=await targetRow.boundingBox();assert.ok(rowBounds,'Target list row is visible');
@@ -593,29 +670,39 @@ try{
   const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
   return slot?.parentElement?.getAttribute('data-task-drop-key')==='list:'+listId&&slot.nextElementSibling===target;
  },{listId:list.id,targetId:listTarget});
- const listResponse=await commitHeld(listDestination);assert.ok(listResponse.ok(),'List drag mutation succeeds');await listResponse.finished();
+ const listControl=await holdNextMutation(),listResponsePromise=waitForMutation();
+ await releaseHeld(listDestination);
+ const pendingListRequest=await listControl.request;assert.equal(pendingListRequest.action,'reorder');
  await waitForDragCleanup();
- const listProbe=await stopMotionProbe();
- assertMotion(listProbe,'List drag',{layout:'row',key:'list:'+list.id});
- const afterListIds=(await readTasks(list.id)).map(item=>item.id);
- assert.deepEqual(afterListIds,[listSource,...beforeIds.filter(id=>id!==listSource)],'List drag persists the exact manual order');
- const listMetadata=await requireApi('/task-lists?'+new URLSearchParams({recordId:list.id}));
- assert.equal(listMetadata.items[0]?.order,'manual','First reorder freezes priority order into manual order');
  await page.waitForFunction(({listId,expected})=>{
   const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
   const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
   return JSON.stringify(actual)===JSON.stringify(expected);
- },{listId:list.id,expected:afterListIds});
+ },{listId:list.id,expected:expectedList});
+ await assertDragTransientCleared(listSource,'Pending list drop');
+ const listProbe=await stopMotionProbe();
+ assertMotion(listProbe,'List drag',{layout:'row',key:'list:'+list.id});
+ listControl.release();
+ const listResponse=await listResponsePromise;assert.ok(listResponse.ok(),'List drag mutation succeeds');await listResponse.finished();
+ const afterListIds=(await readTasks(list.id)).map(item=>item.id);
+ assert.deepEqual(afterListIds,expectedList,'List drag persists the exact record-filtered total order');
+ assert.deepEqual((await readGlobal()).map(item=>item.id),expectedGlobal,'List drag updates the shared global total order');
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:expectedList});
 
  // Releasing after leaving every valid drop container must discard the last
  // valid target and submit no stale move.
  const invalidBefore=(await readTasks(list.id)).map(item=>item.id),invalidRequests=mutationRequests;
  const invalidSource=invalidBefore[2],invalidTarget=invalidBefore[0];
- const invalidTargetBounds=await group.locator('[data-task-id="'+invalidTarget+'"]').boundingBox();assert.ok(invalidTargetBounds);
- const invalidStart=await beginMouseDrag(invalidSource);
- await moveDrag(invalidStart,{x:invalidTargetBounds.x+100,y:invalidTargetBounds.y+invalidTargetBounds.height*.2});
+ const invalidTargetRow=group.locator('[data-task-id="'+invalidTarget+'"]');await invalidTargetRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(invalidSource);await moveHeldToTarget(invalidTargetRow,.2);
  await page.waitForFunction(targetId=>document.querySelector('.tasks-drop-slot')?.nextElementSibling?.getAttribute('data-task-id')===targetId,invalidTarget);
- await page.mouse.move(5,5,{steps:18});await page.waitForTimeout(120);
+ const invalidArea=await page.locator('[data-task-search]').boundingBox();assert.ok(invalidArea,'Task search is a visible invalid drop area');
+ await moveHeld({x:invalidArea.x+invalidArea.width/2,y:invalidArea.y+invalidArea.height/2});
+ await page.mouse.move(invalidArea.x+invalidArea.width/2+1,invalidArea.y+invalidArea.height/2+1,{steps:2});await page.waitForTimeout(120);
  await page.waitForFunction(sourceId=>document.querySelector('.tasks-drop-slot')?.nextElementSibling?.getAttribute('data-task-id')===sourceId,invalidSource);
  await page.mouse.up();await waitForDragCleanup();await stopMotionProbe();await page.waitForTimeout(150);
  assert.equal(mutationRequests,invalidRequests,'Invalid final drop submits no stale mutation');
@@ -624,25 +711,37 @@ try{
  // A rejected move must clean up the transient UI and announce failure only
  // after the async action rejects.
  const failureBefore=(await readTasks(list.id)).map(item=>item.id),failureSource=failureBefore[3],failureTarget=failureBefore[0];
- const failMutation=route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"DRAG_TEST_FAILURE"}'});
- await page.route('**/api/tasks/mutate',failMutation,{times:1});
- const failureBounds=await group.locator('[data-task-id="'+failureTarget+'"]').boundingBox();assert.ok(failureBounds);
- const failureStart=await beginMouseDrag(failureSource),failureResponsePromise=waitForMutation();
- await moveDrag(failureStart,{x:failureBounds.x+100,y:failureBounds.y+failureBounds.height*.2});
+ const failureOptimistic=beforeTarget(failureBefore,failureSource,failureTarget),failureControl=await holdNextMutation({failure:true});
+ const failureTargetRow=group.locator('[data-task-id="'+failureTarget+'"]');await failureTargetRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(failureSource);const failureDestination=await moveHeldToTarget(failureTargetRow,.2),failureResponsePromise=waitForMutation();
  await page.waitForFunction(targetId=>document.querySelector('.tasks-drop-slot')?.nextElementSibling?.getAttribute('data-task-id')===targetId,failureTarget);
- await page.mouse.up();const failureResponse=await failureResponsePromise;
+ await releaseHeld(failureDestination);
+ const pendingFailureRequest=await failureControl.request;assert.equal(pendingFailureRequest.action,'reorder');
+ await waitForDragCleanup();
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:failureOptimistic});
+ await assertDragTransientCleared(failureSource,'Pending rejected list drop');
+ assert.equal(await page.locator('[data-task-workspace]').getByText('操作失败',{exact:true}).count(),0,'Failure UI waits for the rejected response');
+ await stopMotionProbe();failureControl.release();
+ const failureResponse=await failureResponsePromise;
  assert.equal(failureResponse.status(),503,'Rejected drag receives the injected failure');
- await waitForDragCleanup();await stopMotionProbe();
- await page.waitForFunction(()=>document.querySelector('.tasks-drag-live')?.textContent==='无法移动任务');
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:failureBefore});
+ await page.waitForFunction(()=>document.querySelector('.tasks-drag-live')?.textContent==='任务移动失败，已恢复原位置');
+ await page.locator('[data-task-workspace]').getByText('操作失败',{exact:true}).waitFor();
  assert.deepEqual((await readTasks(list.id)).map(item=>item.id),failureBefore,'Rejected drag preserves API order');
 
  // Escape must fully tear down the transient DOM and submit no mutation.
  const cancelBefore=(await readTasks(list.id)).map(item=>item.id),cancelRequests=mutationRequests;
  const cancelSource=cancelBefore[2],cancelTarget=cancelBefore[0];
  const cancelTargetRow=group.locator('[data-task-id="'+cancelTarget+'"]');
- const cancelBounds=await cancelTargetRow.boundingBox();assert.ok(cancelBounds);
- const cancelStart=await beginMouseDrag(cancelSource);
- await moveDrag(cancelStart,{x:cancelBounds.x+Math.min(110,cancelBounds.width/2),y:cancelBounds.y+cancelBounds.height*.2});
+ await cancelTargetRow.scrollIntoViewIfNeeded();await beginMouseDrag(cancelSource);await moveHeldToTarget(cancelTargetRow,.2);
  await page.keyboard.press('Escape');await page.mouse.up();await waitForDragCleanup();await stopMotionProbe();
  await page.waitForTimeout(250);
  assert.equal(mutationRequests,cancelRequests,'Escape cancellation submits no task mutation');

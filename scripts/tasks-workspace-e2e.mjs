@@ -744,28 +744,31 @@ try{
  const deleted=await api('/tasks/'+createdTaskId);
  assert.equal(deleted.status,404,'Deleting from the task editor removes the task from storage');
 
- // Cross-column drag persists status. Global-board placement has its own rank
- // and must not rewrite the task list's canonical manual position.
+ // Cross-column drag persists status. Every global, status, and record view is
+ // a filtered subsequence of one total order and must preserve that relation.
  const crossStatusTask=todo.items[4];
  await dragTask(crossStatusTask.id,page.locator('[data-task-column="in_progress"]'));
  const movedStatus=await requireApi('/tasks/'+crossStatusTask.id);
  assert.equal(movedStatus.item.status,'in_progress','Cross-status drag writes the new status');
  assert.equal(movedStatus.item.recordId,todo.list.id,'Cross-status drag keeps the task in its source list');
  const sortSource=todo.items[1],sortBefore=todo.items[0];
- const canonicalBefore=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
- const canonicalPositions=new Map(canonicalBefore.items.map(item=>[item.id,item.position]));
- const boardBefore=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items.map(item=>item.id);
- assert.ok(boardBefore.includes(sortSource.id)&&boardBefore.includes(sortBefore.id),'Global board order contains both drag tasks');
- const expectedBoard=boardBefore.filter(id=>id!==sortSource.id);
- expectedBoard.splice(expectedBoard.indexOf(sortBefore.id),0,sortSource.id);
+ const allStatuses=statuses.join(','),globalBefore=(await readPaged('/tasks/view',{statuses:allStatuses,order:'board'},100)).items;
+ const statusBefore=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items;
+ const recordBefore=(await readPaged('/tasks/view',{recordId:todo.list.id,statuses:allStatuses,order:'board'},100)).items;
+ const globalIds=globalBefore.map(item=>item.id),statusSet=new Set(statusBefore.map(item=>item.id)),recordSet=new Set(recordBefore.map(item=>item.id));
+ assert.deepEqual(statusBefore.map(item=>item.id),globalIds.filter(id=>statusSet.has(id)),'Todo board starts as a total-order subsequence');
+ assert.deepEqual(recordBefore.map(item=>item.id),globalIds.filter(id=>recordSet.has(id)),'Record view starts as a total-order subsequence');
+ assert.ok(globalIds.includes(sortSource.id)&&globalIds.includes(sortBefore.id),'Global total order contains both drag tasks');
+ const expectedGlobal=globalIds.filter(id=>id!==sortSource.id);
+ expectedGlobal.splice(expectedGlobal.indexOf(sortBefore.id),0,sortSource.id);
+ const expectedStatus=expectedGlobal.filter(id=>statusSet.has(id)),expectedRecord=expectedGlobal.filter(id=>recordSet.has(id));
  await dragTask(sortSource.id,page.locator('[data-task-id="'+sortBefore.id+'"]'),{yRatio:.2});
- const boardAfter=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items.map(item=>item.id);
- assert.deepEqual(boardAfter,expectedBoard,'Same-column global-board drag persists the exact pointer rank');
- const canonicalAfter=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
- assert.equal(canonicalAfter.items.find(item=>item.id===sortSource.id)?.position,canonicalPositions.get(sortSource.id),
-  'Global-board drag preserves the source canonical position');
- assert.equal(canonicalAfter.items.find(item=>item.id===sortBefore.id)?.position,canonicalPositions.get(sortBefore.id),
-  'Global-board drag preserves the target canonical position');
+ const globalAfter=(await readPaged('/tasks/view',{statuses:allStatuses,order:'board'},100)).items.map(item=>item.id);
+ const statusAfter=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items.map(item=>item.id);
+ const recordAfter=(await readPaged('/tasks/view',{recordId:todo.list.id,statuses:allStatuses,order:'board'},100)).items.map(item=>item.id);
+ assert.deepEqual(globalAfter,expectedGlobal,'Same-column drag persists the exact pointer rank in the shared total order');
+ assert.deepEqual(statusAfter,expectedStatus,'Todo board remains the matching total-order subsequence');
+ assert.deepEqual(recordAfter,expectedRecord,'Record view reflects the same persisted total order');
 
  // The 45th todo task is not in the first 40-item page, yet a task query opens
  // its editor directly. Home's first todo link must also carry an exact task ID.

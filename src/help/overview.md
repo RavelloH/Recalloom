@@ -7,7 +7,7 @@ Recalloom 是用户控制的版本化知识库。它提供 Markdown 文档、文
 - 寻找已知路径：resolve_path；不知道位置：browse、search。
 - 了解目录：get_overview；查看长文档标题与行号：get_outline。
 - 读取权威正文：read_record；已知多个 UUID：read_many。搜索结果和概览摘录不是权威正文。
-- 创建与编辑文档：create_record、edit_record；修改元数据：manage_record；处理结构化任务：mutate_task。
+- 创建与编辑文档：create_record、edit_record；修改元数据：manage_record；处理结构化任务：mutate_tasks。
 - 查看变更与历史：changes、version_history、diff_revisions、restore_record。
 - 归档与删除：manage_record(status=archived)、list_archived、delete_archived_record、delete_folder；操作前先读 get_help(lifecycle)。
 - 探索关系：list_links、related_records、get_knowledge_graph；人工显式关系使用 manage_link。

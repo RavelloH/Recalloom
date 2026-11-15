@@ -1,29 +1,36 @@
 # 结构化任务列表
 
-Recalloom 的 task_list 是独立记录类型，不是仅用 Markdown 任务复选框伪装的任务集合。
+Recalloom 的 task_list 是独立记录类型。Markdown 的任务复选框只是文档正文，不会自动成为结构化任务。
 
-## 工具选择
+## 查询和读取
 
-- create_record(kind=task_list)：创建结构化任务列表记录。
-- list_tasks：获取任务的 UUID、状态、优先级与任务列表归属，可筛选 recordId 或 status。
-- mutate_task：使用 action=add/update/remove/reorder 原子性修改单个任务。
-- read_record、version_history：读取任务列表正文的当前版本和历史。
-- restore_record：把历史任务列表作为新版本恢复，并同步任务投影。
+- create_record(kind=task_list)：创建空任务列表；不要直接写入任务 JSON。
+- query_tasks：按 recordId、folderId 子树、query 和多个 statuses 筛选。recordId 与 folderId 互斥；省略 statuses 时包含全部五种状态，空数组不选任何状态。默认 order=manual，也可用 updated 查看最近修改。跟随 page.nextCursor；游标只适用于原筛选及水位，顺序或数据变化后需重新开始查询。
+- read_tasks(ids)：按最多 100 个 UUID 精确读取完整详情、所属列表名称/路径/revision 和 orderVersion；missingIds 明确列出未找到的任务。
+- read_record、version_history：读取任务列表正文的当前版本与历史。该 JSON 是版本化存储内容，数组位置不代表界面顺序。
 
-添加任务时，changes.title 必填；更新或删除时 taskId 必填。changes.details 可记录步骤、验收标准和进度；changes.priority 数字越大越紧急。status 允许 todo、in_progress、blocked、done、cancelled。
+状态固定为 todo（待开始）、in_progress（进行中）、blocked（阻塞）、done（已完成）、cancelled（取消）。未完成/open 是前三者的筛选集合，不是额外状态。Web 的 task-lists 查询也包含空列表及完整计数，计数不受当前已加载页数影响。
 
-reorder 必须提供 taskId 和 beforeTaskId：后者是同一列表内的目标任务 UUID，传 null 表示移动到列表末尾。不能跨列表移动，也不能把任务放在自身之前。可同时提供 changes.status、title 或 details；状态和顺序会在同一次 revision 中提交。普通 add/update/remove 不接受 beforeTaskId。
+## 唯一排序
 
-尚未手动排序的列表在新界面按旧 priority 降序、原数组顺序排列。首次 reorder 将该顺序固化到任务列表 JSON 数组，并保存 taskOrder=manual；此后增加任务追加到末尾，修改优先级不会重新打乱手动顺序。旧 list_tasks 仍按更新时间分页，其排序行为不变。
+全局看板、单个任务列表、列表模式与 MCP 共用同一个全局总序。不同记录和状态只是这个顺序的筛选子序列；没有“内层顺序”和“外层顺序”。旧 priority 字段仅为历史数据，不再决定顺序，也不属于新的任务工具参数。
 
-Web 的 task-lists 查询包含列表名称、路径、revision、完整五状态计数和空列表；tasks/view 支持独立分页的状态列或单列表任务页。query 搜索标题和详情，并同步限制计数；有搜索词时不返回无匹配任务的空分组。状态筛选省略时包含全部五种状态，open/未完成只是 todo、in_progress、blocked 的聚合，不是新状态。folderId 范围包含后代目录，不能与 recordId 同时指定。每页默认 40 条，需跟随 nextCursor 续载，计数不受已加载页数影响。
+place 使用 taskId 和 beforeTaskId：非空时移动到指定任务之前，锚点可以属于其他列表，但不会改变任务归属。beforeTaskId=null 表示放在 scope 的末项之后；scope 可指定 recordId、status 或两者；省略 scope 表示全局末尾，空 scope 范围也追加至全局末尾。真实插入位置按全序中的邻居计算，隐藏的其他状态任务不会被误当成不存在。不能将任务放在自身之前。
 
-Web 全局看板可用 tasks/view 的 order=board 读取跨任务列表的持久顺序；不传 order 时仍使用各任务列表自身的 canonical 顺序。Web 的 board_reorder 只移动全局看板位置，可跨任务列表使用 beforeTaskId，并可同时改变 status；它不会改变任务归属，也不会改写所属列表的 JSON 数组顺序。同状态且不改正文的看板移动不会制造新的内容 revision，但仍使用所属列表的 expectedRevision 做并发校验。board_reorder 是 Web 工作区合同，不属于 mutate_task 的 MCP action。
+仅调整顺序不产生正文 revision。普通 status 修改保留原有位置；拖动跨列等需要一起改状态和位置时，在同一批次提交 update 与 place。新任务追加到全局末尾。
 
-修改任务之前读取所属 task_list 的当前 revision，调用 mutate_task 时必须传 expectedRevision；如版本发生变化，需要重读并协调。remove 从当前任务投影移除条目，但历史版本仍可用于恢复。
+## 原子批量修改
 
-## 与 Markdown 任务复选框的区别
+mutate_tasks 接收 requestId、expectedRevisions、可选 expectedOrderVersion 和最多 50 个 operations。每项使用 op 判别：
 
-普通 document 里写 - [ ] 或 - [x] 只是 GFM Markdown 内容，不能等同于独立任务表的状态/优先级，也不应该用 mutate_task 直接管理它。
+- create：recordId、title，选填 details、status、clientId；返回 created 中的 clientId → UUID 映射；同一批次后续操作可用该 clientId 引用新任务。
+- update：taskId、changes，允许 title、details、status；至少改变一个字段。
+- delete：taskId；从当前列表移除，历史仍可读取。
+- place：taskId、beforeTaskId，选填 scope；修改全局位置。
+- transfer：taskId、targetRecordId；保留 UUID 和全局位置，明确改变所属列表。
 
-操作任务状态时优先使用 list_tasks 与 mutate_task，不要试图手工修改 task_list 的 JSON 正文或仅根据 Markdown 摘录推断任务真实状态。
+先用 query_tasks/read_tasks 取得最新数据。expectedRevisions 是 `{所属列表UUID: 当前revision}`，必须覆盖所有涉及的列表（包括排序来源、锚点与 scope 的列表）；transfer 同时校验来源与目标。place 另须提供 expectedOrderVersion。每个列表在同一批次中最多生成一个内容 revision；任一校验或写入失败，整批不生效。冲突返回 applied=false、最新版本等信息，重新读取并协调后用新的 requestId 重试。
+
+requestId 是幂等键：网络重试时必须使用完全相同的参数和 requestId，将返回第一次的结果，不会重复创建任务；不同参数不能复用同一 requestId。成功返回完整的受影响任务、deletedIds、各列表 revisions 和 orderVersion，通常无需再读取确认。
+
+restore_record 把历史正文恢复为新版本：仍存活的任务 UUID 保留当前顺序，重新出现的 UUID 追加至末尾。整库快照 v3 则同时保存并恢复任务顺序。不要使用 edit_record 手写 task_list JSON。

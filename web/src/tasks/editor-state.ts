@@ -7,11 +7,11 @@ export type TaskEditorDraft={title:string;details:string;status:TaskEditorStatus
 export function taskItemFromMutation<
  T extends {id:string;status:TaskEditorStatus},
  L extends {id:string;revision:number;counts:Record<TaskEditorStatus,number>;total:number}
->(task:T,tasks:T[],list:L,revision:number,updatedAt=new Date().toISOString()){
+>(task:T,tasks:T[],list:L,revision:number,updatedAt=new Date().toISOString(),placement?:{position:number},seed?:{position:number;boardPosition:number}){
  const counts:Record<TaskEditorStatus,number>={todo:0,in_progress:0,blocked:0,done:0,cancelled:0};
  for(const candidate of tasks)counts[candidate.status]++;
  const index=tasks.findIndex(candidate=>candidate.id===task.id);
- return {...task,recordId:list.id,position:index<0?Math.max(0,tasks.length-1):index,updatedAt,
+ return {...task,recordId:list.id,position:seed?.position??(index<0?Math.max(0,tasks.length-1):index),boardPosition:placement?.position??seed?.boardPosition??0,updatedAt,
   list:{...list,revision,counts,total:tasks.length}};
 }
 

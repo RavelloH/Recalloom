@@ -15,7 +15,7 @@ Recalloom 将 Markdown **正文**、记录**元信息**以及 text-version 历�
 | 按 Unified Diff 修改 | `edit_record mode=patch` |
 | 按行插入、替换、删除 | `edit_record mode=lines` |
 | 记录重命名、移动、归档 | `manage_record` |
-| 结构化任务条目 | `mutate_task`，不能伪装成普通 `edit_record` |
+| 结构化任务条目 | `mutate_tasks`，不能伪装成普通 `edit_record` |
 
 **写入流程**：先定位 UUID → `read_record` 读取正文及当前 Revision → 准备最小差异 → 以 `expectedRevision` 写入 → 检查返回内容及 Revision → 必要时重新读取确认。若 Revision 冲突，必须读取最新正文并重新合并，不能用旧内容强行覆盖另一个 Agent 的工作。精确替换要检查预期命中次数；重大修改建议先 `dryRun`。无修改意图时只读，不产生版本。
 

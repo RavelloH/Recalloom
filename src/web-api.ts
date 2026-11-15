@@ -23,7 +23,7 @@ const taskStatus=z.enum(['todo','in_progress','blocked','done','cancelled']);
 const recordKind=z.enum(['document','task_list']);
 const idSchema=z.object({id:uuid});
 const noStore={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'};
-const err=(code:string,status:400|401|403|404|405|409|413|429|500|503=400,message?:string)=>Response.json({code,...(message?{message}:{})},{status,headers:noStore});
+const err=(code:string,status:400|401|403|404|405|409|413|429|500|503=400,message?:string,details?:unknown)=>Response.json({code,...(message?{message}:{}),...(details===undefined?{}:{details})},{status,headers:noStore});
 const parseQuery=<T extends z.ZodTypeAny>(url:string,schema:T):z.infer<T>=>{
   const entries=new URL(url).searchParams;
   return schema.parse(Object.fromEntries(entries.entries()));
@@ -49,9 +49,9 @@ webApi.onError((e)=>{
   if(e instanceof StorageError){
     const code=e.code;
     const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND' ?404
-      :code==='VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
+      :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
       :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
-    return err(code,status,e.message);
+    return err(code,status,e.message,e.details);
   }
   if(e instanceof Error&&/UNIQUE constraint failed/.test(e.message))return err('PATH_CONFLICT',409);
   console.error('Recalloom Web API request failed',e instanceof Error?e.name:'Unknown');

@@ -5,7 +5,56 @@ import {prepareWikiProjection,deleteProjection,insertProjection,pinPathBindings}
 import {now,newId,event,bounded} from './internal.js';
 import {resolvePath} from './folders.js';
 import {getRecord,revisionContent} from './record-core.js';
-export async function commitContent(env:Env,row:StoredRecord,content:string,expectedRevision:number,message:string,actor:string,tasks?:Task[],taskEvent?:unknown,extraStatements:D1PreparedStatement[]=[]){
+import {getTaskOrderVersion} from './task-board.js';
+
+async function conflictingTaskOwners(env:Env,recordId:string,tasks:Task[]){
+  if(!tasks.length)return [] as Array<{id:string;recordId:string}>;
+  return (await env.DB.prepare(`SELECT t.id,t.record_id AS recordId FROM tasks t JOIN json_each(?) requested ON requested.value=t.id
+    WHERE t.record_id<>? ORDER BY t.id`).bind(JSON.stringify(tasks.map(task=>task.id)),recordId).all<{id:string;recordId:string}>()).results;
+}
+
+export async function prepareTaskContentCommit(env:Env,row:StoredRecord,content:string,tasks:Task[],expectedRevision:number,message:string,actor:string,taskEvent?:unknown,ts=now()){
+  if(row.kind!=='task_list')throw new StorageError('NOT_A_TASK_LIST');
+  if(expectedRevision!==row.revision)throw new StorageError('VERSION_CONFLICT','Latest revision is '+row.revision);
+  if(content.length>500_000)throw new StorageError('CONTENT_TOO_LARGE');
+  if(content===row.content)return {
+    statements:[] as D1PreparedStatement[],contentStatements:[] as D1PreparedStatement[],
+    deleteProjectionStatement:undefined,insertProjectionStatement:undefined,
+    orderProjectionStatements:[] as D1PreparedStatement[],finalStatements:[] as D1PreparedStatement[],
+    result:{id:row.id,revision:row.revision,changed:false as const,contentSha256:row.content_sha256}
+  };
+  const rev=row.revision+1,digest=await sha256(content);
+  const version=nextVersion({content:row.content,metadata:row.history_metadata},content,rev);
+  const contentStatements=[
+    env.DB.prepare('UPDATE record_contents SET content=?,revision=?,content_sha256=? WHERE record_id=? AND revision=?').bind(content,rev,digest,row.id,expectedRevision),
+    env.DB.prepare('UPDATE record_histories SET history_metadata=? WHERE record_id=?').bind(version.metadata,row.id),
+    env.DB.prepare('INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,?,?,?,?,?)').bind(row.id,rev,digest,message,actor,ts),
+    env.DB.prepare('UPDATE records SET updated_at=? WHERE id=?').bind(ts,row.id)
+  ];
+  const deleteProjectionStatement=env.DB.prepare('DELETE FROM tasks WHERE record_id=?').bind(row.id);
+  const insertProjectionStatement=env.DB.prepare(`INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at)
+      SELECT json_extract(value,'$.id'),?,json_extract(value,'$.title'),COALESCE(json_extract(value,'$.details'),''),
+        json_extract(value,'$.status'),COALESCE(json_extract(value,'$.priority'),0),CAST(key AS INTEGER),?
+      FROM json_each(?,'$.tasks')`).bind(row.id,ts,content);
+  const orderProjectionStatements=[
+    env.DB.prepare('DELETE FROM task_board_order WHERE record_id=? AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id=task_board_order.task_id AND t.record_id=?)').bind(row.id,row.id),
+    env.DB.prepare(`INSERT OR IGNORE INTO task_board_order(task_id,record_id,position)
+      SELECT t.id,t.record_id,base.position+ROW_NUMBER() OVER (ORDER BY t.position,t.id)*1024
+      FROM tasks t CROSS JOIN (SELECT COALESCE(MAX(position),0) AS position FROM task_board_order) base
+      WHERE t.record_id=? AND NOT EXISTS (SELECT 1 FROM task_board_order bo WHERE bo.task_id=t.id)`).bind(row.id)
+  ];
+  const finalStatements=[
+    env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts),
+    event(env,'record',row.id,'update',rev,actor,taskEvent)
+  ];
+  return {
+    statements:[...contentStatements,deleteProjectionStatement,insertProjectionStatement,...orderProjectionStatements,...finalStatements],
+    contentStatements,deleteProjectionStatement,insertProjectionStatement,orderProjectionStatements,finalStatements,
+    result:{id:row.id,revision:rev,changed:true as const,contentSha256:digest}
+  };
+}
+
+export async function commitContent(env:Env,row:StoredRecord,content:string,expectedRevision:number,message:string,actor:string,tasks?:Task[],taskEvent?:unknown,extraStatements:D1PreparedStatement[]=[],taskOrderHandled=false){
   if (expectedRevision!==row.revision) throw new StorageError('VERSION_CONFLICT','Latest revision is '+row.revision);
   if (content.length>500_000) throw new StorageError('CONTENT_TOO_LARGE');
   if (content===row.content) {
@@ -18,6 +67,15 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
       }
     }
     return {id:row.id,revision:row.revision,changed:false,contentSha256:row.content_sha256};
+  }
+  let automaticOrderChange=false;
+  if(tasks&&!taskOrderHandled){
+    try{
+      const before=JSON.parse(row.content) as {tasks?:Task[]};
+      const old=new Map((before.tasks??[]).map(task=>[task.id,task.status]));
+      const changed=old.size!==tasks.length||tasks.some(task=>old.get(task.id)!==task.status);
+      automaticOrderChange=changed;
+    }catch{throw new StorageError('INVALID_TASK_DOCUMENT');}
   }
   const rev=row.revision+1,ts=now(),digest=await sha256(content);
   const version=nextVersion({content:row.content,metadata:row.history_metadata},content,rev);
@@ -39,10 +97,10 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
   }
   if (tasks) {
     q.push(env.DB.prepare('DELETE FROM tasks WHERE record_id=?').bind(row.id));
-    for (const [position,task] of tasks.entries()) {
-      q.push(env.DB.prepare('INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at) VALUES(?,?,?,?,?,?,?,?)')
-        .bind(task.id,row.id,task.title,task.details,task.status,task.priority,position,ts));
-    }
+    q.push(env.DB.prepare(`INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at)
+      SELECT json_extract(value,'$.id'),?,json_extract(value,'$.title'),COALESCE(json_extract(value,'$.details'),''),
+        json_extract(value,'$.status'),COALESCE(json_extract(value,'$.priority'),0),CAST(key AS INTEGER),?
+      FROM json_each(?,'$.tasks')`).bind(row.id,ts,content));
     q.push(env.DB.prepare('DELETE FROM task_board_order WHERE record_id=? AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id=task_board_order.task_id AND t.record_id=?)').bind(row.id,row.id));
     q.push(env.DB.prepare(`INSERT OR IGNORE INTO task_board_order(task_id,record_id,position)
       SELECT t.id,t.record_id,base.position+ROW_NUMBER() OVER (ORDER BY t.position,t.id)*1024
@@ -51,15 +109,20 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
       .bind(row.id));
   }
   q.push(...extraStatements);
+  if(automaticOrderChange)q.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
   q.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts));
   q.push(event(env,'record',row.id,'update',rev,actor,taskEvent));
   try { await env.DB.batch(q); }
   catch(error) {
     const latest=await env.DB.prepare('SELECT revision FROM record_contents WHERE record_id=?').bind(row.id).first<{revision:number}>();
     if(latest?.revision!==expectedRevision) throw new StorageError('VERSION_CONFLICT','Latest revision is '+latest?.revision);
+    if(tasks&&error instanceof Error&&/UNIQUE constraint failed:\s*tasks\.id/i.test(error.message)){
+      const conflicts=await conflictingTaskOwners(env,row.id,tasks);
+      throw new StorageError('TASK_ID_CONFLICT','A task UUID is currently owned by another task list',{applied:false,conflicts});
+    }
     throw error;
   }
-  return {id:row.id,revision:rev,changed:true,contentSha256:digest};
+  return {id:row.id,revision:rev,changed:true,contentSha256:digest,...(automaticOrderChange?{orderVersion:await getTaskOrderVersion(env)}:{})};
 }
 
 export async function editRecord(env:Env,id:string,expectedRevision:number,edit:EditInput|string,message='Edited',actor='agent',dryRun=false) {
@@ -88,6 +151,8 @@ export async function restoreRecord(env:Env,id:string,targetRevision:number,expe
       ids.add(task.id);
     }
   }catch {throw new StorageError('INVALID_TASK_DOCUMENT','Historical task list cannot be projected safely');}
+  const conflicts=await conflictingTaskOwners(env,id,tasks);
+  if(conflicts.length)throw new StorageError('TASK_ID_CONFLICT','Historical tasks are currently owned by another task list',{applied:false,conflicts});
   return commitContent(env,row,historic,expectedRevision,'Restored task list revision '+targetRevision,actor,tasks,{action:'restore',targetRevision,taskCount:tasks.length});
 }
 

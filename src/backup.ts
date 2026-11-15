@@ -1,10 +1,11 @@
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { historicalVersion, sha256 } from './version.js';
+import {snapshotProjections} from './snapshot-projections.js';
+import {parseWikiTarget} from './wiki-syntax.js';
 
 type AnyRow=Record<string,unknown>;
-export type SnapshotPage={
-  format:'recalloom-snapshot-v2';
+type SnapshotBase={
   watermark:number;
   totalRecords:number;
   cursor:string|null;
@@ -14,6 +15,14 @@ export type SnapshotPage={
   links:AnyRow[];
   pageHash:string;
 };
+export type SnapshotPage=SnapshotBase&(
+  {format:'recalloom-snapshot-v2'}|
+  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}
+);
+type SnapshotPayload=Omit<SnapshotBase,'pageHash'>&(
+  {format:'recalloom-snapshot-v2'}|
+  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}
+);
 const fail=(code:string,message?:string):never=>{throw new StorageError(code,message);};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const id=(value:unknown):string=>typeof value==='string'&&uuid.test(value)?value:fail('INVALID_SNAPSHOT_ID');
@@ -25,21 +34,25 @@ const name=(value:unknown):string=>{
 };
 const asArray=(v:unknown):unknown[]=>Array.isArray(v)?v:fail('INVALID_SNAPSHOT');
 const maxSeq=async(env:Env)=>Number((await env.DB.prepare('SELECT COALESCE(MAX(seq),0) AS value FROM change_events').first<{value:number}>())?.value??0);
-const cursorEncode=(x:{watermark:number;lastId:string;totalRecords:number}):string=>btoa(JSON.stringify(x));
-const cursorDecode=(c:string):{watermark:number;lastId:string;totalRecords:number}=>{
+const orderVersion=async(env:Env)=>Number((await env.DB.prepare('SELECT version FROM task_order_state WHERE id=1').first<{version:number}>())?.version??0);
+type SnapshotCursor={watermark:number;lastId:string;totalRecords:number;orderVersion:number};
+const cursorEncode=(x:SnapshotCursor):string=>btoa(JSON.stringify(x));
+const cursorDecode=(c:string):SnapshotCursor=>{
   try{
-    const v=JSON.parse(atob(c)) as {watermark:number;lastId:string;totalRecords:number};
-    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0)throw Error();
+    const v=JSON.parse(atob(c)) as SnapshotCursor;
+    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0||!Number.isSafeInteger(v.orderVersion)||v.orderVersion<0)throw Error();
     return v;
   }catch{return fail('INVALID_SNAPSHOT_CURSOR');}
 };
-export const pageHash=async(page:Omit<SnapshotPage,'pageHash'>)=>sha256(JSON.stringify({format:page.format,watermark:page.watermark,totalRecords:page.totalRecords,cursor:page.cursor,nextCursor:page.nextCursor,folders:page.folders,records:page.records,links:page.links}));
+export const pageHash=async(page:SnapshotPayload)=>sha256(JSON.stringify({format:page.format,watermark:page.watermark,totalRecords:page.totalRecords,cursor:page.cursor,nextCursor:page.nextCursor,folders:page.folders,records:page.records,links:page.links,
+  ...(page.format==='recalloom-snapshot-v3'?{orderVersion:page.orderVersion,taskOrder:page.taskOrder,pathBindings:page.pathBindings}:{})}));
 
 export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Promise<SnapshotPage>{
   const pageSize=Math.min(5,Math.max(1,Math.floor(limit)));
   const state=cursor?cursorDecode(cursor):null;
   const watermark=state?.watermark??await maxSeq(env);
-  if(await maxSeq(env)!==watermark)fail('SNAPSHOT_CHANGED','Library changed during backup; restart the export');
+  const version=state?.orderVersion??await orderVersion(env);
+  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version)fail('SNAPSHOT_CHANGED','Library changed during backup; restart the export');
   const totalRecords=state?.totalRecords??Number((await env.DB.prepare('SELECT COUNT(*) AS n FROM records').first<{n:number}>())?.n??0);
   const lastId=state?.lastId??'';
   const [folders,recordRows]=await Promise.all([
@@ -59,9 +72,14 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
   }
   const done=recordRows.results.length<=pageSize;
   const links=done?(await env.DB.prepare('SELECT * FROM record_links ORDER BY source_id,target_id,relation').all()).results:[];
-  if(await maxSeq(env)!==watermark)fail('SNAPSHOT_CHANGED','Library changed while exporting; discard all pages');
-  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords});
-  const payload={format:'recalloom-snapshot-v2' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links};
+  const selectedIds=JSON.stringify(selection.map(row=>row.id));
+  const [taskOrder,pathBindings]=await Promise.all([
+    env.DB.prepare('SELECT task_id,record_id,position FROM task_board_order WHERE record_id IN (SELECT value FROM json_each(?)) ORDER BY position,task_id').bind(selectedIds).all(),
+    env.DB.prepare('SELECT source_id,target_expression,target_id FROM record_path_bindings WHERE source_id IN (SELECT value FROM json_each(?)) ORDER BY source_id,target_expression').bind(selectedIds).all()
+  ]);
+  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version)fail('SNAPSHOT_CHANGED','Library changed while exporting; discard all pages');
+  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords,orderVersion:version});
+  const payload={format:'recalloom-snapshot-v3' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links,orderVersion:version,taskOrder:taskOrder.results,pathBindings:pathBindings.results};
   return {...payload,pageHash:await pageHash(payload)};
 }
 
@@ -71,14 +89,19 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   const pages=(bundle as ImportInput).pages;
   if(pages.length<1||pages.length>100||JSON.stringify(bundle).length>6_000_000)fail('SNAPSHOT_TOO_LARGE');
   const watermark=pages[0]?.watermark,expected=pages[0]?.totalRecords;
+  const format=pages[0]?.format,version=pages[0]?.format==='recalloom-snapshot-v3'?pages[0].orderVersion:undefined;
   let previous:string|null=null;
-  const folders:AnyRow[]=[],records:SnapshotPage['records']=[],links:AnyRow[]=[];
+  const folders:AnyRow[]=[],records:SnapshotPage['records']=[],links:AnyRow[]=[],taskOrder:AnyRow[]=[],pathBindings:AnyRow[]=[];
   for(const [index,page] of pages.entries()){
-    if(page.format!=='recalloom-snapshot-v2'||page.watermark!==watermark||page.totalRecords!==expected||
-      page.cursor!==previous||page.pageHash!==await pageHash({
-        format:page.format,watermark:page.watermark,totalRecords:page.totalRecords,cursor:page.cursor,
-        nextCursor:page.nextCursor,folders:page.folders,records:page.records,links:page.links
-      }))fail('SNAPSHOT_INTEGRITY_ERROR');
+    if(!page||(page.format!=='recalloom-snapshot-v2'&&page.format!=='recalloom-snapshot-v3')||page.format!==format||page.watermark!==watermark||page.totalRecords!==expected||
+      page.cursor!==previous||page.pageHash!==await pageHash(page))fail('SNAPSHOT_INTEGRITY_ERROR');
+    if(page.format==='recalloom-snapshot-v3'){
+      if(!Number.isSafeInteger(page.orderVersion)||page.orderVersion<0||page.orderVersion!==version)fail('SNAPSHOT_INTEGRITY_ERROR');
+      const pageRecords=new Set(asArray(page.records).map(item=>id((item as {record:AnyRow}).record.id)));
+      const ranks=asArray(page.taskOrder) as AnyRow[],pins=asArray(page.pathBindings) as AnyRow[];
+      if(ranks.some(row=>!pageRecords.has(id(row.record_id)))||pins.some(row=>!pageRecords.has(id(row.source_id))))fail('INVALID_SNAPSHOT');
+      taskOrder.push(...ranks);pathBindings.push(...pins);
+    }
     if(index>0&&page.folders.length)fail('INVALID_SNAPSHOT');
     if(index<pages.length-1&&page.links.length)fail('INVALID_SNAPSHOT');
     folders.push(...asArray(page.folders) as AnyRow[]);
@@ -89,13 +112,25 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   }
   if(previous!==null||!Number.isSafeInteger(expected)||expected<0||records.length!==expected)fail('INCOMPLETE_SNAPSHOT');
   if(folders.length>2000||records.length>300||links.length>3000)fail('SNAPSHOT_TOO_LARGE');
+  const targetState=await env.DB.batch<AnyRow>([
+    env.DB.prepare('SELECT COALESCE(MAX(seq),0) AS value FROM change_events'),
+    env.DB.prepare('SELECT version FROM task_order_state WHERE id=1'),
+    env.DB.prepare('SELECT COUNT(*) AS count,COALESCE(MAX(position),0) AS position FROM task_board_order')
+  ]);
+  const targetSeq=Number(targetState[0]!.results[0]?.value??0),targetVersion=Number(targetState[1]!.results[0]?.version);
+  const targetOrder=targetState[2]!.results[0]!,targetTaskCount=Number(targetOrder.count),targetLastPosition=Number(targetOrder.position);
+  if(!Number.isSafeInteger(targetVersion))fail('TASK_ORDER_STATE_MISSING');
   const knownFolders=new Set(folders.map(f=>id(f.id)));
   if(knownFolders.size!==folders.length)fail('DUPLICATE_SNAPSHOT_ID');
   const knownRecords=new Set(records.map(v=>id(v.record.id)));
   if(knownRecords.size!==records.length)fail('DUPLICATE_SNAPSHOT_ID');
   const stagedNames=new Set<string>();
   const key=(parent:string|null,recordName:string)=>JSON.stringify([parent,recordName]);
-  const statements:D1PreparedStatement[]=[];
+  // Projection planning resolves existing paths. Reject any intervening library
+  // change before those resolutions can become permanent path identities.
+  const statements:D1PreparedStatement[]=[env.DB.prepare(`INSERT INTO task_order_state(id,version)
+    SELECT 1,0 WHERE (SELECT COALESCE(MAX(seq),0) FROM change_events)<>?
+      OR NOT EXISTS (SELECT 1 FROM task_order_state WHERE id=1 AND version=?)`).bind(targetSeq,targetVersion)];
   // Full validation before the first mutation. Existing DB uniqueness and foreign
   // keys are checked here, not merely when the write batch is executed.
   for(const item of folders){
@@ -129,6 +164,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     statements.push(event(env,'folder',id(folder.id),'restore',null,actor,{name:folder.name,parentId:folder.parent_id}));
   }
   const taskIds=new Set<string>();
+  const taskOwners=new Map<string,string>();
   const validStates=new Set(['todo','in_progress','blocked','done','cancelled']);
   for(const item of records){
     if(!item||typeof item!=='object'||!item.record||!Array.isArray(item.revisions)||!Array.isArray(item.tags))fail('INVALID_SNAPSHOT');
@@ -198,6 +234,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
         if(taskIds.has(tid)||!validStates.has(String(task.status))||!Number.isInteger(task.priority)||
           typeof task.title!=='string'||!task.title.trim()||task.title.length>500||typeof task.details!=='string')fail('INVALID_TASK_DOCUMENT');
         taskIds.add(tid);
+        taskOwners.set(tid,recordId);
         statements.push(env.DB.prepare('INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at) VALUES(?,?,?,?,?,?,?,?)')
           .bind(tid,recordId,task.title,task.details,task.status,task.priority,position,row.updated_at));
       }
@@ -221,16 +258,48 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     statements.push(env.DB.prepare('INSERT INTO record_links(source_id,target_id,relation) VALUES(?,?,?)').bind(source,target,relation));
     statements.push(event(env,'record',source,'link_restore',null,actor,{targetId:target,relation}));
   }
-  statements.push(env.DB.prepare(`INSERT INTO task_board_order(task_id,record_id,position)
+  if(taskIds.size&&await env.DB.prepare('SELECT 1 FROM tasks WHERE id IN (SELECT value FROM json_each(?)) LIMIT 1').bind(JSON.stringify([...taskIds])).first())
+    fail('IMPORT_CONFLICT','A task UUID already exists in the target library');
+  if(format==='recalloom-snapshot-v3'){
+    const ranked=new Set<string>();
+    for(const row of taskOrder){
+      const taskId=id(row.task_id),owner=id(row.record_id);
+      if(ranked.has(taskId)||taskOwners.get(taskId)!==owner||typeof row.position!=='number'||!Number.isFinite(row.position)||Math.abs(row.position)>Number.MAX_SAFE_INTEGER)fail('INVALID_SNAPSHOT_TASK_ORDER');
+      ranked.add(taskId);
+    }
+    if(ranked.size!==taskIds.size)fail('INVALID_SNAPSHOT_TASK_ORDER','Every task must have exactly one saved position');
+    const restoredOrder=targetTaskCount?taskOrder.slice().sort((a,b)=>Number(a.position)-Number(b.position)||(String(a.task_id)<String(b.task_id)?-1:1))
+      .map((row,index)=>({...row,position:targetLastPosition+(index+1)*1024})):taskOrder;
+    if(restoredOrder.some((row,index)=>!Number.isFinite(row.position)||targetTaskCount&&Number(row.position)<=(index?Number(restoredOrder[index-1]!.position):targetLastPosition)))
+      fail('IMPORT_CONFLICT','Target task order has no numeric room for imported tasks');
+    if(taskOrder.length)statements.push(env.DB.prepare(`INSERT INTO task_board_order(task_id,record_id,position)
+      SELECT json_extract(value,'$.task_id'),json_extract(value,'$.record_id'),json_extract(value,'$.position') FROM json_each(?)`).bind(JSON.stringify(restoredOrder)));
+  }else statements.push(env.DB.prepare(`INSERT INTO task_board_order(task_id,record_id,position)
     SELECT t.id,t.record_id,base.position+ROW_NUMBER() OVER (
       ORDER BY t.record_id,CASE WHEN json_extract(c.content,'$.taskOrder')='manual' THEN 0 ELSE -t.priority END,t.position,t.id
     )*1024.0
     FROM tasks t JOIN record_contents c ON c.record_id=t.record_id
     CROSS JOIN (SELECT COALESCE(MAX(position),0) AS position FROM task_board_order) base
     WHERE NOT EXISTS (SELECT 1 FROM task_board_order bo WHERE bo.task_id=t.id)`));
+  const bindingKeys=new Set<string>();
+  for(const row of pathBindings){
+    const source=id(row.source_id),target=string(row.target_expression,2048),key=JSON.stringify([source,target]);
+    id(row.target_id);
+    if(!knownRecords.has(source)||bindingKeys.has(key)||!target.startsWith('/')||parseWikiTarget(target,false)?.target!==target)fail('INVALID_SNAPSHOT_PATH_BINDING');
+    bindingKeys.add(key);
+  }
+  statements.push(...await snapshotProjections(env,records.map(item=>item.record),folders,pathBindings));
+  if(taskIds.size)statements.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
   if(statements.length>700)fail('ATOMIC_IMPORT_LIMIT','This snapshot exceeds the single-transaction import limit; use a D1 database backup for larger libraries');
-  if(!dryRun)await env.DB.batch(statements);
-  return {dryRun,validated:true,folders:folders.length,records:records.length,links:links.length,statements:statements.length};
+  if(!dryRun){
+    try{await env.DB.batch(statements);}
+    catch(error){
+      if(error instanceof Error&&/(?:UNIQUE|PRIMARY KEY) constraint failed:\s*task_order_state\.id/i.test(error.message))
+        fail('IMPORT_CONFLICT','Target library changed during import validation; restart the import');
+      throw error;
+    }
+  }
+  return {dryRun,validated:true,folders:folders.length,records:records.length,links:links.length,taskOrder:taskOrder.length,pathBindings:pathBindings.length,statements:statements.length};
 }
 function event(env:Env,entityType:'folder'|'record',entityId:string,type:string,revision:number|null,actor:string,details:unknown){
   return env.DB.prepare('INSERT INTO change_events(record_id,event_type,revision,actor,created_at,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?,?,?)')
