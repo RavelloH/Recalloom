@@ -30,6 +30,9 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 | `web/src/` | React 前端、编辑器、关系网、组件与路由入口 |
 | `web/src/pages.tsx` | 页面组件兼容导出入口，供非路由调用方继续使用 |
 | `web/src/pages/` | 登录、概览、知识库、归档、记录、任务、搜索、活动和设置页面；`router.tsx` 通过 `lazyRouteComponent` 按需加载，`shared.tsx` 提供通用页面反馈组件 |
+| `src/activity-query.ts`、`activity-analytics.ts`、`web-activity.ts` | 活动流与全量统计共用日期、时区、操作方、类型、文本及文件夹子树筛选；统计不依赖当前加载页，活动原始事件保持逐条可追溯 |
+| `src/activity-events.ts`、`activity-types.ts` | 在任务内容提交边界派生新增、完成、重开、移除和字段变化；跨列表批处理按 requestId 计一次操作，迁移不重复计为创建或删除，详情截断不影响完整计数 |
+| `web/src/activity/` | Astryx 堆叠趋势图、按日分组时间线、连续修改展开与独立堆叠详情面板；默认最近 30 天，按日点击只缩小时间线，保留期间统计用于对照 |
 | `web/src/record-workbench.tsx` | Markdown 文档工作台顶部：文件名（显示时隐藏 `.md`）、更新时间/编辑者/字数信息、信息（属性与关联）/目录/历史独立入口与共用面板容器；文件名仅在顶部编辑（任务列表不受影响） |
 | `web/src/document-heading.ts`、`web/src/document-filename.ts` | Markdown 字数统计与文档文件名显示/重命名规则；所有 H1 均属于正文，不再提升到标题栏 |
 | `web/src/record-editor.tsx` | 源码、预览、可视化三种模式均显示与编辑完整 Markdown 草稿（包括首个 H1）；版本列表通过 Portal 进入历史面板 |
@@ -82,7 +85,7 @@ web/src：React + TanStack Router/Query + Tiptap + Astryx
 4. **数据库变更可回放。** 新增 migrations 文件，不对历史迁移做破坏性重写；复杂升级必须在本地 D1 的多个旧状态上回归。
 5. **组件和 CSS 有明确归属。** 页面模块使用 `web/src/pages/`，可视化编辑器装配使用 `web/src/visual-editor/`，通用 Tiptap 插件使用 `web/src/tiptap/`，服务端存储使用 `src/storage/`。CSS 由 `web/src/styles/` 的单一所有权规则管理，避免全局补丁文件。
 6. **公共入口稳定，内部依赖无环。** `pages.tsx`、`visual-editor.tsx`、`storage.ts` 是兼容导出入口，内部模块不得反向引用这些入口或形成循环。`pnpm modules:check` 自动验证三个领域的导出及依赖图。编辑器源码审计分别检查 `visual-editor/formatting-toolbar.tsx` 与 `visual-editor/editor.tsx`，保证桌面和触屏格式菜单共用同一顺序。
-7. **按用户意图分割前端资源。** 路由页、知识图谱、编辑器、命令面板等不应由 `main.tsx` 或 Shell 静态导入。页面跳转由 TanStack Router 按导航意图预加载；Apple WebKit 原生滚动条模式不加载 JS 滚动条引擎。使用 `pnpm bundle:check` 保证独立 chunk 与初始 JS gzip 预算（250KiB）、全局 CSS gzip 预算（56KiB），通过隔离 E2E 验证真实资源请求；图谱、关联面板、记录、RMD 和编辑器样式归功能组件所有，按需加载。
+7. **按用户意图分割前端资源。** 路由页、知识图谱、编辑器、命令面板等不应由 `main.tsx` 或 Shell 静态导入。页面跳转由 TanStack Router 按导航意图预加载；Apple WebKit 原生滚动条模式不加载 JS 滚动条引擎。使用 `pnpm bundle:check` 保证独立 chunk 与初始 JS gzip 预算（250KiB）、全局 CSS gzip 预算（66KiB，包含新版 Astryx 官方样式），通过隔离 E2E 验证真实资源请求；活动图表、图谱、关联面板、记录、RMD 和编辑器样式归功能组件所有，按需加载。
 8. **文档与代码同步。** 帮助源位于 `src/help/`，修改后运行 `pnpm help:generate` 并通过 `pnpm help:check`；RMD 组件与编辑器命令的入口由语法审计覆盖。
 
 ## 测试金字塔

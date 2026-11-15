@@ -202,7 +202,7 @@ export default function KnowledgeGraphPage(){
      </div>
      {nodes.length?
       <GraphCanvas nodes={nodes} edges={edges} selected={selected} onSelect={onSelect} cyRef={cy} query={filter}/>:
-      <EmptyState className="graph-empty" title="知识库尚无可显示的记录。添加文档后即可查看关系网。"/>}
+      <EmptyState role="status" className="graph-empty" title="知识库尚无可显示的记录。添加文档后即可查看关系网。"/>}
      <p className="graph-bottomline">{data.scope==='recent'?'默认仅显示最近的文档子图；选中文档并设为中心后，才能查询其语义相似候选。':'仅显示当前文档附近的有界子图。'} {data.scope==='local'?semanticMessage(data.semanticStatus):''}</p>
     </div>
     <aside className="graph-inspector" aria-label="选中节点详情">

@@ -1,6 +1,6 @@
 # Astryx 组件使用与保留边界
 
-本次审查以项目安装的 `@astryxdesign/core 0.7.4` 源码和公开类型为准。迁移保持原有字号、尺寸、配色和导航语义；组件来源统一不代表所有文档 DOM 都应改为通用应用控件。
+当前以项目安装的 `@astryxdesign/core`、`@astryxdesign/theme-neutral`、`@astryxdesign/charts` 的 `0.7.17-canary.g8d68f1b` 源码和公开类型为准。图表目前仅提供 canary 版本，因此三个包锁定同一精确版本。升级保持原有字号、尺寸、配色和导航语义；组件来源统一不代表所有文档 DOM 都应改为通用应用控件。
 
 ## 已迁移
 
@@ -14,11 +14,16 @@
 | 搜索、设置与版本对比 | `SegmentedControl` 提供互斥选择状态，设置使用导航模式 `TabList` / `Tab`；真实链接由公共 `LinkProvider` 接入 TanStack Router。 |
 | 路径和文档信息 | `Breadcrumbs` / `BreadcrumbItem`、`MetadataList` / `MetadataListItem`；保留路径共享过渡、异步标签操作和窄屏列宽。 |
 | 加载与空状态 | `Spinner`、`Skeleton`、`EmptyState`；保留加载公告、图谱画布与分批差异渲染。 |
+| 活动统计 | `@astryxdesign/charts` 的 `Chart`、`bar`、`ChartAxis`、`ChartGrid`、图例及 Tooltip；按公开 `useChart` 比例尺处理日期点击，日期选择器提供键盘入口，不自行绘制图形。图表和样式随活动路由加载。 |
 | 块交互与展示 | 拖动把手使用 `IconButton`，代码标题和填空揭示使用 `Button`，快捷键使用 `Kbd`，文档摘要标签使用 `Token`。 |
 
 填空的答案与触发按钮分离，答案可以包含可交互链接。只读状态展开后保留一个小的“隐藏”按钮；编辑状态的 ProseMirror `contentDOM` 始终挂载。
 
 格式菜单的 hover 是应用对受控公开接口的适配，Astryx 没有独立的 hover 开关。安装版本只提供菜单入口动画，没有退出状态接口，因此不再保留旧的双菜单退出叠化；不为此重新复制一套菜单外壳。
+
+新版 `EmptyState` 不再隐式提供根元素的 `status` role；应用显式保留该语义。Toast 的播报改由公共 live region 负责，回归检查实际提示文字的公告，避免在卡片上重复添加播报。认证后的导航外壳与侧栏手势模块按需加载，并与认证查询并行预热，登录入口不承担它们的开销。升级回归包含页面原语、菜单与对话框、文档面板、编辑器以及 Chromium/WebKit 的移动与桌面视图。
+
+Windows Playwright WebKit 在已绘制页面直接缩至 `390×844` 时可能原生崩溃；独立检出的升级前 `0.7.4` 应用也在相同测试位置复现。因此活动与首页的手机截图先设置目标视口再进入页面；其他控件回归继续覆盖运行中的响应式切换，不在业务代码中添加浏览器补丁。
 
 搜索方式使用 `SegmentedControlItem` 直接子项，旁边常驻显示当前模式说明，不再为各选项重复挂载 Tooltip。说明以 React `useId` 加模式值生成稳定 ID，各 radio 的 `aria-describedby` 只关联自身说明：当前模式使用可见文字，其他模式使用隐藏文字。安装版本的 `SegmentedControl` 会用自身的禁用说明覆盖根节点传入的 `aria-describedby`，所以关联放在支持透传的选项上。此调整保留原有尺寸、间距和常驻说明，并减少路由切换时的额外弹层生命周期。
 

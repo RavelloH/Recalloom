@@ -6,6 +6,7 @@ import {now,newId,event,bounded} from './internal.js';
 import {resolvePath} from './folders.js';
 import {getRecord,revisionContent} from './record-core.js';
 import {getTaskOrderVersion} from './task-board.js';
+import {taskEventDetails} from '../activity-events.js';
 
 async function conflictingTaskOwners(env:Env,recordId:string,tasks:Task[]){
   if(!tasks.length)return [] as Array<{id:string;recordId:string}>;
@@ -13,7 +14,7 @@ async function conflictingTaskOwners(env:Env,recordId:string,tasks:Task[]){
     WHERE t.record_id<>? ORDER BY t.id`).bind(JSON.stringify(tasks.map(task=>task.id)),recordId).all<{id:string;recordId:string}>()).results;
 }
 
-export async function prepareTaskContentCommit(env:Env,row:StoredRecord,content:string,tasks:Task[],expectedRevision:number,message:string,actor:string,taskEvent?:unknown,ts=now()){
+export async function prepareTaskContentCommit(env:Env,row:StoredRecord,content:string,tasks:Task[],expectedRevision:number,message:string,actor:string,taskEvent?:unknown,ts=now(),transferred?:ReadonlyMap<string,Task>){
   if(row.kind!=='task_list')throw new StorageError('NOT_A_TASK_LIST');
   if(expectedRevision!==row.revision)throw new StorageError('VERSION_CONFLICT','Latest revision is '+row.revision);
   if(content.length>500_000)throw new StorageError('CONTENT_TOO_LARGE');
@@ -45,7 +46,7 @@ export async function prepareTaskContentCommit(env:Env,row:StoredRecord,content:
   ];
   const finalStatements=[
     env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts),
-    event(env,'record',row.id,'update',rev,actor,taskEvent)
+    event(env,'record',row.id,'update',rev,actor,{name:row.name,kind:row.kind,folderId:row.folder_id,...taskEventDetails(row.content,tasks,taskEvent,transferred)})
   ];
   return {
     statements:[...contentStatements,deleteProjectionStatement,insertProjectionStatement,...orderProjectionStatements,...finalStatements],
@@ -111,7 +112,8 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
   q.push(...extraStatements);
   if(automaticOrderChange)q.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
   q.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts));
-  q.push(event(env,'record',row.id,'update',rev,actor,taskEvent));
+  const details=tasks?taskEventDetails(row.content,tasks,taskEvent):taskEvent;
+  q.push(event(env,'record',row.id,'update',rev,actor,{name:row.name,kind:row.kind,folderId:row.folder_id,...(details&&typeof details==='object'?details:{})}));
   try { await env.DB.batch(q); }
   catch(error) {
     const latest=await env.DB.prepare('SELECT revision FROM record_contents WHERE record_id=?').bind(row.id).first<{revision:number}>();
@@ -138,7 +140,7 @@ export async function editRecord(env:Env,id:string,expectedRevision:number,edit:
 export async function restoreRecord(env:Env,id:string,targetRevision:number,expectedRevision:number,actor='agent') {
   const row=await getRecord(env,id);
   const historic=await revisionContent(env,row,targetRevision);
-  if(row.kind!=='task_list')return commitContent(env,row,historic,expectedRevision,'Restored revision '+targetRevision,actor);
+  if(row.kind!=='task_list')return commitContent(env,row,historic,expectedRevision,'Restored revision '+targetRevision,actor,undefined,{action:'restore',targetRevision});
   let tasks:Task[];
   try {
     const parsed:unknown=JSON.parse(historic);

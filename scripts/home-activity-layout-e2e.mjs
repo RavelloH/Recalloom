@@ -86,17 +86,21 @@ try{
  await page.goto(base+'/login');
  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
+ await page.locator('.home-page').waitFor();
  const suffix=Date.now().toString(36).toUpperCase();
  const name='首页最近活动资源名称应在可用空间内显示而不是只剩省略号-'+suffix+'-extended-document.md';
  await create('/records',{name,kind:'document',folderId:null,content:'# Activity layout fixture'});
- await page.reload();
+ await page.waitForLoadState('networkidle');await page.reload();
  const compact=page.locator('.home-card .recent-entry').filter({hasText:name}).first();await compact.waitFor();
  await waitForReadableActivity(compact);
  assertCompact(await compactGeometry(compact),1365);
  await page.screenshot({path:join(artifactDir,'desktop.png')});
 
- await page.setViewportSize({width:390,height:844});
- await page.reload();await page.waitForFunction(()=>innerWidth===390);
+ // Initialize the mobile capture at its target size. Windows WebKit can
+ // crash while shrinking a painted page; the Astryx 0.7.4 baseline does too.
+ await page.waitForLoadState('networkidle');
+ await page.goto('about:blank');await page.setViewportSize({width:390,height:844});
+ await page.goto(base+'/');await page.waitForFunction(()=>innerWidth===390);
  const mobileCompact=page.locator('.home-card .recent-entry').filter({hasText:name}).first();await mobileCompact.waitFor();
  await waitForReadableActivity(mobileCompact);
  assertCompact(await compactGeometry(mobileCompact),390);

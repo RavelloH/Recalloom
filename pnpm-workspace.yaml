@@ -9,5 +9,8 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20261027.1'
   - 'text-version@2.2.0'
+  - '@astryxdesign/charts@0.7.17-canary.g8d68f1b'
+  - '@astryxdesign/core@0.7.17-canary.g8d68f1b'
+  - '@astryxdesign/theme-neutral@0.7.17-canary.g8d68f1b'
 patchedDependencies:
   tiptap-extension-code-block-shiki@1.2.0: patches/tiptap-extension-code-block-shiki@1.2.0.patch

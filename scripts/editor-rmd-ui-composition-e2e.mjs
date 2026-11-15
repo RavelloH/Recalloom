@@ -107,7 +107,7 @@ try{
    await page.getByRole('menuitem',{name:'粘贴',exact:true}).last().click();
    const toast=page.locator('.astryx-toast').filter({has:page.locator('.rk-editor-context-toast')});await toast.waitFor();
    assert.match(await toast.innerText(),/浏览器无法读取剪贴板/);
-   assert.equal(await toast.getAttribute('role'),'status','library Toast retains its live status semantics');
+   await page.getByRole('status').filter({hasText:'浏览器无法读取剪贴板'}).waitFor();
    assert.equal(await page.locator('.rk-editor-context-feedback').count(),0);
    const bounds=await toast.boundingBox();assert.ok(bounds);
    assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1,'Toast stays inside viewport');

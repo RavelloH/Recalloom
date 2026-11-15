@@ -25,7 +25,7 @@ export const LoadingRows=({count=4,kind='files'}:{count?:number;kind?:SkeletonKi
   <div className="recent-entry" key={i}><Skeleton width={15} height={15} radius={1}/><div className="loading-lines"><Skeleton width={i%2?'65%':'85%'} height={14} radius={1}/><Skeleton width="30%" height={11} radius={1}/></div><Skeleton width={58} height={11} radius={1}/></div>:
   <div className="compact-row" key={i}><Skeleton width={8} height={8} radius={2}/><Skeleton width={i%2?'62%':'80%'} height={14} radius={1}/><Skeleton width={24} height={11} radius={1}/></div>)}</div>;
 
-export const Empty=({title,description}:{title:string;description?:string})=><EmptyState className="knowledge-empty" title={title} description={description} icon={<Icon name="document" size="lg"/>} isCompact/>;
+export const Empty=({title,description}:{title:string;description?:string})=><EmptyState role="status" className="knowledge-empty" title={title} description={description} icon={<Icon name="document" size="lg"/>} isCompact/>;
 
 export const fmt=(v?:string|number)=>{if(v===undefined||v===null)return '—';const n=typeof v==='number'?v:Date.parse(v);return Number.isFinite(n)?new Intl.DateTimeFormat('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(n):String(v)};
 

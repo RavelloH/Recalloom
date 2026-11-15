@@ -20,7 +20,9 @@ const assets=readdirSync(join(dist,'assets'));
 const initialCss=[...html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["']\/?(assets\/[^"']+\.css)["']/g)].map(match=>match[1]);
 assert.equal(initialCss.length,1,'Expected one application-wide CSS entry');
 const baseCss=readFileSync(join(dist,initialCss[0]),'utf8');
-const maxCssGzip=56*1024;
+// Astryx 0.7.17's complete official stylesheet adds gesture, press-feedback
+// and theme-condition rules. Keep it intact; feature CSS still stays deferred.
+const maxCssGzip=66*1024;
 const cssGzip=gzipSync(baseCss,{level:9}).length;
 assert.ok(cssGzip<=maxCssGzip,'Initial CSS gzip '+cssGzip+' exceeds '+maxCssGzip+' bytes');
 // Shared layout CSS can legitimately reference a feature container; these

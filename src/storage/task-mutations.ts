@@ -212,10 +212,12 @@ export async function mutateTasks(env:Env,input:MutateTasksInput,actor='agent'):
  if(orderChanged)statements.push(taskOrderVersionStatements(env,baseOrderVersion).guard);
  const revisions:Record<string,number>=Object.fromEntries(involved.map(state=>[state.row.id,state.row.revision]));
  const preparedCommits=[];
+ const transferredTasks=new Map<string,Task>();
+ for(const state of involved)for(const task of (JSON.parse(state.row.content) as {tasks:Task[]}).tasks)if(transferOwners.has(task.id))transferredTasks.set(task.id,task);
  for(const state of dirty){
   const content=JSON.stringify({...state.parsed,tasks:state.parsed.tasks},null,2);
   const prepared=await prepareTaskContentCommit(env,state.row,content,state.parsed.tasks,state.row.revision,
-    'Task batch '+input.requestId,actor,{action:'mutate_tasks',requestId:input.requestId,operationCount:input.operations.length},ts);
+    'Task batch '+input.requestId,actor,{action:'mutate_tasks',requestId:input.requestId,operationCount:input.operations.length},ts,transferredTasks);
   if(!prepared.result.changed){state.dirty=false;continue;}
   preparedCommits.push(prepared);revisions[state.row.id]=prepared.result.revision;
  }

@@ -456,11 +456,18 @@ try{
    const count=group?.querySelectorAll('[data-task-id]').length??0;
    return count>=40&&count<=45;
   },group.list.id);
-  await listGroup.locator('[data-task-id]').last().scrollIntoViewIfNeeded();
+  // Follow the live sentinel: row heights can still be animating after the
+  // first page appears, so a one-shot scroll to its last row stops too early.
   await page.waitForFunction(id=>{
    const group=document.querySelector('[data-task-list-id="'+CSS.escape(id)+'"]');
+   const viewport=group?.closest('[data-task-list-scroll]'),sentinel=group?.querySelector('.tasks-load-more');
+   if(viewport&&sentinel)viewport.scrollTop+=sentinel.getBoundingClientRect().bottom-viewport.getBoundingClientRect().bottom+30;
    return group?.querySelectorAll('[data-task-id]').length===45;
-  },group.list.id);
+  },group.list.id).catch(async error=>{throw Error('List continuation failed: '+JSON.stringify(await listGroup.evaluate(element=>{
+   const bounds=node=>node?.getBoundingClientRect().toJSON();
+   const collapse=element.querySelector('.tasks-group-collapse'),viewport=element.closest('[data-task-list-scroll]');
+   return {count:element.querySelectorAll('[data-task-id]').length,group:bounds(element),viewport:bounds(viewport),scrollTop:viewport?.scrollTop,collapse:bounds(collapse),collapseScroll:collapse?.scrollTop,sentinel:bounds(element.querySelector('.tasks-load-more'))};
+  }))+' '+error.message);});
   const ids=await listGroup.locator('[data-task-id]').evaluateAll(elements=>elements.map(element=>element.getAttribute('data-task-id')));
   assertSameIds(ids.map(id=>({id})),group.items,'List group '+group.status+' continuation');
  }

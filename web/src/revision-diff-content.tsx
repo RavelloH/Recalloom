@@ -99,7 +99,7 @@ export default function RevisionDiffContent({before,after,sourceId}:{before:stri
    </div>
   </div>
   <div className="revision-diff-scroll" ref={scrollRef} tabIndex={0} aria-label="版本差异内容">
-   {!diff.changed?<EmptyState className="revision-diff-empty" icon={<Icon name="check" size="lg" className="revision-diff-empty-icon"/>} title="两个版本的内容相同" description="此次修订没有文稿内容变化。"/>
+   {!diff.changed?<EmptyState role="status" className="revision-diff-empty" icon={<Icon name="check" size="lg" className="revision-diff-empty-icon"/>} title="两个版本的内容相同" description="此次修订没有文稿内容变化。"/>
     :<>
      {diff.limited&&<p className="revision-diff-note">文档较大或差异较多，使用源码对比并分批展示。内容完整保留。</p>}
      {endingChanged&&<p className="revision-diff-note">换行格式：{lineEnding(before)} → {lineEnding(after)}</p>}

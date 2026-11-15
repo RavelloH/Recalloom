@@ -55,7 +55,7 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
       env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(newId(),tag),
       env.DB.prepare('INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(id,tag)
     ]),
-    event(env,'record',id,'create',1,actor,{name,folderId,kind,tags})
+    event(env,'record',id,'create',1,actor,{name,folderId,kind,tags,...(kind==='task_list'?{taskActivity:{version:1,created:0,completed:0,reopened:0,removed:0,updated:0,changes:[],totalChanges:0}}:{})})
   ];
   await env.DB.batch(statements);
   return {id,name,kind,tags,revision:1,contentSha256:digest};

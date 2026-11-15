@@ -99,10 +99,10 @@ export function Shell({children}:{children:React.ReactNode}){
  // the Dialog's built-in open animation then runs without a cold chunk delay.
  useEffect(()=>{
   if(typeof window.requestIdleCallback==='function'){
-   const handle=window.requestIdleCallback(()=>{void loadQuickSwitcher();},{timeout:1800});
+   const handle=window.requestIdleCallback(()=>{void loadQuickSwitcher().catch(()=>{});},{timeout:1800});
    return()=>window.cancelIdleCallback(handle);
   }
-  const handle=window.setTimeout(()=>{void loadQuickSwitcher();},500);
+  const handle=window.setTimeout(()=>{void loadQuickSwitcher().catch(()=>{});},500);
   return()=>window.clearTimeout(handle);
  },[]);
  useEffect(()=>{const handler=(event:KeyboardEvent)=>{
@@ -126,7 +126,7 @@ export function Shell({children}:{children:React.ReactNode}){
   </div>}>
   <OverlayScroll className="sidebar-scroll" axis="y">
    <div className="sidebar-quick">
-    <NavRow icon="search" label="搜索" className="nav-search" trailing={<Kbd className="nav-kbd" keys="mod+k" style={{gap:appleShortcut?0:'.25em'}}/>} onPointerEnter={()=>{void loadQuickSwitcher();}} onFocus={()=>{void loadQuickSwitcher();}} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
+    <NavRow icon="search" label="搜索" className="nav-search" trailing={<Kbd className="nav-kbd" keys="mod+k" style={{gap:appleShortcut?0:'.25em'}}/>} onPointerEnter={()=>{void loadQuickSwitcher().catch(()=>{});}} onFocus={()=>{void loadQuickSwitcher().catch(()=>{});}} onClick={()=>{closeMobile();setPaletteActivated(true);setCommands(true);}}/>
     <nav aria-label="主导航" className="nav-list">{quickLinks.map(({to,name,icon})=><NavRow key={to} to={to} icon={icon} label={name} onClick={closeMobile} exact={to==='/'}/>)}</nav>
    </div>
    <PageTree onNavigate={closeMobile}/>

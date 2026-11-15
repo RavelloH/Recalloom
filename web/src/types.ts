@@ -6,4 +6,4 @@ export type RecentUpdate={id:string;name:string;kind:'document'|'task_list';upda
 export type Task={id:string;recordId:string;title:string;details?:string;status:'todo'|'in_progress'|'blocked'|'done'|'cancelled';priority:number};
 export type Session={id:string;createdAt:number;lastSeenAt:number;expiresAt:number;userAgent:string};
 export type Version={revision:number;message?:string;actor?:string;createdAt?:string;contentSha256?:string};
-export type Event={id?:string;seq?:number;actor?:string;actorName?:string;actorKind?:'user'|'agent'|'system'|'unknown';clientName?:string|null;operation?:string;resourceName?:string;recordId?:string|null;entityType?:string;entityId?:string;createdAt?:string;revision?:number};
+export type Event={id?:string;seq?:number;actor?:string;actorName?:string;actorKind?:'user'|'agent'|'system'|'unknown';clientName?:string|null;operation?:string;resourceName?:string;recordId?:string|null;entityType?:string;entityId?:string;createdAt?:string;revision?:number|null;details?:Record<string,unknown>|null;category?:string;resourceExists?:boolean;recordKind?:string|null};

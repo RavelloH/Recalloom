@@ -4,7 +4,6 @@ import React from 'react';
 import {createRootRoute,createRoute,createRouter,Outlet,Navigate,useLocation,lazyRouteComponent} from '@tanstack/react-router';
 import {useQuery} from '@tanstack/react-query';
 import {ApiError,api} from './api';
-import {Shell} from './shell';
 import {prepareScrollbars,useScrollbarsReady} from './scrollbars';
 import {preparePairedNavigation,type ResolveSharedLabel} from './shared-view-transition';
 import {getRecentPages} from './recent-pages';
@@ -31,7 +30,7 @@ const TasksPage=lazyRouteComponent(importTasks,'TasksPage');
 const SearchPage=lazyRouteComponent(importSearch,'SearchPage');
 const ActivityPage=lazyRouteComponent(importActivity,'ActivityPage');
 const SettingsPage=lazyRouteComponent(importSettings,'SettingsPage');
-import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,isSearchMode,type SearchMode} from './queries';
+import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 import {taskListPages,taskPages,taskItemQuery,readTaskPreferences} from './tasks/data';
 const prepareTasks=(recordId?:string)=>{
@@ -45,17 +44,21 @@ const KnowledgeGraphPage=React.lazy(importGraph);
 const RmdHelpPage=React.lazy(importHelp);
 const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="status">正在加载 RMD 语法帮助…</div>}><RmdHelpPage/></React.Suspense>;
 const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
+// Navigation and its gesture/resize engine belong to the authenticated shell.
+// Warm it alongside session lookup without adding that code to the login entry.
+const loadShell=()=>import('./shell');
+const Shell=React.lazy(()=>loadShell().then(module=>({default:module.Shell})));
 export const sessionQuery=()=>({queryKey:['auth-session'],queryFn:()=>api<{authenticated:boolean;session:{id:string}}>('/auth/session'),retry:false,staleTime:60000});
 function Root(){const state=useQuery(sessionQuery());const onLogin=useLocation({select:location=>location.pathname})==='/login';
  const scrollbarReady=useScrollbarsReady();
- React.useEffect(()=>{if(!onLogin&&!scrollbarReady)void prepareScrollbars();},[onLogin,scrollbarReady]);
+ React.useEffect(()=>{if(!onLogin){void loadShell().catch(()=>{});if(!scrollbarReady)void prepareScrollbars();}},[onLogin,scrollbarReady]);
  if(onLogin)return <React.Suspense fallback={<div className="center-screen" role="status">正在加载登录页面…</div>}><Outlet/></React.Suspense>;
  if(state.isPending)return <div className="center-screen"><Spinner size="sm" label="正在连接…"/></div>;
  if(state.isError){if(state.error instanceof ApiError&&state.error.status===401)return <Navigate to="/login" replace/>;return <div className="center-screen"><div><p>无法连接 Recalloom</p><p className="muted">{state.error.message}</p><Button label="重试" variant="secondary" onClick={()=>state.refetch()}/></div></div>;}
  // The shell's scroll viewports must initialize before they paint; do not
  // withhold the login page or auth request while the engine chunk downloads.
  if(!scrollbarReady)return <div className="center-screen" role="status"><Spinner size="sm" label="正在准备界面…"/></div>;
- return <Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell>;
+ return <React.Suspense fallback={<div className="center-screen" role="status"><Spinner size="sm" label="正在准备界面…"/></div>}><Shell><React.Suspense fallback={<div className="page" role="status">正在加载页面…</div>}><Outlet/></React.Suspense></Shell></React.Suspense>;
 }
 // Wait for critical page data AND lazy component code before committing the
 // destination. The former 600ms cap could resolve while the cache was still
@@ -100,7 +103,7 @@ const list=[
   // Search is interactive: commit query/mode changes immediately and let the
   // page's React Query state show progress instead of blocking navigation.
   loader:()=>ready(importSearch())}),
- createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>ready(importActivity(),queryClient.ensureInfiniteQueryData(activityPagesQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>ready(importActivity())}),
  createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute,loader:()=>ready(importHelp())}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/appearance',component:()=> <Navigate to="/settings" replace/>}),

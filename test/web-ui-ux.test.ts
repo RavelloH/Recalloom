@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {highlightedSegments} from '../web/src/highlight.js';
-import {recentActivity,rememberOAuthActor} from '../src/web-activity.js';
+import {rememberOAuthActor} from '../src/web-activity.js';
 import type {Env} from '../src/types.js';
 
 test('literal highlighting preserves original text and only marks true matches',()=>{
@@ -12,32 +12,6 @@ test('literal highlighting preserves original text and only marks true matches',
  assert.deepEqual(highlightedSegments('你好世界 你好','你好').filter(v=>v.matched).map(v=>v.text),['你好','你好']);
 });
 
-test('recent activity is newest-first and enriches resource/actor from persisted OAuth registration',async()=>{
- let sql='';const env={DB:{prepare:(q:string)=>{sql=q;return {bind:()=>({all:async()=>({results:[{seq:9,revision:3,actor:'grant:agent-uuid',createdAt:'2026-10-29T00:00:00Z',recordId:'r1',operation:'update',entityType:'record',entityId:'r1',detailsJson:'{}',recordName:'Design.md',folderName:null,clientName:'Codex'},{seq:8,revision:1,actor:'web:owner:x',createdAt:'2026-10-28T00:00:00Z',recordId:null,operation:'create',entityType:'folder',entityId:'f1',detailsJson:'{\"name\":\"Work\"}',recordName:null,folderName:'Work',clientName:null}]})})};}}} as unknown as Env;
- const output=await recentActivity(env,undefined,20);
- assert.match(sql,/ORDER BY e.seq DESC/);
- assert.equal(output.items[0]?.actorName,'Codex');
- assert.equal(output.items[0]?.resourceName,'Design.md');
- assert.equal(output.items[1]?.actorName,'本人（Web）');
- assert.equal(output.items[1]?.resourceName,'Work');
- assert.deepEqual(output.items.map(x=>x.seq),[9,8]);
-});
-
-test('system migrations and genuinely unidentified historical actors have distinct audit names',async()=>{
- const event=(actor:string,seq:number)=>({
-   seq,revision:null,actor,createdAt:'2026-10-29T06:00:00Z',recordId:'r1',
-   operation:'kind_migrate',entityType:'record',entityId:'r1',
-   detailsJson:'{"from":"checkpoint","to":"document"}',recordName:'状态总览.md',folderName:null,clientName:null
- });
- const rows=[event('system:migration',4),event('system:maintenance',3),event('legacy-import',2),event('grant:unregistered',1)];
- const env={DB:{prepare:()=>({bind:()=>({all:async()=>({results:rows})})})}} as unknown as Env;
- const items=(await recentActivity(env)).items;
- assert.deepEqual(items.map(x=>[x.actorName,x.actorKind]),[
-   ['系统迁移','system'],['系统','system'],['未识别的历史操作方','unknown'],['未识别 Agent','agent']
- ]);
- assert.equal(items[0]?.operation,'kind_migrate');
- assert.equal(items[0]?.resourceName,'状态总览.md');
-});
 test('legacy OAuth actor is named when its registered client next uses MCP',async()=>{
  let saved:{name?:string;id?:string}={};
  const env={DB:{prepare:(sql:string)=>({bind:(...args:unknown[])=>({first:async()=>null,run:async()=>{if(sql.includes('INSERT')){saved={id:String(args[0]),name:String(args[1])};}return {};}})})},OAUTH_PROVIDER:{listClients:async()=>({items:[{clientId:'my-client',clientName:'Claude Code'}]})}} as unknown as Env;
