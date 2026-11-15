@@ -91,6 +91,52 @@ async function waitForTaskEditorViewport(modal,width){
   return actualModal===modal&&geometry;
  },{modal,width},{timeout:12000});
 }
+async function assertTaskRecordLayout(width){
+ await page.locator('.task-list-workbench-header').waitFor();
+ await page.locator('[data-task-column] [data-task-id]').first().waitFor();
+ await page.locator('.main-scroll').evaluate(element=>{element.scrollTop=0;});
+ await page.waitForFunction(()=>{
+  const view=document.querySelector('.record-page.workbench-tasks .tasks-view');
+  const viewport=document.querySelector('.main-scroll');
+  return view&&viewport&&view.getBoundingClientRect().bottom<=viewport.getBoundingClientRect().bottom+2;
+ });
+ const layout=await page.locator('.record-page.workbench-tasks').evaluate(element=>{
+  const bounds=selector=>{
+   const rect=element.querySelector(selector)?.getBoundingClientRect();
+   return rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height,right:rect.right,bottom:rect.bottom}:null;
+  };
+  const viewport=document.querySelector('.main-scroll').getBoundingClientRect();
+  const topbar=document.querySelector('.topbar').getBoundingClientRect();
+  return {header:bounds('.task-list-workbench-header'),toolbar:bounds('.tasks-toolbar'),
+   identity:bounds('.workbench-identity'),
+   actions:bounds('.tasks-toolbar-actions'),more:bounds('.tasks-toolbar-actions button[aria-label="更多操作"]'),
+   create:bounds('.tasks-toolbar-actions [data-task-create]'),view:bounds('.tasks-view'),
+   viewport:{top:viewport.top,bottom:viewport.bottom,height:viewport.height},topbarBottom:topbar.bottom,
+   standalone:element.querySelectorAll('.page-actions-bar').length,
+   overflow:document.documentElement.scrollWidth-innerWidth};
+ });
+ assert.ok(layout.header&&layout.toolbar&&layout.actions&&layout.more&&layout.create&&layout.view,
+  'Task record exposes its compact header and grouped actions at '+width+'px: '+JSON.stringify(layout));
+ const topGap=layout.header.y-Math.max(layout.viewport.top,layout.topbarBottom);
+ assert.ok(topGap>=0&&topGap<=24,
+  'Task record begins near the top bar at '+width+'px: '+topGap);
+ assert.ok(layout.identity&&layout.identity.y>=layout.topbarBottom&&layout.identity.height>=20,
+  'Task list type and revision stay below the fixed top bar at '+width+'px: '+JSON.stringify(layout));
+ assert.ok(Math.abs(layout.more.y+layout.more.height/2-layout.create.y-layout.create.height/2)<2&&
+  layout.create.x-layout.more.right>=4&&layout.create.x-layout.more.right<=8,
+  'More sits immediately left of New Task on the same row at '+width+'px: '+JSON.stringify(layout));
+ assert.ok(Math.abs(layout.actions.right-layout.toolbar.right)<2,
+  'Task record actions align to the right at '+width+'px: '+JSON.stringify(layout));
+ assert.equal(layout.standalone,0,'No standalone More action row at '+width+'px');
+ assert.equal(await page.getByRole('button',{name:'更多操作',exact:true}).count(),1,
+  'The task record has exactly one More action at '+width+'px');
+ assert.ok(layout.view.bottom<=layout.viewport.bottom+2&&layout.view.height>=180,
+  'Task view fits the remaining viewport at '+width+'px: '+JSON.stringify(layout));
+ assert.ok(layout.overflow<=1,'Task record has no page overflow at '+width+'px');
+ if(width>1000)assert.ok(layout.view.height>layout.viewport.height*.6,
+  'Desktop task board uses the space released above its header');
+ await page.screenshot({path:join(artifactDir,'record-'+width+'-light.png')});
+}
 const api=(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{
  const response=await fetch('/api'+path,{method,headers:body?{'content-type':'application/json'}:undefined,
   body:body?JSON.stringify(body):undefined});
@@ -427,10 +473,19 @@ try{
  assert.ok((await progress.boundingBox())?.width>20,'Grouped lists show a real progress bar next to creation');
  await animatedGroup.evaluate(element=>{
   const body=element.querySelector('.tasks-group-collapse');
+  const icon=element.querySelector('.tasks-group-collapse-icon');
   window.__taskCollapseFrames=[];
+  window.__taskCollapseRotationFrames=[];
+  window.__taskCollapseIcon=icon;
   element.querySelector('button[aria-expanded]').addEventListener('click',()=>{
    const start=performance.now();
-   const sample=()=>{window.__taskCollapseFrames.push(body.getBoundingClientRect().height);if(performance.now()-start<900)requestAnimationFrame(sample);};
+   const sample=()=>{
+    if(!icon.isConnected)return;
+    window.__taskCollapseFrames.push(body.getBoundingClientRect().height);
+    const matrix=new DOMMatrix(getComputedStyle(icon).transform);
+    window.__taskCollapseRotationFrames.push(Math.atan2(matrix.b,matrix.a)*180/Math.PI);
+    if(performance.now()-start<900)requestAnimationFrame(sample);
+   };
    sample();
   },{once:true});
  });
@@ -446,8 +501,18 @@ try{
  const collapseFrames=await page.evaluate(()=>window.__taskCollapseFrames);
  assert.ok(collapseFrames.some(height=>height>3&&height<collapseFrames[0]-3),
   'Collapsing a task group has intermediate height frames');
+ const rotation=await animatedGroup.evaluate(element=>({frames:window.__taskCollapseRotationFrames,
+  sameIcon:element.querySelector('.tasks-group-collapse-icon')===window.__taskCollapseIcon}));
+ assert.ok(rotation.sameIcon,'Collapse preserves one icon element rather than replacing its content');
+ assert.ok(rotation.frames.some(angle=>angle>1&&angle<89),'Collapse icon rotates through intermediate angles: '+JSON.stringify(rotation));
  await animatedGroup.getByRole('button',{name:'展开'+todo.list.name,exact:true}).click();
  await animatedGroup.locator('[data-task-id]').first().waitFor();
+ await page.waitForFunction(id=>{
+  const icon=document.querySelector('[data-task-list-id="'+CSS.escape(id)+'"] .tasks-group-collapse-icon');
+  if(icon!==window.__taskCollapseIcon)return false;
+  const matrix=new DOMMatrix(getComputedStyle(icon).transform);
+  return Math.abs(Math.atan2(matrix.b,matrix.a)*180/Math.PI-90)<1;
+ },todo.list.id);
  await page.screenshot({path:join(artifactDir,'list-light.png')});
  await boardMode.click();
  await openStatusFilter();
@@ -723,6 +788,11 @@ try{
  assert.equal(await deepLinkEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),deepLinkTask.title,
   'Returning to the same task deep-link reopens its closed panel');
  await deepLinkEditor.getByRole('button',{name:'关闭',exact:true}).click();
+ await deepLinkEditor.waitFor({state:'hidden'});
+ await assertTaskRecordLayout(1600);
+ await page.setViewportSize({width:800,height:1100});
+ await assertTaskRecordLayout(800);
+ await page.setViewportSize({width:1600,height:1100});
  await page.goto(base+'/');
  const todoSection=page.locator('section').filter({has:page.getByRole('heading',{name:'未完成事项',exact:true})});
  const homeTodo=todoSection.locator('a[href*="task="]').first();
@@ -808,6 +878,9 @@ try{
   const noOverflow=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth}));
   assert.ok(noOverflow.scrollWidth<=noOverflow.viewport+1,'Task editor does not overflow at '+width+'px');
   await mobileEditor.getByRole('button',{name:'关闭',exact:true}).click();
+  await mobileEditor.waitFor({state:'hidden'});
+  await page.goto(base+'/records/'+todo.list.id);
+  await assertTaskRecordLayout(width);
  }
 
  assert.deepEqual(faults,[],'Browser runtime errors');

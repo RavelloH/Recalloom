@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {useInfiniteQuery} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
@@ -14,7 +14,7 @@ import {TaskEditors,type TaskSelection} from '../tasks/editor';
 import {TasksContentTransition,TasksResultCount,TasksStateTransition,TasksViewSwitcher} from '../tasks/toolbar';
 import {PageTitle,ErrorText,Empty} from './shared';
 
-export function TasksPage({recordId,focusTaskId}:{recordId?:string;focusTaskId?:string}){
+export function TasksPage({recordId,focusTaskId,recordActions}:{recordId?:string;focusTaskId?:string;recordActions?:ReactNode}){
  const [preferences]=useState(readTaskPreferences),[view,setView]=useState(preferences.view),[statuses,setStatuses]=useState(preferences.statuses);
  const [source,setSource]=useState('all'),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[catalogNeeded,setCatalogNeeded]=useState(false);
  const [selection,setSelection]=useState<TaskSelection|null>(()=>focusTaskId?{id:focusTaskId,recordId}:null);
@@ -61,7 +61,7 @@ export function TasksPage({recordId,focusTaskId}:{recordId?:string;focusTaskId?:
     {!recordId&&<div className="tasks-filter-source"><Selector label="所属任务列表" isLabelHidden size="sm" variant="secondary" width="100%" value={source} onChange={setSource} onFocus={()=>setCatalogNeeded(true)} onClick={()=>setCatalogNeeded(true)} hasSearch presentation="adaptive" options={[{value:'all',label:'所有任务列表'},...catalogLists.map(list=>({value:list.id,label:list.name,description:list.path}))]}/></div>}
     <div className="tasks-filter-search" data-task-search><TextInput label="搜索任务" isLabelHidden size="sm" value={search} onChange={value=>setSearch(value.slice(0,200))} placeholder="搜索任务…" startIcon={<Icon name="search" size="sm"/>} width="100%"/></div>
    </div>
-   <TasksResultCount pending={listsQuery.isPending} total={total}/>{recordId&&createButton}
+   <TasksResultCount pending={listsQuery.isPending} total={total}/>{recordId&&<div className="tasks-toolbar-actions">{recordActions}{createButton}</div>}
   </div>
   <TasksStateTransition stateKey={actions.error?String(actions.error):'none'}>{Boolean(actions.error)&&<ErrorText error={actions.error}/>}</TasksStateTransition>
   <TasksStateTransition stateKey={catalog.isFetchNextPageError&&catalogNeeded?'error':'none'}>{catalog.isFetchNextPageError&&catalogNeeded&&<div className="tasks-error"><ErrorText error={catalog.error}/><Button label="重新加载任务列表" variant="ghost" size="sm" onClick={()=>void catalog.fetchNextPage()}/></div>}</TasksStateTransition>

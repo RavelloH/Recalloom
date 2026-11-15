@@ -232,6 +232,8 @@
   max-width: none;
   width: 100%;
   padding-inline: clamp(20px, 2.8vw, 42px);
+  /* The 46px desktop topbar overlays the scrolling page. Keep a 16px gap below it. */
+  padding-block-start: 62px;
   padding-block-end: 16px;
 }
 
@@ -260,6 +262,14 @@
   outline-offset: 0;
   overflow: hidden;
   background: transparent;
+}
+
+.tasks-toolbar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
 }
 
 .tasks-view-switch > button {
@@ -652,6 +662,16 @@
   background: var(--rk-canvas);
 }
 
+.tasks-group-collapse-icon {
+  display: inline-flex;
+  transform: rotate(0deg);
+  transition: transform 160ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.tasks-group-collapse-icon.is-expanded {
+  transform: rotate(90deg);
+}
+
 .tasks-group-name {
   flex: 1 1 180px;
   min-width: 0;
@@ -972,6 +992,7 @@
 
   .page.record-page.workbench-tasks {
     padding-inline: var(--rk-gutter);
+    padding-block-start: 16px;
     padding-block-end: 8px;
   }
 
@@ -1091,7 +1112,8 @@
   .tasks-card,
   .tasks-row,
   .tasks-column,
-  .tasks-group-progress-fill {
+  .tasks-group-progress-fill,
+  .tasks-group-collapse-icon {
     transition: none;
   }
 }
@@ -1198,11 +1220,6 @@
 .workbench-tasks .workbench-details-trigger {
   flex: none;
   white-space: nowrap;
-}
-
-.workbench-tasks .record-main .page-actions-bar {
-  margin-top: 11px;
-  margin-bottom: 5px;
 }
 
 @media (max-width: 720px) {

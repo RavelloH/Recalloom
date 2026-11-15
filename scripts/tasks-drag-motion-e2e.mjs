@@ -132,6 +132,60 @@ function assertMotion(probe,label,{layout,status=null,key=null}){
  assert.ok(intermediate,label+' captures a real intermediate sibling transform: '+JSON.stringify(probe.frames.slice(-12)));
 }
 
+async function startOrderProbe(recordId){
+ await page.evaluate(id=>{
+  const probe={done:false,frames:[]};
+  const matrix=element=>{
+   const value=getComputedStyle(element).transform;
+   if(!value||value==='none')return {x:0,y:0};
+   const parsed=new DOMMatrixReadOnly(value);return {x:parsed.m41,y:parsed.m42};
+  };
+  const frame=()=>{
+   probe.frames.push([...document.querySelectorAll('[data-task-record-id="'+CSS.escape(id)+'"][data-task-id]')].map(element=>({
+    id:element.getAttribute('data-task-id'),transform:matrix(element),running:element.getAnimations().some(animation=>
+     animation.playState==='running'||animation.playState==='pending')
+   })));
+   if(!probe.done&&probe.frames.length<120)requestAnimationFrame(frame);
+  };
+  probe.stop=()=>{probe.done=true;};window.__taskOrderProbe=probe;requestAnimationFrame(frame);
+ },recordId);
+}
+
+async function stopOrderProbe(){
+ return page.evaluate(async()=>{
+  const probe=window.__taskOrderProbe;if(!probe)return [];
+  probe.stop();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return probe.frames;
+ });
+}
+
+function assertOrderMotion(frames,label){
+ assert.ok(frames.length>2,label+' captures layout frames');
+ const offsets=frames.flat().map(item=>Math.abs(item.transform.y)).filter(value=>value>1);
+ assert.ok(offsets.length>1&&Math.max(...offsets)-Math.min(...offsets)>.5,label+' animates real intermediate row positions');
+}
+
+async function waitForStableHandle(handle){
+ await handle.evaluate(async element=>{
+  const region=element.closest('[data-task-list-id],[data-task-column]')??element.parentElement??element;
+  const tracked=[];
+  for(let node=element;node;node=node.parentElement){tracked.push(node);if(node===region)break;}
+  let previous=null,stableFrames=0;
+  const deadline=performance.now()+4000;
+  while(performance.now()<deadline){
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   if(!element.isConnected)throw Error('Drag handle was detached while waiting for stable geometry');
+   const rects=tracked.map(node=>node.getBoundingClientRect());
+   const stable=previous&&rects.every((rect,index)=>{
+    const before=previous[index];return before&&Math.abs(rect.x-before.x)<.05&&Math.abs(rect.y-before.y)<.05&&
+     Math.abs(rect.width-before.width)<.05&&Math.abs(rect.height-before.height)<.05;
+   });
+   stableFrames=stable?stableFrames+1:0;previous=rects;
+   if(stableFrames>=5)return;
+  }
+  throw Error('Drag handle geometry did not settle before pointer input');
+ });
+}
+
 async function beginMouseDrag(sourceId){
  const handle=page.locator('[data-task-id="'+sourceId+'"] [data-task-drag]').first();
  await handle.scrollIntoViewIfNeeded();
@@ -139,6 +193,9 @@ async function beginMouseDrag(sourceId){
   const button=document.querySelector('[data-task-id="'+CSS.escape(id)+'"] [data-task-drag]');
   return Boolean(button&&!button.disabled&&button.getAttribute('draggable')==='true');
  },sourceId);
+ await waitForStableHandle(handle);
+ await handle.hover();
+ await waitForStableHandle(handle);
  const bounds=await handle.boundingBox();assert.ok(bounds,'Source drag handle is visible');
  await startMotionProbe(sourceId);
  const start={x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
@@ -170,7 +227,7 @@ try{
  for(let index=1;index<=5;index++){
   const title=prefix+String(index);
   const result=await requireApi('/tasks/mutate','POST',{recordId:list.id,action:'add',expectedRevision:revision,
-   changes:{title,details:'Motion fixture '+index,status:'todo',priority:0}});
+   changes:{title,details:'Motion fixture '+index,status:'todo',priority:[2,9,4,7,1][index-1]}});
   revision=result.revision;
   const task=result.tasks.find(item=>item.title===title);assert.ok(task,'Seed mutation returns '+title);seeded.push(task);
  }
@@ -205,6 +262,8 @@ try{
  const moved=await requireApi('/tasks/'+boardSource.id);
  assert.equal(moved.item.status,'in_progress','Board drag persists the destination status');
  assert.equal(moved.item.recordId,list.id,'Board drag keeps the source task list');
+ await page.waitForFunction(id=>Boolean(document.querySelector('[data-task-column="in_progress"] [data-task-id="'+CSS.escape(id)+'"]')&&
+  !document.querySelector('[data-task-column="todo"] [data-task-id="'+CSS.escape(id)+'"]')),boardSource.id);
 
  // A board column may contain several task lists. Moving to the canonical end
  // of one list must reserve space at that recordId segment, not column end.
@@ -237,6 +296,14 @@ try{
  const segmentResponse=await segmentMutation;assert.ok(segmentResponse.ok(),'Mixed board drag mutation succeeds');await segmentResponse.finished();
  await waitForDragCleanup();await stopMotionProbe();
  assert.equal((await requireApi('/tasks/'+boardSource.id)).item.status,'blocked','Mixed board drag persists destination status');
+ await page.waitForFunction(({sourceId,recordId})=>{
+  const container=document.querySelector('[data-task-column="blocked"] [data-task-drop-container]');if(!container)return false;
+  const tasks=[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]'));
+  const recordIds=tasks.map(element=>element.getAttribute('data-task-record-id'));
+  return tasks.some(element=>element.getAttribute('data-task-id')===sourceId)&&
+   recordIds.every((value,index)=>index===0||recordIds[index-1].localeCompare(value)<=0)&&
+   tasks.filter(element=>element.getAttribute('data-task-record-id')===recordId).at(-1)?.getAttribute('data-task-id')===sourceId;
+ },{sourceId:boardSource.id,recordId:list.id});
 
  // List: move the last canonical task before the first and assert the exact
  // API order, in addition to the same live geometry/motion contract.
@@ -262,6 +329,13 @@ try{
  assertMotion(listProbe,'List drag',{layout:'row',key:'list:'+list.id});
  const afterListIds=(await readTasks(list.id)).map(item=>item.id);
  assert.deepEqual(afterListIds,[listSource,...beforeIds.filter(id=>id!==listSource)],'List drag persists the exact manual order');
+ const listMetadata=await requireApi('/task-lists?'+new URLSearchParams({recordId:list.id}));
+ assert.equal(listMetadata.items[0]?.order,'manual','First reorder freezes priority order into manual order');
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:afterListIds});
 
  // Releasing after leaving every valid drop container must discard the last
  // valid target and submit no stale move.
@@ -321,9 +395,46 @@ try{
  await waitForDragCleanup();
  const keyboardAfter=(await readTasks(list.id)).map(item=>item.id);
  assert.deepEqual(keyboardAfter,[...keyboardBefore.slice(1),keyboardSource],'Keyboard End + Enter persists the task at the list end');
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:keyboardAfter});
+
+ // Drawer controls use the same authoritative response. Verify both directions
+ // update the visible list immediately and animate the real rows into place.
+ const drawerSource=keyboardAfter[1];assert.ok(drawerSource,'Drawer reorder source exists');
+ await group.locator('[data-task-id="'+drawerSource+'"] [data-task-edit]').click();
+ const editor=page.locator('[id="task-editor-'+drawerSource+'"] [data-task-editor]');await editor.waitFor();
+ const moveDown=editor.getByRole('button',{name:'下移任务',exact:true});await moveDown.waitFor();
+ const drawerBefore=(await readTasks(list.id)).map(item=>item.id),drawerIndex=drawerBefore.indexOf(drawerSource);
+ assert.ok(drawerIndex>=0&&drawerIndex<drawerBefore.length-1,'Drawer source can move down');
+ const drawerDownExpected=[...drawerBefore];drawerDownExpected.splice(drawerIndex,1);drawerDownExpected.splice(drawerIndex+1,0,drawerSource);
+ await startOrderProbe(list.id);
+ const downMutation=waitForMutation();await moveDown.click();
+ const downResponse=await downMutation;assert.ok(downResponse.ok(),'Drawer move down mutation succeeds');await downResponse.finished();
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:drawerDownExpected});
+ await page.waitForTimeout(90);assertOrderMotion(await stopOrderProbe(),'Drawer move down');
+ assert.deepEqual((await readTasks(list.id)).map(item=>item.id),drawerDownExpected,'Drawer move down persists exact order');
+
+ const moveUp=editor.getByRole('button',{name:'上移任务',exact:true});await moveUp.waitFor();
+ await startOrderProbe(list.id);
+ const upMutation=waitForMutation();await moveUp.click();
+ const upResponse=await upMutation;assert.ok(upResponse.ok(),'Drawer move up mutation succeeds');await upResponse.finished();
+ await page.waitForFunction(({listId,expected})=>{
+  const container=document.querySelector('[data-task-drop-key="list:'+CSS.escape(listId)+'"]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{listId:list.id,expected:drawerBefore});
+ await page.waitForTimeout(90);assertOrderMotion(await stopOrderProbe(),'Drawer move up');
+ assert.deepEqual((await readTasks(list.id)).map(item=>item.id),drawerBefore,'Drawer move up restores exact order');
 
  assert.deepEqual(faults,[],'Browser runtime errors');
- console.log('PASS task drag motion:',engine,'board/list preview, in-flow slot, FLIP frames, Escape and keyboard order');
+ console.log('PASS task drag motion:',engine,'board/list preview, in-flow slot, FLIP frames, immediate DOM order, drawer order and keyboard order');
 }catch(error){
  const failureScreenshot=join(artifactDir,'failure.png');
  await page.screenshot({path:failureScreenshot,fullPage:true}).catch(()=>undefined);

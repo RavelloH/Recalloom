@@ -16,7 +16,7 @@ import {markdownCharacterCount} from '../document-heading';
 import {filenameFromDocumentTitle} from '../document-filename';
 import {useConfirmDialog} from '../confirm-dialog';
 import {TopbarPortal} from '../topbar-slot';
-import {Breadcrumbs,PageActions,TagEditor} from '../page-chrome';
+import {Breadcrumbs,TagEditor} from '../page-chrome';
 import {rememberPage,forgetPage} from '../recent-pages';
 import {revealFolder} from '../page-tree';
 import {consumeTitleFocus} from '../create-page';
@@ -129,7 +129,7 @@ export function RecordPage(){
   :<TaskListWorkbenchHeader item={item} focusTitle={focusTitle} onRename={next=>saveMeta({name:next})}
     onDetails={()=>setMetaOpen(value=>!value)} detailsOpen={metaOpen}/>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage key={recordId} recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage key={recordId} recordId={recordId} focusTaskId={focusTaskId} recordActions={pageActions}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
   pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanels.includes('history')}
   outlineOpen={documentPanels.includes('outline')} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>

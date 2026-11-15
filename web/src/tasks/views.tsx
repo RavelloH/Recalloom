@@ -61,7 +61,7 @@ function TaskGroup({list,scope,statuses,root,interactions}:{list:TaskList;scope:
  return <section className="tasks-group" data-task-list-id={list.id} ref={ref}>
   <header className="tasks-group-header">
    <IconButton variant="ghost" size="sm" label={(expanded?'折叠':'展开')+list.name} aria-expanded={expanded}
-    icon={<AutoTransition as="span" mode="sync" transitionKey={expanded?'open':'closed'} duration={.14}><Icon name={expanded?'chevronDown':'chevronRight'} size="sm"/></AutoTransition>}
+    icon={<span className={'tasks-group-collapse-icon'+(expanded?' is-expanded':'')}><Icon name="chevronRight" size="sm" aria-hidden="true"/></span>}
     onClick={()=>setExpanded(v=>!v)}/>
    <div className="tasks-group-name"><h2>{list.name}</h2><span className="tasks-group-path" title={list.path}>{list.path}</span></div>
    <div className="tasks-group-progress" title={'已完成 '+list.counts.done+' / '+list.total}

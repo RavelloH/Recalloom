@@ -1,4 +1,5 @@
 import {memo} from 'react';
+import {motion,useReducedMotion} from 'motion/react';
 import {Link} from '@tanstack/react-router';
 import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
@@ -18,8 +19,9 @@ export function TaskStatusControl({item,pending,onStatus}:{item:TaskItem;pending
 }
 export type TaskItemProps={item:TaskItem;pending:boolean;layout:'card'|'row';onEdit:(item:TaskItem)=>void;onStatus:(item:TaskItem,status:TaskStatus)=>void;onDrag:(item:TaskItem|null)=>void;onDrop:(item:TaskItem)=>Promise<void>;canDrop:(item:TaskItem)=>boolean};
 export const TaskEntry=memo(function TaskEntry({item,pending,layout,onEdit,onStatus}:TaskItemProps){
- const drag=useTaskDragItem(item);
- return <article className={(layout==='card'?'tasks-card':'tasks-row')+(drag.activeId===item.id?' is-dragging':'')} data-task-id={item.id} data-task-status={item.status} data-task-record-id={item.recordId}
+ const drag=useTaskDragItem(item),reduceMotion=useReducedMotion();
+ return <motion.article layout={!reduceMotion&&drag.activeId===null?'position':false} transition={{layout:{duration:.19,ease:[.2,.8,.2,1]}}}
+  className={(layout==='card'?'tasks-card':'tasks-row')+(drag.activeId===item.id?' is-dragging':'')} data-task-id={item.id} data-task-status={item.status} data-task-record-id={item.recordId}
   onClick={event=>{if(!(event.target as HTMLElement).closest('button,a'))onEdit(item);}}>
   <AutoResizer className="tasks-entry-resizer" duration={.18}>
    <div className="tasks-entry-content">
@@ -38,5 +40,5 @@ export const TaskEntry=memo(function TaskEntry({item,pending,layout,onEdit,onSta
     {layout==='card'&&<Link data-task-source className="tasks-card-source" to="/records/$recordId" params={{recordId:item.recordId}} title={item.list.path}><Icon name="taskList" size="sm"/><span>{item.list.name}</span></Link>}
    </div>
   </AutoResizer>
- </article>;
+ </motion.article>;
 });
