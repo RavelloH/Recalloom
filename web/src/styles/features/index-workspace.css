@@ -4,6 +4,9 @@
 .index-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .index-toolbar h2, .index-toolbar h3, .index-chart-card h3 { margin: 0; }
 .index-toolbar p { margin: 6px 0 0; }
+.index-model-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.index-model-title h3 { margin: 0; }
+.index-model-id code { overflow-wrap: anywhere; }
 .index-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
 .index-metrics .index-metric { height: auto; min-height: 96px; padding: 16px; text-align: start; }
 .index-metric strong, .storage-value { display: block; margin-top: 8px; font-size: 24px; font-weight: 650; }

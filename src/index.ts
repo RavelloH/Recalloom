@@ -158,7 +158,8 @@ export default {
   scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
     ctx.waitUntil(processVectorDeleteJobs(env,5).then(x=>console.log('Recalloom vector cleanup',JSON.stringify(x))).catch(e=>console.error('Recalloom vector cleanup failed',e)));
     ctx.waitUntil(processIndexJobs(env,5).then(x=>console.log('Recalloom indexing',JSON.stringify(x))).catch(e=>console.error('Recalloom indexing failed',e)));
-    ctx.waitUntil(cleanupIndexVectors(env).then(()=>sampleIndexState(env)).catch(e=>console.error('Index maintenance failed',e)));
+    ctx.waitUntil(cleanupIndexVectors(env).catch(e=>console.error('Index maintenance failed',e)));
+    ctx.waitUntil(sampleIndexState(env,true).catch(e=>console.error('Index metrics sampling failed',e)));
     ctx.waitUntil(cleanupWebAuth(env).catch(e=>console.error('Recalloom Web auth cleanup failed',e)));
   }
 } satisfies ExportedHandler<Env>;

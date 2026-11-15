@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {processIndexJobs,cleanupIndexVectors,drainIndexJobs} from '../src/indexing.js';
-import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllIndexes} from '../src/index-observability.js';
+import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllIndexes,sampleIndexState} from '../src/index-observability.js';
 import {createFolder,createRecord,editRecord,updateMeta} from '../src/storage.js';
 import {previewDeleteFolder,deleteFolder} from '../src/lifecycle.js';
 import type {Env} from '../src/types.js';
@@ -108,4 +108,14 @@ test('exhausted tasks stop advertising a retry time and new writes clear obsolet
  f.sql.prepare("UPDATE index_jobs SET attempts=4,total_chunks=10,completed_chunks=5").run();f.onEmbed(async()=>{throw Error('model unavailable');});await processIndexJobs(f.env,1);
  const failed=f.sql.prepare('SELECT * FROM index_jobs').get()!;assert.equal(failed.state,'failed');assert.equal(failed.next_retry_at,null);
  await editRecord(f.env,record.id,1,'new version');const pending=f.sql.prepare('SELECT * FROM index_jobs').get()!;assert.equal(pending.state,'pending');assert.equal(pending.attempts,0);assert.equal(pending.total_chunks,0);assert.equal(pending.completed_chunks,0);
+});
+
+test('scheduled remote sampling records real counts without depending on storage page reads',async()=>{
+ const f=fixture();f.vectors.set('vector-a',{});await sampleIndexState(f.env,true);
+ assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1);
+ await sampleIndexState(f.env);assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1);
+ Object.assign(f.env.VECTORIZE,{describe:async()=>{throw Error('service unavailable');}});
+ await sampleIndexState(f.env,true);assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1,'A failed refresh preserves the last real count within the hour');
+ f.sql.exec('DELETE FROM index_samples');await sampleIndexState(f.env,true);
+ assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,null,'A missing sample is never replaced with a fake zero');
 });

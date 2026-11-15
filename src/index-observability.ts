@@ -18,13 +18,9 @@ export async function indexOverview(env:Env,days=7){
  return {counts:counts.results,coverage,runs:runs.results,samples:samples.results,cleanup,last,performance,model:EMBEDDING_MODEL,dimensions:EMBEDDING_DIMENSIONS,sampledAt:new Date().toISOString()};
 }
 
-export async function storageOverview(env:Env){
- const [documents,chunks,histories]=await Promise.all([
-  env.DB.prepare("SELECT COUNT(*) AS count,COALESCE(SUM(status='archived'),0) AS archived,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM records JOIN record_contents ON record_id=records.id").all(),
-  env.DB.prepare('SELECT COUNT(*) AS count,COUNT(DISTINCT record_id) AS documents,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM search_chunks').first(),
-  env.DB.prepare('SELECT (SELECT COUNT(*) FROM revisions) AS revisions,COALESCE(SUM(length(CAST(history_metadata AS BLOB))),0) AS bytes FROM record_histories').first()
- ]);
- let remote:{status:string;count:number|null;dimensions:number|null;processedAt:string|null;sampledAt:string}={status:'unavailable',count:null,dimensions:null,processedAt:null,sampledAt:new Date().toISOString()};
+type RemoteIndexInfo={status:string;count:number|null;dimensions:number|null;processedAt:string|null;sampledAt:string};
+async function readRemoteIndex(env:Env):Promise<RemoteIndexInfo>{
+ let remote:RemoteIndexInfo={status:'unavailable',count:null,dimensions:null,processedAt:null,sampledAt:new Date().toISOString()};
  try{
   const index=env.VECTORIZE as unknown as {describe:()=>Promise<{vectorCount?:number;vectorsCount?:number;dimensions?:number;config?:{dimensions:number};processedUpToDatetime?:string}>};
   let timer:ReturnType<typeof setTimeout>|undefined;
@@ -32,20 +28,30 @@ export async function storageOverview(env:Env){
   const count=info.vectorCount??info.vectorsCount;
   remote={...remote,status:typeof count==='number'?'ready':'unavailable',count:count??null,dimensions:info.dimensions??info.config?.dimensions??null,processedAt:info.processedUpToDatetime??null,sampledAt:new Date().toISOString()};
  }catch{/* Unavailable remote metrics do not fail the local storage report. */}
- await sampleIndexState(env);
- if(remote.count!==null)await env.DB.prepare('UPDATE index_samples SET vector_count=? WHERE hour=?').bind(remote.count,new Date().toISOString().slice(0,13)+':00:00.000Z').run();
+ return remote;
+}
+
+export async function storageOverview(env:Env){
+ const [documents,chunks,histories]=await Promise.all([
+  env.DB.prepare("SELECT COUNT(*) AS count,COALESCE(SUM(status='archived'),0) AS archived,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM records JOIN record_contents ON record_id=records.id").all(),
+  env.DB.prepare('SELECT COUNT(*) AS count,COUNT(DISTINCT record_id) AS documents,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM search_chunks').first(),
+  env.DB.prepare('SELECT (SELECT COUNT(*) FROM revisions) AS revisions,COALESCE(SUM(length(CAST(history_metadata AS BLOB))),0) AS bytes FROM record_histories').first()
+ ]);
+ const remote=await readRemoteIndex(env);
+ await sampleIndexState(env,remote);
  const samples=await env.DB.prepare('SELECT hour AS time,documents,chunks,text_bytes AS textBytes,vector_count AS vectorCount,database_bytes AS databaseBytes FROM index_samples ORDER BY hour DESC LIMIT 720').all();
  return {documents:documents.results[0],chunks,histories,databaseBytes:documents.meta.size_after??null,remote,samples:samples.results.reverse(),sampledAt:new Date().toISOString()};
 }
 
-export async function sampleIndexState(env:Env){
+export async function sampleIndexState(env:Env,remoteInfo?:RemoteIndexInfo|true){
+ const remote=remoteInfo===true?await readRemoteIndex(env):remoteInfo;
  const [counts,size]=await Promise.all([
   env.DB.prepare("SELECT SUM(state IN ('pending','retry')) AS pending,SUM(state='running') AS running,SUM(state='failed') AS failed FROM index_jobs").first<{pending:number;running:number;failed:number}>(),
   env.DB.prepare('SELECT (SELECT COUNT(*) FROM records) AS documents,COUNT(*) AS chunks,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM search_chunks').all<{documents:number;chunks:number;bytes:number}>()
  ]);
  const at=new Date().toISOString(),row=size.results[0];
- await env.DB.prepare('INSERT INTO index_samples(hour,pending,running,failed,documents,chunks,text_bytes,database_bytes,sampled_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(hour) DO UPDATE SET pending=excluded.pending,running=excluded.running,failed=excluded.failed,documents=excluded.documents,chunks=excluded.chunks,text_bytes=excluded.text_bytes,database_bytes=excluded.database_bytes,sampled_at=excluded.sampled_at')
-  .bind(at.slice(0,13)+':00:00.000Z',counts?.pending??0,counts?.running??0,counts?.failed??0,row.documents,row.chunks,row.bytes,size.meta.size_after??null,at).run();
+ await env.DB.prepare('INSERT INTO index_samples(hour,pending,running,failed,documents,chunks,text_bytes,database_bytes,vector_count,sampled_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(hour) DO UPDATE SET pending=excluded.pending,running=excluded.running,failed=excluded.failed,documents=excluded.documents,chunks=excluded.chunks,text_bytes=excluded.text_bytes,database_bytes=excluded.database_bytes,vector_count=COALESCE(excluded.vector_count,index_samples.vector_count),sampled_at=excluded.sampled_at')
+  .bind(at.slice(0,13)+':00:00.000Z',counts?.pending??0,counts?.running??0,counts?.failed??0,row.documents,row.chunks,row.bytes,size.meta.size_after??null,remote?.count??null,at).run();
  await env.DB.batch([
   env.DB.prepare('DELETE FROM index_runs WHERE created_at<?').bind(new Date(Date.now()-30*86400_000).toISOString()),
   env.DB.prepare('DELETE FROM index_samples WHERE hour<?').bind(new Date(Date.now()-90*86400_000).toISOString())

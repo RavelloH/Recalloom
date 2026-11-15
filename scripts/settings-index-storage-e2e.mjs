@@ -25,11 +25,11 @@ try{
  await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:'索引运行情况',exact:true}).waitFor();
  assert.equal(await page.locator('.settings-nav a.active').count(),1);
- await page.getByRole('button',{name:'诊断与维护',exact:true}).click();
  await page.getByRole('button',{name:'重新索引全部有效文稿',exact:true}).click();
  const rebuildDialog=page.getByRole('alertdialog',{name:'重新索引全部有效文稿？',exact:true});await rebuildDialog.waitFor();
  await rebuildDialog.getByRole('button',{name:'取消',exact:true}).click();
- await page.getByRole('button',{name:'诊断与维护',exact:true}).click();
+ assert.equal(await page.getByRole('heading',{name:'Wiki 引用索引',exact:true}).count(),0);
+ assert.ok(await page.locator('.index-model-title').evaluate(el=>Boolean(el.compareDocumentPosition(document.querySelector('.index-task-list'))&Node.DOCUMENT_POSITION_FOLLOWING)),'Model configuration precedes the infinite task list');
  await page.locator('.index-chart-card svg').first().waitFor();assert.equal(await page.locator('.index-chart-card svg').count(),2);
  await page.getByRole('button',{name:one.name,exact:true}).waitFor();await page.screenshot({path:'tmp/settings-index-list-'+engine+'.png'});
  await page.getByRole('button',{name:one.name,exact:true}).click();await page.getByRole('complementary',{name:'索引详情：'+one.name,exact:true}).waitFor();
@@ -42,6 +42,7 @@ try{
  await page.getByRole('navigation',{name:'设置页面'}).getByRole('link',{name:'存储',exact:true}).click();await page.waitForURL(base+'/settings/storage');
  await page.getByRole('heading',{name:'存储容量',exact:true}).waitFor();await page.getByText('逻辑数据量',{exact:true}).waitFor();
  await page.waitForFunction(()=>!document.querySelector('.index-workspace').getAnimations({subtree:true}).some(a=>a.playState==='running'));
+ assert.equal(await page.getByRole('heading',{name:'索引与清理',exact:true}).count(),0);
  await page.screenshot({path:'tmp/settings-storage-desktop-'+engine+'.png'});
  await page.goto('about:blank');await page.setViewportSize({width:390,height:844});await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('button',{name:one.name,exact:true}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No mobile horizontal overflow');

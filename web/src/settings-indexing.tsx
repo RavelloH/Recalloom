@@ -5,7 +5,6 @@ import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Badge} from '@astryxdesign/core/Badge';
 import {api,queryString} from './api';
 import {useConfirmDialog} from './confirm-dialog';
@@ -13,11 +12,10 @@ import {AutoResizer,AutoTransition} from './motion-primitives';
 import {ErrorText,Empty,Loading,fmt} from './pages/shared';
 import {IndexChart} from './index-status-chart';
 import {IndexTaskPanel} from './index-task-panel';
-import {WikiIndexPanel} from './wiki-index-panel';
 import {stateLabels,stageLabels,type IndexTask,type IndexState,type IndexSummary} from './index-status-data';
 
 export function SettingsIndexing(){
- const [days,setDays]=useState('7'),[state,setState]=useState('all'),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[diagnostics,setDiagnostics]=useState(false);
+ const [days,setDays]=useState('7'),[state,setState]=useState('all'),[query,setQuery]=useState(''),[search,setSearch]=useState('');
  const [error,setError]=useState<unknown>(null),[busy,setBusy]=useState<string|null>(null),[panels,setPanels]=useState<Array<{task:IndexTask;open:boolean;activation:number}>>([]),sequence=useRef(0);
  const more=useRef<HTMLDivElement>(null),qc=useQueryClient(),{confirm,confirmation}=useConfirmDialog();
  useEffect(()=>{const timer=setTimeout(()=>setSearch(query),250);return()=>clearTimeout(timer);},[query]);
@@ -36,13 +34,14 @@ export function SettingsIndexing(){
    {label:'正在处理',value:count('running'),filter:'running'},
    {label:'处理失败',value:count('failed'),filter:'failed'}
   ].map(metric=><Button className="index-metric" variant="secondary" key={metric.label} label={metric.label} children={<><span>{metric.label}</span><AutoTransition as="span" transitionKey={String(metric.value)}><strong>{metric.value}</strong></AutoTransition></>} onClick={()=>setState(metric.filter)}/>)}</div>}</AutoTransition></AutoResizer>
+  <Card padding={4}><div className="index-toolbar"><AutoResizer><AutoTransition transitionKey={data?.model??'loading'}><div className="index-model-title"><h3>索引配置</h3><Badge label={data?.model.split('/').at(-1)?.toUpperCase()??'读取中…'}/>{data&&<Badge variant="info" label={data.dimensions+' 维'}/>}</div></AutoTransition></AutoResizer><div className="index-toolbar"><Button href="/settings/storage" size="sm" variant="ghost" label="查看存储"/><Button size="sm" variant="secondary" label="重新索引全部有效文稿" isLoading={busy==='all'} onClick={()=>void rebuild()}/></div></div><p className="index-model-id muted small">嵌入模型 <code>{data?.model??'—'}</code></p><p className="muted small">每项任务最多尝试 5 次，自动退避重试。待清理文稿 {data?.cleanup.records??'—'} · 待清理向量批次 {data?.cleanup.batches??'—'}</p></Card>
   <div className="index-toolbar"><p className="muted small">归档文稿不计入覆盖率。最近 {data?.performance.samples??0} 次成功执行：平均 {data?.performance.meanMs!=null?(data.performance.meanMs/1000).toFixed(1)+' 秒':'—'} · P95 {data?.performance.p95Ms!=null?(data.performance.p95Ms/1000).toFixed(1)+' 秒':'—'}。最早等待 {fmt(data?.last.waitingSince??undefined)}</p><Selector label="统计范围" size="sm" value={days} onChange={setDays} options={[{value:'1',label:'24 小时'},{value:'7',label:'7 天'},{value:'30',label:'30 天'}]}/></div>
   <AutoResizer><AutoTransition transitionKey={days}><div className="index-charts"><IndexChart title="处理情况" description="成功与失败的执行次数，包含重试" data={data?.runs??[]} kind="bar" fields={[{key:'completed',label:'已提交'},{key:'failed',label:'失败'}]}/><IndexChart title="积压变化" description="按小时采样的待处理量；未采样的时段不补零" data={data?.samples??[]} fields={[{key:'pending',label:'等待 / 重试'},{key:'running',label:'处理中'}]}/></div></AutoTransition></AutoResizer>
   <Card padding={4}><div className="index-toolbar"><h3>文稿索引任务</h3><div className="index-filters"><TextInput label="搜索文稿" isLabelHidden placeholder="搜索文稿…" value={query} onChange={setQuery} size="sm"/><Selector label="任务状态" size="sm" value={state} onChange={setState} options={[{value:'all',label:'全部状态'},{value:'waiting',label:'等待处理 / 重试'},...Object.entries(stateLabels).map(([value,label])=>({value,label}))]}/></div></div>
    <AutoResizer><AutoTransition transitionKey={state+search+(tasks.isPending?'loading':'ready')+items.map(t=>t.record_id).join('|')}>{tasks.isPending?<Loading/>:tasks.isError?<ErrorText error={tasks.error}/>:!items.length?<Empty title="没有符合条件的任务"/>:<div className="index-task-list">{items.map(task=><Button variant="ghost" className="index-task-row" key={task.record_id} label={task.name} children={<AutoTransition as="span" className="index-task-content" transitionKey={task.name+task.state+task.stage+task.completed_chunks+task.revision}><span className="index-task-name"><strong>{task.name}</strong><span className="muted small">{task.indexed_revision?'R'+task.indexed_revision:'未索引'} → R{task.revision}{task.record_status==='archived'?' · 已归档':''}</span></span><span><Badge variant={task.state==='failed'?'error':task.state==='running'?'info':'neutral'} label={stateLabels[task.state]}/><span className="muted small">{task.state==='running'?(stageLabels[task.stage]??task.stage)+(task.total_chunks?' · '+task.completed_chunks+'/'+task.total_chunks+' 块':''):task.state==='retry'?'重试于 '+fmt(task.next_retry_at??undefined):fmt(task.finished_at??task.updated_at??task.created_at)}</span></span></AutoTransition>} onClick={()=>open(task)}/>)}</div>}</AutoTransition></AutoResizer>
    <div ref={more}>{tasks.hasNextPage&&<Button variant="ghost" label="加载更多" isLoading={tasks.isFetchingNextPage} onClick={()=>void tasks.fetchNextPage()}/>}</div>
   </Card>
-  <Collapsible trigger="诊断与维护" isOpen={diagnostics} onOpenChange={setDiagnostics}><Card padding={4}><p>模型 {data?.model??'—'} · {data?.dimensions??'—'} 维</p><p className="muted small">待清理文稿 {data?.cleanup.records??'—'} · 待清理向量批次 {data?.cleanup.batches??'—'}</p><p className="muted small">每项任务最多尝试 5 次，自动退避重试；执行记录保留 30 天，容量采样保留 90 天。已提交索引不等于已验证语义查询可见。</p><Button size="sm" variant="secondary" label="重新索引全部有效文稿" isLoading={busy==='all'} onClick={()=>void rebuild()}/><p><a href="/settings/storage">查看存储容量</a></p></Card><WikiIndexPanel/></Collapsible>
+
   {panels.map(panel=><IndexTaskPanel key={panel.task.record_id} task={items.find(t=>t.record_id===panel.task.record_id)??panel.task} open={panel.open} activation={panel.activation} onOpenChange={open=>setPanels(p=>p.map(v=>v.task.record_id===panel.task.record_id?{...v,open}:v))} onAfterClose={()=>setPanels(p=>p.filter(v=>v.task.record_id!==panel.task.record_id||v.open))} onRetry={task=>void retry(task)} busy={busy===panel.task.record_id}/>)}
  </div>;
 }
