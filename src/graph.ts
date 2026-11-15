@@ -113,6 +113,33 @@ async function nodesByIds(env:Env,ids:string[]):Promise<KnowledgeNode[]>{
  ).bind(JSON.stringify(ids)).all()).results as KnowledgeNode[];
 }
 
+/** Bound overview vector work independently of graph size. The UI loads this
+ * enrichment separately, so even a cold/unavailable index cannot delay nodes.
+ * Only current indexed documents are sampled, and suggestions remain ephemeral. */
+async function overviewSemantic(env:Env,nodes:Map<string,KnowledgeNode>,confirmed:KnowledgeEdge[]){
+ const indexed=(await env.DB.prepare(
+  'SELECT DISTINCT s.record_id AS recordId FROM search_chunks s JOIN record_contents c ON c.record_id=s.record_id AND c.revision=s.revision WHERE s.record_id IN (SELECT value FROM json_each(?))'
+ ).bind(JSON.stringify([...nodes.keys()])).all()).results as Array<{recordId:string}>;
+ const ready=new Set(indexed.map(row=>row.recordId));
+ const sources=[...nodes.values()].filter(node=>ready.has(node.id)).slice(0,6);
+ if(!sources.length)return {status:'indexing' as SemanticState,edges:[] as KnowledgeEdge[]};
+ const suggestions:KnowledgeEdge[]=[],states:SemanticState[]=[];
+ // Two concurrent documents, at most 18 vector queries for the whole overview.
+ for(let start=0;start<sources.length;start+=2){
+  const results=await Promise.all(sources.slice(start,start+2).map(source=>relatedSemantic(env,source,6)));
+  for(const result of results){states.push(result.status);suggestions.push(...result.edges);}
+ }
+ const pairs=new Set(confirmed.map(edge=>[edge.sourceId,edge.targetId].sort().join(':')));
+ const degree=new Map<string,number>(),edges:KnowledgeEdge[]=[];
+ for(const edge of suggestions.sort((a,b)=>(b.score??0)-(a.score??0))){
+  const pair=[edge.sourceId,edge.targetId].sort().join(':');
+  if(!nodes.has(edge.targetId)||pairs.has(pair)||(degree.get(edge.sourceId)??0)>=4||(degree.get(edge.targetId)??0)>=4)continue;
+  pairs.add(pair);edges.push(edge);
+  for(const id of [edge.sourceId,edge.targetId])degree.set(id,(degree.get(id)??0)+1);
+ }
+ return {status:states.includes('ready')?'ready' as const:states.includes('unavailable')?'unavailable' as const:'indexing' as const,edges};
+}
+
 export async function recordRelations(env:Env,id:string,options:{semantic?:boolean;limit?:number}={}){
  const source=await node(env,id);
  const explicit=await linksFor(env,id,160);
@@ -182,6 +209,9 @@ export async function graphView(env:Env,options:{focusId?:string;limit?:number;s
    ).bind(JSON.stringify(ids),JSON.stringify(ids)).all()).results as Array<{sourceId:string;targetId:string;kind:'link'|'embed'}>;
    for(const item of wiki)edges.push({id:'wiki:'+item.kind+':'+item.sourceId+':'+item.targetId,
     sourceId:item.sourceId,targetId:item.targetId,type:item.kind==='link'?'reference':'embed',relation:item.kind==='link'?'正文引用':'内容嵌入'});
+   if(options.semantic!==false){
+    const semantic=await overviewSemantic(env,nodes,edges);status=semantic.status;edges.push(...semantic.edges);
+   }
    // Only sparse folder links. Never build an N² clique for a large folder.
    const lastByFolder=new Map<string,string>();
    for(const item of rows){

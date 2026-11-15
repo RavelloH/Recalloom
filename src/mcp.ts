@@ -207,7 +207,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     z.object({id:uuid,semantic:z.boolean().describe('Include Vectorize semantic candidates (default true); false returns only confirmed links.').optional(),limit:z.number().int().min(1).max(25).describe('Maximum semantic candidates (1–25).').optional()}),false,
     (x)=>recordRelations(env,x.id,{semantic:x.semantic!==false,limit:x.limit}));
   register('get_knowledge_graph',
-    z.object({focusId:uuid.describe('Center the graph around one record; omit to show a recent-knowledge subgraph.').optional(),limit:z.number().int().min(10).max(100).optional(),semantic:z.boolean().describe('Include semantic neighbours only when focusId is provided.').optional()}),false,
+    z.object({focusId:uuid.describe('Center the graph around one record; omit to show a recent-knowledge subgraph.').optional(),limit:z.number().int().min(10).max(100).optional(),semantic:z.boolean().describe('Include semantic candidates (default true). Overview samples up to six indexed records and limits semantic degree to four per node.').optional()}),false,
     (x)=>graphView(env,{focusId:x.focusId,limit:x.limit,semantic:x.semantic!==false}));
   register('manage_link',
     z.object({id:uuid,action:z.enum(['add','remove']),targetId:uuid,relation:z.string().min(1).max(64).optional()}),true,

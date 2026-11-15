@@ -95,114 +95,173 @@ try{
  assert.ok(global.nodes.every(n=>n.status!=='archived'));
  assert.ok(global.edges.every(e=>global.nodes.some(n=>n.id===e.sourceId)&&global.nodes.some(n=>n.id===e.targetId)));
 
- await page.goto(base+'/graph?focus='+A.id,{waitUntil:'networkidle'});
- step('canvas and independent panels');
+ // Include unrelated documents outside the focused API response.
+ const otherFolder=expectCode(await api('/folders','POST',{name:'Graph outer '+stamp}),201,'outer folder');
+ const outer=[];
+ for(let index=0;index<16;index++)outer.push(expectCode(await api('/records','POST',{
+  name:'外围文稿 '+index+' · '+stamp,folderId:otherFolder.id,kind:'document',content:'# 外围文稿 '+index
+ }),201,'outer document'));
+ await page.goto(base+'/tasks',{waitUntil:'networkidle'});
+ const taskHeader=await page.locator('.tasks-page').evaluate(el=>({
+  top:getComputedStyle(el).paddingTop,left:getComputedStyle(el).paddingLeft,
+  font:getComputedStyle(el.querySelector('h1')).fontSize,gap:getComputedStyle(el.querySelector('.page-header')).marginBottom
+ }));
+ // Hold semantic enrichment to prove that authoritative content renders first.
+ let releaseSemantic;const semanticGate=new Promise(resolve=>{releaseSemantic=resolve;});
+ await page.route('**/api/graph?**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.searchParams.get('semantic')!=='true'){await route.fallback();return;}
+  const response=await route.fetch(sessionCookie?{headers:{...await route.request().allHeaders(),cookie:sessionCookie}}:undefined),body=await response.json();await semanticGate;
+  assert.equal(response.status(),200,'Semantic enrichment response: '+JSON.stringify(body));
+  const focus=url.searchParams.get('focusId');
+  if(!focus||focus===A.id){
+   if(!body.nodes.some(node=>node.id===outer[0].id))body.nodes.push({...outer[0],folderName:otherFolder.name});
+   body.edges.push({id:'semantic:'+A.id+':'+outer[0].id,sourceId:A.id,targetId:outer[0].id,type:'semantic',relation:'语义相似',score:.91});
+   body.semanticStatus='ready';
+  }
+  await route.fulfill({response,json:body});
+ });
+ await page.goto(base+'/graph',{waitUntil:'domcontentloaded'});
+ step('progressive overview and task page header');
  await visible(page.getByRole('heading',{name:'知识关系网'}));
  await visible(page.getByRole('img',{name:/交互式文档关系图/}));
- const graphLayout=await page.locator('.graph-workspace').evaluate(el=>({display:getComputedStyle(el).display}));
- assert.equal(graphLayout.display,'flex','The graph uses its whole workspace');
- assert.ok(cssRequests.some(path=>path.includes('/knowledge-graph-')),'Graph route must request its own CSS asset');
- const canvas=page.locator('.knowledge-graph-canvas');
- const dims=await canvas.boundingBox();
- await page.screenshot({path:'tmp/knowledge-graph-overview-'+engine+'.jpg',type:'jpeg',quality:72});
- assert.ok(dims&&dims.width>1000&&dims.height>600,'Full-width graph fills the remaining viewport '+JSON.stringify(dims));
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')?._cyreg?.cy?.nodes().length>=20&&document.querySelector('.graph-stage').getAttribute('aria-busy')==='false');
+ assert.ok(await page.getByText('正在补充语义关联…',{exact:true}).isVisible(),'Only semantic enrichment remains loading');
+ assert.ok(await page.getByRole('checkbox',{name:'语义关联',exact:true}).isEnabled(),'Semantic suggestions are available in overview');
+ const header=await page.locator('.knowledge-graph-page').evaluate(el=>({
+  top:getComputedStyle(el).paddingTop,left:getComputedStyle(el).paddingLeft,
+  font:getComputedStyle(el.querySelector('h1')).fontSize,gap:getComputedStyle(el.querySelector('.page-header')).marginBottom
+ }));
+ assert.deepEqual(header,taskHeader,'Graph and task headers use identical spacing and typography');
+ assert.equal(await page.locator('.knowledge-graph-page h1 svg').count(),0,'No title icon');
+ releaseSemantic();
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.edges('.semantic').length>0);
+ assert.ok(cssRequests.some(path=>path.includes('/knowledge-graph-')),'Graph route requests its own CSS');
+ const canvas=page.locator('.knowledge-graph-canvas'),dims=await canvas.boundingBox();
+ assert.ok(dims.width>1000&&dims.height>550,'Graph fills remaining workspace '+JSON.stringify(dims));
  assert.equal(await page.locator('.graph-inspector').count(),0,'No permanent sidebar');
- assert.equal(await page.getByRole('complementary',{name:'文稿列表',exact:true}).count(),0,'Document panel opens on demand');
- await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')?._cyreg?.cy?.nodes().length>=4);
  const geometry=()=>page.evaluate(()=>{
   const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy;
   return {same:cy===window.graphRegressionCy,zoom:cy.zoom(),pan:cy.pan(),positions:cy.nodes().map(node=>({id:node.id(),position:node.position()})).sort((a,b)=>a.id.localeCompare(b.id))};
  });
- await page.evaluate(id=>{
-  const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy;window.graphRegressionCy=cy;
-  const position=cy.$id(id).position();cy.zoom(.9);cy.pan({x:cy.width()*.3-position.x*.9,y:cy.height()*.45-position.y*.9});
- },A.id);
- const before=await geometry();
- await page.getByRole('button',{name:'文稿列表',exact:true}).click();
- step('document list opened');
- const documents=page.getByRole('complementary',{name:'文稿列表',exact:true});await visible(documents);
- await visible(documents.getByRole('button',{name:A.name,exact:true}));
- const opened=await canvas.boundingBox();
- assert.equal(opened.width,dims.width,'Floating panel does not narrow the graph');
- assert.deepEqual(await geometry(),before,'Opening a panel preserves graph instance, node positions, zoom and pan');
+ const settle=()=>page.waitForFunction(()=>{
+  const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy;
+  return !cy.animated()&&cy.nodes().every(node=>!node.animated());
+ });
+ await settle();
+ await page.evaluate(()=>{window.graphRegressionCy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy;});
+ const overviewGeometry=await geometry();
+ const initialViewport=await canvas.evaluate(element=>{
+  const cy=element._cyreg.cy,bounds=element.getBoundingClientRect();
+  return {height:cy.height(),width:cy.width(),clientHeight:bounds.height,zoom:cy.zoom(),pan:cy.pan(),bounds:cy.nodes().boundingBox()};
+ });
+ assert.ok(initialViewport.height>500&&initialViewport.zoom>.3,'Initial graph uses the measured viewport: '+JSON.stringify(initialViewport));
+ const tap=async id=>{
+  await page.evaluate(id=>{document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).emit('tap');},id);
+  await page.waitForURL('**/graph?focus='+id);
+  await page.waitForFunction(id=>{
+   const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy,p=cy.$id(id).position();
+   return cy.$id(id).hasClass('focus-node')&&Math.hypot(p.x,p.y)<.5&&!cy.animated()&&cy.nodes().every(node=>!node.animated());
+  },id);
+ };
+ // Actual pointer click changes the center and does not open a preview.
  const point=await page.evaluate(id=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).renderedPosition(),A.id);
- await page.mouse.click(opened.x+point.x,opened.y+point.y);
- step('canvas node selected');
+ await page.mouse.click(dims.x+point.x,dims.y+point.y);
+ await page.waitForURL('**/graph?focus='+A.id);
+ await page.waitForFunction(id=>{
+  const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy,p=cy.$id(id).position();
+  return cy.$id(id).hasClass('focus-node')&&Math.hypot(p.x,p.y)<.5&&!cy.animated()&&cy.nodes().every(node=>!node.animated());
+ },A.id);
+ assert.equal(await page.locator('.workspace-panel:not([data-closing])').count(),0,'Single click explores without opening a Drawer');
+ assert.ok((await geometry()).same,'Center changes keep the graph instance');
+ for(const node of overviewGeometry.positions)assert.ok((await geometry()).positions.some(item=>item.id===node.id),'Background retained: '+node.id);
+ assert.ok(await page.evaluate(id=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).hasClass('context-node'),outer[1].id),'Unrelated documents stay in the outer ring');
+ await page.screenshot({path:'tmp/knowledge-graph-overview-'+engine+'.jpg',type:'jpeg',quality:78});
+ // Interrupt position animations with subsequent center changes.
+ for(const id of [B.id,C.id,A.id]){
+  await page.evaluate(id=>{document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).emit('tap');},id);
+  await page.waitForURL('**/graph?focus='+id);
+  await page.waitForFunction(id=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).hasClass('focus-node'),id);
+ }
+ await settle();
+ assert.ok(await page.evaluate(id=>{
+  const node=document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id);
+  return Math.hypot(node.position().x,node.position().y)<.5&&Number(node.style('text-opacity'))===1;
+ },A.id),'Rapid navigation settles the final center and its label');
+ await tap(D.id);await tap(A.id);
  const detail=id=>page.locator('[data-workspace-panel="graph-node-'+id+'"]:not([data-closing])');
- await visible(detail(A.id));
- assert.deepEqual(await geometry(),before,'Selecting an unobscured node does not move the graph');
- assert.ok(await detail(A.id).getByText('Markdown 文档',{exact:true}).count(),'Existing metadata renders immediately');
- await detail(A.id).getByRole('button',{name:new RegExp('^'+C.name)}).click();
- step('neighbor opened');
- await visible(detail(C.id));
- assert.equal(await page.locator('.workspace-panel:not([data-closing])').count(),3,'Different nodes have independent stacked panels');
- step('reactivate existing node');
- await page.evaluate(id=>{document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).emit('tap');},A.id);
- step('existing node activated');
- await visible(detail(A.id));
- assert.equal(await page.locator('[data-workspace-panel^="graph-node-"]:not([data-closing])').count(),2,'Reselecting a node reuses its own panel');
- assert.deepEqual((await geometry()).positions,before.positions,'Selection preserves node layout');
- assert.equal((await geometry()).zoom,before.zoom,'Selection preserves zoom');
- step('reveal obscured node');
- // Reactivate a selected node deliberately hidden under the rail: only pan enough
- // to expose it, without changing the graph layout or zoom.
+ const inspect=async id=>{
+  await page.getByRole('button',{name:'文稿列表',exact:true}).click();
+  await page.getByRole('complementary',{name:'文稿列表',exact:true}).getByRole('button',{name:'查看'+(id===A.id?A.name:C.name)+'的详情',exact:true}).click();
+  await visible(detail(id));
+ };
+ step('independent detail panels');
+ await page.getByRole('button',{name:'查看当前文稿详情',exact:true}).click();await visible(detail(A.id));
+ assert.ok(await detail(A.id).getByText('Markdown 文档',{exact:true}).count(),'Metadata renders immediately');
+ await detail(A.id).getByRole('button',{name:'查看'+C.name+'的详情',exact:true}).click();await visible(detail(C.id));
+ assert.equal(await page.locator('[data-workspace-panel^="graph-node-"]:not([data-closing])').count(),2,'Independent node panels');
+ await page.getByRole('button',{name:'查看当前文稿详情',exact:true}).click();
+ assert.equal(await page.locator('[data-workspace-panel^="graph-node-"]:not([data-closing])').count(),2,'Existing detail is reused');
+ assert.ok(page.url().endsWith('focus='+A.id),'Inspecting neighbors does not change the center');
+ await detail(C.id).getByRole('button',{name:'关闭',exact:true}).click();await detail(C.id).waitFor({state:'detached'});
+ await detail(A.id).getByRole('button',{name:'关闭',exact:true}).click();await detail(A.id).waitFor({state:'detached'});await settle();
+ step('temporary focus and camera restoration');
  await page.evaluate(id=>{
   const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy,p=cy.$id(id).position();
-  cy.pan({x:cy.width()-80-p.x*cy.zoom(),y:cy.height()*.5-p.y*cy.zoom()});cy.$id(id).emit('tap');
+  cy.pan({x:cy.width()-80-p.x*cy.zoom(),y:cy.height()/2-p.y*cy.zoom()});
  },A.id);
- step('obscured node activated');
+ const obscured=await geometry();
+ await page.getByRole('button',{name:'查看当前文稿详情',exact:true}).click();await visible(detail(A.id));
  await page.waitForFunction(id=>{
   const host=document.querySelector('.knowledge-graph-canvas'),cy=host._cyreg.cy;
-  return host.getBoundingClientRect().left+cy.$id(id).renderedPosition().x<document.querySelector('.workspace-panel-rail').getBoundingClientRect().left-15;
+  return !cy.animated()&&host.getBoundingClientRect().left+cy.$id(id).renderedPosition().x<document.querySelector('.workspace-panel-rail').getBoundingClientRect().left-15;
  },A.id);
- await page.screenshot({path:'tmp/knowledge-graph-desktop-'+engine+'.jpg',type:'jpeg',quality:72});
- step('panel cleanup and canvas filters');
- // Close just one card; every other panel remains available.
- await page.evaluate(id=>document.querySelector('[data-workspace-panel="graph-node-'+id+'"]').querySelector('.workspace-panel-actions button:last-child').click(),C.id);
- await detail(C.id).waitFor({state:'detached'});
- await visible(detail(A.id));
- await documents.getByRole('button',{name:'关闭',exact:true}).click();
- await documents.waitFor({state:'detached'});
- await detail(A.id).getByRole('button',{name:'关闭',exact:true}).click();
- await detail(A.id).waitFor({state:'detached'});
+ await detail(A.id).getByRole('button',{name:'关闭',exact:true}).click();await detail(A.id).waitFor({state:'detached'});await settle();
+ const restored=await geometry();assert.ok(Math.abs(restored.pan.x-obscured.pan.x)<1&&Math.abs(restored.pan.y-obscured.pan.y)<1,'Closing restores automatic reveal pan');
+ assert.equal(await page.evaluate(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.elements('.dimmed, .inspected-node').length),0,'Temporary focus clears when details close');
+ await page.getByRole('button',{name:'查看当前文稿详情',exact:true}).click();await visible(detail(A.id));
+ await page.waitForFunction(id=>{
+  const host=document.querySelector('.knowledge-graph-canvas'),cy=host._cyreg.cy;
+  return !cy.animated()&&host.getBoundingClientRect().left+cy.$id(id).renderedPosition().x<document.querySelector('.workspace-panel-rail').getBoundingClientRect().left-15;
+ },A.id);
+ await page.evaluate(()=>{const cy=document.querySelector('.knowledge-graph-canvas')._cyreg.cy,p=cy.pan();cy.pan({x:p.x-70,y:p.y+25});});
+ const manual=await geometry();
+ await detail(A.id).getByRole('button',{name:'关闭',exact:true}).click();await detail(A.id).waitFor({state:'detached'});await settle();
+ assert.deepEqual((await geometry()).pan,manual.pan,'Manual viewport changes survive closing details');
+ await page.getByRole('button',{name:'适应视图',exact:true}).click();
  const stable=await geometry();
+ step('filters, labels and wheel zoom');
  await page.getByRole('textbox',{name:'查找图中节点'}).fill('Graph Alpha');
- await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.search-dimmed').length>=3);
- assert.deepEqual(await geometry(),stable,'Search does not reset the viewport or recreate the graph');
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.search-dimmed').length>=19);
+ assert.deepEqual(await geometry(),stable,'Search preserves geometry');
  await page.getByRole('textbox',{name:'查找图中节点'}).fill('');
- await page.getByRole('combobox',{name:/显示关联类型/}).click();
- await page.getByRole('option',{name:'同目录',exact:true}).click();
- await page.keyboard.press('Escape');
+ await page.getByRole('combobox',{name:/显示关联类型/}).click();await page.getByRole('option',{name:'同目录',exact:true}).click();await page.keyboard.press('Escape');
  await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.edges('.folder').every(edge=>edge.style('display')==='none'));
- assert.deepEqual(await geometry(),stable,'Relationship filtering preserves the viewport and node positions');
- await page.getByRole('checkbox',{name:'语义关联',exact:true}).click();
- await page.waitForFunction(()=>document.querySelector('.graph-stage').getAttribute('aria-busy')==='false');
- assert.deepEqual(await geometry(),stable,'Semantic refetch reconciles graph data without resetting the canvas');
- const lightColor=await page.evaluate(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes().first().style('color'));
- step('theme');
- await page.getByRole('button',{name:'主题：跟随系统',exact:true}).click();
- await page.getByRole('button',{name:'主题：浅色',exact:true}).click();
- await page.waitForFunction(color=>document.documentElement.dataset.effectiveTheme==='dark'&&document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes().first().style('color')!==color,lightColor);
- assert.deepEqual(await geometry(),stable,'Theme repaint keeps graph instance, layout and viewport intact');
- await page.getByRole('button',{name:'文稿列表',exact:true}).evaluate(async element=>{
-  await Promise.all(element.getAnimations({subtree:true}).filter(animation=>animation.playState==='running'&&animation.effect?.getTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));
- });
- await page.screenshot({path:'tmp/knowledge-graph-dark-'+engine+'.jpg',type:'jpeg',quality:72});
- await page.getByRole('button',{name:'折叠侧边栏',exact:true}).click();
- await page.getByRole('button',{name:'返回概览',exact:true}).click({trial:true});
- assert.ok(await page.locator('.graph-page-heading').evaluate(element=>element.getBoundingClientRect().top>=46),'Collapsed navigation does not cover the graph header');
+ assert.deepEqual(await geometry(),stable,'Relationship filters preserve geometry');
+ await page.getByRole('checkbox',{name:'语义关联',exact:true}).click();await settle();
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.edges('.semantic').length===0);
+ await settle();
+ const filtered=await geometry();
+ await page.getByRole('button',{name:'主题：跟随系统',exact:true}).click();await page.getByRole('button',{name:'主题：浅色',exact:true}).click();
+ await page.waitForFunction(()=>document.documentElement.dataset.effectiveTheme==='dark');
+ assert.deepEqual(await geometry(),filtered,'Theme preserves geometry');
+ const wheelBefore=(await geometry()).zoom;
+ await page.mouse.move(dims.x+70,dims.y+90);await page.mouse.wheel(0,-100);
+ await page.waitForFunction(zoom=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.zoom()>zoom*1.1,wheelBefore);
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.context-node.label-visible').length>0);
+ assert.ok(await page.evaluate(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.label-visible').length>3),'Zoom shows readable background labels');
+ await page.getByRole('button',{name:'查看当前文稿详情',exact:true}).click();await visible(detail(A.id));
+ await detail(A.id).getByRole('button',{name:'关闭',exact:true}).click();await detail(A.id).waitFor({state:'detached'});await settle();
+ await page.screenshot({path:'tmp/knowledge-graph-dark-'+engine+'.jpg',type:'jpeg',quality:78});
+ await page.getByRole('button',{name:'折叠侧边栏',exact:true}).click();await page.getByRole('button',{name:'返回概览',exact:true}).click({trial:true});
+ assert.ok(await page.locator('.knowledge-graph-page .page-header').evaluate(element=>element.getBoundingClientRect().top>=46),'Collapsed navigation does not cover header');
  await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();
- await page.getByRole('button',{name:'适应视图'}).click();
- await page.getByRole('button',{name:'放大'}).click();
- await page.getByRole('button',{name:'缩小'}).click();
- await page.getByRole('button',{name:'返回概览'}).click();
- await page.waitForURL(base+'/graph',{timeout:12000});
- await page.getByRole('textbox',{name:'查找图中节点'}).fill('Graph Alpha');
- await page.getByRole('button',{name:'文稿列表',exact:true}).click();
- await visible(page.locator('.graph-node-list').getByText(A.name,{exact:true}));
- await page.locator('.graph-node-list').getByText(A.name,{exact:true}).click();
- await visible(detail(A.id).getByRole('link',{name:'打开文档'}));
- await detail(A.id).getByRole('button',{name:'管理关联',exact:true}).click();
+ await page.getByRole('button',{name:'放大',exact:true}).click();await page.getByRole('button',{name:'缩小',exact:true}).click();
+ await page.getByRole('button',{name:'返回概览',exact:true}).click();await page.waitForURL(base+'/graph');await settle();
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.focus-node').length===0);
+ await settle();
+ assert.equal(await page.evaluate(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.focus-node').length),0,'Overview clears persistent center');
+ await inspect(A.id);await detail(A.id).getByRole('button',{name:'管理关联',exact:true}).click();
  await visible(detail(A.id).getByRole('region',{name:'文档关联'}).getByText(B.name,{exact:true}));
 
  // Direct inspector: actual incoming/outgoing links, then a new outgoing link.
@@ -260,10 +319,22 @@ try{
  assert.ok(mobile.scrollWidth<=mobile.width+1,'mobile graph page must not overflow '+JSON.stringify(mobile));
  const mobileHeight=await canvas.boundingBox();assert.ok(mobileHeight.height>350,'Mobile canvas uses the remaining viewport');
  assert.ok(await page.locator('.main-scroll').evaluate(el=>el.scrollHeight<=el.clientHeight+2),'Graph does not scroll behind mobile navigation');
+ await settle();
+ const labelBoxes=await page.evaluate(()=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.nodes('.label-visible').map(node=>({
+  id:node.id(),box:node.renderedBoundingBox({includeNodes:false,includeEdges:false,includeOverlays:false,includeLabels:true})
+ })));
+ for(let a=0;a<labelBoxes.length;a++)for(let b=a+1;b<labelBoxes.length;b++){
+  const x=labelBoxes[a].box,y=labelBoxes[b].box;
+  assert.ok(x.x2<=y.x1+1||y.x2<=x.x1+1||x.y2<=y.y1+1||y.y2<=x.y1+1,'Mobile labels avoid collisions: '+JSON.stringify([labelBoxes[a],labelBoxes[b]]));
+ }
  await page.screenshot({path:'tmp/knowledge-graph-mobile-'+engine+'.png'});
  await page.getByRole('button',{name:'文稿列表',exact:true}).click();
  const sheet=page.getByRole('dialog',{name:'文稿列表',exact:true});await visible(sheet);
  await sheet.getByRole('button',{name:A.name,exact:true}).click();
+ await sheet.waitFor({state:'hidden'});
+ assert.equal(await page.getByRole('dialog',{name:/节点详情/}).count(),0,'Mobile center selection does not open details');
+ await page.getByRole('button',{name:'文稿列表',exact:true}).click();
+ await page.getByRole('dialog',{name:'文稿列表',exact:true}).getByRole('button',{name:'查看'+A.name+'的详情',exact:true}).click();
  const mobileDetail=page.getByRole('dialog',{name:'节点详情：'+A.name,exact:true});await visible(mobileDetail);
  await visible(mobileDetail.getByRole('link',{name:'打开文档'}));
  // Trial interaction waits for the sheet's moving ancestor to settle before
@@ -275,6 +346,6 @@ try{
  await page.waitForFunction(()=>!document.querySelector('.workspace-panel-sheet'));
  assert.deepEqual(errors,[],'no browser runtime failures');
 
- console.log('PASS knowledge graph ('+engine+'): links, semantic fallback, full viewport canvas, stable instance/positions/pan/zoom, filters, independent stacked panels, node reveal, UI link creation/removal, archive, mobile sheet and navigation');
+ console.log('PASS knowledge graph ('+engine+'): progressive semantics, task header, center navigation, outer context, temporary focus restoration, manual viewport, wheel, filters, theme, independent panels, relationships and mobile sheets');
 }catch(error){await page.screenshot({path:'tmp/knowledge-graph-failure-'+engine+'.png',timeout:3000}).catch(()=>{});throw error;}
 finally{clearTimeout(watchdog);await browser.close()}

@@ -161,3 +161,52 @@ describe('knowledge graph D1 binding limits',()=>{
   assert.ok(result.links.every(l=>l.direction==='incoming'));
  });
 });
+
+describe('overview semantic enrichment',()=>{
+ function fixture(indexed=true,unavailable=false){
+  const nodes=Array.from({length:12},(_,index)=>({...source,id:'node-'+index,name:'Node '+index,revision:1}));
+  let queries=0,active=0,peak=0;
+  const db={prepare:(sql:string)=>({bind:(...params:unknown[])=>({all:async()=>{
+   assert.ok(params.length<=2);
+   if(sql.includes('ORDER BY r.updated_at DESC LIMIT ?'))return {results:nodes};
+   if(sql.includes('FROM record_links WHERE source_id IN'))return {results:[{sourceId:'node-0',targetId:'node-1',relation:'related'}]};
+   if(sql.includes('FROM record_references'))return {results:[]};
+   if(sql.includes('SELECT DISTINCT s.record_id AS recordId'))return {results:indexed?nodes.map(node=>({recordId:node.id})):[]};
+   if(sql.includes('SELECT chunk_id AS chunkId'))return {results:[0,1,2].map(index=>({chunkId:String(params[0])+':'+index}))};
+   if(sql.includes('SELECT s.chunk_id,s.content,s.revision'))return {results:nodes.map(node=>({
+    chunk_id:node.id+':0',record_id:node.id,revision:1,current_revision:1,status:'active',content:node.name
+   }))};
+   throw Error('Unexpected overview SQL '+sql);
+  }})})};
+  const vector={queryById:async(id:string)=>{
+   queries++;active++;peak=Math.max(peak,active);await Promise.resolve();active--;
+   if(unavailable)throw Error('index unavailable');
+   return {matches:nodes.filter(node=>!id.startsWith(node.id+':')).map((node,index)=>({
+    id:node.id+':0',score:.99-index/100,metadata:{record_id:node.id,revision:1}
+   }))};
+  }};
+  return {env:{DB:db,VECTORIZE:vector} as unknown as Env,count:()=>queries,peak:()=>peak};
+ }
+ it('adds bounded, current, deduplicated semantic relationships by default',async()=>{
+  const fixtureData=fixture(),result=await graphView(fixtureData.env);
+  assert.equal(result.semanticStatus,'ready');assert.equal(fixtureData.count(),18);assert.ok(fixtureData.peak()<=6);
+  const semantic=result.edges.filter(edge=>edge.type==='semantic');assert.ok(semantic.length>0);
+  const pairs=new Set<string>(),degree=new Map<string,number>();
+  for(const edge of semantic){
+   const pair=[edge.sourceId,edge.targetId].sort().join(':');assert.ok(!pairs.has(pair));pairs.add(pair);
+   assert.notEqual(pair,'node-0:node-1','Confirmed edges are not duplicated as suggestions');
+   for(const id of [edge.sourceId,edge.targetId])degree.set(id,(degree.get(id)??0)+1);
+  }
+  assert.ok([...degree.values()].every(count=>count<=4));
+ });
+ it('exposes index preparation without performing vector queries',async()=>{
+  const fixtureData=fixture(false),result=await graphView(fixtureData.env);
+  assert.equal(result.semanticStatus,'indexing');assert.equal(fixtureData.count(),0);
+  assert.ok(result.edges.some(edge=>edge.type==='explicit'));
+ });
+ it('preserves authoritative data when the semantic index is unavailable',async()=>{
+  const fixtureData=fixture(true,true),result=await graphView(fixtureData.env);
+  assert.equal(result.semanticStatus,'unavailable');assert.equal(result.nodes.length,12);
+  assert.ok(result.edges.some(edge=>edge.type==='explicit'));assert.ok(result.edges.every(edge=>edge.type!=='semantic'));
+ });
+});
