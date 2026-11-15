@@ -116,12 +116,12 @@ export const TOOL_GUIDANCE={
  },
  index_diagnostics:{
   title:'Inspect vector indexing health',
-  description:'Read queue counts, stale running leases and recent indexing errors without processing jobs.',
+  description:'Read current-version coverage, queue counts, stage/retry errors, processing trends and vector cleanup status without processing jobs.',
   destructive:false
  },
  index_pending:{
   title:'Process queued index jobs',
-  description:'Process queued semantic indexing and permanent-deletion vector cleanup. Cron normally handles both; alters Vectorize, not remaining record content.',
+  description:'Process queued semantic indexing and permanent-deletion vector cleanup. Writes normally start indexing in the background; Cron is a recovery fallback. Supply recordId to reset retry attempts for one record, plus rebuild=true for a completed index. Alters Vectorize, not record content.',
   destructive:false
  },
  read_many:{

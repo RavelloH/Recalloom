@@ -1,3 +1,4 @@
+import {INDEX_JOB_UPSERT} from '../index-queue.js';
 import type {Env,RecordKind,StoredRecord} from '../types.js';
 import {StorageError} from '../types.js';
 import {sha256,initialVersion,historicalVersion} from '../version.js';
@@ -47,7 +48,7 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
     env.DB.prepare('INSERT INTO record_histories(record_id,history_metadata) VALUES(?,?)').bind(id,version.metadata),
     env.DB.prepare('INSERT INTO revisions(record_id,revision,content_sha256,message,actor,created_at) VALUES(?,?,?,?,?,?)')
       .bind(id,1,digest,'Created',actor,ts),
-    env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
+    env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT)
       .bind(newId(),id,1,ts),
     ...(wikiRefs.length?[pinPathBindings(env,wikiRefs),insertProjection(env,wikiRefs)]:[]),
     ...resolveNewWikiTarget(env,id,newPath),

@@ -83,15 +83,15 @@ export default {
       let staleRecord=false;
       try{await store.updateMeta(env,rec.id,{status:'active',expectedMetadataRevision:1},'integration');}catch(e){staleRecord=e instanceof Error&&e.message.includes('metadataRevision');}
       check(staleRecord,'record metadata compare-and-set');
-      check((await indexJobCount())===beforeIndex+1,'archive queues a cleanup job for same content revision');
+      check((await indexJobCount())===beforeIndex,'archive queues a cleanup job for same content revision');
       await store.updateMeta(env,rec.id,{status:'active'},'integration');
-      check((await indexJobCount())===beforeIndex+2,'reactivate queues a rebuild job for same revision');
+      check((await indexJobCount())===beforeIndex,'reactivate queues a rebuild job for same revision');
       await store.updateMeta(env,rec.id,{name:'renamed.md'},'integration');
-      check((await indexJobCount())===beforeIndex+3,'rename queues a rebuild job');
+      check((await indexJobCount())===beforeIndex,'rename coalesces its rebuild job');
       await store.updateMeta(env,rec.id,{description:'description only'},'integration');
       const noChange=await store.updateMeta(env,rec.id,{description:'description only'},'integration');
       check(noChange.changed===false,'metadata no-op does not generate events');
-      check((await indexJobCount())===beforeIndex+3,'description-only update does not create unnecessary index job');
+      check((await indexJobCount())===beforeIndex,'description-only update does not create unnecessary index job');
       const diffs=await agent.diffRevisions(env,rec.id,2,3);
       check(diffs.changed && diffs.diff.includes('hello world'),'version diff');
       const details=await agent.readMany(env,[{id:rec.id},{id:todo.id}],20000);

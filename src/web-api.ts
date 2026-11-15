@@ -7,6 +7,7 @@ import {getTaskLists,getTaskView,getTaskItem} from './storage/tasks.js';
 import * as lifecycle from './lifecycle.js';
 import * as agent from './agent-tools.js';
 import { search } from './search.js';
+import {indexOverview,indexTasks,retryIndex,storageOverview,previewIndexRebuild,rebuildAllIndexes} from './index-observability.js';
 import {recordRelations,graphView} from './graph.js';
 import {resolveWikiReference,listWikiReferences,backfillWikiReferences} from './wiki-references.js';
 import {recentActivity,activityDetail} from './web-activity.js';
@@ -321,10 +322,27 @@ webApi.get('/overview',async(c)=>{
   return asJson(await agent.getOverview(c.env,q.folderId??null,q.depth,q.budget,q.cursor));
 });
 webApi.get('/index',async(c)=>{
-  const [counts,errors]=await Promise.all([
-    c.env.DB.prepare('SELECT state,COUNT(*) AS count FROM index_jobs GROUP BY state').all(),
-    c.env.DB.prepare("SELECT id,record_id AS recordId,revision,attempts,last_error AS lastError FROM index_jobs WHERE state='failed' ORDER BY created_at DESC LIMIT 10").all()
-  ]);
-  return asJson({counts:counts.results,recentFailures:errors.results});
+  const q=parseQuery(c.req.url,z.object({days:z.coerce.number().pipe(z.union([z.literal(1),z.literal(7),z.literal(30)])).optional()}));
+  return asJson(await indexOverview(c.env,q.days??7));
+});
+webApi.get('/index/tasks',async(c)=>{
+ const q=parseQuery(c.req.url,z.object({state:z.enum(['pending','running','retry','failed','done','waiting']).optional(),query:z.string().max(200).optional(),offset:z.coerce.number().int().min(0).max(1000000).optional()}));
+ return asJson(await indexTasks(c.env,q.state,q.query,q.offset));
+});
+webApi.get('/index/tasks/:id',async(c)=>{
+ const id=uuid.parse(c.req.param('id'));
+ const task=await c.env.DB.prepare('SELECT j.*,r.name,r.status AS record_status,c.revision AS current_revision FROM index_jobs j JOIN records r ON r.id=j.record_id JOIN record_contents c ON c.record_id=r.id WHERE j.record_id=?').bind(id).first();
+ if(!task)throw new StorageError('RECORD_NOT_FOUND');
+ return asJson({task,runs:(await c.env.DB.prepare('SELECT * FROM index_runs WHERE record_id=? ORDER BY created_at DESC LIMIT 20').bind(id).all()).results});
+});
+webApi.post('/index/tasks/:id/retry',async(c)=>{
+ const id=uuid.parse(c.req.param('id')),input=await jsonBody(c.req.raw,z.object({rebuild:z.boolean().optional()}).strict());
+ return asJson(await retryIndex(c.env,id,input.rebuild));
+});
+webApi.get('/storage',async(c)=>asJson(await storageOverview(c.env)));
+webApi.get('/index/rebuild/preview',async(c)=>asJson(await previewIndexRebuild(c.env)));
+webApi.post('/index/rebuild',async(c)=>{
+ const input=await jsonBody(c.req.raw,z.object({token:z.string().regex(/^[a-f0-9]{64}$/)}).strict());
+ return asJson(await rebuildAllIndexes(c.env,input.token));
 });
 webApi.notFound(()=>err('NOT_FOUND',404));

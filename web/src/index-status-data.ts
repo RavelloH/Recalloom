@@ -1,0 +1,9 @@
+export type IndexState='pending'|'running'|'retry'|'failed'|'done';
+export const stateLabels:Record<IndexState,string>={pending:'等待处理',running:'正在处理',retry:'等待重试',failed:'处理失败',done:'已提交索引'};
+export const stageLabels:Record<string,string>={queued:'等待执行',preparing:'准备文本',embedding:'生成向量',uploading:'提交向量',committing:'保存索引',submitted:'已提交索引'};
+export type IndexTask={id:string;record_id:string;name:string;state:IndexState;stage:string;revision:number;indexed_revision:number|null;current_revision:number;record_status:string;attempts:number;completed_chunks:number;total_chunks:number;created_at:string;updated_at:string|null;started_at:string|null;finished_at:string|null;next_retry_at:string|null;lease_expires_at:string|null;last_error:string|null};
+export type Run={id:string;revision:number;outcome:string;chunks:number;duration_ms:number;created_at:string;error:string|null};
+export type Point={time:string;[key:string]:string|number|null};
+export type IndexSummary={counts:Array<{state:IndexState;count:number}>;coverage:{total:number;indexed:number|null};runs:Point[];samples:Point[];cleanup:{records:number;batches:number};performance:{samples:number;meanMs:number|null;p95Ms:number|null};last:{completedAt:string|null;waitingSince:string|null};model:string;dimensions:number;sampledAt:string};
+export type StorageSummary={documents:{count:number;archived:number;bytes:number};chunks:{count:number;documents:number;bytes:number};histories:{revisions:number;bytes:number};databaseBytes:number|null;remote:{status:string;count:number|null;dimensions:number|null;processedAt:string|null;sampledAt:string};samples:Point[];sampledAt:string};
+export function bytes(value:number|null|undefined){if(value==null)return '暂不可用';if(value<1024)return value+' B';const unit=Math.min(3,Math.floor(Math.log(value)/Math.log(1024)));return (value/1024**unit).toFixed(1)+' '+['B','KiB','MiB','GiB'][unit];}

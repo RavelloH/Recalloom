@@ -2,6 +2,8 @@ import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/w
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
 import { processIndexJobs } from './search.js';
+import {drainIndexJobs,cleanupIndexVectors} from './indexing.js';
+import {sampleIndexState} from './index-observability.js';
 import {processVectorDeleteJobs} from './lifecycle.js';
 import { webApi } from './web-api.js';
 import { cleanupWebAuth } from './web-auth.js';
@@ -117,7 +119,7 @@ function provider(env:Env,request:Request){
         if(!scopes.includes('notes:read'))return Response.json({error:'insufficient_scope'},{status:403});
         const props=ctx.props&&typeof ctx.props==='object'?ctx.props as {actorId?:string;clientName?:string}:{};
         if(props.actorId)ctx.waitUntil(rememberOAuthActor(requestEnv,props.actorId,ctx.auth?.clientId,props.clientName).catch(e=>console.error('Agent name sync failed',e)));
-        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown')),{legacy:'stateless'});
+        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown'),()=>ctx.waitUntil(drainIndexJobs(requestEnv).then(()=>sampleIndexState(requestEnv)).catch(e=>console.error('MCP indexing failed',e)))),{legacy:'stateless'});
         return handler.fetch(mcpRequest);
       }
     },
@@ -147,12 +149,16 @@ function provider(env:Env,request:Request){
   });
 }
 export default {
-  fetch(request:Request,env:Env,ctx:ExecutionContext){
-    return provider(env,request).fetch(request,env,ctx);
+  async fetch(request:Request,env:Env,ctx:ExecutionContext){
+    const response=await provider(env,request).fetch(request,env,ctx);
+    if(new URL(request.url).pathname.startsWith('/api/')&&!new URL(request.url).pathname.startsWith('/api/auth/')&&!['GET','HEAD','OPTIONS'].includes(request.method)&&response.status<400)
+      ctx.waitUntil(drainIndexJobs(env).then(()=>sampleIndexState(env)).catch(e=>console.error('Background indexing failed',e)));
+    return response;
   },
   scheduled(_event:ScheduledController,env:Env,ctx:ExecutionContext){
     ctx.waitUntil(processVectorDeleteJobs(env,5).then(x=>console.log('Recalloom vector cleanup',JSON.stringify(x))).catch(e=>console.error('Recalloom vector cleanup failed',e)));
     ctx.waitUntil(processIndexJobs(env,5).then(x=>console.log('Recalloom indexing',JSON.stringify(x))).catch(e=>console.error('Recalloom indexing failed',e)));
+    ctx.waitUntil(cleanupIndexVectors(env).then(()=>sampleIndexState(env)).catch(e=>console.error('Index maintenance failed',e)));
     ctx.waitUntil(cleanupWebAuth(env).catch(e=>console.error('Recalloom Web auth cleanup failed',e)));
   }
 } satisfies ExportedHandler<Env>;

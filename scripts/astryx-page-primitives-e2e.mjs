@@ -155,7 +155,7 @@ try{
  await page.goto(base+'/settings',{waitUntil:'networkidle'});
  const settings=page.getByRole('navigation',{name:'设置页面'});
  assert.equal(await settings.locator('[role="tab"]').count(),0,'Settings is route navigation rather than panel tabs');
- assert.equal(await settings.getByRole('link').count(),5);
+ assert.equal(await settings.getByRole('link').count(),6);
  await page.evaluate(()=>{window.__pageSpaSentinel='retained';});
  const settingsTransition=await transitionCount();
  await settings.getByRole('link',{name:'Agent 授权',exact:true}).click();

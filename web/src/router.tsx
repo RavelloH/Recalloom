@@ -110,6 +110,7 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/settings/oauth',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/sessions',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/indexing',component:SettingsPage,loader:()=>ready(importSettings())}),
+ createRoute({getParentRoute:()=>root,path:'/settings/storage',component:SettingsPage,loader:()=>ready(importSettings())}),
  createRoute({getParentRoute:()=>root,path:'/settings/backup',component:SettingsPage,loader:()=>ready(importSettings())})
 ];
 /**

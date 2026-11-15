@@ -1,3 +1,4 @@
+import {INDEX_JOB_UPSERT} from './index-queue.js';
 import type {Env} from './types.js';
 import {StorageError} from './types.js';
 import {getRecord} from './storage.js';
@@ -99,7 +100,7 @@ export async function deleteFolder(env:Env,id:string,expectedMetadataRevision:nu
   statements.push(env.DB.prepare(
    'INSERT INTO index_jobs(id,record_id,revision,created_at) '+
    'SELECT lower(hex(randomblob(16))),r.id,c.revision,? FROM records r JOIN record_contents c ON c.record_id=r.id '+
-   'WHERE r.id IN (SELECT json_extract(value,\'$.id\') FROM json_each(?))'
+   'WHERE r.id IN (SELECT json_extract(value,\'$.id\') FROM json_each(?))'+INDEX_JOB_UPSERT
   ).bind(ts,records));
   statements.push(env.DB.prepare(
    'INSERT INTO change_events(record_id,event_type,revision,actor,created_at,entity_type,entity_id,details_json) '+

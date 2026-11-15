@@ -1,3 +1,4 @@
+import {INDEX_JOB_UPSERT} from './index-queue.js';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { historicalVersion, sha256 } from './version.js';
@@ -245,7 +246,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
       statements.push(env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(crypto.randomUUID(),tag));
       statements.push(env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(recordId,tag));
     }
-    if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)')
+    if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT)
       .bind(crypto.randomUUID(),recordId,revision,new Date().toISOString()));
     statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:archived?null:folder,kind:restoredKind,legacyCheckpoint,archivedFromPath}));
   }

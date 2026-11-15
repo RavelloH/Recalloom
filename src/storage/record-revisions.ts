@@ -1,3 +1,4 @@
+import {INDEX_JOB_UPSERT} from '../index-queue.js';
 import type {Env,EditInput,StoredRecord,Task} from '../types.js';
 import {StorageError} from '../types.js';
 import {sha256,nextVersion,editContent} from '../version.js';
@@ -45,7 +46,7 @@ export async function prepareTaskContentCommit(env:Env,row:StoredRecord,content:
       WHERE t.record_id=? AND NOT EXISTS (SELECT 1 FROM task_board_order bo WHERE bo.task_id=t.id)`).bind(row.id)
   ];
   const finalStatements=[
-    env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts),
+    env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT).bind(newId(),row.id,rev,ts),
     event(env,'record',row.id,'update',rev,actor,{name:row.name,kind:row.kind,folderId:row.folder_id,...taskEventDetails(row.content,tasks,taskEvent,transferred)})
   ];
   return {
@@ -111,7 +112,7 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
   }
   q.push(...extraStatements);
   if(automaticOrderChange)q.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
-  q.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts));
+  q.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT).bind(newId(),row.id,rev,ts));
   const details=tasks?taskEventDetails(row.content,tasks,taskEvent):taskEvent;
   q.push(event(env,'record',row.id,'update',rev,actor,{name:row.name,kind:row.kind,folderId:row.folder_id,...(details&&typeof details==='object'?details:{})}));
   try { await env.DB.batch(q); }

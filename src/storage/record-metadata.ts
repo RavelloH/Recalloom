@@ -1,3 +1,4 @@
+import {INDEX_JOB_UPSERT} from '../index-queue.js';
 import type {Env,RecordStatus} from '../types.js';
 import {StorageError} from '../types.js';
 import {now,newId,event,recordExtras,nameCheck} from './internal.js';
@@ -44,7 +45,7 @@ export async function updateMeta(env:Env,id:string,updates:{
    .bind(id,'metadata',row.revision,actor,ts,'record',id,JSON.stringify({name,folderId,status,description,metadataRevision:next,archivedFromPath}),id,next)
  ];
  if(name!==row.name||status!==row.status)
-  stmts.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) SELECT ?,?,?,? WHERE changes()>0 AND EXISTS(SELECT 1 FROM records WHERE id=? AND metadata_revision=?)')
+  stmts.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) SELECT ?,?,?,? WHERE changes()>0 AND EXISTS(SELECT 1 FROM records WHERE id=? AND metadata_revision=?)'+INDEX_JOB_UPSERT)
    .bind(newId(),id,row.revision,ts,id,next));
  const result=await env.DB.batch(stmts);
  if((result[0]?.meta?.changes??0)!==1)throw new StorageError('METADATA_CONFLICT','Current metadataRevision changed; re-read the record');

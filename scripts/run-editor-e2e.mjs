@@ -23,7 +23,7 @@ const suite=[
 ];
 // Destructive lifecycle tests are opt-in and only run against the local,
 // temporary Worker/D1 created by this harness.
-const optionalSuites=['editor-format-library-e2e.mjs','editor-rmd-ui-composition-e2e.mjs','astryx-page-primitives-e2e.mjs','archive-management-e2e.mjs','knowledge-graph-e2e.mjs','rmd-help-web-e2e.mjs',
+const optionalSuites=['settings-index-storage-e2e.mjs','editor-format-library-e2e.mjs','editor-rmd-ui-composition-e2e.mjs','astryx-page-primitives-e2e.mjs','archive-management-e2e.mjs','knowledge-graph-e2e.mjs','rmd-help-web-e2e.mjs',
  'web-panels-ui-e2e.mjs','alert-dialog-e2e.mjs','web-ui-e2e.mjs','record-workspace-e2e.mjs','view-transitions-e2e.mjs','shared-title-e2e.mjs','shared-sources-e2e.mjs','mobile-sidebar-e2e.mjs','scroll-navigation-e2e.mjs','recent-card-layout-e2e.mjs','home-recent-updates-e2e.mjs','home-activity-layout-e2e.mjs','activity-analytics-e2e.mjs','editor-tablet-sticky-e2e.mjs','editor-undo-clean-e2e.mjs','editor-concurrent-session-e2e.mjs','editor-merge-e2e.mjs','editor-merge-manual-e2e.mjs','editor-performance-e2e.mjs','tasks-workspace-e2e.mjs','tasks-drag-motion-e2e.mjs'];
 const requested=process.argv.slice(2);
 const chosen=requested.length?requested.map(name=>name.replace(/^scripts[\\/]/,'')):suite;
@@ -113,7 +113,7 @@ try{
  let logs='';
  worker=spawn(process.execPath,[
   wrangler,'dev','--ip','127.0.0.1','--port',String(port),'--local',
-  '--persist-to',stateDir,'--var','WEB_AUTH_RATE_LIMIT_ENABLED:'+limit
+  '--persist-to',stateDir,'--var','WEB_AUTH_RATE_LIMIT_ENABLED:'+limit,'--var','INDEX_BACKGROUND_ENABLED:false'
  ],{cwd:root,env:process.env,stdio:['ignore','pipe','pipe'],windowsHide:true});
  for(const stream of [worker.stdout,worker.stderr])
   stream?.on('data',chunk=>{logs=(logs+String(chunk)).slice(-12000);});

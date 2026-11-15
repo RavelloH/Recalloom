@@ -9,6 +9,7 @@ import {queryTasks,readTasks} from './storage/tasks.js';
 import {mutateTasks} from './storage/task-mutations.js';
 import { processIndexJobs, search } from './search.js';
 import {processVectorDeleteJobs} from './lifecycle.js';
+import {indexOverview,retryIndex} from './index-observability.js';
 import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
 import {getHelp,listHelpResources,HELP_TOPICS,RMD_COMPONENT_NAMES,RMD_NODE_NAMES,type HelpTopic} from './help/index.js';
@@ -67,7 +68,7 @@ function mappedEdit(input:z.infer<typeof editSchema>, original:string):EditInput
   if(input.mode==='patch')return {mode:'patch',patch:input.patch!};
   return {mode:'lines',operations:input.operations!};
 }
-export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-client') {
+export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-client',onWrite?:()=>void) {
   const mcp=new McpServer({name:'recalloom',version:'0.1.0'}, {instructions:SERVER_INSTRUCTIONS});
   // Same canonical Markdown as get_help: MCP clients may discover/read these
   // static resources without accessing D1, Vectorize, or user records.
@@ -94,6 +95,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
           throw new StorageError('INSUFFICIENT_SCOPE','This operation requires notes:'+ (write?'write':'read'));
         const data=schema.parse(raw);
         const value=await action(data);
+        if(write)onWrite?.();
         return {content:[{type:'text' as const,text:JSON.stringify(value)}],structuredContent:{result:value} as any};
       }catch(error) {
         const message=error instanceof Error?error.message:String(error);
@@ -185,13 +187,12 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   }),false,async (x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};});
   register('index_diagnostics',z.object({}),false,
     async()=>{const [counts,failures,vectorCleanup]=await Promise.all([
-      env.DB.prepare("SELECT state,COUNT(*) AS count, SUM(CASE WHEN state='running' AND (started_at IS NULL OR started_at<?) THEN 1 ELSE 0 END) AS stale FROM index_jobs GROUP BY state")
-        .bind(new Date(Date.now()-5*60*1000).toISOString()).all(),
-      env.DB.prepare("SELECT id,record_id,revision,attempts,last_error,started_at FROM index_jobs WHERE state='failed' ORDER BY created_at DESC LIMIT 10").all(),
+      indexOverview(env),
+      env.DB.prepare("SELECT id,record_id,revision,indexed_revision,state,stage,attempts,last_error,started_at,next_retry_at,lease_expires_at FROM index_jobs WHERE state IN ('retry','failed') ORDER BY created_at DESC LIMIT 20").all(),
       env.DB.prepare('SELECT record_id AS recordId,state,attempts,last_error AS lastError FROM vector_delete_jobs ORDER BY created_at DESC LIMIT 20').all()
-    ]);return {counts:counts.results,recentFailures:failures.results,vectorCleanup:vectorCleanup.results};});
-  register('index_pending',z.object({limit:z.number().int().min(1).max(10).optional()}),true,
-    async(x)=>({vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3)}));
+    ]);return {...counts,recentFailures:failures.results,vectorCleanup:vectorCleanup.results};});
+  register('index_pending',z.object({limit:z.number().int().min(1).max(10).optional(),recordId:uuid.describe('Retry this record only; resets backoff and attempts.').optional(),rebuild:z.boolean().describe('Required true to rebuild an already completed index.').optional()}).refine(x=>!x.rebuild||Boolean(x.recordId),{message:'rebuild requires recordId'}),true,
+    async(x)=>{if(x.recordId)await retryIndex(env,x.recordId,x.rebuild);return {vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3,x.recordId)};});
   register('read_many',
     z.object({items:z.array(z.object({id:uuid,revision:z.number().int().positive().optional(),offsetChars:z.number().int().nonnegative().describe('Zero-based UTF-16 character offset from previous item.nextOffsetChars.').optional()})).min(1).max(12),maxChars:z.number().int().min(1000).max(60000).describe('Shared JSON output character budget across records.').optional()}),false,
     (x)=>agent.readMany(env,x.items,x.maxChars));

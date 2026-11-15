@@ -1,0 +1,37 @@
+/* Route-owned indexing and storage workspace. */
+.index-workspace { display: grid; gap: 20px; min-width: 0; }
+.storage-sections { display: grid; gap: 20px; min-width: 0; }
+.index-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.index-toolbar h2, .index-toolbar h3, .index-chart-card h3 { margin: 0; }
+.index-toolbar p { margin: 6px 0 0; }
+.index-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.index-metrics .index-metric { height: auto; min-height: 96px; padding: 16px; text-align: start; }
+.index-metric strong, .storage-value { display: block; margin-top: 8px; font-size: 24px; font-weight: 650; }
+.index-charts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; min-width: 0; }
+.index-chart-card { min-width: 0; overflow: hidden; }
+.index-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.index-task-list { display: grid; margin-top: 16px; }
+.index-task-list .index-task-row { height: auto; min-height: 74px; justify-content: stretch; border-top: 1px solid var(--color-border); border-radius: 0; padding: 12px 4px; text-align: start; }
+.index-task-row > span { width: 100%; }
+.index-task-row > span > span { width: 100%; min-width: 0; white-space: normal; }
+.index-task-row .index-task-name { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.index-task-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.index-task-content { display: flex; gap: 12px; align-items: center; justify-content: space-between; width: 100%; }
+.index-task-name + span { display: grid; justify-items: end; gap: 5px; flex: none; }
+.index-properties { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,2fr); gap: 12px 20px; margin-block: 20px; line-height: 1.6; }
+.index-properties dt { color: var(--color-text-secondary); }
+.index-properties dd { margin: 0; overflow-wrap: anywhere; }
+.index-task-detail { padding: 16px 20px 24px; display: grid; gap: 16px; }
+.index-run { border-top: 1px solid var(--color-border); padding-block: 12px; }
+.index-error { overflow-wrap: anywhere; white-space: pre-wrap; }
+@media (max-width: 900px) {
+ .index-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .index-charts { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 720px) {
+ .index-task-content { align-items: flex-start; flex-direction: column; }
+ .index-task-name + span { justify-items: start; }
+ .index-filters { width: 100%; }
+ .index-filters > :first-child { flex: 1; min-width: 120px; }
+ .index-properties { gap: 10px; }
+}

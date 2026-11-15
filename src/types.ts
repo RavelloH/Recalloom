@@ -10,6 +10,8 @@ export interface Env {
   MCP_BASE_URL?: string;
   /** Local E2E only: literal "false" disables Web login rate limiting on loopback. Defaults on. */
   WEB_AUTH_RATE_LIMIT_ENABLED?: string;
+  /** Local fixture only: never call paid embedding services from browser regressions. */
+  INDEX_BACKGROUND_ENABLED?: string;
 }
 export type RecordKind = 'document' | 'task_list';
 export type RecordStatus = 'draft' | 'active' | 'completed' | 'superseded' | 'archived';
