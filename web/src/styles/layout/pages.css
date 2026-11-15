@@ -32,12 +32,6 @@
   gap: 8px;
 }
 
-/* The graph uses available workspace width instead of the document measure. */
-.page.knowledge-graph-page {
-  max-width: none;
-  width: 100%;
-}
-
 .crumbs {
   display: block;
   min-width: 0;
