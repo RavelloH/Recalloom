@@ -54,6 +54,7 @@ export interface TaskListSummary {
 export interface TaskViewItem extends Task {
   recordId:string;
   position:number;
+  boardPosition:number;
   updatedAt:string;
   list:TaskListSummary;
 }

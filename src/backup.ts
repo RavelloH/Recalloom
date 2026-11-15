@@ -221,6 +221,13 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     statements.push(env.DB.prepare('INSERT INTO record_links(source_id,target_id,relation) VALUES(?,?,?)').bind(source,target,relation));
     statements.push(event(env,'record',source,'link_restore',null,actor,{targetId:target,relation}));
   }
+  statements.push(env.DB.prepare(`INSERT INTO task_board_order(task_id,record_id,position)
+    SELECT t.id,t.record_id,base.position+ROW_NUMBER() OVER (
+      ORDER BY t.record_id,CASE WHEN json_extract(c.content,'$.taskOrder')='manual' THEN 0 ELSE -t.priority END,t.position,t.id
+    )*1024.0
+    FROM tasks t JOIN record_contents c ON c.record_id=t.record_id
+    CROSS JOIN (SELECT COALESCE(MAX(position),0) AS position FROM task_board_order) base
+    WHERE NOT EXISTS (SELECT 1 FROM task_board_order bo WHERE bo.task_id=t.id)`));
   if(statements.length>700)fail('ATOMIC_IMPORT_LIMIT','This snapshot exceeds the single-transaction import limit; use a D1 database backup for larger libraries');
   if(!dryRun)await env.DB.batch(statements);
   return {dryRun,validated:true,folders:folders.length,records:records.length,links:links.length,statements:statements.length};

@@ -5,10 +5,20 @@ import {prepareWikiProjection,deleteProjection,insertProjection,pinPathBindings}
 import {now,newId,event,bounded} from './internal.js';
 import {resolvePath} from './folders.js';
 import {getRecord,revisionContent} from './record-core.js';
-export async function commitContent(env:Env,row:StoredRecord,content:string,expectedRevision:number,message:string,actor:string,tasks?:Task[],taskEvent?:unknown) {
+export async function commitContent(env:Env,row:StoredRecord,content:string,expectedRevision:number,message:string,actor:string,tasks?:Task[],taskEvent?:unknown,extraStatements:D1PreparedStatement[]=[]){
   if (expectedRevision!==row.revision) throw new StorageError('VERSION_CONFLICT','Latest revision is '+row.revision);
   if (content.length>500_000) throw new StorageError('CONTENT_TOO_LARGE');
-  if (content===row.content) return {id:row.id,revision:row.revision,changed:false,contentSha256:row.content_sha256};
+  if (content===row.content) {
+    if(extraStatements.length){
+      try{await env.DB.batch(extraStatements);}
+      catch(error){
+        const latest=await env.DB.prepare('SELECT revision FROM record_contents WHERE record_id=?').bind(row.id).first<{revision:number}>();
+        if(latest?.revision!==expectedRevision)throw new StorageError('VERSION_CONFLICT','Latest revision is '+latest?.revision);
+        throw error;
+      }
+    }
+    return {id:row.id,revision:row.revision,changed:false,contentSha256:row.content_sha256};
+  }
   const rev=row.revision+1,ts=now(),digest=await sha256(content);
   const version=nextVersion({content:row.content,metadata:row.history_metadata},content,rev);
   const wikiRefs=row.kind==='document'?await prepareWikiProjection(env,row.id,content,rev,resolvePath):null;
@@ -33,7 +43,14 @@ export async function commitContent(env:Env,row:StoredRecord,content:string,expe
       q.push(env.DB.prepare('INSERT INTO tasks(id,record_id,title,details,status,priority,position,updated_at) VALUES(?,?,?,?,?,?,?,?)')
         .bind(task.id,row.id,task.title,task.details,task.status,task.priority,position,ts));
     }
+    q.push(env.DB.prepare('DELETE FROM task_board_order WHERE record_id=? AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id=task_board_order.task_id AND t.record_id=?)').bind(row.id,row.id));
+    q.push(env.DB.prepare(`INSERT OR IGNORE INTO task_board_order(task_id,record_id,position)
+      SELECT t.id,t.record_id,base.position+ROW_NUMBER() OVER (ORDER BY t.position,t.id)*1024
+      FROM tasks t CROSS JOIN (SELECT COALESCE(MAX(position),0) AS position FROM task_board_order) base
+      WHERE t.record_id=? AND NOT EXISTS (SELECT 1 FROM task_board_order bo WHERE bo.task_id=t.id)`)
+      .bind(row.id));
   }
+  q.push(...extraStatements);
   q.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)').bind(newId(),row.id,rev,ts));
   q.push(event(env,'record',row.id,'update',rev,actor,taskEvent));
   try { await env.DB.batch(q); }

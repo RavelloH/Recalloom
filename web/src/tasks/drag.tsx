@@ -9,9 +9,10 @@ type TaskDragActions={
  onDrop:(item:TaskItem)=>Promise<void>;
  canDrop:(item:TaskItem)=>boolean;
  onColumnDrop:(status:TaskStatus)=>Promise<void>;
+ onBoardDrop:(beforeTaskId:string|null,status:TaskStatus)=>Promise<void>;
  canColumnDrop:()=>boolean;
 };
-type DragTarget={kind:'item';item:TaskItem}|{kind:'container';status:TaskStatus};
+type DragTarget={kind:'item';item:TaskItem}|{kind:'container';status:TaskStatus}|{kind:'board';beforeTaskId:string|null;status:TaskStatus};
 type PointerPending={pointerId:number;x:number;y:number;item:TaskItem;layout:TaskLayout;source:HTMLElement};
 type DragSession={
  item:TaskItem;layout:TaskLayout;source:HTMLElement;sourceStyle:string|null;workspace:HTMLElement;
@@ -71,9 +72,21 @@ function setNativeDragImage(dataTransfer:DataTransfer){
 function containerStatus(container:HTMLElement,fallback:TaskStatus){
  return (container.dataset.taskDropStatus as TaskStatus|undefined)??fallback;
 }
-function containerItems(container:HTMLElement,recordId:string,source:HTMLElement){
+function containerItems(container:HTMLElement,recordId:string|null,source:HTMLElement){
  return Array.from(container.children).filter((child):child is HTMLElement=>
-  child instanceof HTMLElement&&child.matches(taskSelector)&&child!==source&&itemRecord(child)===recordId);
+  child instanceof HTMLElement&&child.matches(taskSelector)&&child!==source&&(!recordId||itemRecord(child)===recordId));
+}
+const isBoardOrder=(container:HTMLElement)=>container.dataset.taskDropOrder==='board';
+const candidatesFor=(current:DragSession,container:HTMLElement)=>containerItems(container,isBoardOrder(container)?null:current.item.recordId,current.source);
+function placementReference(current:DragSession,container:HTMLElement,candidates:HTMLElement[]){
+ return isBoardOrder(container)?endAnchor(container):segmentEndReference(container,current.item.recordId,current.source,candidates);
+}
+function itemMidpoint(element:HTMLElement){
+ const rect=element.getBoundingClientRect(),transform=getComputedStyle(element).transform;
+ // Placement animations must not move the hit-test thresholds back across the
+ // pointer after the in-flow slot has already changed the layout.
+ const offset=transform&&transform!=='none'?new DOMMatrixReadOnly(transform).m42:0;
+ return rect.top-offset+rect.height/2;
 }
 function segmentEndReference(container:HTMLElement,recordId:string,source:HTMLElement,candidates:HTMLElement[]){
  const children=Array.from(container.children);
@@ -201,14 +214,16 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
   const key=isOrigin?'origin':container.dataset.taskDropKey+':'+status+':'+(beforeId??'end')+':'+visualKey;
   if(key===current.placementKey)return true;
   const targetItem=beforeId?items.current.get(beforeId)??null:null;
-  if(targetItem&&!actionsRef.current.canDrop(targetItem))return false;
+  const board=isBoardOrder(container);
+  if(targetItem&&!board&&!actionsRef.current.canDrop(targetItem))return false;
+  if(board&&!actionsRef.current.canColumnDrop())return false;
   if(!targetItem&&!actionsRef.current.canColumnDrop())return false;
   animatePlacement(current,()=>{
    if(isOrigin)current.source.before(current.slot);
    else if(visualBefore)container.insertBefore(current.slot,visualBefore);
    else container.insertBefore(current.slot,endAnchor(container));
   });
-  current.placementKey=key;current.target=isOrigin?null:targetItem?{kind:'item',item:targetItem}:{kind:'container',status};
+  current.placementKey=key;current.target=isOrigin?null:board?{kind:'board',beforeTaskId:beforeId,status}:targetItem?{kind:'item',item:targetItem}:{kind:'container',status};
   current.workspace.querySelectorAll<HTMLElement>('[data-task-drop-active]').forEach(element=>element.removeAttribute('data-task-drop-active'));
   container.setAttribute('data-task-drop-active','true');
   const position=targetItem?'“'+targetItem.title+'”之前':status===current.item.status?'列表末尾':'“'+container.dataset.taskDropLabel+'”末尾';
@@ -226,9 +241,9 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
    container=columns.find(value=>{const rect=value.getBoundingClientRect();return x>=rect.left&&x<=rect.right&&y>=rect.top-54&&y<=rect.bottom;})??null;
   }
   if(!container||!validContainer(current,container)){returnToOrigin(current);return false;}
-  const candidates=containerItems(container,current.item.recordId,current.source);
-  const before=candidates.find(element=>y<=element.getBoundingClientRect().top+element.getBoundingClientRect().height/2)??null;
-  const visualBefore=before??segmentEndReference(container,current.item.recordId,current.source,candidates);
+  const candidates=candidatesFor(current,container);
+  const before=candidates.find(element=>y<=itemMidpoint(element))??null;
+  const visualBefore=before??placementReference(current,container,candidates);
   if(!place(current,container,before,visualBefore)){returnToOrigin(current);return false;}
   return true;
  },[activate,place,returnToOrigin]);
@@ -242,7 +257,7 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
   const workspace=source.closest<HTMLElement>('[data-task-workspace]'),container=source.parentElement;
   if(!workspace||!container||container.dataset.taskDropLayout!==layout)return null;
   const rect=source.getBoundingClientRect(),slot=makeSlot(layout,rect.height),preview=makePreview(item,layout,source);
-  const originItems=containerItems(container,item.recordId,source),sourceIndex=Array.from(container.children).indexOf(source);
+  const originItems=containerItems(container,isBoardOrder(container)?null:item.recordId,source),sourceIndex=Array.from(container.children).indexOf(source);
   const originBefore=originItems.find(element=>Array.from(container.children).indexOf(element)>sourceIndex)??null;
   const current:DragSession={item,layout,source,sourceStyle:source.getAttribute('style'),workspace,slot,preview,
    originContainer:container,originBeforeId:originBefore?itemId(originBefore):null,originStatus:containerStatus(container,item.status),
@@ -262,7 +277,8 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
   const target=current.target;
   void (async()=>{
    try{
-    if(target.kind==='item')await actionsRef.current.onDrop(target.item);
+    if(target.kind==='board')await actionsRef.current.onBoardDrop(target.beforeTaskId,target.status);
+    else if(target.kind==='item')await actionsRef.current.onDrop(target.item);
     else await actionsRef.current.onColumnDrop(target.status);
     if(session.current===current)cleanup('success');
    }catch{if(session.current===current)cleanup('failure');}
@@ -291,19 +307,19 @@ export function TaskDragProvider({actions,children}:{actions:TaskDragActions;chi
    const containers=Array.from(current.workspace.querySelectorAll<HTMLElement>('[data-task-drop-container][data-task-drop-layout="card"]'));
    const index=containers.indexOf(container),next=containers[Math.max(0,Math.min(containers.length-1,index+(key==='ArrowLeft'?-1:1)))];
    if(next&&next!==container){
-    const nextItems=containerItems(next,current.item.recordId,current.source);
-    place(current,next,null,segmentEndReference(next,current.item.recordId,current.source,nextItems));return;
+    const nextItems=candidatesFor(current,next);
+    place(current,next,null,placementReference(current,next,nextItems));return;
    }
   }
-  const candidates=containerItems(container,current.item.recordId,current.source);
+  const candidates=candidatesFor(current,container);
  const target=current.target;
- let index=target?.kind==='item'?candidates.findIndex(element=>itemId(element)===target.item.id):
+ let index=target?.kind==='board'?(target.beforeTaskId?candidates.findIndex(element=>itemId(element)===target.beforeTaskId):candidates.length):target?.kind==='item'?candidates.findIndex(element=>itemId(element)===target.item.id):
   target?.kind==='container'?candidates.length:current.originBeforeId?candidates.findIndex(element=>itemId(element)===current.originBeforeId):candidates.length;
   if(index<0)index=candidates.length;
   if(key==='Home')index=0;else if(key==='End')index=candidates.length;
   else if(key==='ArrowUp')index=Math.max(0,index-1);else if(key==='ArrowDown')index=Math.min(candidates.length,index+1);else return;
   const before=candidates[index]??null;
-  place(current,container,before,before??segmentEndReference(container,current.item.recordId,current.source,candidates));
+  place(current,container,before,before??placementReference(current,container,candidates));
  },[place]);
  const handleKey=useCallback((event:KeyboardEvent<HTMLElement>,item:TaskItem,layout:TaskLayout)=>{
   const current=session.current;

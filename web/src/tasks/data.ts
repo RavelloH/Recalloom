@@ -5,8 +5,8 @@ import type {Paged,Task} from '../types';
 export type TaskStatus=Task['status'];
 export type TaskCounts=Record<TaskStatus,number>;
 export type TaskList={id:string;name:string;path:string;folderId:string|null;status:string;revision:number;order:'priority'|'manual';counts:TaskCounts;total:number};
-export type TaskItem=Task&{position:number;updatedAt:string;list:TaskList};
-export type TaskScope={recordId?:string;query?:string};
+export type TaskItem=Task&{position:number;boardPosition?:number;updatedAt:string;list:TaskList};
+export type TaskScope={recordId?:string;query?:string;order?:'board'};
 export type TaskListsPage=Paged<TaskList>&{counts:TaskCounts};
 export const taskStatuses:TaskStatus[]=['todo','in_progress','blocked','done','cancelled'];
 export const statusLabels:Record<TaskStatus,string>={todo:'待开始',in_progress:'进行中',blocked:'阻塞',done:'已完成',cancelled:'取消'};
@@ -19,7 +19,7 @@ export const taskListPages=(scope:TaskScope={})=>infiniteQueryOptions({
  staleTime:15000
 });
 export const taskPages=(scope:TaskScope,statuses:TaskStatus[])=>infiniteQueryOptions({
- queryKey:['task-workspace','view',scope.recordId??null,scope.query??'',statuses.join(',')],
+ queryKey:['task-workspace','view',scope.recordId??null,scope.query??'',statuses.join(','),scope.order??'list'],
  initialPageParam:null as string|null,
  queryFn:({pageParam,signal})=>api<Paged<TaskItem>>('/tasks/view?'+queryString({...scope,statuses:statuses.join(','),limit:40,cursor:pageParam}),{signal}),
  getNextPageParam:(page:Paged<TaskItem>)=>page.page.nextCursor as string|null,

@@ -744,22 +744,28 @@ try{
  const deleted=await api('/tasks/'+createdTaskId);
  assert.equal(deleted.status,404,'Deleting from the task editor removes the task from storage');
 
- // Cross-column drag persists status; a second drag within one list persists
- // the canonical manual position.
+ // Cross-column drag persists status. Global-board placement has its own rank
+ // and must not rewrite the task list's canonical manual position.
  const crossStatusTask=todo.items[4];
  await dragTask(crossStatusTask.id,page.locator('[data-task-column="in_progress"]'));
  const movedStatus=await requireApi('/tasks/'+crossStatusTask.id);
  assert.equal(movedStatus.item.status,'in_progress','Cross-status drag writes the new status');
  assert.equal(movedStatus.item.recordId,todo.list.id,'Cross-status drag keeps the task in its source list');
  const sortSource=todo.items[1],sortBefore=todo.items[0];
+ const canonicalBefore=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
+ const canonicalPositions=new Map(canonicalBefore.items.map(item=>[item.id,item.position]));
+ const boardBefore=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items.map(item=>item.id);
+ assert.ok(boardBefore.includes(sortSource.id)&&boardBefore.includes(sortBefore.id),'Global board order contains both drag tasks');
+ const expectedBoard=boardBefore.filter(id=>id!==sortSource.id);
+ expectedBoard.splice(expectedBoard.indexOf(sortBefore.id),0,sortSource.id);
  await dragTask(sortSource.id,page.locator('[data-task-id="'+sortBefore.id+'"]'),{yRatio:.2});
- const orderedList=await requireApi('/task-lists?recordId='+todo.list.id+'&limit=40');
- assert.equal(orderedList.items[0].order,'manual','Same-list drag switches to manual ordering');
- const orderedTasks=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
- const sourcePosition=orderedTasks.items.find(item=>item.id===sortSource.id)?.position;
- const beforePosition=orderedTasks.items.find(item=>item.id===sortBefore.id)?.position;
- assert.ok(typeof sourcePosition==='number'&&typeof beforePosition==='number'&&sourcePosition<beforePosition,
-  'Same-list drag persists the moved row before its target');
+ const boardAfter=(await readPaged('/tasks/view',{statuses:'todo',order:'board'},100)).items.map(item=>item.id);
+ assert.deepEqual(boardAfter,expectedBoard,'Same-column global-board drag persists the exact pointer rank');
+ const canonicalAfter=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
+ assert.equal(canonicalAfter.items.find(item=>item.id===sortSource.id)?.position,canonicalPositions.get(sortSource.id),
+  'Global-board drag preserves the source canonical position');
+ assert.equal(canonicalAfter.items.find(item=>item.id===sortBefore.id)?.position,canonicalPositions.get(sortBefore.id),
+  'Global-board drag preserves the target canonical position');
 
  // The 45th todo task is not in the first 40-item page, yet a task query opens
  // its editor directly. Home's first todo link must also carry an exact task ID.
@@ -845,21 +851,45 @@ try{
    const host=document.querySelector('[data-task-scroll-fade="horizontal"]');
    return host?.hasAttribute('data-edge-start')&&!host.hasAttribute('data-edge-end');
   });
-  const verticalHost=verticalFade.first();
-  await scrollToEnd(verticalHost,'vertical');
-  await page.waitForFunction(()=>{
-   const host=document.querySelector('[data-task-scroll-fade="vertical"]');
-   return host?.hasAttribute('data-edge-start');
+  const visibleStatus=await verticalFade.evaluateAll(elements=>{
+   const board=document.querySelector('[data-task-scroll-fade="horizontal"] > .tasks-board-viewport');
+   const bounds=board?.getBoundingClientRect();
+   if(!bounds)return null;
+   const match=elements.map(element=>{
+    const column=element.closest('[data-task-column]'),rect=column?.getBoundingClientRect();
+    const overlap=rect?Math.max(0,Math.min(rect.right,bounds.right)-Math.max(rect.left,bounds.left)):0;
+    return {status:column?.getAttribute('data-task-column')??null,overlap};
+   }).sort((a,b)=>b.overlap-a.overlap)[0];
+   return match&&match.overlap>0?match.status:null;
   });
+  assert.ok(visibleStatus,'Horizontal end exposes a task column at '+width+'px');
+  const verticalHost=page.locator('[data-task-column="'+visibleStatus+'"] [data-task-scroll-fade="vertical"]');
+  await page.waitForFunction(status=>{
+   const host=document.querySelector('[data-task-column="'+CSS.escape(status)+'"] [data-task-scroll-fade="vertical"]');
+   const viewport=host?.querySelector('[data-task-column-scroll]');
+   return Boolean(viewport?.querySelector('[data-task-id]')&&viewport.scrollHeight>viewport.clientHeight+2);
+  },visibleStatus,{timeout:20000}).catch(async error=>{
+   const metrics=await verticalHost.evaluate(element=>{
+    const viewport=element.querySelector('[data-task-column-scroll]');
+    return {cards:viewport?.querySelectorAll('[data-task-id]').length??0,clientHeight:viewport?.clientHeight??0,
+     scrollHeight:viewport?.scrollHeight??0,column:element.closest('[data-task-column]')?.getBoundingClientRect().toJSON()};
+   });
+   throw Error('Visible vertical scroller was not ready at '+width+'px: '+JSON.stringify(metrics)+': '+error.message);
+  });
+  await scrollToEnd(verticalHost,'vertical');
+  await page.waitForFunction(status=>{
+   const host=document.querySelector('[data-task-column="'+CSS.escape(status)+'"] [data-task-scroll-fade="vertical"]');
+   return host?.hasAttribute('data-edge-start');
+  },visibleStatus);
   await verticalHost.evaluate(element=>{
    const scrollers=[element,...element.querySelectorAll('*')].filter(node=>node.scrollHeight>node.clientHeight+2)
     .sort((a,b)=>b.scrollHeight-a.scrollHeight);
    const target=scrollers[0]??element;target.scrollTop=0;target.dispatchEvent(new Event('scroll',{bubbles:true}));
   });
-  await page.waitForFunction(()=>{
-   const host=document.querySelector('[data-task-scroll-fade="vertical"]');
+  await page.waitForFunction(status=>{
+   const host=document.querySelector('[data-task-column="'+CSS.escape(status)+'"] [data-task-scroll-fade="vertical"]');
    return !host?.hasAttribute('data-edge-start')&&host?.hasAttribute('data-edge-end');
-  });
+  },visibleStatus);
   const taskRow=page.locator('[data-task-column="todo"] [data-task-id]').first();
   await taskRow.locator('[data-task-edit]').click();
   const mobileEditor=page.locator('[id^="task-editor-"]:has([data-task-editor])');

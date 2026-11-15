@@ -22,6 +22,7 @@ const context=await browser.newContext({viewport:{width:1440,height:980},reduced
 const page=await context.newPage();
 page.setDefaultTimeout(16000);
 const faults=[];
+const orderMotionEvidence=[];
 page.on('pageerror',error=>faults.push(error.message));
 let mutationRequests=0;
 page.on('request',request=>{
@@ -57,6 +58,7 @@ const requireApi=async(path,method='GET',body,expected=200)=>{
 };
 const taskPath=listId=>'/tasks/view?'+new URLSearchParams({recordId:listId,statuses:'todo,in_progress,blocked,done,cancelled',limit:'20'});
 const readTasks=async listId=>(await requireApi(taskPath(listId))).items;
+const readBoard=async status=>(await requireApi('/tasks/view?'+new URLSearchParams({query:prefix,statuses:status,order:'board',limit:'100'}))).items;
 const waitForMutation=()=>page.waitForResponse(response=>new URL(response.url()).pathname==='/api/tasks/mutate'&&
  response.request().method()==='POST',{timeout:10000});
 const waitForDragCleanup=()=>page.waitForFunction(()=>!document.body.classList.contains('tasks-drag-active')&&
@@ -142,7 +144,7 @@ async function startOrderProbe(recordId){
   };
   const frame=()=>{
    probe.frames.push([...document.querySelectorAll('[data-task-record-id="'+CSS.escape(id)+'"][data-task-id]')].map(element=>({
-    id:element.getAttribute('data-task-id'),transform:matrix(element),running:element.getAnimations().some(animation=>
+    id:element.getAttribute('data-task-id'),top:element.getBoundingClientRect().top,transform:matrix(element),running:element.getAnimations().some(animation=>
      animation.playState==='running'||animation.playState==='pending')
    })));
    if(!probe.done&&probe.frames.length<120)requestAnimationFrame(frame);
@@ -161,41 +163,67 @@ async function stopOrderProbe(){
 function assertOrderMotion(frames,label){
  assert.ok(frames.length>2,label+' captures layout frames');
  const offsets=frames.flat().map(item=>Math.abs(item.transform.y)).filter(value=>value>1);
- assert.ok(offsets.length>1&&Math.max(...offsets)-Math.min(...offsets)>.5,label+' animates real intermediate row positions');
+ const tracks=new Map();
+ for(const item of frames.flat()){
+  const values=tracks.get(item.id)??[];values.push(item.top);tracks.set(item.id,values);
+ }
+ const geometricIntermediate=[...tracks.entries()].map(([id,values])=>{
+  const min=Math.min(...values),max=Math.max(...values);
+  return {id,min,max,intermediate:values.find(value=>value>min+.5&&value<max-.5)};
+ }).find(track=>track.max-track.min>1&&track.intermediate!==undefined);
+ const transformRange=offsets.length>1?Math.max(...offsets)-Math.min(...offsets):0;
+ assert.ok(geometricIntermediate||transformRange>.5,
+  label+' animates real intermediate row positions: '+JSON.stringify(frames.slice(-16)));
+ orderMotionEvidence.push({label,geometry:geometricIntermediate??null,transformRange,
+  runningFrames:frames.flat().filter(item=>item.running).length});
 }
 
-async function waitForStableHandle(handle){
- await handle.evaluate(async element=>{
+async function waitForStableHandle(sourceId){
+ await page.waitForFunction(async id=>{
+  const selector='[data-task-id="'+CSS.escape(id)+'"] [data-task-drag]';
+  const handles=[...document.querySelectorAll(selector)];
+  if(handles.length!==1)return false;
+  const element=handles[0];
   const region=element.closest('[data-task-list-id],[data-task-column]')??element.parentElement??element;
   const tracked=[];
   for(let node=element;node;node=node.parentElement){tracked.push(node);if(node===region)break;}
   let previous=null,stableFrames=0;
-  const deadline=performance.now()+4000;
-  while(performance.now()<deadline){
+  for(let frame=0;frame<16;frame++){
    await new Promise(resolve=>requestAnimationFrame(resolve));
-   if(!element.isConnected)throw Error('Drag handle was detached while waiting for stable geometry');
+   const current=[...document.querySelectorAll(selector)];
+   if(!element.isConnected||current.length!==1||current[0]!==element)return false;
    const rects=tracked.map(node=>node.getBoundingClientRect());
    const stable=previous&&rects.every((rect,index)=>{
     const before=previous[index];return before&&Math.abs(rect.x-before.x)<.05&&Math.abs(rect.y-before.y)<.05&&
      Math.abs(rect.width-before.width)<.05&&Math.abs(rect.height-before.height)<.05;
    });
    stableFrames=stable?stableFrames+1:0;previous=rects;
-   if(stableFrames>=5)return;
+   if(stableFrames>=5)return true;
   }
-  throw Error('Drag handle geometry did not settle before pointer input');
- });
+  return false;
+ },sourceId,{timeout:12000});
+}
+
+async function waitForPersistentHandle(sourceId){
+ await page.waitForFunction(async id=>{
+  const selector='[data-task-id="'+CSS.escape(id)+'"] [data-task-drag]';
+  const handles=[...document.querySelectorAll(selector)];
+  if(handles.length!==1||handles[0].disabled||handles[0].getAttribute('draggable')!=='true')return false;
+  const handle=handles[0];
+  for(let frame=0;frame<3;frame++)await new Promise(resolve=>requestAnimationFrame(resolve));
+  const current=[...document.querySelectorAll(selector)];
+  return handle.isConnected&&current.length===1&&current[0]===handle;
+ },sourceId,{timeout:12000});
 }
 
 async function beginMouseDrag(sourceId){
+ await waitForPersistentHandle(sourceId);
+ await page.evaluate(id=>document.querySelector('[data-task-id="'+CSS.escape(id)+'"] [data-task-drag]')?.scrollIntoView({block:'nearest',inline:'nearest'}),sourceId);
+ await waitForPersistentHandle(sourceId);
  const handle=page.locator('[data-task-id="'+sourceId+'"] [data-task-drag]').first();
- await handle.scrollIntoViewIfNeeded();
- await page.waitForFunction(id=>{
-  const button=document.querySelector('[data-task-id="'+CSS.escape(id)+'"] [data-task-drag]');
-  return Boolean(button&&!button.disabled&&button.getAttribute('draggable')==='true');
- },sourceId);
- await waitForStableHandle(handle);
+ await waitForStableHandle(sourceId);
  await handle.hover();
- await waitForStableHandle(handle);
+ await waitForStableHandle(sourceId);
  const bounds=await handle.boundingBox();assert.ok(bounds,'Source drag handle is visible');
  await startMotionProbe(sourceId);
  const start={x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
@@ -213,6 +241,82 @@ async function moveDrag(start,destination){
  // The in-flow slot can replace the node under a stationary cursor. A final
  // real mouse sample makes Chromium dispatch dragover to that new hit target.
  await page.mouse.move(destination.x+1,destination.y+1,{steps:2});await page.waitForTimeout(30);
+}
+
+async function moveHeld(destination){
+ await page.mouse.move(destination.x,destination.y,{steps:28});
+}
+
+async function waitForStableTarget(target){
+ await target.evaluate(async element=>{
+  let previous=null,stableFrames=0;
+  const deadline=performance.now()+3000;
+  while(performance.now()<deadline){
+   await new Promise(resolve=>requestAnimationFrame(resolve));
+   if(!element.isConnected)throw Error('Held drag target was detached while its geometry settled');
+   const rect=element.getBoundingClientRect();
+   const stable=previous&&Math.abs(rect.x-previous.x)<.05&&Math.abs(rect.y-previous.y)<.05&&
+    Math.abs(rect.width-previous.width)<.05&&Math.abs(rect.height-previous.height)<.05;
+   stableFrames=stable?stableFrames+1:0;previous=rect;
+   if(stableFrames>=3)return;
+  }
+  throw Error('Held drag target geometry did not settle');
+ });
+}
+
+async function moveHeldToTarget(target,yRatio){
+ let destination=null;
+ // The first dragover inserts the in-flow slot and can move the target by a
+ // full card height. Re-sample the settled target before the decisive trusted
+ // mouse input so WebKit crosses the current midpoint, not its stale position.
+ for(let pass=0;pass<2;pass++){
+  await waitForStableTarget(target);
+  const bounds=await target.boundingBox();assert.ok(bounds,'Held drag target remains visible');
+  destination={x:bounds.x+bounds.width/2,y:bounds.y+bounds.height*yRatio};
+  await moveHeld(destination);
+ }
+ return destination;
+}
+
+async function commitHeld(destination){
+ const mutation=waitForMutation();
+ await page.mouse.move(destination.x+1,destination.y+1,{steps:2});await page.mouse.up();
+ return mutation;
+}
+
+async function liveSlot(){
+ return page.evaluate(()=>{
+  const slot=document.querySelector('.tasks-drop-slot');if(!slot)return null;
+  const task=(element,direction)=>{
+   let current=element[direction];
+   while(current&&!current.matches?.('[data-task-id][data-task-record-id]'))current=current[direction];
+   return current?{id:current.getAttribute('data-task-id'),recordId:current.getAttribute('data-task-record-id'),rect:current.getBoundingClientRect()}:null;
+  };
+  const rect=slot.getBoundingClientRect(),style=getComputedStyle(slot),pointer=window.__taskDragMotionProbe?.lastPointer??null;
+  return {status:slot.parentElement?.getAttribute('data-task-drop-status'),key:slot.parentElement?.getAttribute('data-task-drop-key'),
+   rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},display:style.display,position:style.position,pointer,
+   previous:task(slot,'previousElementSibling'),next:task(slot,'nextElementSibling')};
+ });
+}
+
+async function cancelHeldDrag(){
+ await page.keyboard.press('Escape');
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await page.mouse.up();await waitForDragCleanup();await stopMotionProbe();
+}
+
+const beforeTarget=(ids,sourceId,targetId)=>{
+ const next=ids.filter(id=>id!==sourceId),index=next.indexOf(targetId);assert.ok(index>=0,'Board target is present in API order');next.splice(index,0,sourceId);return next;
+};
+const afterTarget=(ids,sourceId,targetId)=>{
+ const next=ids.filter(id=>id!==sourceId),index=next.indexOf(targetId);assert.ok(index>=0,'Board target is present in API order');next.splice(index+1,0,sourceId);return next;
+};
+async function waitForBoardDom(status,expected){
+ await page.waitForFunction(({status,expected})=>{
+  const container=document.querySelector('[data-task-column="'+CSS.escape(status)+'"] [data-task-drop-container]');
+  const actual=container?[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-id')):[];
+  return JSON.stringify(actual)===JSON.stringify(expected);
+ },{status,expected});
 }
 
 try{
@@ -236,6 +340,34 @@ try{
  const otherResult=await requireApi('/tasks/mutate','POST',{recordId:otherList.id,action:'add',expectedRevision:otherList.revision??1,
   changes:{title:prefix+'OTHER',details:'Mixed board segment fixture',status:'blocked',priority:0}});
  const otherTask=otherResult.tasks.find(item=>item.title===prefix+'OTHER');assert.ok(otherTask,'Mixed board fixture task exists');
+ const liveList=await requireApi('/records','POST',{name:'Task drag live '+runId,kind:'task_list'},201);
+ let liveRevision=liveList.revision??1;const liveInProgress=[],liveDone=[];
+ for(let index=0;index<15;index++){
+  const status=index<3?'in_progress':'done',title=prefix+'LIVE_'+status+'_'+index;
+  const result=await requireApi('/tasks/mutate','POST',{recordId:liveList.id,action:'add',expectedRevision:liveRevision,
+   changes:{title,details:'Live native placement fixture '+index,status,priority:0}});
+  liveRevision=result.revision;
+  const task=result.tasks.find(item=>item.title===title);assert.ok(task,'Live placement fixture exists: '+title);
+  (status==='in_progress'?liveInProgress:liveDone).push(task);
+ }
+ const liveOther=await requireApi('/records','POST',{name:'Task drag live other '+runId,kind:'task_list'},201);
+ let liveOtherRevision=liveOther.revision??1;const liveOtherDone=[];
+ for(let index=0;index<5;index++){
+  const title=prefix+'LIVE_OTHER_'+index;
+  const result=await requireApi('/tasks/mutate','POST',{recordId:liveOther.id,action:'add',expectedRevision:liveOtherRevision,
+   changes:{title,details:'Other record populated column '+index,status:index===0?'in_progress':'done',priority:0}});
+  liveOtherRevision=result.revision;
+  const task=result.tasks.find(item=>item.title===title);assert.ok(task,'Other live fixture exists: '+title);liveOtherDone.push(task);
+ }
+ const singletonFixtures=[];
+ for(let index=0;index<2;index++){
+  const singletonList=await requireApi('/records','POST',{name:'Task drag singleton '+runId+' '+index,kind:'task_list'},201);
+  const title=prefix+'SINGLETON_'+index;
+  const result=await requireApi('/tasks/mutate','POST',{recordId:singletonList.id,action:'add',expectedRevision:singletonList.revision??1,
+   changes:{title,details:'One own task in a populated status '+index,status:'in_progress',priority:0}});
+  const task=result.tasks.find(item=>item.title===title);assert.ok(task,'Singleton live fixture exists: '+title);
+  singletonFixtures.push({recordId:singletonList.id,task});
+ }
 
  await page.goto(base+'/records/'+list.id);
  const workspace=page.locator('[data-task-workspace]');await workspace.waitFor();
@@ -265,8 +397,7 @@ try{
  await page.waitForFunction(id=>Boolean(document.querySelector('[data-task-column="in_progress"] [data-task-id="'+CSS.escape(id)+'"]')&&
   !document.querySelector('[data-task-column="todo"] [data-task-id="'+CSS.escape(id)+'"]')),boardSource.id);
 
- // A board column may contain several task lists. Moving to the canonical end
- // of one list must reserve space at that recordId segment, not column end.
+ // Global board rank follows the pointer across task-list boundaries.
  await page.goto(base+'/tasks');
  const scopedColumns=Promise.all(['in_progress','blocked'].map(status=>page.waitForResponse(response=>{
   const url=new URL(response.url());
@@ -278,32 +409,172 @@ try{
   document.querySelector('[data-task-column="in_progress"] [data-task-id="'+CSS.escape(sourceId)+'"]')&&
   document.querySelector('[data-task-column="blocked"] [data-task-id="'+CSS.escape(otherId)+'"]')),
  {sourceId:boardSource.id,otherId:otherTask.id});
- const blocked=page.locator('[data-task-column="blocked"] [data-task-drop-container]');
- const blockedBounds=await blocked.boundingBox();assert.ok(blockedBounds,'Mixed target board column is visible');
- const segmentStart=await beginMouseDrag(boardSource.id);
- await moveDrag(segmentStart,{x:blockedBounds.x+blockedBounds.width/2,y:blockedBounds.y+Math.min(100,blockedBounds.height/3)});
- await page.waitForFunction(recordId=>{
+
+ // Keep the native mouse held while checking live placement. These cases
+ // catch stale origin slots even when a later drop mutation would succeed.
+ await page.waitForFunction(({sameIds,doneId,otherId})=>sameIds.every(id=>document.querySelector('[data-task-column="in_progress"] [data-task-id="'+CSS.escape(id)+'"]'))&&
+  Boolean(document.querySelector('[data-task-column="done"] [data-task-id="'+CSS.escape(doneId)+'"]'))&&
+  Boolean(document.querySelector('[data-task-column="done"] [data-task-id="'+CSS.escape(otherId)+'"]')),
+ {sameIds:liveInProgress.map(task=>task.id),doneId:liveDone[0].id,otherId:liveOtherDone[1].id});
+ const liveMutationBaseline=mutationRequests;
+ const liveSource=liveInProgress[0],sameTarget=liveInProgress[2];
+ const sameTargetRow=page.locator('[data-task-column="in_progress"] [data-task-id="'+sameTarget.id+'"]');
+ await sameTargetRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(liveSource.id);
+ await moveHeldToTarget(sameTargetRow,.8);
+ await page.waitForFunction(targetId=>{
+  const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
+  if(!slot||!target||slot.parentElement?.getAttribute('data-task-drop-status')!=='in_progress')return false;
+  let previous=slot.previousElementSibling;while(previous&&!previous.matches('[data-task-id][data-task-record-id]'))previous=previous.previousElementSibling;
+  const slotRect=slot.getBoundingClientRect(),targetRect=target.getBoundingClientRect();
+  return previous===target&&slotRect.height>40&&slotRect.top>targetRect.top+targetRect.height*.45;
+ },sameTarget.id);
+ const sameSlot=await liveSlot();assert.equal(sameSlot?.previous?.id,sameTarget.id,'Held same-column drag moves slot below the target task');
+ assert.equal(sameSlot?.status,'in_progress');assert.ok(sameSlot.rect.height>40&&sameSlot.display!=='none','Same-column slot occupies visible geometry');
+ await page.screenshot({path:join(artifactDir,'held-same-column.png'),fullPage:true});
+ await cancelHeldDrag();
+
+ const foreignBefore=(await readBoard('in_progress')).map(task=>task.id),singletonIds=new Set(singletonFixtures.map(fixture=>fixture.task.id));
+ const orderedSingletonIds=foreignBefore.filter(id=>singletonIds.has(id));assert.equal(orderedSingletonIds.length,2,'Both singleton tasks are in board order');
+ const foreignSource=singletonFixtures.find(fixture=>fixture.task.id===orderedSingletonIds[0]).task;
+ const foreignTarget=singletonFixtures.find(fixture=>fixture.task.id===orderedSingletonIds[1]).task;
+ const foreignExpected=afterTarget(foreignBefore,foreignSource.id,foreignTarget.id);
+ const foreignTargetRow=page.locator('[data-task-column="in_progress"] [data-task-id="'+foreignTarget.id+'"]');
+ await foreignTargetRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(foreignSource.id);
+ const foreignDestination=await moveHeldToTarget(foreignTargetRow,.8);
+ await page.waitForFunction(targetId=>{
+  const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
+  if(!slot||!target||slot.parentElement?.getAttribute('data-task-drop-status')!=='in_progress')return false;
+  let previous=slot.previousElementSibling;while(previous&&!previous.matches('[data-task-id][data-task-record-id]'))previous=previous.previousElementSibling;
+  return previous===target&&slot.getBoundingClientRect().height>40;
+ },foreignTarget.id);
+ const foreignSlot=await liveSlot();assert.equal(foreignSlot?.previous?.id,foreignTarget.id,'Single-own-task drag follows a foreign-record card downward');
+ assert.equal(foreignSlot?.status,'in_progress');
+ const foreignMutation=await commitHeld(foreignDestination);
+ const foreignResponse=await foreignMutation;assert.ok(foreignResponse.ok(),'Foreign same-column board mutation succeeds');
+ const foreignRequest=foreignResponse.request().postDataJSON(),foreignResult=await foreignResponse.json();
+ assert.equal(foreignRequest.action,'board_reorder','Global board uses the cross-record reorder action');
+ assert.equal(foreignResult.boardOrder?.taskId,foreignSource.id);assert.equal(typeof foreignResult.boardOrder?.position,'number');
+ await foreignResponse.finished();await waitForDragCleanup();await stopMotionProbe();
+ assert.deepEqual((await readBoard('in_progress')).map(task=>task.id),foreignExpected,'Foreign same-column board rank persists at the pointer position');
+ await waitForBoardDom('in_progress',foreignExpected);
+
+ const foreignUpSource=foreignSource,foreignUpTarget=foreignTarget;
+ const foreignUpRow=page.locator('[data-task-column="in_progress"] [data-task-id="'+foreignUpTarget.id+'"]');
+ await foreignUpRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(foreignUpSource.id);
+ await moveHeldToTarget(foreignUpRow,.2);
+ await page.waitForFunction(targetId=>{
+  const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
+  if(!slot||!target||slot.parentElement?.getAttribute('data-task-drop-status')!=='in_progress')return false;
+  let next=slot.nextElementSibling;while(next&&!next.matches('[data-task-id][data-task-record-id]'))next=next.nextElementSibling;
+  return next===target&&slot.getBoundingClientRect().height>40;
+ },foreignUpTarget.id);
+ const foreignUpSlot=await liveSlot();assert.equal(foreignUpSlot?.next?.id,foreignUpTarget.id,'Single-own-task drag follows a foreign-record card upward');
+ assert.equal(foreignUpSlot?.status,'in_progress');await cancelHeldDrag();
+
+ const doneTarget=liveDone[0],doneTargetRow=page.locator('[data-task-column="done"] [data-task-id="'+doneTarget.id+'"]');
+ const doneBefore=(await readBoard('done')).map(task=>task.id),doneExpected=beforeTarget(doneBefore,foreignSource.id,doneTarget.id);
+ await doneTargetRow.scrollIntoViewIfNeeded();
+ await beginMouseDrag(foreignSource.id);
+ const doneDestination=await moveHeldToTarget(doneTargetRow,.2);
+ await page.waitForFunction(({targetId,otherRecordId})=>{
+  const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
+  const container=slot?.parentElement;if(!slot||!target||container?.getAttribute('data-task-drop-status')!=='done')return false;
+  let next=slot.nextElementSibling;while(next&&!next.matches('[data-task-id][data-task-record-id]'))next=next.nextElementSibling;
+  const records=new Set([...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]')).map(element=>element.getAttribute('data-task-record-id')));
+  const slotRect=slot.getBoundingClientRect(),targetRect=target.getBoundingClientRect();
+  const targetMoving=target.getAnimations().some(animation=>animation.playState==='running'||animation.playState==='pending');
+  return next===target&&records.has(otherRecordId)&&!targetMoving&&slotRect.height>40&&slotRect.top<targetRect.top&&targetRect.top-slotRect.bottom<32;
+ },{targetId:doneTarget.id,otherRecordId:liveOther.id});
+ const crossSlot=await liveSlot();assert.equal(crossSlot?.next?.id,doneTarget.id,'Held cross-column drag places slot before the same-list target');
+ assert.equal(crossSlot?.status,'done');assert.ok(crossSlot.rect.height>40&&crossSlot.position==='relative','Cross-column slot remains in flow');
+ await page.screenshot({path:join(artifactDir,'held-cross-column.png'),fullPage:true});
+ const crossMutation=await commitHeld(doneDestination);
+ const crossResponse=await crossMutation;assert.ok(crossResponse.ok(),'Foreign cross-column board mutation succeeds');
+ const crossRequest=crossResponse.request().postDataJSON(),crossResult=await crossResponse.json();
+ assert.equal(crossRequest.action,'board_reorder');assert.equal(crossRequest.changes?.status,'done');
+ assert.equal(crossResult.boardOrder?.taskId,foreignSource.id);assert.equal(typeof crossResult.boardOrder?.position,'number');
+ await crossResponse.finished();await waitForDragCleanup();await stopMotionProbe();
+ assert.deepEqual((await readBoard('done')).map(task=>task.id),doneExpected,'Foreign cross-column board rank persists at the pointer position');
+ await waitForBoardDom('done',doneExpected);
+ const inProgressAfterCross=foreignExpected.filter(id=>id!==foreignSource.id);
+ assert.deepEqual((await readBoard('in_progress')).map(task=>task.id),inProgressAfterCross,'Cross-column board move removes the source from its previous rank');
+
+ await page.reload();
+ await page.getByPlaceholder('搜索任务…').fill(prefix);
+ assert.deepEqual((await readBoard('in_progress')).map(task=>task.id),inProgressAfterCross,'Reload preserves same-column global board rank');
+ assert.deepEqual((await readBoard('done')).map(task=>task.id),doneExpected,'Reload preserves cross-column global board rank');
+ await waitForBoardDom('in_progress',inProgressAfterCross);await waitForBoardDom('done',doneExpected);
+
+ const doneViewport=page.locator('[data-task-column="done"] .tasks-column-viewport');await doneViewport.evaluate(element=>{element.scrollTop=0;});
+ await beginMouseDrag(foreignSource.id);
+ const viewportBounds=await doneViewport.boundingBox();assert.ok(viewportBounds,'Scrollable done column is visible while held');
+ await moveHeld({x:viewportBounds.x+viewportBounds.width/2,y:viewportBounds.y+70});
+ await page.waitForFunction(()=>document.querySelector('.tasks-drop-slot')?.parentElement?.getAttribute('data-task-drop-status')==='done');
+ const scrollStart=await liveSlot();assert.ok(scrollStart?.next?.id||scrollStart?.previous?.id,'Initial scrolled-column slot has a task neighbour');
+ const initialNeighbour=scrollStart.next?.id??scrollStart.previous.id;
+ const edgeTop=viewportBounds.y+viewportBounds.height-48;
+ const edgeY=viewportBounds.y+viewportBounds.height-24;
+ // Chromium may stop producing dragover events when the in-flow slot replaces
+ // the element under a vertical pointer path. Sweep across distinct cards at
+ // the inner edge so this test first proves that trusted input reached the
+ // production auto-scroll zone, then judges the resulting scroll behavior.
+ try{
+  await moveHeld({x:viewportBounds.x+viewportBounds.width*.28,y:edgeY});
+  await moveHeld({x:viewportBounds.x+viewportBounds.width*.72,y:edgeY});
+  await page.waitForFunction(({edgeTop,edgeBottom})=>{
+   const pointer=window.__taskDragMotionProbe?.lastPointer;
+   return Boolean(pointer&&pointer.y>=edgeTop&&pointer.y<=edgeBottom);
+  },{edgeTop,edgeBottom:viewportBounds.y+viewportBounds.height});
+  await page.waitForFunction(({initialNeighbour})=>{
+   const viewport=document.querySelector('[data-task-column="done"] .tasks-column-viewport'),slot=document.querySelector('.tasks-drop-slot');
+   if(!viewport||!slot||viewport.scrollTop<60||slot.parentElement?.getAttribute('data-task-drop-status')!=='done')return false;
+   const task=(direction)=>{let node=slot[direction];while(node&&!node.matches?.('[data-task-id][data-task-record-id]'))node=node[direction];return node?.getAttribute('data-task-id')??null;};
+   const rect=slot.getBoundingClientRect(),viewportRect=viewport.getBoundingClientRect(),neighbour=task('nextElementSibling')??task('previousElementSibling');
+   return neighbour!==initialNeighbour&&rect.bottom>=viewportRect.top&&rect.top<=viewportRect.bottom;
+  },{initialNeighbour});
+ }catch(error){
+  const diagnostic=await page.evaluate(({requestedEdgeY,edgeTop})=>{
+    const viewport=document.querySelector('[data-task-column="done"] .tasks-column-viewport'),slot=document.querySelector('.tasks-drop-slot');
+    const pointer=window.__taskDragMotionProbe?.lastPointer??null,hit=pointer?document.elementFromPoint(pointer.x,pointer.y):null;
+    const rect=element=>{const value=element?.getBoundingClientRect();return value?{x:value.x,y:value.y,width:value.width,height:value.height}:null;};
+    const ancestors=[];for(let node=hit;node&&ancestors.length<12;node=node.parentElement)ancestors.push({tag:node.tagName,className:node.getAttribute?.('class')});
+    const viewportRect=viewport?.getBoundingClientRect(),board=viewport?.closest('.tasks-board-viewport'),boardRect=board?.getBoundingClientRect();
+    const clipping=value=>value?{left:Math.max(0,-value.left),top:Math.max(0,-value.top),
+     right:Math.max(0,value.right-innerWidth),bottom:Math.max(0,value.bottom-innerHeight)}:null;
+    return {requestedEdgeY,edgeTop,pointer,window:{width:innerWidth,height:innerHeight},
+     hit:{tag:hit?.tagName,className:hit?.getAttribute?.('class'),insideViewport:Boolean(hit?.closest?.('.tasks-column-viewport')),ancestors},
+     viewport:{rect:rect(viewport),scrollTop:viewport?.scrollTop,scrollHeight:viewport?.scrollHeight,clientHeight:viewport?.clientHeight,overflowY:viewport?getComputedStyle(viewport).overflowY:null},
+     clipping:{viewport:clipping(viewportRect),board:clipping(boardRect),boardRect:rect(board)},
+     slot:{rect:rect(slot),status:slot?.parentElement?.getAttribute('data-task-drop-status')}};
+  },{requestedEdgeY:edgeY,edgeTop});
+  throw new Error('Held column auto-scroll did not advance: '+JSON.stringify(diagnostic),{cause:error});
+ }
+ const scrolledSlot=await liveSlot(),scrollTop=await doneViewport.evaluate(element=>element.scrollTop);
+ assert.ok(scrollTop>=60,'Held edge drag auto-scrolls the populated column');
+ assert.notEqual(scrolledSlot?.next?.id??scrolledSlot?.previous?.id,initialNeighbour,'Slot advances to a later task while auto-scrolling');
+ assert.equal(scrolledSlot?.status,'done');await cancelHeldDrag();
+ assert.equal(mutationRequests,liveMutationBaseline+2,'Only the two committed live board placements mutate tasks');
+
+ const blockedBefore=(await readBoard('blocked')).map(task=>task.id),blockedExpected=beforeTarget(blockedBefore,boardSource.id,otherTask.id);
+ const blockedTarget=page.locator('[data-task-column="blocked"] [data-task-id="'+otherTask.id+'"]');await blockedTarget.scrollIntoViewIfNeeded();
+ await beginMouseDrag(boardSource.id);
+ const blockedDestination=await moveHeldToTarget(blockedTarget,.2);
+ await page.waitForFunction(targetId=>{
   const slot=document.querySelector('.tasks-drop-slot'),container=slot?.parentElement;
   if(!slot||container?.getAttribute('data-task-drop-status')!=='blocked')return false;
-  const expected=[...container.children].find(element=>element.matches('[data-task-id][data-task-record-id]')&&
-   element.getAttribute('data-task-record-id')>recordId);
-  const nextTask=[...container.children].slice([...container.children].indexOf(slot)+1)
-   .find(element=>element.matches('[data-task-id][data-task-record-id]'));
-  return expected?slot.nextElementSibling===expected:!nextTask;
- },list.id);
- const segmentMutation=waitForMutation();
- await page.mouse.up();
+  let next=slot.nextElementSibling;while(next&&!next.matches('[data-task-id][data-task-record-id]'))next=next.nextElementSibling;
+  return next?.getAttribute('data-task-id')===targetId&&slot.getBoundingClientRect().height>40;
+ },otherTask.id);
+ const segmentMutation=await commitHeld(blockedDestination);
  const segmentResponse=await segmentMutation;assert.ok(segmentResponse.ok(),'Mixed board drag mutation succeeds');await segmentResponse.finished();
  await waitForDragCleanup();await stopMotionProbe();
  assert.equal((await requireApi('/tasks/'+boardSource.id)).item.status,'blocked','Mixed board drag persists destination status');
- await page.waitForFunction(({sourceId,recordId})=>{
-  const container=document.querySelector('[data-task-column="blocked"] [data-task-drop-container]');if(!container)return false;
-  const tasks=[...container.children].filter(element=>element.matches('[data-task-id][data-task-record-id]'));
-  const recordIds=tasks.map(element=>element.getAttribute('data-task-record-id'));
-  return tasks.some(element=>element.getAttribute('data-task-id')===sourceId)&&
-   recordIds.every((value,index)=>index===0||recordIds[index-1].localeCompare(value)<=0)&&
-   tasks.filter(element=>element.getAttribute('data-task-record-id')===recordId).at(-1)?.getAttribute('data-task-id')===sourceId;
- },{sourceId:boardSource.id,recordId:list.id});
+ assert.equal(segmentResponse.request().postDataJSON().action,'board_reorder');
+ assert.deepEqual((await readBoard('blocked')).map(task=>task.id),blockedExpected,'Mixed board pointer rank persists across records');
+ await waitForBoardDom('blocked',blockedExpected);
 
  // List: move the last canonical task before the first and assert the exact
  // API order, in addition to the same live geometry/motion contract.
@@ -316,14 +587,13 @@ try{
  await targetRow.scrollIntoViewIfNeeded();
  const rowBounds=await targetRow.boundingBox();assert.ok(rowBounds,'Target list row is visible');
  const listStart=await beginMouseDrag(listSource);
- const listMutation=waitForMutation();
- await moveDrag(listStart,{x:rowBounds.x+Math.min(120,rowBounds.width/2),y:rowBounds.y+rowBounds.height*.25});
+ const listDestination={x:rowBounds.x+Math.min(120,rowBounds.width/2),y:rowBounds.y+rowBounds.height*.25};
+ await moveDrag(listStart,listDestination);
  await page.waitForFunction(({listId,targetId})=>{
   const slot=document.querySelector('.tasks-drop-slot'),target=document.querySelector('[data-task-id="'+CSS.escape(targetId)+'"]');
   return slot?.parentElement?.getAttribute('data-task-drop-key')==='list:'+listId&&slot.nextElementSibling===target;
  },{listId:list.id,targetId:listTarget});
- await page.mouse.up();
- const listResponse=await listMutation;assert.ok(listResponse.ok(),'List drag mutation succeeds');await listResponse.finished();
+ const listResponse=await commitHeld(listDestination);assert.ok(listResponse.ok(),'List drag mutation succeeds');await listResponse.finished();
  await waitForDragCleanup();
  const listProbe=await stopMotionProbe();
  assertMotion(listProbe,'List drag',{layout:'row',key:'list:'+list.id});
@@ -434,7 +704,8 @@ try{
  assert.deepEqual((await readTasks(list.id)).map(item=>item.id),drawerBefore,'Drawer move up restores exact order');
 
  assert.deepEqual(faults,[],'Browser runtime errors');
- console.log('PASS task drag motion:',engine,'board/list preview, in-flow slot, FLIP frames, immediate DOM order, drawer order and keyboard order');
+ console.log('PASS task drag motion:',engine,'board/list preview, in-flow slot, FLIP frames, immediate DOM order, drawer order and keyboard order',
+  JSON.stringify({orderMotionEvidence}));
 }catch(error){
  const failureScreenshot=join(artifactDir,'failure.png');
  await page.screenshot({path:failureScreenshot,fullPage:true}).catch(()=>undefined);

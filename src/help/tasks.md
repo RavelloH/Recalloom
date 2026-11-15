@@ -18,6 +18,8 @@ reorder 必须提供 taskId 和 beforeTaskId：后者是同一列表内的目标
 
 Web 的 task-lists 查询包含列表名称、路径、revision、完整五状态计数和空列表；tasks/view 支持独立分页的状态列或单列表任务页。query 搜索标题和详情，并同步限制计数；有搜索词时不返回无匹配任务的空分组。状态筛选省略时包含全部五种状态，open/未完成只是 todo、in_progress、blocked 的聚合，不是新状态。folderId 范围包含后代目录，不能与 recordId 同时指定。每页默认 40 条，需跟随 nextCursor 续载，计数不受已加载页数影响。
 
+Web 全局看板可用 tasks/view 的 order=board 读取跨任务列表的持久顺序；不传 order 时仍使用各任务列表自身的 canonical 顺序。Web 的 board_reorder 只移动全局看板位置，可跨任务列表使用 beforeTaskId，并可同时改变 status；它不会改变任务归属，也不会改写所属列表的 JSON 数组顺序。同状态且不改正文的看板移动不会制造新的内容 revision，但仍使用所属列表的 expectedRevision 做并发校验。board_reorder 是 Web 工作区合同，不属于 mutate_task 的 MCP action。
+
 修改任务之前读取所属 task_list 的当前 revision，调用 mutate_task 时必须传 expectedRevision；如版本发生变化，需要重读并协调。remove 从当前任务投影移除条目，但历史版本仍可用于恢复。
 
 ## 与 Markdown 任务复选框的区别

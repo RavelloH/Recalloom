@@ -14,10 +14,11 @@ import {AutoResizer,AutoTransition} from '../motion-primitives';
 
 export type TaskInteractions=Pick<TaskItemProps,'onEdit'|'onStatus'|'onDrag'|'onDrop'|'canDrop'>&{
  pending:string[];onCreate:(list?:TaskList,status?:TaskStatus)=>void;onColumnDrop:(status:TaskStatus)=>Promise<void>;canColumnDrop:()=>boolean;
+ onBoardDrop:(beforeTaskId:string|null,status:TaskStatus)=>Promise<void>;
 };
 type BoardProps={scope:TaskScope;statuses:TaskStatus[];counts:TaskCounts;lists:TaskList[];interactions:TaskInteractions};
 function BoardColumn({scope,status,count,list,interactions}:{scope:TaskScope;status:TaskStatus;count:number;list?:TaskList;interactions:TaskInteractions}){
- const q=useInfiniteQuery(taskPages(scope,[status])),[root,setRoot]=useState<HTMLDivElement|null>(null);
+ const q=useInfiniteQuery(taskPages(scope.recordId?scope:{...scope,order:'board'},[status])),[root,setRoot]=useState<HTMLDivElement|null>(null);
  const tasks=useMemo(()=>q.data?.pages.flatMap(page=>page.items)??[],[q.data]);
  const state=q.isPending?'loading':q.isError&&!tasks.length?'error':!tasks.length?'empty':'ready';
  const stateKey=state==='error'?'error:'+String(q.error):state;
@@ -28,7 +29,7 @@ function BoardColumn({scope,status,count,list,interactions}:{scope:TaskScope;sta
   </span></div>
    <IconButton data-task-create label={'新建'+statusLabels[status]+'任务'} icon={<Icon name="plus" size="sm"/>} variant="ghost" size="sm" onClick={()=>interactions.onCreate(list,status)}/></header>
   <OverlayScroll axis="y" edges className="tasks-column-scroll" viewportClassName="tasks-column-viewport" data-task-scroll-fade="vertical" viewportRef={setRoot} viewportProps={{'data-task-column-scroll':'',role:'region','aria-label':statusLabels[status]+'任务列表',tabIndex:0}}>
-   <div className="tasks-cards" data-task-drop-container data-task-drop-layout="card" data-task-drop-key={'board:'+status} data-task-drop-status={status} data-task-drop-label={statusLabels[status]}>
+   <div className="tasks-cards" data-task-drop-container data-task-drop-layout="card" data-task-drop-key={'board:'+status} data-task-drop-status={status} data-task-drop-label={statusLabels[status]} data-task-drop-order={scope.recordId?'list':'board'}>
     {tasks.map(item=><TaskEntry key={item.id} item={item} {...interactions} pending={interactions.pending.includes(item.recordId)} layout="card"/>)}
     <AutoTransition transitionKey={stateKey} className={stateClass} duration={.15}>
      {state==='loading'?<Spinner size="sm" label="正在加载任务…"/>:state==='error'?<><ErrorText error={q.error}/><Button label="重试" variant="ghost" size="sm" onClick={()=>q.refetch()}/></>:state==='empty'?'暂无任务':null}

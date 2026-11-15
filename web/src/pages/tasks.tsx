@@ -48,8 +48,9 @@ export function TasksPage({recordId,focusTaskId,recordActions}:{recordId?:string
   if(item&&item.id!==target.id&&item.recordId===target.recordId)await actions.move(item,target.id,view==='board'?target.status:item.status);
  },[actions.move,view]);
  const onColumnDrop=useCallback(async(status:TaskStatus)=>{const item=dragged.current;dragged.current=null;if(item)await actions.move(item,null,status);},[actions.move]);
+ const onBoardDrop=useCallback(async(beforeTaskId:string|null,status:TaskStatus)=>{const item=dragged.current;dragged.current=null;if(item)await actions.moveBoard(item,beforeTaskId,status);},[actions.moveBoard]);
  const canColumnDrop=useCallback(()=>Boolean(dragged.current),[]);
- const interactions=useMemo<TaskInteractions>(()=>({pending:actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop}),[actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop]);
+ const interactions=useMemo<TaskInteractions>(()=>({pending:actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop,onBoardDrop}),[actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop,onBoardDrop]);
  const createButton=<Button data-task-create label="新建任务" icon={<Icon name="plus" size="sm"/>} variant="primary" size="sm" onClick={()=>onCreate()}/>;
  const contentState=listsQuery.isError&&!lists.length?'error':!statuses.length?'no-status':view==='board'?'board':listsQuery.isPending?'list-loading':lists.length?'list-ready':'list-empty';
  return <div className={recordId?'tasks-workspace embedded-tasks':'page tasks-page tasks-workspace'} data-task-workspace>

@@ -40,7 +40,7 @@ async function jsonBody<T extends z.ZodTypeAny>(req:Request,schema:T,max=520000)
 const body=<T extends z.ZodTypeAny>(schema:T,max?:number)=>(req:Request)=>jsonBody(req,schema,max);
 const inputTask=z.object({title:z.string().trim().min(1).max(500).optional(),details:z.string().max(50000).optional(),status:taskStatus.optional(),priority:z.number().int().min(-10).max(10).optional()}).strict();
 const taskViewQuery=z.object({recordId:uuid.optional(),folderId:uuid.optional(),query:z.string().trim().max(200).optional(),limit,cursor:z.string().max(4096).optional(),
-  statuses:z.string().transform(v=>v.split(',')).pipe(z.array(taskStatus).min(1).max(5)).optional()
+  statuses:z.string().transform(v=>v.split(',')).pipe(z.array(taskStatus).min(1).max(5)).optional(),order:z.enum(['canonical','board']).optional()
 }).strict().refine(v=>!(v.recordId&&v.folderId),{message:'Choose recordId or folderId, not both'});
 const asJson=(result:unknown,status:200|201=200)=>Response.json(result,{status,headers:noStore});
 const actor=(s:WebSession)=>'web:owner:'+s.id;
@@ -49,7 +49,7 @@ webApi.onError((e)=>{
   if(e instanceof StorageError){
     const code=e.code;
     const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND' ?404
-      :code==='VERSION_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
+      :code==='VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
       :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
     return err(code,status,e.message);
   }
@@ -275,13 +275,17 @@ webApi.get('/tasks/:taskId',async(c)=>{
   return asJson(await getTaskItem(c.env,taskId));
 });
 webApi.post('/tasks/mutate',async(c)=>{
-  const v=await body(z.object({recordId:uuid,action:z.enum(['add','update','remove','reorder']),taskId:uuid.optional(),expectedRevision:z.number().int().positive(),changes:inputTask.optional(),beforeTaskId:uuid.nullable().optional()}).strict().superRefine((v,ctx)=>{
+  const v=await body(z.object({recordId:uuid,action:z.enum(['add','update','remove','reorder','board_reorder']),taskId:uuid.optional(),expectedRevision:z.number().int().positive(),changes:inputTask.optional(),beforeTaskId:uuid.nullable().optional()}).strict().superRefine((v,ctx)=>{
     if(v.action==='add'&&!v.changes?.title)ctx.addIssue({code:'custom',path:['changes','title'],message:'Required for add'});
     if(v.action!=='add'&&!v.taskId)ctx.addIssue({code:'custom',path:['taskId'],message:'Required for update/remove'});
-    if(v.action==='reorder'&&v.beforeTaskId===undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Required for reorder; null means end of list'});
-    if(v.action!=='reorder'&&v.beforeTaskId!==undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Only allowed for reorder'});
+    const ordered=v.action==='reorder'||v.action==='board_reorder';
+    if(ordered&&v.beforeTaskId===undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Required for reorder; null means end of list'});
+    if(!ordered&&v.beforeTaskId!==undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Only allowed for reorder'});
+    if(v.action==='board_reorder'&&(!v.changes?.status||Object.keys(v.changes).some(key=>key!=='status')))
+      ctx.addIssue({code:'custom',path:['changes'],message:'board_reorder only accepts status'});
   }))(c.req.raw);
-  return asJson(await store.taskOperation(c.env,v.recordId,v.expectedRevision,v.action,v.taskId,v.changes??{},actor(c.get('webSession')),v.action==='reorder'?{beforeTaskId:v.beforeTaskId!}:undefined));
+  const ordered=v.action==='reorder'||v.action==='board_reorder';
+  return asJson(await store.taskOperation(c.env,v.recordId,v.expectedRevision,v.action,v.taskId,v.changes??{},actor(c.get('webSession')),ordered?{beforeTaskId:v.beforeTaskId!}:undefined));
 });
 webApi.get('/graph',async(c)=>{
  const q=parseQuery(c.req.url,z.object({focusId:uuid.optional(),limit:z.coerce.number().int().min(10).max(100).optional(),semantic:z.enum(['true','false']).optional()}));
