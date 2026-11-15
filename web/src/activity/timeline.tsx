@@ -10,14 +10,11 @@ function ActivityGroupRow({group,onOpen}:{group:ActivityGroup;onOpen:(event:Acti
  const [expanded,setExpanded]=useState(false),first=group.events[0],last=group.events.at(-1)!,multiple=group.events.length>1;
  return <div className="activity-group" data-activity-group={group.key}>
   <ClickableCard className="activity-event-card" padding={0} variant="transparent" label={'查看活动详情：'+(first.resourceName??'资源')} onClick={()=>onOpen(first)}>
-   <ActivityEntry item={first}/>
-   <div className="activity-event-context"><span>{multiple?'连续修改 '+group.events.length+' 次':eventDescription(first)}</span>
-    {multiple&&last.revision!=null&&first.revision!=null&&<span>R{Math.max(1,last.revision-1)} → R{first.revision}</span>}
-    <span className="activity-detail-hint">查看详情 <Icon name="chevronRight" size="sm"/></span>
-   </div>
+   <ActivityEntry item={first} description={multiple?'连续修改 '+group.events.length+' 次':eventDescription(first)}
+    revisionLabel={multiple&&last.revision!=null&&first.revision!=null?'R'+Math.max(1,last.revision-1)+' → R'+first.revision:undefined}/>
   </ClickableCard>
   {multiple&&<div className="activity-group-toggle"><Button size="sm" variant="ghost" label={expanded?'收起修改记录':'展开 '+group.events.length+' 条修改记录'} aria-expanded={expanded} icon={<span className="activity-disclosure" data-expanded={expanded}><Icon name="chevronRight" size="sm"/></span>} onClick={()=>setExpanded(value=>!value)}/></div>}
-  <AutoResizer><AutoTransition transitionKey={expanded?'expanded':'collapsed'}>{expanded?<div className="activity-group-events">{group.events.map(event=><ClickableCard key={event.seq} variant="transparent" padding={0} className="activity-event-card" label={'查看修改详情：'+eventDescription(event)} onClick={()=>onOpen(event)}><ActivityEntry item={event}/><p className="activity-event-description muted">{eventDescription(event)}</p></ClickableCard>)}</div>:null}</AutoTransition></AutoResizer>
+  <AutoResizer><AutoTransition transitionKey={expanded?'expanded':'collapsed'}>{expanded?<div className="activity-group-events">{group.events.map(event=><ClickableCard key={event.seq} variant="transparent" padding={0} className="activity-event-card" label={'查看修改详情：'+eventDescription(event)} onClick={()=>onOpen(event)}><ActivityEntry item={event} description={eventDescription(event)}/></ClickableCard>)}</div>:null}</AutoTransition></AutoResizer>
  </div>;
 }
 export function ActivityTimeline({groups,onOpen}:{groups:ActivityGroup[];onOpen:(event:ActivityEvent)=>void}){

@@ -72,7 +72,7 @@ export function ActivityPage(){
     <span className="muted">{metricLabels[key]}</span><AutoTransition transitionKey={summary.isPending?'pending':String(summary.data?.totals[key]??0)}>{summary.isPending?<Skeleton width={64} height={32} radius={1}/>:<strong>{(summary.data?.totals[key]??0).toLocaleString('zh-CN')}</strong>}</AutoTransition>
     <span className="activity-metric-caption muted">{key==='activeDays'?'有修改的日期':key==='changes'?'成功提交的操作':key==='resources'?'去重的文档与任务列表':partialTasks?'自 '+coverageStart?.replaceAll('-','/')+' 起':'转为已完成的任务'}</span>
    </div>)}</div>}
-   <AutoTransition transitionKey={summary.isPending?'pending':summary.isError?'error':JSON.stringify(filters)}>{summary.isPending?<div className="activity-chart-loading"><Skeleton width="100%" height={160} radius={2}/></div>:summary.data?<ActivityChart days={summary.data.days} selectedDay={selectedDay} onSelect={setSelectedDay}/>:null}</AutoTransition>
+   <AutoTransition transitionKey={summary.isPending?'pending':summary.isError?'error':JSON.stringify(filters)}>{summary.isPending?<div className="activity-chart-loading"><Skeleton width="100%" height={160} radius={2}/></div>:summary.data?<ActivityChart days={summary.data.days} agents={summary.data.agents} selectedDay={selectedDay} onSelect={setSelectedDay}/>:null}</AutoTransition>
    {partialTasks&&<p className="activity-coverage muted"><Icon name="infoCircle" size="sm"/>任务完成统计自 {coverageStart?.replaceAll('-','/')} 起记录，早期活动仍可在下方查看。{Boolean(coverage?.incompleteTaskEvents)&&'所选范围包含缺少逐项变化的历史记录。'}</p>}
   </section>
   <section className="activity-history" aria-label="活动时间线"><div className="activity-section-heading"><div><h2>活动记录</h2><p className="muted">连续修改合并显示，原始记录完整保留。</p></div>

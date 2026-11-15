@@ -36,13 +36,10 @@
 .activity-date-heading h3 { font-size: var(--rk-font-small); font-weight: 550; color: var(--rk-ink-soft); margin: 0; }
 .activity-group { border-bottom: 1px solid var(--rk-border-soft); padding: 6px 0; }
 .activity-page .activity-event-card { border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
-.activity-page .activity-event-card .activity-row { border: 0; padding: 12px 10px 4px; }
+.activity-page .activity-event-card .activity-row { border: 0; padding: 12px 10px; }
 .activity-page .activity-event-card .activity-icon { color: var(--rk-ink-soft); }
-.activity-event-context { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 10px 12px 42px; font-size: var(--rk-font-small); color: var(--rk-ink-soft); }
-.activity-detail-hint { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; color: var(--rk-ink-faint); font-size: var(--rk-font-caption); }
 .activity-group-toggle { margin-left: 34px; }
 .activity-group-events { margin-left: 24px; border-left: 1px solid var(--rk-border-soft); padding-left: 8px; }
-.activity-event-description { margin: 0 12px 12px 42px; font-size: var(--rk-font-small); }
 .activity-disclosure { display: inline-flex; transition: transform .2s var(--rk-ease-out); }
 .activity-disclosure[data-expanded="true"] { transform: rotate(90deg); }
 .activity-load-more { display: grid; justify-items: center; gap: 12px; padding: 24px 0; min-height: 64px; }
@@ -79,8 +76,6 @@
  .activity-chart-scroll { margin-top: 14px; }
  .activity-history { margin-top: 28px; }
  .activity-page .activity-event-card .activity-row { padding-inline: 4px; }
- .activity-event-context { margin-left: 36px; margin-right: 4px; gap: 6px 12px; }
- .activity-detail-hint { display: none; }
  .activity-group-toggle { margin-left: 28px; }
  .activity-group-events { margin-left: 12px; }
  .activity-extra-filters { gap: 12px; }

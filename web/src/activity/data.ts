@@ -6,8 +6,9 @@ import type {ISODateString} from '@astryxdesign/core/Calendar';
 
 export type ActivityFilters={from:ISODateString;to:ISODateString;timeZone:string;actor?:string;categories?:string;query?:string;folderId?:string};
 export type ActivityEvent=Event&{seq:number;createdAt:string;details?:Record<string,unknown>&{taskActivity?:TaskActivity}};
-export type ActivityDay={day:ISODateString;user:number;agent:number;system:number;unknown:number;total:number};
-export type ActivitySummary={totals:{activeDays:number;changes:number;resources:number;completed:number};days:ActivityDay[];contributions:{user:number;agent:number;system:number;unknown:number};actors:Array<{actorKey:string;actorName:string;count:number}>;coverage:{taskTrackingSince:string|null;incompleteTaskEvents:number}};
+export type ActivityAgent={actorKey:string;actorName:string};
+export type ActivityDay={day:ISODateString;user:number;agent:number;system:number;unknown:number;total:number;agents:Record<string,number>};
+export type ActivitySummary={totals:{activeDays:number;changes:number;resources:number;completed:number};days:ActivityDay[];contributions:{user:number;agent:number;system:number;unknown:number};agents:ActivityAgent[];actors:Array<ActivityAgent&{count:number}>;coverage:{taskTrackingSince:string|null;incompleteTaskEvents:number}};
 export const dayString=(date:Date)=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') as ISODateString;
 export function dateRange(days=30){const end=new Date(),start=new Date(end.getFullYear(),end.getMonth(),end.getDate()-(days-1));return {from:dayString(start),to:dayString(end)};}
 export const defaultActivityFilters=():ActivityFilters=>({...dateRange(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone});

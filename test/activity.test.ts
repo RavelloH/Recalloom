@@ -78,6 +78,40 @@ test('statistics cover the complete interval, independent of feed pagination, an
  assert.equal(seen.length,115);assert.equal(new Set(seen).size,115);assert.deepEqual(seen,[...seen].sort((a,b)=>b-a));
 });
 
+test('daily chart separates named agents, merges their grants and preserves aggregate counts and filters',async(t)=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const doc=await createRecord(f.env,{name:'Agent chart'});f.db.exec('DELETE FROM change_events');
+ const register=f.db.prepare("INSERT INTO oauth_actor_names VALUES(?,?,'x')");
+ register.run('chat-a',' ChatGPT ');register.run('chat-b','ChatGPT');register.run('muse','Muse');
+ f.event(doc.id);
+ f.event(doc.id,'grant:chat-a',undefined,{requestId:'same-operation'});
+ f.event(doc.id,'grant:chat-b',undefined,{requestId:'same-operation'});
+ f.event(doc.id,'grant:chat-b');f.event(doc.id,'grant:muse');
+ f.event(doc.id,'grant:old-a');f.event(doc.id,'grant:old-b');f.event(doc.id,'system:maintenance');
+ f.event(doc.id,'grant:muse','2026-11-16T03:00:00.000Z');
+ const filter={...range,to:'2026-11-17'},summary=await activitySummary(f.env,filter);
+ assert.deepEqual(summary.agents,[{actorKey:'agent:unidentified',actorName:'未识别 Agent'},{actorKey:'client:ChatGPT',actorName:'ChatGPT'},{actorKey:'client:Muse',actorName:'Muse'}]);
+ assert.deepEqual(summary.days.map(day=>day.agents),[{'client:ChatGPT':2,'client:Muse':1,'agent:unidentified':2},{'client:Muse':1},{}]);
+ assert.deepEqual(summary.days.map(day=>[day.agent,day.total]),[[5,7],[1,1],[0,0]]);
+ assert.equal(summary.totals.changes,8);assert.equal(summary.contributions.agent,6);
+ for(const day of summary.days)assert.equal(Object.values(day.agents).reduce((sum,count)=>sum+count,0),day.agent);
+ const filtered=await activitySummary(f.env,{...filter,actor:'client:Muse'});
+ assert.deepEqual(filtered.agents,[{actorKey:'client:Muse',actorName:'Muse'}]);
+ assert.deepEqual(filtered.days.map(day=>day.agents),[{'client:Muse':1},{'client:Muse':1},{}]);
+ assert.equal(filtered.totals.changes,2);
+});
+
+test('daily chart retains every matching agent beyond the actor selector catalog limit',async(t)=>{
+ const f=fixture();t.after(()=>f.db.close());
+ const doc=await createRecord(f.env,{name:'Many agents'});f.db.exec('DELETE FROM change_events');
+ const register=f.db.prepare("INSERT INTO oauth_actor_names VALUES(?,?,'x')");
+ for(let index=0;index<102;index++){const name='Agent '+String(index).padStart(3,'0');register.run(String(index),name);f.event(doc.id,'grant:'+index);}
+ const summary=await activitySummary(f.env,range);
+ assert.equal(summary.actors.length,100);assert.equal(summary.agents.length,102);
+ assert.equal(Object.keys(summary.days[0]!.agents).length,102);assert.equal(summary.days[0]!.agent,102);
+ assert.equal(summary.days[0]!.agents['client:Agent 101'],1);
+});
+
 test('feed and summary share actor, category, text and subtree filters, including malformed history',async(t)=>{
  const f=fixture();t.after(()=>f.db.close());
  const parent=f.folder('Projects'),child=f.folder('Child',parent),other=f.folder('Other');

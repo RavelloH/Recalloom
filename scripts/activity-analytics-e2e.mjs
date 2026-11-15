@@ -14,11 +14,21 @@ const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,..
 const context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Shanghai',colorScheme:'light'}),page=await context.newPage();
 page.setDefaultTimeout(20000);
 const faults=[];page.on('pageerror',error=>faults.push(error.message));
-let sessionCookie='',holdDetail=false,releaseDetail;
+let sessionCookie='',holdDetail=false,releaseDetail,chartAgentFixture=false;
+const namedAgents=[{actorKey:'client:ChatGPT',actorName:'ChatGPT'},{actorKey:'client:Codex',actorName:'Codex'},{actorKey:'client:Muse',actorName:'Muse'}];
 const held=new Promise(resolve=>{releaseDetail=resolve;});
 await page.route('**/api/**',async route=>{
  const request=route.request(),url=new URL(request.url());
  if(holdDetail&&/^\/api\/activity\/\d+$/.test(url.pathname))await held;
+ // Backend tests verify OAuth aggregation against SQLite; this response fixture
+ // checks how multiple named series render through the public Astryx chart API.
+ if(chartAgentFixture&&url.pathname==='/api/activity/summary'){
+  const response=await route.fetch({headers:{...await request.allHeaders(),...(sessionCookie?{cookie:sessionCookie}:{})}}),summary=await response.json();
+  summary.agents=namedAgents;
+  const last=summary.days.at(-1);last.agents=Object.fromEntries(namedAgents.map((agent,index)=>[agent.actorKey,index+1]));
+  last.agent=6;last.total+=6;summary.contributions.agent=6;summary.totals.changes+=6;
+  await route.fulfill({response,json:summary});return;
+ }
  if(engine!=='webkit'){await route.continue();return;}
  if(url.pathname==='/api/auth/login'){
   const response=await route.fetch();sessionCookie=/^(__Host-recalloom_session=[^;]+)/.exec(response.headers()['set-cookie']??'')?.[1]??'';
@@ -60,9 +70,11 @@ try{
  await page.getByRole('textbox',{name:'搜索活动',exact:true}).fill(name);
  await page.waitForFunction(()=>document.querySelector('.activity-date-heading span')?.textContent==='7 条记录');
  const group=page.locator('.activity-group').filter({hasText:'连续修改 3 次'});await group.waitFor();
+ assert.equal(await group.locator('.activity-description').first().innerText(),'连续修改 3 次 · 记录 · R1 → R4');
  const expand=group.getByRole('button',{name:'展开 3 条修改记录',exact:true});await expand.click();
  await group.locator('.activity-group-events .activity-row').nth(2).waitFor();
  assert.equal(await group.locator('.activity-group-events .activity-row').count(),3);
+ for(const description of await group.locator('.activity-group-events .activity-description').allTextContents())assert.match(description,/^更新 · 记录 · R[234]$/);
  await group.getByRole('button',{name:'收起修改记录',exact:true}).click();
  await group.locator('.activity-group-events').waitFor({state:'hidden'});
 
@@ -120,7 +132,29 @@ try{
  await page.locator('.activity-load-more').scrollIntoViewIfNeeded();
  await page.waitForFunction(()=>document.querySelectorAll('.activity-timeline [data-activity-seq]').length===61);
  await page.getByText('已显示所选范围内的全部活动',{exact:true}).waitFor();
+ stage='task metadata second line';
+ await api('/tasks/mutate',{recordId:list.id,expectedRevision:3,action:'update',taskId,changes:{title:'Updated activity task'}});
+ await page.getByRole('textbox',{name:'搜索活动',exact:true}).fill(name+'-任务');
+ const taskGroup=page.locator('.activity-group').filter({hasText:'连续修改 3 次'});await taskGroup.waitFor();
+ await taskGroup.getByRole('button',{name:'展开 3 条修改记录',exact:true}).click();
+ await taskGroup.locator('.activity-group-events .activity-description').filter({hasText:'修改 1 项任务 · 记录 · R4'}).waitFor();
+ assert.equal(await page.locator('.activity-event-context,.activity-event-description').count(),0,'Event descriptions stay in the second metadata row');
+ stage='named agent chart colors';
+ chartAgentFixture=true;await page.reload();
+ const legend=chart.getByRole('list',{name:'图例'});await legend.getByText('Muse',{exact:true}).waitFor();
+ const swatches=[];
+ for(const agent of namedAgents){
+  const item=legend.getByRole('listitem').filter({hasText:agent.actorName});
+  assert.equal(await item.count(),1,'Each named agent has its own legend entry');
+  swatches.push(await item.locator('[aria-hidden="true"]').evaluate(element=>getComputedStyle(element).backgroundColor));
+ }
+ assert.equal(await legend.getByText('Agent',{exact:true}).count(),0,'No combined Agent series');
+ assert.equal(new Set(swatches).size,namedAgents.length,'Named agents have distinct chart colors');
+ const namedPlot=chart.locator('svg').first(),namedBounds=await namedPlot.boundingBox();
+ await namedPlot.hover({position:{x:namedBounds.width-20,y:85}});
+ for(const agent of namedAgents)await page.getByRole('tooltip').getByText(agent.actorName,{exact:true}).waitFor();
+ await page.screenshot({path:artifacts+'/named-agents.png'});
  assert.deepEqual(faults,[],'No browser runtime errors');
- console.log('PASS Astryx charts, real activity aggregates, daily filtering, grouping, independent panels, compare and mobile themes:',engine,artifacts);
+ console.log('PASS Astryx named chart series/colors, real activity aggregates, second-line metadata, daily filtering, grouping, independent panels, compare and mobile themes:',engine,artifacts);
 }catch(error){console.error('ACTIVITY FAILURE at',stage,error);await page.screenshot({path:artifacts+'/failure.png',fullPage:true}).catch(()=>{});console.error(await page.locator('body').innerText().catch(()=>'(page unavailable)'),faults);throw error;}
 finally{releaseDetail();await page.unrouteAll({behavior:'ignoreErrors'});await browser.close();}
