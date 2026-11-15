@@ -1,6 +1,6 @@
 import {Icon} from '../icon';
 import {useState} from 'react';
-import {useNavigate,useLocation} from '@tanstack/react-router';
+import {useNavigate,useRouterState} from '@tanstack/react-router';
 import {useQuery,useInfiniteQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {Card} from '@astryxdesign/core/Card';
@@ -13,7 +13,7 @@ import {useConfirmDialog} from '../confirm-dialog';
 import {WikiIndexPanel} from '../wiki-index-panel';
 import {PageTitle,ErrorText,Loading,Empty,fmt} from './shared';
 
-export function SettingsPage(){const {confirm:askConfirm,confirmation}=useConfirmDialog();const {density,setDensity}=useAppearance();const pathname=useLocation({select:state=>state.pathname});const qc=useQueryClient(),navigate=useNavigate();const [error,setError]=useState<unknown>(null);const ss=useQuery({queryKey:['sessions'],queryFn:sessions,enabled:pathname==='/settings/sessions'});
+export function SettingsPage(){const {confirm:askConfirm,confirmation}=useConfirmDialog();const {density,setDensity}=useAppearance();const pathname=useRouterState({select:state=>state.matches[state.matches.length-1]?.pathname??state.location.pathname});const qc=useQueryClient(),navigate=useNavigate();const [error,setError]=useState<unknown>(null);const ss=useQuery({queryKey:['sessions'],queryFn:sessions,enabled:pathname==='/settings/sessions'});
  const oauth=pathname.endsWith('/oauth');
  const grants=useInfiniteQuery({queryKey:['oauth-grants'],initialPageParam:undefined as string|undefined,queryFn:({pageParam})=>api<{items:Array<{id:string;clientId:string;clientName:string;scope:string[];createdAt:number;expiresAt:number|null;redirectHost:string|null}>;cursor:string|null}>('/auth/oauth-grants'+(pageParam?'?'+queryString({cursor:pageParam}):'')),getNextPageParam:last=>last.cursor??undefined,enabled:oauth});const index=useQuery({queryKey:['index'],queryFn:()=>api<{counts:Array<{state:string;count:number}>;recentFailures:Array<{id:string;lastError:string}>}>('/index'),enabled:pathname==='/settings/indexing'});
  const revoke=async(id:string)=>{if(!(await askConfirm({title:'撤销登录会话？',description:'撤销后对应浏览器需要重新登录，当前会话也可能随即退出。',actionLabel:'撤销会话',destructive:true})))return;try{await api('/auth/sessions/'+id,{method:'DELETE'});if(id===ss.data?.currentSessionId){qc.clear();navigate({to:'/login'});}else qc.invalidateQueries({queryKey:['sessions']});}catch(e){setError(e);}};
