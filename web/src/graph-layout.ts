@@ -6,7 +6,7 @@ const order=(a:KnowledgeNode,b:KnowledgeNode)=>(a.folderId??'').localeCompare(b.
 
 /** Rendering-independent positions, shared by overview and local exploration.
  * Ring capacity grows with circumference; background nodes never disappear. */
-export function arrangeGraph(nodes:KnowledgeNode[],edges:KnowledgeEdge[],focusId?:string):GraphArrangement{
+export function arrangeGraph(nodes:KnowledgeNode[],edges:KnowledgeEdge[],focusId?:string,viewport?:{width:number;height:number}):GraphArrangement{
  const positions=new Map<string,GraphPoint>(),neighbors=new Set<string>(),byId=new Map(nodes.map(node=>[node.id,node]));
  const rings=(items:KnowledgeNode[],startRadius:number,spacing:number)=>{
   let offset=0,radius=startRadius,ring=0;
@@ -35,6 +35,15 @@ export function arrangeGraph(nodes:KnowledgeNode[],edges:KnowledgeEdge[],focusId
  }else{
   // Keep documents from one folder adjacent without introducing fictitious edges.
   rings([...nodes].sort(order),nodes.length<=8?125:180,100);
+ }
+ // Match the available rectangle while preserving concentric relationship tiers.
+ // Reserve room for node bodies, labels and the bottom canvas controls.
+ if(viewport&&positions.size){
+  const width=Math.max(120,viewport.width-160),height=Math.max(100,viewport.height-140);
+  const points=[...positions.values()];
+  const radiusX=Math.max(1,...points.map(point=>Math.abs(point.x))),radiusY=Math.max(1,...points.map(point=>Math.abs(point.y)));
+  const scaleX=width/(2*radiusX),scaleY=height/(2*radiusY);
+  for(const [id,point] of positions)positions.set(id,{x:point.x*scaleX,y:point.y*scaleY});
  }
  return {positions,neighbors};
 }

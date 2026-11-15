@@ -10,6 +10,16 @@ const edge=(from:number,to:number,type:KnowledgeEdge['type']='explicit',score=.9
 });
 
 describe('knowledge graph exploration layout',()=>{
+ it('fits wide and portrait viewports without clipping the outer context',()=>{
+  for(const viewport of [{width:1100,height:600},{width:360,height:470}]){
+   const result=arrangeGraph(nodes,[edge(0,1),edge(2,0)],nodes[0].id,viewport);
+   assert.deepEqual(result.positions.get(nodes[0].id),{x:0,y:0});
+   for(const point of result.positions.values()){
+    assert.ok(Math.abs(point.x)<= (viewport.width-160)/2+.01);
+    assert.ok(Math.abs(point.y)<= (viewport.height-140)/2+.01);
+   }
+  }
+ });
  it('keeps every background document while centering incoming and outgoing neighbors',()=>{
   const result=arrangeGraph(nodes,[edge(0,1),edge(2,0),edge(0,3,'semantic')],nodes[0].id);
   assert.deepEqual(result.positions.get(nodes[0].id),{x:0,y:0});

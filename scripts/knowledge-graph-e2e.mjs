@@ -176,6 +176,10 @@ try{
  assert.ok((await geometry()).same,'Center changes keep the graph instance');
  for(const node of overviewGeometry.positions)assert.ok((await geometry()).positions.some(item=>item.id===node.id),'Background retained: '+node.id);
  assert.ok(await page.evaluate(id=>document.querySelector('.knowledge-graph-canvas')._cyreg.cy.$id(id).hasClass('context-node'),outer[1].id),'Unrelated documents stay in the outer ring');
+ assert.ok(await canvas.evaluate(element=>{
+  const cy=element._cyreg.cy;
+  return cy.nodes().every(node=>{const p=node.renderedPosition();return p.x>=30&&p.x<=cy.width()-30&&p.y>=30&&p.y<=cy.height()-45;});
+ }),'Changing center keeps the outer nodes inside the rectangular viewport');
  await page.screenshot({path:'tmp/knowledge-graph-overview-'+engine+'.jpg',type:'jpeg',quality:78});
  // Interrupt position animations with subsequent center changes.
  for(const id of [B.id,C.id,A.id]){

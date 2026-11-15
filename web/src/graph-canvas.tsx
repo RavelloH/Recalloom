@@ -101,6 +101,8 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
  const labels=useRef<()=>void>(()=>{});
  const layoutAnimation=useRef<cytoscape.Layouts|null>(null);
  const fitted=useRef(false);
+ const [size,setSize]=useState({width:0,height:0});
+ const previousSize=useRef('');
  const layout=useRef({signature:'',focusId:focusId as string|undefined,ready:false});
  type View={pan:{x:number;y:number};zoom:number};
  const reveal=useRef<{before:View;expected:View}|null>(null),lastFocus=useRef(focusId);
@@ -157,12 +159,13 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
   observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-effective-theme','style','class']});
   const systemTheme=matchMedia('(prefers-color-scheme: dark)'),compactScreen=matchMedia('(max-width:760px)');
   systemTheme.addEventListener('change',schedule);compactScreen.addEventListener('change',schedule);
-  const resizeObserver=new ResizeObserver(()=>{cy.resize();schedule();});resizeObserver.observe(host.current);
+  const resizeObserver=new ResizeObserver(()=>{cy.resize();const width=Math.round(element.clientWidth),height=Math.round(element.clientHeight);setSize(current=>current.width===width&&current.height===height?current:{width,height});schedule();scheduleLabels();});resizeObserver.observe(host.current);
   return()=>{cancelAnimationFrame(frame);cancelAnimationFrame(labelFrame);labels.current=()=>{};element.removeEventListener('wheel',wheel,true);observer.disconnect();resizeObserver.disconnect();systemTheme.removeEventListener('change',schedule);compactScreen.removeEventListener('change',schedule);cyRef.current=null;cy.destroy();};
  },[cyRef]);
  useEffect(()=>{
   const cy=cyRef.current;if(!cy)return;
-  const arrangement=arrangeGraph(nodes,edges,focusId);
+  if(!viewportReady||size.width<1||size.height<1)return;
+  const arrangement=arrangeGraph(nodes,edges,focusId,size);
   const ids=new Set([...nodes.map(node=>node.id),...edges.map(edge=>edge.id)]);
   const additions:ElementDefinition[]=[];
   cy.batch(()=>{
@@ -192,24 +195,23 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
    const nextLayout=cy.layout({name:'preset',positions:Object.fromEntries(arrangement.positions),animate:previous.ready&&fitted.current&&duration>0,
     animationDuration:duration,animationEasing:'ease-out-cubic',fit:false});
    layoutAnimation.current=nextLayout;nextLayout.run();
-   if(fitted.current&&previous.focusId!==focusId){
+   if(fitted.current&&(previous.focusId!==focusId||previousSize.current!==size.width+':'+size.height)){
     cy.stop();
     // New centers occupy the origin; keep zoom and make the camera follow them.
-    const zoom=Math.max(.65,Math.min(1.15,cy.zoom()));
-    cy.animate({zoom,pan:{x:cy.width()/2,y:cy.height()/2}},{duration,easing:'ease-out-cubic'});
+    const zoom=Math.min(1,cy.zoom());
+    cy.animate({zoom,pan:{x:cy.width()/2,y:cy.height()/2-10}},{duration,easing:'ease-out-cubic'});
    }
    layout.current={signature,focusId,ready:true};
   }
   // The route measures its viewport on the first frame. A cached API response
   // can arrive sooner (notably WebKit); never fit a zero-height canvas.
   if(viewportReady&&!fitted.current&&nodes.length){
-   cy.resize();cy.stop();cy.fit(undefined,40);
-   if(cy.zoom()>1.15)cy.zoom({level:1.15,renderedPosition:{x:cy.width()/2,y:cy.height()/2}});
-   if(focusId)cy.pan({x:cy.width()/2,y:cy.height()/2});
+   cy.resize();cy.stop();cy.zoom(1);cy.pan({x:cy.width()/2,y:cy.height()/2-10});
    fitted.current=true;
   }
   labels.current();
- },[nodes,edges,focusId,cyRef,viewportReady]);
+  previousSize.current=size.width+':'+size.height;
+ },[nodes,edges,focusId,cyRef,viewportReady,size]);
  useEffect(()=>{
   const cy=cyRef.current;if(!cy)return;
   const token=query.trim().toLocaleLowerCase();
