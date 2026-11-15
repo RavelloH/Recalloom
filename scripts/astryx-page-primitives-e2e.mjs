@@ -60,6 +60,9 @@ page.on('pageerror',error=>{
 let sessionCookie='',emptyGraph=false;
 await page.route('**/api/**',async route=>{
  const request=route.request(),url=new URL(request.url());
+ if(url.pathname==='/api/auth/oauth-grants'&&request.method()==='GET'){
+  await route.fulfill({json:{items:[{id:'fixture-grant',clientId:'fixture-client',clientName:'测试 Agent · 知识库助手',scope:['notes:read','notes:write'],createdAt:1794700000,expiresAt:null,redirectHost:'agent.example.test'}],cursor:null}});return;
+ }
  if(emptyGraph&&url.pathname==='/api/graph'){
   await route.fulfill({json:{nodes:[],edges:[],focusId:null,semanticStatus:'disabled',limit:80,scope:'recent'}});
   return;
@@ -162,8 +165,28 @@ try{
  if(settingsSnapshot!==undefined){assert.ok(settingsSnapshot.includes('显示偏好'),'The outgoing settings snapshot retains the old panel');assert.ok(!settingsSnapshot.includes('已授权的 Agent'),'Destination content is committed inside the native transition');}
  assert.equal(await page.evaluate(()=>window.__pageSpaSentinel),'retained','Astryx links retain SPA navigation');
  assert.match(await settings.getByRole('link',{name:'Agent 授权',exact:true}).getAttribute('aria-current')??'',/^(page|true)$/);
+ await page.getByText('测试 Agent · 知识库助手',{exact:true}).waitFor();
+ await page.getByText('读取内容',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'撤销授权',exact:true}).waitFor();
+ await page.screenshot({path:'tmp/settings-oauth-'+engine+'.png'});
+ const activeTab=settings.getByRole('link',{name:'Agent 授权',exact:true});
+ assert.ok(await activeTab.evaluate(el=>el.classList.contains('active')&&getComputedStyle(el).backgroundColor!=='rgba(0, 0, 0, 0)'),'Current settings tab has a visible background');
+ assert.equal(await settings.locator('a.active').count(),1,'Only the exact settings destination is highlighted');
+ const sessionNav=await transitionCount();
+ await settings.getByRole('link',{name:'登录会话',exact:true}).click();await page.waitForURL(base+'/settings/sessions');await settledView(sessionNav);
+ await page.getByText('当前会话',{exact:true}).waitFor();
+ const currentRow=page.locator('.session-row').filter({hasText:'当前会话'});
+ await currentRow.getByRole('button',{name:'退出此会话',exact:true}).waitFor();
+ await currentRow.getByRole('button',{name:'会话详情',exact:true}).click();
+ await currentRow.getByText(/到期时间/).waitFor();
+ await currentRow.getByRole('button',{name:'退出此会话',exact:true}).click({trial:true});
+ await page.screenshot({path:'tmp/settings-sessions-'+engine+'.png'});
  console.log('PAGE STEP settings mobile resize');
  await page.setViewportSize({width:390,height:900});
+ await noPageOverflow();
+ const sessionButton=currentRow.getByRole('button',{name:'退出此会话',exact:true});
+ assert.ok(await sessionButton.evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'Session action remains within the mobile viewport');
+ await page.screenshot({path:'tmp/settings-sessions-mobile-'+engine+'.png'});
  const backup=settings.getByRole('link',{name:'备份',exact:true});
  const backupTransition=await transitionCount();
  await backup.focus();await backup.press('Enter');await page.waitForURL(base+'/settings/backup');

@@ -190,9 +190,10 @@
   font-weight: 400;
 }
 
-.settings-nav .astryx-tab[data-selected="selected"] {
-  background: var(--color-background-muted);
-  color: var(--color-text-secondary);
+.settings-nav .astryx-tab.active {
+  background: var(--color-background-muted,light-dark(#ededed,#383838));
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
 .settings-nav .astryx-tab-indicator {

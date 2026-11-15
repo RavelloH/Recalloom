@@ -8,5 +8,6 @@ export function AstryxRouterLink({href,ref,...props}:React.ComponentPropsWithRef
   return <a {...props} href={href} ref={ref}/>;
  const url=new URL(href,location.origin);
  return <Link {...props} ref={ref} to={url.pathname}
+  activeOptions={url.pathname.startsWith('/settings')?{exact:true}:undefined}
   search={router.options.parseSearch(url.search)} hash={url.hash.slice(1)}/>;
 }

@@ -13,6 +13,26 @@
   border-top: 0;
 }
 
+.grant-row > button {
+  flex: none;
+}
+
+.access-title,
+.grant-scopes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.access-details {
+  padding-block: 4px;
+}
+
+.access-agent {
+  overflow-wrap: anywhere;
+}
+
 .grant-details {
   flex: 1;
   min-width: 0;
