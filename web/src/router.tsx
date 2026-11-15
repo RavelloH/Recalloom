@@ -33,6 +33,12 @@ const ActivityPage=lazyRouteComponent(importActivity,'ActivityPage');
 const SettingsPage=lazyRouteComponent(importSettings,'SettingsPage');
 import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,activityPagesQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
+import {taskListPages,taskPages,taskItemQuery,readTaskPreferences} from './tasks/data';
+const prepareTasks=(recordId?:string)=>{
+ const preferences=readTaskPreferences();
+ return ready(queryClient.ensureInfiniteQueryData(taskListPages({recordId})),
+  ...(preferences.view==='board'?preferences.statuses.map(status=>queryClient.ensureInfiniteQueryData(taskPages({recordId},[status]))):[]));
+};
 const importGraph=()=>import('./knowledge-graph');
 const importHelp=()=>import('./rmd-help-page');
 const KnowledgeGraphPage=React.lazy(importGraph);
@@ -68,17 +74,17 @@ const list=[
    ...(search.mode==='source'?{mode:'source' as const}:{}),
    ...(typeof search.task==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(search.task)?{task:search.task}:{})
   }),
-  loaderDeps:({search})=>({mode:search.mode}),
+  loaderDeps:({search})=>({mode:search.mode,task:search.task}),
   loader:async({params,deps})=>{
    const chunk=importRecord();
    const item=await queryClient.ensureQueryData(recordQuery(params.recordId)).catch(()=>null);
    // Warm editor code before capturing the title. Its expensive body mounts
    // after the native animation; task lists instead need their initial tasks.
    await ready(chunk,...(item?[item.kind==='task_list'
-    ?queryClient.ensureQueryData(tasksQuery(params.recordId))
+    ?ready(prepareTasks(params.recordId),...(deps.task?[queryClient.ensureQueryData(taskItemQuery(deps.task))]:[]))
     :preloadEditor(deps.mode??'visual')]:[]));
   }}),
- createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),queryClient.ensureQueryData(tasksQuery()))}),
+ createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),prepareTasks())}),
  createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>ready(importArchive(),queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
  createRoute({getParentRoute:()=>root,path:'/graph',component:GraphRoute,loader:()=>ready(importGraph()),
   validateSearch:(search:Record<string,unknown>):{focus?:string}=>typeof search.focus==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(search.focus)?{focus:search.focus}:{}}),
@@ -112,8 +118,8 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
   if(kind==='folder')return queryClient.getQueryData<{name:string}>(['folder',id])?.name;
   if(kind==='task'){
    const parent=/^\/records\/([^/]+)$/.exec(location.pathname);
-   const tasks=parent?queryClient.getQueryData<{items:Task[]}>(['tasks',decodeURIComponent(parent[1])]):null;
-   return tasks?.items.find(item=>item.id===id)?.title;
+   const task=queryClient.getQueryData<{item:Task}>(['task-workspace','item',id])?.item;
+   return parent&&task?.recordId===decodeURIComponent(parent[1])?task.title:undefined;
   }
   const record=queryClient.getQueryData<{kind:string;name:string}>(['record',id]);
   if(record)return labelForRecord(record.name,record.kind);

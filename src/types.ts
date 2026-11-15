@@ -39,6 +39,24 @@ export interface Task {
   status: TaskStatus;
   priority: number;
 }
+export type TaskCounts = Record<TaskStatus,number>;
+export interface TaskListSummary {
+  id:string;
+  name:string;
+  path:string;
+  folderId:string|null;
+  status:RecordStatus;
+  revision:number;
+  order:'priority'|'manual';
+  counts:TaskCounts;
+  total:number;
+}
+export interface TaskViewItem extends Task {
+  recordId:string;
+  position:number;
+  updatedAt:string;
+  list:TaskListSummary;
+}
 export type EditInput =
   | { mode: 'replace'; oldText: string; newText: string; expectedReplacements?: number }
   | { mode: 'replace_many'; replacements: Array<{oldText: string;newText: string;expectedReplacements?: number}> }

@@ -143,9 +143,14 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
     recordId:uuid.describe('Task-list record UUID; omit for all active task lists.').optional(),status:taskStatuses.describe('Task status filter.').optional(),limit,cursor:pageCursor
   }),false,(x)=>store.getTasks(env,x.recordId,x.status,x.limit,x.cursor));
   register('mutate_task',z.object({
-    action:z.enum(['add','update','remove']).describe('Add a new task, update an existing one, or remove a task.'),recordId:uuid,taskId:uuid.describe('Task UUID, required for update/remove; omit for add.').optional(),
-    expectedRevision,changes:taskFields.optional()
-  }),true,(x)=>store.taskOperation(env,x.recordId,x.expectedRevision,x.action,x.taskId,x.changes??{},actor));
+    action:z.enum(['add','update','remove','reorder']).describe('Add, update, remove, or reorder a task within its owning list.'),recordId:uuid,taskId:uuid.describe('Task UUID, required for update/remove/reorder; omit for add.').optional(),
+    expectedRevision,changes:taskFields.optional(),beforeTaskId:uuid.nullable().describe('Reorder only: same-list anchor UUID; null places the task at the end. changes.status may change its board column in this same revision.').optional()
+  }).strict().superRefine((v,ctx)=>{
+    if(v.action==='add'&&!v.changes?.title?.trim())ctx.addIssue({code:'custom',path:['changes','title'],message:'Required for add'});
+    if(v.action!=='add'&&!v.taskId)ctx.addIssue({code:'custom',path:['taskId'],message:'Required for update/remove/reorder'});
+    if(v.action==='reorder'&&v.beforeTaskId===undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Required for reorder; null means end of list'});
+    if(v.action!=='reorder'&&v.beforeTaskId!==undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Only allowed for reorder'});
+  }),true,(x)=>store.taskOperation(env,x.recordId,x.expectedRevision,x.action,x.taskId,x.changes??{},actor,x.action==='reorder'?{beforeTaskId:x.beforeTaskId!}:undefined));
   register('version_history',z.object({id:uuid,limit,cursor:z.number().int().positive().describe('Older revision from page.nextCursor; omit for latest revisions.').optional()}),false,
     (x)=>store.listVersions(env,x.id,x.limit,x.cursor));
   register('restore_record',z.object({id:uuid,targetRevision:z.number().int().positive().describe('Historical revision to restore as a new current revision.'),expectedRevision}),true,

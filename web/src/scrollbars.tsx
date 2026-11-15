@@ -71,19 +71,23 @@ export function prepareScrollbars():Promise<void>{
  })();
 }
 
-/** Edge fades tell readers that a horizontal block continues beyond the column. */
-function trackEdges(host:HTMLElement,viewport:HTMLElement){
+/** Edge fades follow the actual scroll range, including asynchronously loaded content. */
+function trackEdges(host:HTMLElement,viewport:HTMLElement,axis:ScrollAxis){
  const sync=()=>{
-  const max=viewport.scrollWidth-viewport.clientWidth;
-  host.toggleAttribute('data-edge-start',max>1&&viewport.scrollLeft>2);
-  host.toggleAttribute('data-edge-end',max>1&&viewport.scrollLeft<max-2);
+  const vertical=axis==='y';
+  const max=vertical?viewport.scrollHeight-viewport.clientHeight:viewport.scrollWidth-viewport.clientWidth;
+  const offset=vertical?viewport.scrollTop:viewport.scrollLeft;
+  host.toggleAttribute('data-edge-start',max>1&&offset>2);
+  host.toggleAttribute('data-edge-end',max>1&&offset<max-2);
  };
  viewport.addEventListener('scroll',sync,{passive:true});
  const observer=new ResizeObserver(sync);
  observer.observe(viewport);
- if(viewport.firstElementChild)observer.observe(viewport.firstElementChild);
+ let content:Element|null=null;
+ const observeContent=()=>{if(content)observer.unobserve(content);content=viewport.firstElementChild;if(content)observer.observe(content);sync();};
+ const changes=new MutationObserver(observeContent);changes.observe(viewport,{childList:true});observeContent();
  sync();
- return()=>{viewport.removeEventListener('scroll',sync);observer.disconnect();};
+ return()=>{viewport.removeEventListener('scroll',sync);observer.disconnect();changes.disconnect();};
 }
 
 /** Imperative attachment for DOM owned by ProseMirror node views. */
@@ -97,7 +101,7 @@ export function attachScrollbars(host:HTMLElement,viewport:HTMLElement,axis:Scro
   if(loadedEngine)initialize(loadedEngine);
   else void loadEngine().then(initialize).catch(()=>undefined);
  }
- const untrack=edges?trackEdges(host,viewport):undefined;
+ const untrack=edges?trackEdges(host,viewport,axis):undefined;
  return()=>{disposed=true;untrack?.();instance?.destroy();};
 }
 
@@ -124,7 +128,7 @@ export function OverlayScroll({axis='y',children,className='',viewportClassName=
   else void loadEngine().then(initialize).catch(()=>undefined);
   return()=>{disposed=true;instance?.destroy();};
  },[axis,persistent]);
- useEffect(()=>{const h=host.current,v=viewport.current;if(edges&&h&&v)return trackEdges(h,v);},[edges]);
+ useEffect(()=>{const h=host.current,v=viewport.current;if(edges&&h&&v)return trackEdges(h,v,axis);},[edges,axis]);
  return <div {...props} ref={host} className={('rk-scroll '+className).trim()} data-axis={axis}>
   <div {...viewportProps} ref={node=>{viewport.current=node;assign(viewportRef,node);}} className={('rk-scroll-viewport '+viewportClassName).trim()} data-axis={axis}>{children}</div>
  </div>;

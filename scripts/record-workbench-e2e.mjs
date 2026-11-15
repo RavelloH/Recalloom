@@ -342,15 +342,18 @@ try{
  assert.deepEqual(lazyPanelRequests,[],'Outline, relations and history data remain unloaded until their panel opens');
  await openPanelWithMotion(header.getByRole('button',{name:'详细信息',exact:true}),'desktop header details open',1440);
  const verifyPropertyLayout=async()=>{
-  const layout=await inspector.locator('.workbench-inspector-details .page-properties').evaluate(el=>({
-   display:getComputedStyle(el).display,
-   rows:[...el.querySelectorAll('.property-row')].map(row=>({
-    label:row.querySelector('dt')?.getBoundingClientRect().toJSON(),
-    value:row.querySelector('dd')?.getBoundingClientRect().toJSON()
-   }))
+  const layout=await inspector.locator('.workbench-inspector-details .page-properties dl').evaluate(el=>({
+   tag:el.tagName,
+   values:el.querySelectorAll('dd').length,
+   rows:[...el.querySelectorAll('dt')].map(label=>{
+    const value=label.nextElementSibling;
+    return {name:label.textContent?.trim(),label:label.getBoundingClientRect().toJSON(),
+     value:value?.tagName==='DD'?value.getBoundingClientRect().toJSON():null};
+   })
   }));
-  assert.equal(layout.display,'flex','Every property must receive its own row');
+  assert.equal(layout.tag,'DL','Properties retain definition-list semantics');
   assert.equal(layout.rows.length,9,'The filename is edited at the page title, not duplicated in the inspector');
+  assert.equal(layout.values,9,'Each property label has one corresponding value');
   assert.ok(layout.rows.every(({label,value})=>label&&value&&label.right<=value.left+2),
    'Property values must not overlap labels: '+JSON.stringify(layout));
   return layout;

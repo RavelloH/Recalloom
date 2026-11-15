@@ -120,7 +120,7 @@ export function RecordPage(){
     title="此记录已归档" description="已从知识库列表中隐藏，内容及历史版本仍完整保留。"
     endContent={<Button label="恢复为正常" size="sm" variant="secondary" onClick={()=>void updateMeta({status:'active'})}/>}/>
   :null;
- return <div className={'page record-page'+(item.kind==='document'?' workbench-document':'')}>{confirmation}
+ return <div className={'page record-page'+(item.kind==='document'?' workbench-document':item.kind==='task_list'?' workbench-tasks':'')}>{confirmation}
  <TopbarPortal slot="start"><Breadcrumbs folderId={item.folderId} current={item.name}/></TopbarPortal>
  {item.kind==='document'&&tabletPanelActions&&<TopbarPortal slot="end"><div className="editor-view-actions">{pageActions}</div></TopbarPortal>}
  {item.kind==='document'
@@ -139,7 +139,7 @@ export function RecordPage(){
     </Properties>
    </header>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
+ <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage key={recordId} recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
   pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanels.includes('history')}
   outlineOpen={documentPanels.includes('outline')} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>

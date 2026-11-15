@@ -328,14 +328,15 @@ try{
   });
   assert.equal(spacing.top,96,'all desktop pages must share the preview/workbench first-content baseline');
   assert.ok(Math.abs(spacing.moved-80)<=2,'home top spacing must scroll away with the content');
-  // Ordinary routes and library folders use the same first-content baseline
-  // as document preview. Switching pages must not add another header margin.
+  // Ordinary routes share the document baseline. The full-width task workbench
+  // has a deliberately compact header so its independently scrolling board fits.
   for(const route of ['/','/tasks','/activity','/archive','/search','/settings','/library','/graph']){
    await stableGoto(base+route);
    const heading=page.locator('.page > .page-header, .folder-page > .doc-header, .knowledge-graph-page > .graph-page-heading').first();
    await heading.waitFor();
    const top=await heading.evaluate(el=>el.getBoundingClientRect().top);
-   assert.ok(Math.abs(top-96)<=2,'inconsistent desktop first-content baseline '+route+': '+top);
+   const expected=route==='/tasks'?28:96;
+   assert.ok(Math.abs(top-expected)<=2,'inconsistent desktop first-content baseline '+route+': '+top);
   }
   await stableGoto(base+'/');
   await recent.waitFor();
@@ -435,31 +436,39 @@ try{
   page.off('request',recordRequest);
 
   await stableGoto(base+'/tasks');
-  await page.locator('.page > .task-list .task-item').first().waitFor();
+  await page.locator('[data-task-workspace] [data-task-id]').first().waitFor();
   const taskRequests=[];
   const spyTasks=request=>{
-   if(new URL(request.url()).pathname==='/api/tasks')taskRequests.push(request.url());
+   const url=new URL(request.url());
+   if(url.pathname==='/api/tasks/view'&&!url.searchParams.has('recordId'))taskRequests.push(request.url());
   };
   page.on('request',spyTasks);
-  // Lazy OverlayScrollbars used to re-parent the viewport after CSS row
-  // animations had already run. Delay its import and prove one animation.
+  // Delay the optional scrollbar engine and verify that task cards mount once,
+  // during initialization, without a second viewport move after first paint or hidden-card flash.
   await page.addInitScript(()=>{
-   window.__rkRowStartup={starts:[],viewportMoves:[]};
-   document.addEventListener('animationstart',event=>{
-    if(event.target.matches?.('.task-list .task-item')&&event.animationName==='data-row-fade-in')
-     window.__rkRowStartup.starts.push({taskId:event.target.getAttribute('data-task-id'),at:Math.round(performance.now())});
-   },true);
-   const monitor=()=>{
-    const observer=new MutationObserver(records=>{
-     for(const record of records)for(const node of record.removedNodes){
-      if(node.nodeType===1&&(node.matches?.('.main-scroll')||node.querySelector?.('.main-scroll')))
-       window.__rkRowStartup.viewportMoves.push(Math.round(performance.now()));
+   window.__rkRowStartup={mounts:[],removals:[],viewportMoves:[],firstCardFrame:null};
+   const seen=new WeakSet();
+   const cards=node=>node.nodeType===1?[...(node.matches('[data-task-id]')?[node]:[]),...node.querySelectorAll('[data-task-id]')]:[];
+   new MutationObserver(records=>{
+    for(const record of records){
+     for(const node of record.addedNodes)for(const card of cards(node)){
+      if(seen.has(card))continue;seen.add(card);
+      window.__rkRowStartup.mounts.push({taskId:card.dataset.taskId,at:performance.now()});
+      if(!window.__rkRowStartup.paintScheduled){
+       window.__rkRowStartup.paintScheduled=true;
+       requestAnimationFrame(()=>{
+        window.__rkRowStartup.firstCardFrame=performance.now();
+        window.__rkRowStartup.firstCardOpacity=Number(getComputedStyle(card).opacity);
+       });
+      }
      }
-    });
-    observer.observe(document,{childList:true,subtree:true});
-   };
-   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',monitor,{once:true});
-   else monitor();
+     for(const node of record.removedNodes){
+      if(node.nodeType===1&&(node.matches('.main-scroll')||node.querySelector('.main-scroll')))
+       window.__rkRowStartup.viewportMoves.push(performance.now());
+      for(const card of cards(node))if(!card.isConnected)window.__rkRowStartup.removals.push(card.dataset.taskId);
+     }
+    }
+   }).observe(document,{childList:true,subtree:true});
   });
   let overlayChunkDelivered=false;
   if(engine==='chromium')await page.route('**/assets/overlayscrollbars-*.js',async route=>{
@@ -475,27 +484,31 @@ try{
    assert.equal(overlayChunkDelivered,false,'React must paint before the scrollbar chunk resolves');
    assert.equal(await page.locator('.shell').count(),0,'scroll shell must wait for the engine');
   }
-  await page.locator('.page > .task-list .task-item').first().waitFor();
+  await page.locator('[data-task-workspace] [data-task-id]').first().waitFor();
   await page.waitForTimeout(800);
   const startup=await page.evaluate(()=>({
    ...window.__rkRowStartup,
-   animation:getComputedStyle(document.querySelector('.page .task-list .task-item')).animationName
+   animation:getComputedStyle(document.querySelector('[data-task-workspace] [data-task-id]')).animationName,
+   opacity:Number(getComputedStyle(document.querySelector('[data-task-workspace] [data-task-id]')).opacity)
   }));
-  assert.equal(startup.animation,'data-row-fade-in','the staggered entrance animation must remain enabled');
-  assert.ok(startup.starts.length>0,'task list must have entrance animations');
+  assert.equal(startup.animation,'none','compact task cards use the route transition, without a second row entrance');
+  assert.equal(startup.opacity,1,'task cards remain visible after scrollbar initialization');
+  assert.equal(startup.firstCardOpacity,1,'task cards must be visible on their first paint frame');
+  assert.ok(startup.mounts.length>0,'task cards must mount');
   const perTask=new Map();
-  for(const event of startup.starts)perTask.set(event.taskId,(perTask.get(event.taskId)??0)+1);
+  for(const event of startup.mounts)perTask.set(event.taskId,(perTask.get(event.taskId)??0)+1);
   assert.ok([...perTask.values()].every(count=>count===1),
-   'each individual task row must animate only once: '+JSON.stringify(startup));
+   'each task card must mount only once: '+JSON.stringify(startup));
+  assert.deepEqual(startup.removals,[],'scroll initialization must not remove and remount task cards');
   if(engine==='chromium'){
-   assert.ok(startup.viewportMoves.length>0,'overlay scrollbars must initialize the scroll viewport');
-   const firstAnimation=Math.min(...startup.starts.map(entry=>entry.at));
-   assert.ok(startup.viewportMoves.every(t=>t<=firstAnimation),
-    'scrollbars must re-parent BEFORE row animations: '+JSON.stringify(startup));
+   assert.ok(startup.firstCardFrame!==null,'the first task card must reach a paint frame');
+   assert.ok(startup.viewportMoves.every(t=>t<=startup.firstCardFrame),
+    'scrollbar setup must complete before the first task card frame: '+JSON.stringify(startup));
    await page.unroute('**/assets/overlayscrollbars-*.js');
   }
   page.off('request',spyTasks);
-  assert.equal(taskRequests.length,1,'task page refresh must request its items only once');
+  assert.equal(taskRequests.length,5,'task refresh fetches exactly one first page per status column');
+  assert.equal(new Set(taskRequests.map(url=>new URL(url).searchParams.get('statuses'))).size,5,'column requests cover all five independent states');
 
   await stableGoto(base+'/activity');
   await page.locator('.page > .activity-list').waitFor();
@@ -672,7 +685,7 @@ try{
   try{
    await failurePage.route('**/assets/overlayscrollbars-*.js',route=>route.abort('failed'));
    await failurePage.goto(base+'/tasks',{waitUntil:'domcontentloaded'});
-   await failurePage.locator('.page > .task-list .task-item').first().waitFor();
+   await failurePage.locator('[data-task-workspace] [data-task-id]').first().waitFor();
    const fallback=await failurePage.evaluate(()=>({
     mode:document.documentElement.dataset.scrollbarMode,
     width:getComputedStyle(document.querySelector('.main-scroll')).scrollbarWidth,
@@ -690,7 +703,7 @@ try{
     await route.continue().catch(()=>undefined);
    });
    await stalledPage.goto(base+'/tasks',{waitUntil:'domcontentloaded'});
-   await stalledPage.locator('.page > .task-list .task-item').first().waitFor({timeout:6500});
+   await stalledPage.locator('[data-task-workspace] [data-task-id]').first().waitFor({timeout:6500});
    const mode=await stalledPage.evaluate(()=>document.documentElement.dataset.scrollbarMode);
    assert.equal(mode,'native','stalled overlay module must fall back to native scrollbars');
   }finally{await fallbackContext.close();}

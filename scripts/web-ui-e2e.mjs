@@ -159,25 +159,37 @@ try{
  assert.equal(await skeletonPage.locator('.skeleton-files').count(),0,'loaded route shows real file data');
  assert.ok(fileBox.x>=0&&fileBox.x+fileBox.width<=390,'file rows stay within the mobile viewport');
   // A deterministic fixture avoids dependence on leftovers in local D1.
-  await skeletonPage.evaluate(async()=>{
+  const taskFixture=await skeletonPage.evaluate(async()=>{
     const post=async(path,body)=>{
       const response=await fetch('/api'+path,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
       if(!response.ok)throw new Error('Fixture '+path+': '+response.status+' '+(await response.text()));
       return response.json();
     };
     const list=await post('/records',{name:'UI layout task fixture '+Date.now(),kind:'task_list'});
-    await post('/tasks/mutate',{recordId:list.id,action:'add',expectedRevision:1,changes:{title:'UI layout task',details:'Check long task text for mobile geometry.',status:'todo',priority:0}});
+    const title='UI layout task '+('Long title '.repeat(20));
+    const result=await post('/tasks/mutate',{recordId:list.id,action:'add',expectedRevision:1,changes:{title,details:'Long task detail '.repeat(20),status:'todo',priority:0}});
+    return {recordId:list.id,id:result.tasks.at(-1).id,title:title.trim()};
   });
  await skeletonPage.goto(url+'/tasks',{waitUntil:'networkidle'});
- await skeletonPage.locator('.task-list > .task-item').first().waitFor();
- await skeletonPage.evaluate(()=>{const task=document.querySelector('.task-list > .task-item');if(task&&!task.querySelector('.task-details')){const details=document.createElement('p');details.className='task-details muted';details.textContent='Long task detail '.repeat(20);task.querySelector('.task-heading')?.after(details);}});
- const taskGeometry=await skeletonPage.locator('.task-list > .task-item').first().evaluate(el=>{
-   const a=el.getBoundingClientRect(),b=el.querySelector('.task-details').getBoundingClientRect(),footer=el.querySelector('.task-footer').getBoundingClientRect();
-   return {itemWidth:a.width,detailsWidth:b.width,footerWidth:footer.width,scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth};
+ const taskCard=skeletonPage.locator('[data-task-id="'+taskFixture.id+'"]');
+ await taskCard.waitFor();
+ assert.equal(await skeletonPage.locator('[data-task-column]').count(),5,'global task board initially displays all five states');
+ assert.equal(await taskCard.locator('.tasks-status-control').count(),1,'each task has a single status control');
+ assert.equal(await taskCard.locator('input[type="checkbox"]').count(),0,'task cards have no duplicate completion checkbox');
+ assert.equal(await taskCard.locator('[data-task-source]').getAttribute('href'),'/records/'+taskFixture.recordId,'card preserves its source list link');
+ const taskGeometry=await taskCard.evaluate(el=>{
+   const a=el.getBoundingClientRect(),b=el.querySelector('.tasks-card-details').getBoundingClientRect(),heading=el.querySelector('.tasks-card-heading').getBoundingClientRect();
+   const board=document.querySelector('.tasks-board-viewport');
+   return {itemWidth:a.width,detailsWidth:b.width,headingWidth:heading.width,scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,boardWidth:board.clientWidth,boardScrollWidth:board.scrollWidth};
  });
  assert.ok(taskGeometry.detailsWidth>taskGeometry.itemWidth*.70,'task description uses available width: '+JSON.stringify(taskGeometry));
- assert.ok(taskGeometry.footerWidth>taskGeometry.itemWidth*.70,'task controls row stretches to available width');
+ assert.ok(taskGeometry.headingWidth<=taskGeometry.itemWidth,'long task title stays within its compact card');
+ assert.ok(taskGeometry.boardScrollWidth>taskGeometry.boardWidth,'five columns scroll inside the task board');
  assert.ok(taskGeometry.scrollWidth<=taskGeometry.viewport,'task layout does not overflow mobile viewport');
+ await taskCard.locator('[data-task-edit]').click();
+ const taskDrawer=skeletonPage.locator('[data-task-editor]:visible');await taskDrawer.waitFor();
+ assert.equal(await taskDrawer.getByRole('textbox',{name:'任务标题',exact:true}).inputValue(),taskFixture.title,'task title opens the exact detail drawer');
+ assert.ok(await skeletonPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'task drawer retains mobile viewport width');
  await skeletonContext.close();
  // OS accessibility preference must disable all custom entry and navigation motion.
  const quiet=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});

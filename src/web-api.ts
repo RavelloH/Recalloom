@@ -3,6 +3,7 @@ import { z, ZodError } from 'zod';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import * as store from './storage.js';
+import {getTaskLists,getTaskView,getTaskItem} from './storage/tasks.js';
 import * as lifecycle from './lifecycle.js';
 import * as agent from './agent-tools.js';
 import { search } from './search.js';
@@ -38,13 +39,16 @@ async function jsonBody<T extends z.ZodTypeAny>(req:Request,schema:T,max=520000)
 }
 const body=<T extends z.ZodTypeAny>(schema:T,max?:number)=>(req:Request)=>jsonBody(req,schema,max);
 const inputTask=z.object({title:z.string().trim().min(1).max(500).optional(),details:z.string().max(50000).optional(),status:taskStatus.optional(),priority:z.number().int().min(-10).max(10).optional()}).strict();
+const taskViewQuery=z.object({recordId:uuid.optional(),folderId:uuid.optional(),query:z.string().trim().max(200).optional(),limit,cursor:z.string().max(4096).optional(),
+  statuses:z.string().transform(v=>v.split(',')).pipe(z.array(taskStatus).min(1).max(5)).optional()
+}).strict().refine(v=>!(v.recordId&&v.folderId),{message:'Choose recordId or folderId, not both'});
 const asJson=(result:unknown,status:200|201=200)=>Response.json(result,{status,headers:noStore});
 const actor=(s:WebSession)=>'web:owner:'+s.id;
 webApi.onError((e)=>{
   if(e instanceof ZodError)return err('INVALID_ARGUMENT',400,e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ').slice(0,600));
   if(e instanceof StorageError){
     const code=e.code;
-    const status=code==='RECORD_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND' ?404
+    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND' ?404
       :code==='VERSION_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
       :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
     return err(code,status,e.message);
@@ -258,12 +262,26 @@ webApi.get('/tasks',async(c)=>{
   const q=parseQuery(c.req.url,z.object({recordId:uuid.optional(),status:taskStatus.optional(),limit,cursor:z.string().max(4096).optional()}));
   return asJson(await store.getTasks(c.env,q.recordId,q.status,q.limit,q.cursor));
 });
+webApi.get('/task-lists',async(c)=>{
+  const q=parseQuery(c.req.url,taskViewQuery);
+  return asJson(await getTaskLists(c.env,q));
+});
+webApi.get('/tasks/view',async(c)=>{
+  const q=parseQuery(c.req.url,taskViewQuery);
+  return asJson(await getTaskView(c.env,q));
+});
+webApi.get('/tasks/:taskId',async(c)=>{
+  const {taskId}=z.object({taskId:uuid}).parse(c.req.param());
+  return asJson(await getTaskItem(c.env,taskId));
+});
 webApi.post('/tasks/mutate',async(c)=>{
-  const v=await body(z.object({recordId:uuid,action:z.enum(['add','update','remove']),taskId:uuid.optional(),expectedRevision:z.number().int().positive(),changes:inputTask.optional()}).strict().superRefine((v,ctx)=>{
+  const v=await body(z.object({recordId:uuid,action:z.enum(['add','update','remove','reorder']),taskId:uuid.optional(),expectedRevision:z.number().int().positive(),changes:inputTask.optional(),beforeTaskId:uuid.nullable().optional()}).strict().superRefine((v,ctx)=>{
     if(v.action==='add'&&!v.changes?.title)ctx.addIssue({code:'custom',path:['changes','title'],message:'Required for add'});
     if(v.action!=='add'&&!v.taskId)ctx.addIssue({code:'custom',path:['taskId'],message:'Required for update/remove'});
+    if(v.action==='reorder'&&v.beforeTaskId===undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Required for reorder; null means end of list'});
+    if(v.action!=='reorder'&&v.beforeTaskId!==undefined)ctx.addIssue({code:'custom',path:['beforeTaskId'],message:'Only allowed for reorder'});
   }))(c.req.raw);
-  return asJson(await store.taskOperation(c.env,v.recordId,v.expectedRevision,v.action,v.taskId,v.changes??{},actor(c.get('webSession'))));
+  return asJson(await store.taskOperation(c.env,v.recordId,v.expectedRevision,v.action,v.taskId,v.changes??{},actor(c.get('webSession')),v.action==='reorder'?{beforeTaskId:v.beforeTaskId!}:undefined));
 });
 webApi.get('/graph',async(c)=>{
  const q=parseQuery(c.req.url,z.object({focusId:uuid.optional(),limit:z.coerce.number().int().min(10).max(100).optional(),semantic:z.enum(['true','false']).optional()}));

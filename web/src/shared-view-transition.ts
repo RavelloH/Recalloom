@@ -101,9 +101,9 @@ function findSource(kind:SharedResourceKind,id:string,key:string):HTMLElement|nu
 function findHeader(kind:SharedResourceKind,id:string):HTMLElement|null{
  const matches=Array.from(document.querySelectorAll<HTMLElement>('.doc-header [data-rk-vt-kind]')).filter(el=>
   el.dataset.rkVtKind===kind&&el.dataset.rkVtId===id);
- // A task targets its own inline row, not the enclosing task-list filename.
+ // Exact task deep links open their title in the shared workspace drawer.
  if(kind==='task'){
-  const tasks=Array.from(document.querySelectorAll<HTMLElement>('.embedded-tasks .task-title [data-rk-vt-kind="task"]')).filter(el=>
+  const tasks=Array.from(document.querySelectorAll<HTMLElement>('#task-editor [data-rk-vt-kind="task"]')).filter(el=>
    el.dataset.rkVtId===id);
   return tasks.length===1?tasks[0]:null;
  }

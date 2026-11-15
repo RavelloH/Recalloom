@@ -8,8 +8,8 @@ import './workspace-panels.css';
 
 const BottomSheet=React.lazy(()=>import('@astryxdesign/core/BottomSheet').then(module=>({default:module.BottomSheet})));
 
-type PanelProps={id:string;label:string;title?:string;titleId?:string;description?:string;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
-type Panel={id:string;label:string;title?:string;titleId?:string;description?:string;container:HTMLDivElement;owner:symbol;open:boolean;present:boolean;ready:boolean;height:number;sequence:number;collapsed:boolean;change:(open:boolean)=>void;afterClose?:()=>void;opener:HTMLElement|null};
+type PanelProps={id:string;label:string;title?:string;titleId?:string;description?:string;reserveSpace?:boolean;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
+type Panel={id:string;label:string;title?:string;titleId?:string;description?:string;reserveSpace:boolean;container:HTMLDivElement;owner:symbol;open:boolean;present:boolean;ready:boolean;height:number;sequence:number;collapsed:boolean;change:(open:boolean)=>void;afterClose?:()=>void;opener:HTMLElement|null};
 type Drag={id:string;x:number;y:number;top:number;height:number;dx:number;dy:number;active:boolean;collapsed:boolean;originalHeight:number;originalCollapsed:boolean};
 type Snapshot={panels:Panel[];width:number;height:number;docked:boolean;drag:Drag|null};
 const motionDuration=440;
@@ -29,9 +29,9 @@ class PanelStore{
  private emit(patch:Partial<Snapshot>={}){this.snapshot={...this.snapshot,...patch};this.listeners.forEach(fn=>fn());}
  private update(id:string,patch:Partial<Panel>){this.emit({panels:this.snapshot.panels.map(panel=>panel.id===id?{...panel,...patch}:panel)});}
  get(id:string){return this.snapshot.panels.find(panel=>panel.id===id);}
- describe(id:string,{label,title,titleId,description}:Pick<PanelProps,'label'|'title'|'titleId'|'description'>){
+ describe(id:string,{label,title,titleId,description,reserveSpace=true}:Pick<PanelProps,'label'|'title'|'titleId'|'description'|'reserveSpace'>){
   const panel=this.get(id);
-  if(panel&&(panel.label!==label||panel.title!==title||panel.titleId!==titleId||panel.description!==description))this.update(id,{label,title,titleId,description});
+  if(panel&&(panel.label!==label||panel.title!==title||panel.titleId!==titleId||panel.description!==description||panel.reserveSpace!==reserveSpace))this.update(id,{label,title,titleId,description,reserveSpace});
  }
  measure(width:number,height:number){
   const nextDocked=width>=840&&height>=260;
@@ -46,7 +46,7 @@ class PanelStore{
   let panel=this.get(props.id);
   if(!panel){
    const container=document.createElement('div');container.className='workspace-panel-content';
-   panel={id:props.id,label:props.label,owner,container,open:false,present:false,ready:false,height:320,sequence:0,collapsed:false,change:props.onOpenChange,afterClose:props.onAfterClose,opener:null};
+   panel={id:props.id,label:props.label,reserveSpace:props.reserveSpace??true,owner,container,open:false,present:false,ready:false,height:320,sequence:0,collapsed:false,change:props.onOpenChange,afterClose:props.onAfterClose,opener:null};
    this.emit({panels:[...this.snapshot.panels,panel]});
   }
   this.update(props.id,{owner,label:props.label,title:props.title,titleId:props.titleId,description:props.description,change:props.onOpenChange,afterClose:props.onAfterClose});
@@ -223,7 +223,7 @@ function DockPanel({panel,store,snapshot}:{panel:Panel;store:PanelStore;snapshot
  const flush=()=>{if(pending.current!==null)cancelAnimationFrame(pending.current);pending.current=null;if(pointer.current)store.moveDrag(pointer.current.x,pointer.current.y);pointer.current=null;};
  const finish=(event:React.PointerEvent,cancel=false)=>{flush();store.endDrag(cancel);if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);};
  return <aside ref={root} id={panel.id} role="complementary" aria-label={panel.label} className="workspace-panel" data-workspace-panel={panel.id}
-  data-ready={panel.ready||undefined} data-closing={!panel.open||undefined} data-collapsed={layout.collapsed||undefined} data-dragging={drag?.active||undefined}
+  data-ready={panel.ready||undefined} data-closing={!panel.open||undefined} data-collapsed={layout.collapsed||undefined} data-dragging={drag?.active||undefined} data-overlap-edge={rank<stack.length-1||undefined}
   style={{top:drag?.active?drag.top+drag.dy:layout.top,height:drag?.active?drag.height-drag.dy:layout.height,transform:drag?.active?`translateX(${drag.dx}px)`:undefined,zIndex:z,'--workspace-panel-depth':Math.max(1,stack.length-rank),'--workspace-panel-exposed':layout.exposedHeight+'px'} as React.CSSProperties}>
   <div className="workspace-panel-grip-row">
    <div className="workspace-panel-grip" data-panel-handle role="separator" aria-orientation="horizontal" tabIndex={0}
@@ -247,7 +247,7 @@ export function WorkspacePanels({children}:{children:React.ReactNode}){
  const mounted=useRef(false);
  const width=Math.max(320,Math.min(400,Math.round(snapshot.width*.32)));
  const panels=snapshot.panels.filter(panel=>panel.present);
- const space=snapshot.docked&&panels.length?width+32:0;
+ const space=snapshot.docked&&panels.some(panel=>panel.reserveSpace)?width+32:0;
  const previousGeometry=useRef<{space:number;element:HTMLElement;left:number}|null>(null);
  const articleMotion=useRef<Animation|null>(null);
  useLayoutEffect(()=>{
@@ -293,7 +293,7 @@ export function WorkspacePanel({children,...props}:PanelProps){
   setContainer(store.attach({...props,onOpenChange:open=>callbacks.current.onOpenChange(open),onAfterClose:()=>callbacks.current.onAfterClose?.()},owner));
   return()=>store.detach(props.id,owner);
  },[store,props.id]);
- useLayoutEffect(()=>{store?.describe(props.id,props);},[store,props.id,props.label,props.title,props.titleId,props.description]);
+ useLayoutEffect(()=>{store?.describe(props.id,props);},[store,props.id,props.label,props.title,props.titleId,props.description,props.reserveSpace]);
  useLayoutEffect(()=>{store?.setOpen(props.id,props.open);},[store,props.id,props.open]);
  return container?createPortal(children,container):null;
 }

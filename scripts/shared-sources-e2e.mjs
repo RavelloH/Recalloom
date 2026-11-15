@@ -304,43 +304,34 @@ try{
  await page.waitForFunction(()=>window.__rkVTLog.at(-1)?.finished===true);
  console.log('PASS editor initialization resumes after a skipped native transition');
 
- // Home todo links target the exact embedded task, not the record filename.
+ // Home todo links open the exact task drawer while retaining the list identity.
  await page.reload();
  const todo=page.locator('.compact-row').filter({hasText:targetTask.title});
  await todo.waitFor();
- // Inject after the last full reload: style tags from an earlier document
- // are discarded on page.goto()/reload(), but survive SPA navigation.
- // Put the requested task below the fold to verify its anchor wins.
- await page.addStyleTag({content:'.embedded-tasks .task-item[data-task-target="true"] { margin-top: 1100px !important; }'});
  await page.waitForTimeout(450);
  before=await count();
  await todo.locator('a').click();
  await page.waitForURL(url=>url.pathname==='/records/'+taskList.id&&url.searchParams.get('task')===targetTask.id);
- const target=page.locator('.embedded-tasks .task-item[data-task-id="'+targetTask.id+'"]');
+ const target=page.locator('.embedded-tasks [data-task-id="'+targetTask.id+'"]');
  await target.waitFor();
- await page.waitForFunction(id=>{
-  const row=document.querySelector('.embedded-tasks .task-item[data-task-id="'+id+'"]');
-  return row&&row===document.activeElement&&row.getBoundingClientRect().top<innerHeight;
- },targetTask.id);
+ const drawer=page.locator('[data-task-editor]:visible');
+ await drawer.waitFor();
+ await page.waitForFunction(title=>document.querySelector('[data-task-editor] input')?.value===title,targetTask.title);
  assert.equal(await page.locator('.record-page h1.page-title').innerText(),taskList.name,
   'Home task must NOT replace its parent task-list record title');
- assert.equal(await target.locator('.task-title').innerText(),targetTask.title);
+ assert.equal(await target.locator('[data-task-edit]').innerText(),targetTask.title);
+ assert.equal(await target.locator('.tasks-status-control').count(),1,'task has one status entry');
+ assert.equal(await target.locator('input[type="checkbox"]').count(),0,'task status has no duplicate completion checkbox');
+ assert.equal(await page.locator('.embedded-tasks [data-task-column]').count(),5,'the embedded board initially includes all five states');
+ assert.equal(await drawer.getByRole('textbox',{name:'任务标题',exact:true}).inputValue(),targetTask.title);
+ assert.equal(await drawer.locator('[data-task-source]').getAttribute('href'),'/records/'+taskList.id,'drawer retains the exact owning list');
+ // The exact drawer heading pairs with its home source in both directions.
  await assertRouteTransition(before,{expectPair:true});
- const focusedPosition=await page.evaluate(taskId=>{
-  const row=document.querySelector('.task-item[data-task-id="'+taskId+'"]');
-  const viewport=document.querySelector('.main-scroll');
-  const bounds=row.getBoundingClientRect(),clip=viewport.getBoundingClientRect();
-  return {scrollTop:viewport.scrollTop,top:bounds.top,bottom:bounds.bottom,
-   viewportTop:clip.top,viewportBottom:clip.bottom};
- },targetTask.id);
- assert.ok(focusedPosition.scrollTop>150&&focusedPosition.top<focusedPosition.viewportBottom&&
-  focusedPosition.bottom>focusedPosition.viewportTop,
-  'explicit home task deep link must override normal scroll-to-top: '+JSON.stringify(focusedPosition));
  before=await count();
  await page.goBack();
  await page.waitForURL(base+'/');
  await assertRouteTransition(before,{expectPair:true});
- console.log('PASS home todo navigates, scrolls and focuses exact task item');
+ console.log('PASS home todo pairs with exact task drawer in both directions and retains parent identity');
 
  // Generate two distinct activity events for the SAME record. The source
  // is the particular event seq, not every matching resource title in the feed.
