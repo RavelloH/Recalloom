@@ -77,11 +77,14 @@ const list=[
   loaderDeps:({search})=>({mode:search.mode,task:search.task}),
   loader:async({params,deps})=>{
    const chunk=importRecord();
+   // Exact task details load inside their panel; they must not hold up the
+   // document header or metadata already available from the task list.
+   if(deps.task)void queryClient.prefetchQuery(taskItemQuery(deps.task));
    const item=await queryClient.ensureQueryData(recordQuery(params.recordId)).catch(()=>null);
    // Warm editor code before capturing the title. Its expensive body mounts
    // after the native animation; task lists instead need their initial tasks.
    await ready(chunk,...(item?[item.kind==='task_list'
-    ?ready(prepareTasks(params.recordId),...(deps.task?[queryClient.ensureQueryData(taskItemQuery(deps.task))]:[]))
+    ?prepareTasks(params.recordId)
     :preloadEditor(deps.mode??'visual')]:[]));
   }}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),prepareTasks())}),
@@ -118,7 +121,8 @@ const resolveSharedLabel:ResolveSharedLabel=(kind,id,direction,source,location,k
   if(kind==='folder')return queryClient.getQueryData<{name:string}>(['folder',id])?.name;
   if(kind==='task'){
    const parent=/^\/records\/([^/]+)$/.exec(location.pathname);
-   const task=queryClient.getQueryData<{item:Task}>(['task-workspace','item',id])?.item;
+   const task=queryClient.getQueryData<{item:Task}>(['task-workspace','item',id])?.item
+    ??queryClient.getQueryData<{items:Task[]}>(['tasks','all'])?.items.find(task=>task.id===id);
    return parent&&task?.recordId===decodeURIComponent(parent[1])?task.title:undefined;
   }
   const record=queryClient.getQueryData<{kind:string;name:string}>(['record',id]);

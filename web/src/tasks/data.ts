@@ -1,4 +1,4 @@
-import {infiniteQueryOptions,queryOptions} from '@tanstack/react-query';
+import {infiniteQueryOptions,queryOptions,type InfiniteData,type QueryClient} from '@tanstack/react-query';
 import {api,queryString} from '../api';
 import type {Paged,Task} from '../types';
 
@@ -26,6 +26,22 @@ export const taskPages=(scope:TaskScope,statuses:TaskStatus[])=>infiniteQueryOpt
  staleTime:15000
 });
 export const taskItemQuery=(id:string)=>queryOptions({queryKey:['task-workspace','item',id],queryFn:({signal})=>api<{item:TaskItem}>('/tasks/'+encodeURIComponent(id),{signal}),staleTime:0});
+
+/** Reuse list/view metadata while the exact task request fills in current details. */
+export function findTaskItemInCache(queryClient:QueryClient,id:string):TaskItem|undefined{
+ const exact=queryClient.getQueryData<{item:TaskItem}>(['task-workspace','item',id]);
+ if(exact?.item)return exact.item;
+ for(const [,data] of queryClient.getQueriesData<InfiniteData<Paged<TaskItem>>>({queryKey:['task-workspace','view']})){
+  const item=data?.pages.flatMap(page=>page.items).find(candidate=>candidate.id===id);
+  if(item)return item;
+ }
+ const legacy=queryClient.getQueryData<{items:Task[]}>(['tasks','all'])?.items.find(item=>item.id===id);
+ if(!legacy)return;
+ for(const [,data] of queryClient.getQueriesData<InfiniteData<TaskListsPage>>({queryKey:['task-workspace','lists']})){
+  const list=data?.pages.flatMap(page=>page.items).find(candidate=>candidate.id===legacy.recordId);
+  if(list)return {...legacy,position:0,updatedAt:'',list};
+ }
+}
 
 type Preferences={version:1;view:'board'|'list';statuses:TaskStatus[]};
 const preferenceKey='recalloom:tasks:v1';

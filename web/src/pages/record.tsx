@@ -16,7 +16,7 @@ import {markdownCharacterCount} from '../document-heading';
 import {filenameFromDocumentTitle} from '../document-filename';
 import {useConfirmDialog} from '../confirm-dialog';
 import {TopbarPortal} from '../topbar-slot';
-import {Breadcrumbs,InlineTitle,PageActions,Properties,Property,TagEditor} from '../page-chrome';
+import {Breadcrumbs,PageActions,TagEditor} from '../page-chrome';
 import {rememberPage,forgetPage} from '../recent-pages';
 import {revealFolder} from '../page-tree';
 import {consumeTitleFocus} from '../create-page';
@@ -25,10 +25,10 @@ import {RecordEditorChunk} from '../editor-chunks';
 import {setFullWidth,useFullWidth,setOutlineOpen,useOutlineOpen} from '../preferences';
 import {useWorkspaceDocked} from '../workspace-panels';
 import {recordQuery} from '../queries';
-import {sharedViewTransitionName} from '../shared-view-transition';
 import {useMediaQuery} from '../use-media';
 import {ErrorText,ago,statusNames} from './shared';
 import {TasksPage} from './tasks';
+import {TaskListWorkbenchHeader} from '../tasks/toolbar';
 
 export function RecordPage(){
  const {task:focusTaskId}=useSearch({strict:false}) as {task?:string};const {recordId}=useParams({strict:false}) as {recordId:string};const nav=useNavigate();const qc=useQueryClient();const q=useQuery({...recordQuery(recordId),refetchOnWindowFocus:'always',refetchInterval:60_000});const [metaOpen,setMetaOpen]=useState(false),[localPanels,setLocalPanels]=useState<DocumentPanel[]>([]),[historyTarget,setHistoryTarget]=useState<HTMLDivElement|null>(null),[outlineTarget,setOutlineTarget]=useState<{key:string;token:number}|null>(null),[outline,setOutline]=useState<DocumentOutline|null>(null),[error,setError]=useState<unknown>(null);
@@ -40,7 +40,6 @@ export function RecordPage(){
   if(panel==='outline'&&docked)setOutlineOpen(false);
   setLocalPanels(current=>current.filter(value=>value!==panel));
  };
- const sharedRecordName=sharedViewTransitionName('record',recordId);
  const [documentPresentation,setDocumentPresentation]=useState<DocumentPresentation|null>(null);
  const updatePresentation=useCallback((next:DocumentPresentation)=>setDocumentPresentation(prev=>
   prev&&prev.id===next.id&&prev.revision===next.revision&&prev.characters===next.characters?prev:next),[]);
@@ -113,8 +112,7 @@ export function RecordPage(){
  ];
  const pageActions=item.kind==='document'
   ?<DocumentWorkbenchActions panels={documentPanels} onToggle={toggleDocumentPanel} moreItems={moreItems}/>
-  :<><IconButton variant="ghost" size="sm" label="详情与关联" icon={<Icon name="layoutSidebarRightExpand" size="sm"/>} onClick={()=>setMetaOpen(v=>!v)}/>
-    <MoreMenu size="sm" variant="ghost" label="更多操作" items={moreItems}/></>;
+  :<MoreMenu size="sm" variant="ghost" label="更多操作" items={moreItems}/>;
  const archiveNotice=item.status==='archived'
   ?<Banner data-rk-record-notice="archive" status="warning" container="section"
     title="此记录已归档" description="已从知识库列表中隐藏，内容及历史版本仍完整保留。"
@@ -128,23 +126,15 @@ export function RecordPage(){
     characters={currentPresentation?.characters??0} editors={editorsQuery.isSuccess?editorNames:null}
     onDetails={()=>toggleDocumentPanel('info')} detailsOpen={documentPanels.includes('info')}
     onRename={next=>saveMeta({name:filenameFromDocumentTitle(item.name,next)})}/>
-  :<header className="doc-header">
-    <div className="page-icon" aria-hidden="true"><Icon name="taskList" inline/></div>
-    <InlineTitle value={item.name} onRename={next=>saveMeta({name:next})} autoFocus={focusTitle} transitionName={sharedRecordName} transitionResource={{kind:'record',id:item.id}}/>
-    <Properties>
-     <Property label="类型">任务列表</Property>
-     <Property label="标签"><TagEditor tags={item.tags??[]} onChange={changeTag}/></Property>
-     <Property label="更新时间"><span title={item.updatedAt}>{ago(item.updatedAt)||'—'}</span></Property>
-     {item.status!=='active'&&<Property label="状态">{statusNames[item.status??'']??item.status}</Property>}
-    </Properties>
-   </header>}
+  :<TaskListWorkbenchHeader item={item} focusTitle={focusTitle} onRename={next=>saveMeta({name:next})}
+    onDetails={()=>setMetaOpen(value=>!value)} detailsOpen={metaOpen}/>}
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
  <div className="record-layout"><div className="record-main">{item.kind==='task_list'?<><PageActions>{pageActions}</PageActions><AutoResizer>{archiveNotice&&<div className="doc-notice">{archiveNotice}</div>}</AutoResizer><TasksPage key={recordId} recordId={recordId} focusTaskId={focusTaskId}/></>:<React.Suspense fallback={<div className="editor-pending" aria-busy="true"/>}><RecordEditorChunk key={recordId} item={item} jumpToHeading={outlineTarget}
   pageActions={tabletPanelActions?undefined:pageActions} archiveNotice={archiveNotice} onSaved={()=>{void refresh();}} historyTarget={historyTarget} historyOpen={documentPanels.includes('history')}
   outlineOpen={documentPanels.includes('outline')} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
- {item.kind==='task_list'&&<ContextPanel open={metaOpen} onOpenChange={setMetaOpen} label="记录信息"><div className="record-inspector"><div className="panel-heading"><h2>记录信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
-  <dl><dt>记录类型</dt><dd>任务列表</dd><dt>内容版本</dt><dd>Revision {item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
+ {item.kind==='task_list'&&<ContextPanel id="task-list-panel-info" open={metaOpen} onOpenChange={setMetaOpen} label="详细信息"><div className="record-inspector"><div className="panel-heading"><h2>详细信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
+  <dl><dt>记录类型</dt><dd>任务列表</dd><dt>标签</dt><dd><TagEditor tags={item.tags??[]} onChange={changeTag}/></dd><dt>更新时间</dt><dd><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></dd><dt>内容版本</dt><dd>R{item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
  </div></ContextPanel>}
  {item.kind==='document'&&(['info','outline','history'] as const).map(panel=><DocumentWorkbenchPanel key={panel} open={documentPanels.includes(panel)} panel={panel}
   onClose={()=>closeDocumentPanel(panel)} item={item} outline={outline}

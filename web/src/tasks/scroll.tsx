@@ -1,6 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {Spinner} from '@astryxdesign/core/Spinner';
+import {AutoResizer,AutoTransition} from '../motion-primitives';
 
 /** A single observer follows the real scroll viewport on native and overlay bars. */
 export function useTaskIntersection(root:HTMLElement|null,enabled:boolean,onVisible:()=>void){
@@ -14,7 +15,10 @@ export function useTaskIntersection(root:HTMLElement|null,enabled:boolean,onVisi
 }
 export function TaskLoadMore({root,hasMore,loading,error,onLoad}:{root:HTMLElement|null;hasMore:boolean;loading:boolean;error:boolean;onLoad:()=>void}){
  const ref=useTaskIntersection(root,hasMore&&!loading&&!error,onLoad);
- return <div className="tasks-load-more" ref={ref}>{loading?<Spinner size="sm" label="正在加载更多任务…"/>:error?<Button label="加载失败，重试" variant="ghost" size="sm" onClick={onLoad}/>:hasMore?<Button label="加载更多" variant="ghost" size="sm" onClick={onLoad}/>:null}</div>;
+ const state=loading?'loading':error?'error':hasMore?'more':'done';
+ return <div className="tasks-load-more" ref={ref}><AutoResizer animateWidth><AutoTransition transitionKey={state}>
+  {loading?<Spinner size="sm" label="正在加载更多任务…"/>:error?<Button label="加载失败，重试" variant="ghost" size="sm" onClick={onLoad}/>:hasMore?<Button label="加载更多" variant="ghost" size="sm" onClick={onLoad}/>:null}
+ </AutoTransition></AutoResizer></div>;
 }
 /** Measure the remaining shell viewport, including record headers above an embedded list. */
 export function useTaskViewHeight(){

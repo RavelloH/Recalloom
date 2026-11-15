@@ -103,7 +103,7 @@ function findHeader(kind:SharedResourceKind,id:string):HTMLElement|null{
   el.dataset.rkVtKind===kind&&el.dataset.rkVtId===id);
  // Exact task deep links open their title in the shared workspace drawer.
  if(kind==='task'){
-  const tasks=Array.from(document.querySelectorAll<HTMLElement>('#task-editor [data-rk-vt-kind="task"]')).filter(el=>
+  const tasks=Array.from(document.querySelectorAll<HTMLElement>('[data-task-editor] [data-rk-vt-kind="task"]')).filter(el=>
    el.dataset.rkVtId===id);
   return tasks.length===1?tasks[0]:null;
  }

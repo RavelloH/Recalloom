@@ -81,7 +81,7 @@ async function waitForDockedPanelSettled(panel){
 }
 async function waitForTaskEditorViewport(modal,width){
  await page.waitForFunction(({modal,width})=>{
-  const element=document.querySelector('#task-editor');
+  const element=document.querySelector('[id^="task-editor-"]');
   if(!element)return false;
   const rect=element.getBoundingClientRect(),dialog=element.closest('dialog');
   const actualModal=Boolean(dialog?.matches(':modal'));
@@ -355,6 +355,8 @@ try{
  const boardMode=viewGroup.getByRole('button',{name:'看板',exact:true});
  const listMode=viewGroup.getByRole('button',{name:'列表',exact:true});
  await boardMode.waitFor();
+ assert.equal(await viewGroup.evaluate(element=>getComputedStyle(element).outlineStyle),'solid',
+  'The task mode selector has the same outlined treatment as document modes');
  const columns=page.locator('[data-task-column]');
  assert.equal(await columns.count(),5,'The board always exposes five fixed task statuses');
 
@@ -417,6 +419,35 @@ try{
   assertSameIds(ids.map(id=>({id})),group.items,'List group '+group.status+' continuation');
  }
  await listScroll.evaluate(element=>{element.scrollTop=0;element.dispatchEvent(new Event('scroll',{bubbles:true}));});
+ const animatedGroup=page.locator('[data-task-list-id="'+todo.list.id+'"]');
+ await animatedGroup.scrollIntoViewIfNeeded();
+ const progress=animatedGroup.getByRole('progressbar');
+ assert.equal(await progress.getAttribute('aria-valuenow'),'0');
+ assert.equal(await progress.getAttribute('aria-valuemax'),'45');
+ assert.ok((await progress.boundingBox())?.width>20,'Grouped lists show a real progress bar next to creation');
+ await animatedGroup.evaluate(element=>{
+  const body=element.querySelector('.tasks-group-collapse');
+  window.__taskCollapseFrames=[];
+  element.querySelector('button[aria-expanded]').addEventListener('click',()=>{
+   const start=performance.now();
+   const sample=()=>{window.__taskCollapseFrames.push(body.getBoundingClientRect().height);if(performance.now()-start<900)requestAnimationFrame(sample);};
+   sample();
+  },{once:true});
+ });
+ await animatedGroup.getByRole('button',{name:'折叠'+todo.list.name,exact:true}).click();
+ await page.waitForFunction(id=>window.__taskCollapseFrames?.length>3&&
+  document.querySelector('[data-task-list-id="'+CSS.escape(id)+'"] .tasks-group-collapse')?.getBoundingClientRect().height<2,todo.list.id).catch(async error=>{
+  throw Error('Collapse motion did not settle: '+JSON.stringify(await animatedGroup.evaluate(element=>({
+   expanded:element.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded'),
+   height:element.querySelector('.tasks-group-collapse')?.getBoundingClientRect().height,
+   frames:window.__taskCollapseFrames
+  })))+' '+error.message);
+ });
+ const collapseFrames=await page.evaluate(()=>window.__taskCollapseFrames);
+ assert.ok(collapseFrames.some(height=>height>3&&height<collapseFrames[0]-3),
+  'Collapsing a task group has intermediate height frames');
+ await animatedGroup.getByRole('button',{name:'展开'+todo.list.name,exact:true}).click();
+ await animatedGroup.locator('[data-task-id]').first().waitFor();
  await page.screenshot({path:join(artifactDir,'list-light.png')});
  await boardMode.click();
  await openStatusFilter();
@@ -467,14 +498,69 @@ try{
  await search.fill('');
  for(const status of statuses)await page.locator('[data-task-column="'+status+'"] [data-task-id]').first().waitFor();
 
- // Open a task editor and save title, details and status through the drawer.
+ // Existing task data renders before the exact lookup completes. Simulate a
+ // metadata-only cached row so that only the details area waits for its body.
  const editTask=todo.items[2];
+ const metadataRoute='**/api/tasks/view?**';
+ const metadataOnly=async route=>{
+  const request=route.request();
+  const response=await route.fetch({headers:{...(await request.allHeaders()),...(sessionCookie?{cookie:sessionCookie}:{})}});
+  const data=await response.json();
+  for(const item of data.items??[])if(item.id===editTask.id)delete item.details;
+  await route.fulfill({response,json:data});
+ };
+ await page.route(metadataRoute,metadataOnly);
+ await page.reload();
+ let releaseDetails;
+ const detailsGate=new Promise(resolve=>{releaseDetails=resolve;});
+ const exactRoute='**/api/tasks/'+editTask.id;
+ const delayedDetails=async route=>{await detailsGate;await route.fallback();};
+ await page.route(exactRoute,delayedDetails);
  const editRow=page.locator('[data-task-id="'+editTask.id+'"]');
  await editRow.locator('[data-task-edit]').click();
- const editor=page.locator('#task-editor');
+ const editor=page.locator('#task-editor-'+editTask.id);
  await editor.waitFor();
+ const earlyTitle=editor.getByRole('textbox',{name:'任务标题'});
+ assert.equal(await earlyTitle.inputValue(),editTask.title,'Known title appears during details loading');
+ assert.equal(await earlyTitle.isEnabled(),true,'Metadata remains editable during details loading');
+ assert.equal(await editor.getByRole('combobox',{name:'任务状态'}).isEnabled(),true);
+ await editor.getByText('正在加载任务详情…',{exact:true}).waitFor();
+ const hydrationTitle=fixturePrefix+'typed_while_loading';
+ await earlyTitle.fill(hydrationTitle);
+ releaseDetails();
+ await waitForInputValues([{locator:editor.getByRole('textbox',{name:'任务详情'}),expected:'Fixture detail '+editTask.title}]);
+ assert.equal(await earlyTitle.inputValue(),hydrationTitle,'Detail hydration preserves local title edits');
+ await page.unroute(exactRoute,delayedDetails);
+ await page.unroute(metadataRoute,metadataOnly);
+ // A second task owns a separate panel; opening and closing it preserves the first draft.
+ const secondTask=todo.items[5];
+ await page.locator('[data-task-id="'+secondTask.id+'"] [data-task-edit]').click();
+ const secondEditor=page.locator('#task-editor-'+secondTask.id);
+ await secondEditor.getByRole('textbox',{name:'任务标题'}).waitFor();
+ assert.equal(await page.locator('[data-task-editor]').count(),2,'Two tasks have independent editor panels');
+ assert.equal(await earlyTitle.inputValue(),hydrationTitle,'Opening another task retains the original draft');
+ await secondEditor.getByRole('textbox',{name:'任务标题'}).fill(fixturePrefix+'second_draft');
+ await secondEditor.getByRole('button',{name:'折叠任务详情',exact:true}).click();
+ await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute('data-collapsed'),'task-editor-'+secondTask.id);
+ await page.locator('[data-task-id="'+secondTask.id+'"] [data-task-edit]').click();
+ await page.waitForFunction(id=>!document.getElementById(id)?.hasAttribute('data-collapsed'),'task-editor-'+secondTask.id);
+ assert.equal(await secondEditor.getByRole('textbox',{name:'任务标题'}).isVisible(),true,'Reopening an existing task reveals its collapsed panel');
+ assert.equal(await page.locator('[data-task-editor]').count(),2,'Reopening a task reuses its own panel');
+ await page.getByRole('link',{name:'概览',exact:true}).click();
+ const leaveDialog=page.getByRole('alertdialog',{name:'放弃未保存的任务更改？'});
+ await leaveDialog.waitFor();
+ assert.equal(await page.getByRole('alertdialog').count(),1,'Multiple task drafts share one navigation confirmation');
+ await leaveDialog.getByRole('button',{name:'取消',exact:true}).click();
+ assert.equal(await earlyTitle.inputValue(),hydrationTitle,'Cancelling navigation retains the first draft');
+ assert.equal(await secondEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),fixturePrefix+'second_draft');
+ await secondEditor.getByRole('button',{name:'关闭',exact:true}).click();
+ const closeDialog=page.getByRole('alertdialog',{name:'放弃未保存的更改？'});
+ await closeDialog.waitFor();
+ await closeDialog.getByRole('button',{name:'放弃更改',exact:true}).click();
+ await secondEditor.waitFor({state:'hidden'});
+ assert.equal(await earlyTitle.inputValue(),hydrationTitle,'Closing another panel retains the first draft');
  const desktopGeometry=await page.evaluate(()=>{
-  const panel=document.querySelector('#task-editor'),main=document.querySelector('.workspace>.main-content');
+  const panel=document.querySelector('[id^="task-editor-"]'),main=document.querySelector('.workspace>.main-content');
   const p=panel?.getBoundingClientRect(),m=main?.getBoundingClientRect();
   return {panel:p?{x:p.x,right:p.right,width:p.width}:null,main:m?{x:m.x,width:m.width}:null,
    mainPaddingInlineEnd:main?getComputedStyle(main).paddingInlineEnd:null,
@@ -492,7 +578,21 @@ try{
  await title.fill(savedTitle);await details.fill(savedDetails);
  await taskStatus.click();
  await page.getByRole('option',{name:statusNames.blocked}).click();
+ let failedUpdatedReads=0;
+ const updatedReadOutage=async route=>{
+  failedUpdatedReads++;
+  await route.fulfill({status:503,json:{error:'Temporary task details outage'}});
+ };
+ await page.route(exactRoute,updatedReadOutage);
  await clickTaskMutation(editor.getByRole('button',{name:'保存更改',exact:true}));
+ await editor.getByText('已保存',{exact:true}).waitFor();
+ assert.ok(failedUpdatedReads>0,'The saved task has an unavailable background detail lookup');
+ assert.equal(await editor.getByRole('button',{name:'保存更改',exact:true}).isDisabled(),true,
+  'A successful mutation clears the draft even when its detail refresh fails');
+ await title.fill(savedTitle+' ');
+ assert.equal(await editor.getByRole('button',{name:'保存更改',exact:true}).isDisabled(),true,
+  'Whitespace alone does not leave a task permanently dirty');
+ await page.unroute(exactRoute,updatedReadOutage);
  const saved=await requireApi('/tasks/'+editTask.id);
  assert.equal(saved.item.title,savedTitle,'Task title persists after save');
  assert.equal(saved.item.details,savedDetails,'Task details persist after save');
@@ -500,10 +600,11 @@ try{
 
  // A stale task-list revision must leave the local edit in the drawer until
  // the user explicitly confirms loading the newer server state.
+ await editor.getByRole('button',{name:'关闭',exact:true}).click();
  const conflictTask=todo.items[3];
  const conflictRow=page.locator('[data-task-id="'+conflictTask.id+'"]');
  await conflictRow.locator('[data-task-edit]').click();
- const conflictEditor=page.locator('#task-editor');
+ const conflictEditor=page.locator('#task-editor-'+conflictTask.id);
  await conflictEditor.waitFor();
  const conflictBase=await requireApi('/tasks/'+conflictTask.id);
  const localTitle=fixturePrefix+'local_conflict_draft';
@@ -537,7 +638,7 @@ try{
 
  // Create from the single header action, then delete through the same editor.
  await createButton.click();
- const createEditor=page.locator('#task-editor');
+ let createEditor=page.locator('[id^="task-editor-new-"]:has([data-task-editor])');
  await createEditor.waitFor();
  const createdTitle=fixturePrefix+'created_then_deleted';
  await createEditor.getByRole('textbox',{name:'任务标题'}).fill(createdTitle);
@@ -545,11 +646,32 @@ try{
  const listSelect=createEditor.getByRole('button',{name:'所属任务列表'});
  await listSelect.click();
  await page.getByRole('option').filter({hasText:todo.list.name}).first().click();
+ let failedCreatedReads=0;
+ const createdReadRoute='**/api/tasks/*';
+ const failCreatedRead=async route=>{
+  const request=route.request(),path=new URL(request.url()).pathname;
+  if(request.method()!=='GET'||path==='/api/tasks/view'){await route.fallback();return;}
+  const response=await route.fetch({headers:{...(await request.allHeaders()),...(sessionCookie?{cookie:sessionCookie}:{})}});
+  const data=await response.json();
+  if(data.item?.title===createdTitle){
+   failedCreatedReads++;
+   await route.fulfill({status:503,json:{error:'Temporary task details outage'}});return;
+  }
+  await route.fulfill({response,json:data});
+ };
+ await page.route(createdReadRoute,failCreatedRead);
  await clickTaskMutation(createEditor.getByRole('button',{name:'创建任务',exact:true}));
  const createdSearch=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo',query:createdTitle},40);
  assert.equal(createdSearch.items.length,1,'Header creation persists a new task in the selected list');
  assert.equal(createdSearch.items[0].details,'Temporary editor-created task');
  const createdTaskId=createdSearch.items[0].id;
+ createEditor=page.locator('#task-editor-'+createdTaskId);
+ await createEditor.getByRole('button',{name:'删除任务',exact:true}).waitFor();
+ await page.waitForFunction(()=>document.querySelectorAll('[id^="task-editor-new-"]:has([data-task-editor])').length===0);
+ for(let attempt=0;attempt<100&&!failedCreatedReads;attempt++)await wait(50);
+ assert.ok(failedCreatedReads>0,'A failed post-create task lookup does not leave a second creation form');
+ assert.equal(await createEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),createdTitle,'The created task remains editable when its detail lookup fails');
+ await page.unroute(createdReadRoute,failCreatedRead);
  await createEditor.getByRole('button',{name:'删除任务',exact:true}).click();
  const deleteDialog=page.getByRole('alertdialog',{name:'删除这个任务？'});
  await deleteDialog.waitFor();
@@ -565,7 +687,7 @@ try{
  assert.equal(movedStatus.item.status,'in_progress','Cross-status drag writes the new status');
  assert.equal(movedStatus.item.recordId,todo.list.id,'Cross-status drag keeps the task in its source list');
  const sortSource=todo.items[1],sortBefore=todo.items[0];
- await dragTask(sortSource.id,page.locator('[data-task-id="'+sortBefore.id+'"]'));
+ await dragTask(sortSource.id,page.locator('[data-task-id="'+sortBefore.id+'"]'),{yRatio:.2});
  const orderedList=await requireApi('/task-lists?recordId='+todo.list.id+'&limit=40');
  assert.equal(orderedList.items[0].order,'manual','Same-list drag switches to manual ordering');
  const orderedTasks=await readPaged('/tasks/view',{recordId:todo.list.id,statuses:'todo'},100);
@@ -581,10 +703,25 @@ try{
  assert.ok(firstTodoPage.page.hasMore);
  assert.ok(!firstTodoPage.items.some(item=>item.id===deepLinkTask.id),'Deep-link target starts beyond page 40');
  await page.goto(base+'/records/'+todo.list.id+'?task='+deepLinkTask.id);
- const deepLinkEditor=page.locator('#task-editor');
+ const deepLinkEditor=page.locator('#task-editor-'+deepLinkTask.id);
  await deepLinkEditor.waitFor();
  assert.equal(await deepLinkEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),deepLinkTask.title,
   'A deep-link focuses the exact task beyond the initial page');
+ const compactHeader=page.locator('.task-list-workbench-header');
+ const compactBounds=await compactHeader.boundingBox();
+ assert.ok(compactBounds&&compactBounds.height<250,'Task record header uses the compact document layout');
+ assert.equal(await compactHeader.locator('.properties,.page-icon').count(),0,'Task header has no expanded property table or large icon');
+ // A repeated task search parameter is a fresh open request in the same page
+ // instance, even after the previous request was consumed and its panel closed.
+ await deepLinkEditor.locator('[data-task-source]').click();
+ await page.waitForURL(url=>url.pathname==='/records/'+todo.list.id&&!url.searchParams.has('task'));
+ await deepLinkEditor.getByRole('button',{name:'关闭',exact:true}).click();
+ await deepLinkEditor.waitFor({state:'hidden'});
+ await page.goBack();
+ await page.waitForURL(url=>url.searchParams.get('task')===deepLinkTask.id);
+ await deepLinkEditor.waitFor();
+ assert.equal(await deepLinkEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),deepLinkTask.title,
+  'Returning to the same task deep-link reopens its closed panel');
  await deepLinkEditor.getByRole('button',{name:'关闭',exact:true}).click();
  await page.goto(base+'/');
  const todoSection=page.locator('section').filter({has:page.getByRole('heading',{name:'未完成事项',exact:true})});
@@ -596,9 +733,9 @@ try{
  await waitForViewTransitionsSince(routeTransitionCount);
  const homeTaskId=new URL(page.url()).searchParams.get('task');
  assert.ok(homeTaskId,'Home todo navigation carries the task ID');
- await page.locator('#task-editor').waitFor();
- const homeTaskEditor=page.locator('#task-editor');
- await waitForDockedPanelSettled('task-editor');
+ const homeTaskEditor=page.locator('#task-editor-'+homeTaskId);
+ await homeTaskEditor.waitFor();
+ await waitForDockedPanelSettled('task-editor-'+homeTaskId);
  assert.equal(await homeTaskEditor.getByRole('textbox',{name:'任务标题'}).inputValue(),
   (await requireApi('/tasks/'+homeTaskId)).item.title,'Home opens the linked task editor');
  await page.setViewportSize({width:390,height:900});
@@ -655,8 +792,12 @@ try{
   });
   const taskRow=page.locator('[data-task-column="todo"] [data-task-id]').first();
   await taskRow.locator('[data-task-edit]').click();
-  const mobileEditor=page.locator('#task-editor');
+  const mobileEditor=page.locator('[id^="task-editor-"]:has([data-task-editor])');
   await mobileEditor.waitFor();
+  await page.waitForFunction(()=>{
+   const content=document.querySelector('[data-task-editor]'),host=content?.closest('dialog')??content;
+   return host&&!host.getAnimations({subtree:true}).some(animation=>animation.playState==='running'||animation.playState==='pending');
+  });
   await page.screenshot({path:join(artifactDir,'mobile-'+width+'-light.png')});
   const sheet=await mobileEditor.evaluate(element=>{
    const rect=element.getBoundingClientRect(),dialog=element.closest('dialog');

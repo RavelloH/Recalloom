@@ -91,6 +91,9 @@ export function approveLogoutNavigation(value:boolean){logoutNavigationApproved=
 export function isLogoutNavigationApproved(){return logoutNavigationApproved;}
 
 // Track unsaved content even when sessionStorage is unavailable (private mode/quota).
-let activeEditorDirty=false;
-export function setActiveEditorDirty(value:boolean){activeEditorDirty=value;}
-export function hasActiveEditorDirty(){return activeEditorDirty;}
+// Sources are independent: closing one editor must not clear another editor's flag.
+const activeEditorDirtySources=new Set<string>();
+export function setActiveEditorDirty(value:boolean,source='legacy'){
+ if(value)activeEditorDirtySources.add(source);else activeEditorDirtySources.delete(source);
+}
+export function hasActiveEditorDirty(){return activeEditorDirtySources.size>0;}

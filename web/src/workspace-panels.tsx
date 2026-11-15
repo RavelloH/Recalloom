@@ -8,7 +8,7 @@ import './workspace-panels.css';
 
 const BottomSheet=React.lazy(()=>import('@astryxdesign/core/BottomSheet').then(module=>({default:module.BottomSheet})));
 
-type PanelProps={id:string;label:string;title?:string;titleId?:string;description?:string;reserveSpace?:boolean;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
+type PanelProps={id:string;label:string;title?:string;titleId?:string;description?:string;reserveSpace?:boolean;activationKey?:number;open:boolean;onOpenChange:(open:boolean)=>void;onAfterClose?:()=>void;children:React.ReactNode};
 type Panel={id:string;label:string;title?:string;titleId?:string;description?:string;reserveSpace:boolean;container:HTMLDivElement;owner:symbol;open:boolean;present:boolean;ready:boolean;height:number;sequence:number;collapsed:boolean;change:(open:boolean)=>void;afterClose?:()=>void;opener:HTMLElement|null};
 type Drag={id:string;x:number;y:number;top:number;height:number;dx:number;dy:number;active:boolean;collapsed:boolean;originalHeight:number;originalCollapsed:boolean};
 type Snapshot={panels:Panel[];width:number;height:number;docked:boolean;drag:Drag|null};
@@ -93,6 +93,14 @@ class PanelStore{
   open.slice(1).forEach(panel=>panel.change(false));
  }
  activate(id:string){if(this.activeId!==id){this.activeId=id;this.emit();}}
+ reveal(id:string){
+  const panel=this.get(id);if(!panel?.open)return;
+  const others=this.layout().filter(candidate=>candidate.id!==id&&!candidate.collapsed);
+  const shortest=Math.min(...others.map(candidate=>candidate.height));
+  const height=others.length?Math.max(PANEL_MIN_HEIGHT,Math.min(320,shortest-PANEL_STACK_PEEK)):panel.height;
+  this.activeId=id;
+  this.update(id,{collapsed:false,height,sequence:++this.sequence});
+ }
  setCollapsed(id:string,collapsed:boolean){if(!collapsed)this.activeId=id;this.update(id,{collapsed,sequence:++this.sequence});}
  resize(id:string,height:number){this.activeId=id;this.update(id,{height:Math.max(PANEL_MIN_HEIGHT,Math.min(this.snapshot.height-112,height)),collapsed:false});}
  startDrag(id:string,x:number,y:number){
@@ -265,10 +273,14 @@ export function WorkspacePanels({children}:{children:React.ReactNode}){
  useEffect(()=>store.keepOneMobilePanel(),[store,snapshot.docked]);
  useLayoutEffect(()=>{
   const element=root.current!;
+  let frame=0;
   const measure=()=>store.measure(Math.round(element.clientWidth),Math.round(element.clientHeight));
-  const observer=new ResizeObserver(measure);observer.observe(element);
+  // Changing docked/sheet layout mounts descendants with their own observers.
+  // Commit that change outside the current ResizeObserver delivery cycle.
+  const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;measure();});};
+  const observer=new ResizeObserver(schedule);observer.observe(element);
   document.addEventListener('close',measure,true);measure();
-  return()=>{observer.disconnect();document.removeEventListener('close',measure,true);};
+  return()=>{observer.disconnect();cancelAnimationFrame(frame);document.removeEventListener('close',measure,true);};
  },[store]);
  useEffect(()=>{
   mounted.current=true;
@@ -295,5 +307,11 @@ export function WorkspacePanel({children,...props}:PanelProps){
  },[store,props.id]);
  useLayoutEffect(()=>{store?.describe(props.id,props);},[store,props.id,props.label,props.title,props.titleId,props.description,props.reserveSpace]);
  useLayoutEffect(()=>{store?.setOpen(props.id,props.open);},[store,props.id,props.open]);
+ const activation=useRef(props.activationKey);
+ useLayoutEffect(()=>{
+  if(activation.current===props.activationKey)return;
+  activation.current=props.activationKey;
+  if(props.open)store?.reveal(props.id);
+ },[store,props.id,props.open,props.activationKey]);
  return container?createPortal(children,container):null;
 }
