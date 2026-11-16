@@ -16,8 +16,10 @@ pnpm exec wrangler login
 ```bash
 pnpm exec wrangler kv namespace create OAUTH_KV
 pnpm exec wrangler d1 create recalloom
-pnpm exec wrangler vectorize create recalloom --dimensions=1024 --metric=cosine
+pnpm exec wrangler vectorize create recalloom --dimensions=512 --metric=cosine
 ```
+
+当前版本使用 `@cf/google/embeddinggemma-2`，输出 512 维。已有 1024 维索引的实例需要先准备同名 512 维索引，再更新程序并从设置页手动重建全部有效文稿的索引。
 
 保存命令返回的 **KV Namespace ID** 和 **D1 Database ID**。如果资源已存在，直接使用现有资源，不要重复创建。项目会通过 Wrangler 配置绑定 Workers AI。
 

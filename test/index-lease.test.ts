@@ -15,9 +15,10 @@ function fixture(){
  async all(){return {results:sql.prepare(query).all(...args as never[]),meta:{changes:0,size_after:4096}};},
  async first(column?:string){const row=sql.prepare(query).get(...args as never[]) as Record<string,unknown>|undefined;return column?row?.[column]??null:row??null;},
  async run(){const result=sql.prepare(query).run(...args as never[]);return {results:[],meta:{changes:Number(result.changes)}};}};return statement;};
+ const embeddings:Array<{model:string;input:{input:string[];dimensions:number}}>=[];
  const vectors=new Map<string,unknown>();let beforeEmbed:(()=>Promise<void>)|undefined;
- const env={DB:{prepare,async batch(commands:Array<ReturnType<typeof prepare>>){sql.exec('BEGIN');try{const results=[];for(const command of commands)results.push(await command.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}}},AI:{async run(_model:string,input:{text:string[]}){await beforeEmbed?.();return {data:input.text.map(()=>Array(1024).fill(.1))};}},VECTORIZE:{async upsert(values:Array<{id:string}>){for(const value of values)vectors.set(value.id,value);return {mutationId:'test'};},async deleteByIds(ids:string[]){ids.forEach(id=>vectors.delete(id));},async describe(){return {vectorCount:vectors.size,dimensions:1024};}}} as unknown as Env;
- return {env,sql,vectors,onEmbed:(fn?:()=>Promise<void>)=>{beforeEmbed=fn;}};
+ const env={DB:{prepare,async batch(commands:Array<ReturnType<typeof prepare>>){sql.exec('BEGIN');try{const results=[];for(const command of commands)results.push(await command.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}}},AI:{async run(_model:string,input:{input:string[];dimensions:number}){embeddings.push({model:_model,input});await beforeEmbed?.();return {data:input.input.map(()=>({embedding:Array(512).fill(.1)}))};}},VECTORIZE:{async upsert(values:Array<{id:string}>){for(const value of values)vectors.set(value.id,value);return {mutationId:'test'};},async deleteByIds(ids:string[]){ids.forEach(id=>vectors.delete(id));},async describe(){return {vectorCount:vectors.size,dimensions:512};}}} as unknown as Env;
+ return {env,sql,vectors,embeddings,onEmbed:(fn?:()=>Promise<void>)=>{beforeEmbed=fn;}};
 }
 
 test('transactional enqueues coalesce content and same-revision metadata edits',async()=>{
@@ -25,6 +26,7 @@ test('transactional enqueues coalesce content and same-revision metadata edits',
  await editRecord(f.env,record.id,1,'second');await updateMeta(f.env,record.id,{name:'two.md'});
  const rows=f.sql.prepare('SELECT * FROM index_jobs').all();assert.equal(rows.length,1);assert.equal(rows[0].revision,2);assert.equal(rows[0].generation,3);
  const result=await processIndexJobs(f.env,1);assert.equal(result.results[0].chunks,1);
+ assert.deepEqual(f.embeddings[0],{model:'@cf/google/embeddinggemma-2',input:{input:['title: two | text: two.md\nsecond'],dimensions:512}});
  const job=f.sql.prepare('SELECT * FROM index_jobs').get()!;assert.equal(job.state,'done');assert.equal(job.indexed_revision,2);assert.equal(f.vectors.size,1);
  const report=await indexOverview(f.env);assert.equal(report.coverage?.indexed,1);assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM index_runs').get()!.n,1);
  const capacity=await storageOverview(f.env);assert.equal(capacity.remote.count,1);assert.equal(capacity.databaseBytes,4096);assert.equal(capacity.chunks?.count,1);

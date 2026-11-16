@@ -47,7 +47,7 @@ export async function search(env:Env,input:{
     lexicalResults.sort((a,b)=>b.score-a.score);
   }
   if(semantic){
-    const vector=(await embed(env,[query]))[0]!;
+    const vector=(await embed(env,['task: search result | query: '+query]))[0]!;
     const result=await env.VECTORIZE.query(vector,{
       topK:Math.min(50,Math.max(20,limit*5)),returnMetadata:'all'
     });

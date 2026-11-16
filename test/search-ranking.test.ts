@@ -45,7 +45,7 @@ const docs=[
 function fixture(similarities:Record<string,number>,lexicalMatches:string[]=[]){
   let dbCalls=0;
   const env={
-    AI:{run:async()=>({data:[Array(1024).fill(0)]})},
+    AI:{run:async()=>({data:[{embedding:Array(512).fill(0)}]})},
     VECTORIZE:{query:async()=>({
       matches:Object.entries(similarities).map(([id,score])=>({
         id:id+':0',score,metadata:{record_id:id,revision:1,chunk_index:0}

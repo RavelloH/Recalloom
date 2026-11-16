@@ -2,18 +2,23 @@ import type {Env} from './types.js';
 import {StorageError} from './types.js';
 import {paragraphChunks} from './search-ranking.js';
 import {sha256} from './version.js';
-export const EMBEDDING_MODEL = '@cf/baai/bge-m3';
-export const EMBEDDING_DIMENSIONS = 1024;
+export const EMBEDDING_MODEL = '@cf/google/embeddinggemma-2';
+export const EMBEDDING_DIMENSIONS = 512;
 // Preserves natural paragraph and line boundaries while retaining overlap.
 export const splitText = paragraphChunks;
 export async function embed(env:Env,texts:string[]):Promise<number[][]> {
   if(!texts.length)return [];
-  const result = await env.AI.run(EMBEDDING_MODEL,{text:texts}) as unknown as {data?:number[][]};
+  const result = await env.AI.run(EMBEDDING_MODEL,{input:texts,dimensions:EMBEDDING_DIMENSIONS}) as unknown as {data?:Array<{embedding?:unknown}>};
   if(!Array.isArray(result.data)||result.data.length!==texts.length)
     throw new StorageError('EMBEDDING_FAILED','Embedding model returned unexpected output');
-  for(const vector of result.data)if(vector.length!==EMBEDDING_DIMENSIONS)
-    throw new StorageError('VECTOR_DIMENSION_MISMATCH');
-  return result.data;
+  return result.data.map(item=>{
+    const vector=item?.embedding;
+    if(!Array.isArray(vector)||vector.length!==EMBEDDING_DIMENSIONS)
+      throw new StorageError('VECTOR_DIMENSION_MISMATCH');
+    if(!vector.every(value=>typeof value==='number'&&Number.isFinite(value)))
+      throw new StorageError('EMBEDDING_FAILED','Embedding model returned invalid vector values');
+    return vector as number[];
+  });
 }
 type Job={id:string;record_id:string;revision:number;generation:number;attempts:number};
 const iso=()=>new Date().toISOString();
@@ -57,7 +62,7 @@ export async function processIndexJobs(env:Env,limit=3,recordId?:string,deadline
    if(ids.length)await env.DB.prepare('INSERT INTO index_vector_garbage(id,chunk_ids,not_before) VALUES(?,?,?)').bind(token,JSON.stringify(ids),new Date(start+3600_000).toISOString()).run();
    for(let i=0;i<chunks.length;i+=8){
     await progress('embedding',i);
-    const vectors=await withinBudget(embed(env,chunks.slice(i,i+8)));
+    const vectors=await withinBudget(embed(env,chunks.slice(i,i+8).map(chunk=>'title: '+record.name.replace(/\.md$/i,'')+' | text: '+chunk)));
     await progress('uploading',i);
     await withinBudget(env.VECTORIZE.upsert(vectors.map((values,j)=>({id:ids[i+j],values,metadata:{record_id:record.id,revision:record.revision,chunk_index:i+j}}))));
     await progress('embedding',Math.min(i+8,total));

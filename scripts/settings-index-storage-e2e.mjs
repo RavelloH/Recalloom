@@ -29,7 +29,7 @@ try{
  const config=page.getByRole('table',{name:'索引配置参数',exact:true});await config.waitFor();
  assert.equal(await config.getByRole('row').count(),5);
  assert.equal(await config.getByRole('rowheader',{name:'嵌入模型',exact:true}).count(),1);
- await config.getByText('@cf/baai/bge-m3',{exact:true}).waitFor();
+ await config.getByText('@cf/google/embeddinggemma-2',{exact:true}).waitFor();
  const metricStyle=await page.locator('.index-metric-card').first().evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.borderTopColor,s.borderTopWidth,s.borderRadius,s.padding];});
  await page.getByRole('button',{name:'筛选：等待处理 / 重试',exact:true}).click();
  await page.getByRole('button',{name:one.name,exact:true}).waitFor();
