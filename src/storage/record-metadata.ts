@@ -48,7 +48,9 @@ export async function updateMeta(env:Env,id:string,updates:{
   stmts.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) SELECT ?,?,?,? WHERE changes()>0 AND EXISTS(SELECT 1 FROM records WHERE id=? AND metadata_revision=?)'+INDEX_JOB_UPSERT)
    .bind(newId(),id,row.revision,ts,id,next));
  const result=await env.DB.batch(stmts);
- if((result[0]?.meta?.changes??0)!==1)throw new StorageError('METADATA_CONFLICT','Current metadataRevision changed; re-read the record');
+ // D1 includes trigger writes in meta.changes. Task-list visibility also
+ // advances the ordering version, so a successful update can report > 1.
+ if((result[0]?.meta?.changes??0)<1)throw new StorageError('METADATA_CONFLICT','Current metadataRevision changed; re-read the record');
  return {id,name,folderId,status,metadataRevision:next,changed:true,archivedFromPath};
 }
 

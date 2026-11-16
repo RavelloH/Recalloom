@@ -7,6 +7,7 @@ import {mutateTasks} from '../src/storage/task-mutations.js';
 import {getRecord} from '../src/storage/record-core.js';
 import {commitContent,restoreRecord} from '../src/storage/record-revisions.js';
 import {updateMeta} from '../src/storage/record-metadata.js';
+import {archivedRecords} from '../src/storage/archive.js';
 import {initialVersion,sha256} from '../src/version.js';
 import {webApi} from '../src/web-api.js';
 import {webHmacHex} from '../src/web-keys.js';
@@ -67,6 +68,48 @@ function fixture(){
 }
 const task=(title:string,status:TaskStatus='todo',priority=0,details=''):Task=>({id:crypto.randomUUID(),title,details,status,priority});
 const code=(expected:string)=>(error:unknown)=>!!error&&typeof error==='object'&&'code'in error&&error.code===expected;
+
+test('archive pagination uses archive dates and binds cursors to kind, search and sort',async()=>{
+ const f=fixture();
+ try{
+  const first=await f.list('Alpha'),second=await f.list('beta'),third=await f.list('Gamma');
+  for(const [index,id] of [first,second,third].entries())f.db.prepare("UPDATE records SET status='archived',archived_at=?,archived_from_path=?,updated_at=? WHERE id=?").run('2026-11-'+(10+index),'/Plans/'+['Alpha','beta','Gamma'][index],'2026-12-'+(20-index),id);
+  f.db.prepare("UPDATE records SET kind='document' WHERE id=?").run(second);
+  const recent=await archivedRecords(f.env,1);
+  assert.equal(recent.total,3);assert.equal(recent.items[0].id,third);
+  const next=await archivedRecords(f.env,1,recent.page.nextCursor!);
+  assert.equal(next.items[0].id,second);
+  assert.equal((await archivedRecords(f.env,1,next.page.nextCursor!)).items[0].id,first);
+  assert.equal((await archivedRecords(f.env,10,undefined,'','', 'oldest')).items[0].id,first);
+  assert.deepEqual((await archivedRecords(f.env,10,undefined,'Plans','','name')).items.map(item=>item.id),[first,second,third]);
+  const documents=await archivedRecords(f.env,1,undefined,'','document');
+  assert.equal(documents.total,1);assert.equal(documents.items[0].id,second);assert.equal(documents.page.hasMore,false);
+  await assert.rejects(()=>archivedRecords(f.env,1,recent.page.nextCursor!,'','document'),code('INVALID_CURSOR'));
+  await assert.rejects(()=>archivedRecords(f.env,1,recent.page.nextCursor!,'other'),code('INVALID_CURSOR'));
+  await assert.rejects(()=>archivedRecords(f.env,1,recent.page.nextCursor!,'','','name'),code('INVALID_CURSOR'));
+  const response=await f.request('/archives?kind=document&sort=name');
+  assert.equal(response.status,200);assert.equal((await response.json() as {total:number}).total,1);
+  assert.equal((await f.request('/archives?sort=unsafe')).status,400);
+ }finally{f.db.close();}
+});
+
+test('archive and restore accept D1 change counts that include task visibility triggers',async()=>{
+ const f=fixture();
+ try{
+  const id=await f.list('Task archive',[task('Retained task')]);
+  const batch=f.env.DB.batch.bind(f.env.DB);
+  f.env.DB.batch=(async(statements:D1PreparedStatement[])=>{
+   const result=await batch(statements);
+   if(result[0]?.meta?.changes)result[0].meta.changes++;
+   return result;
+  }) as typeof f.env.DB.batch;
+  const archived=await updateMeta(f.env,id,{status:'archived',expectedMetadataRevision:1});
+  assert.equal(archived.metadataRevision,2);
+  const restored=await updateMeta(f.env,id,{status:'active',expectedMetadataRevision:2});
+  assert.equal(restored.metadataRevision,3);
+  assert.equal((await getTasks(f.env,id)).items.length,1);
+ }finally{f.db.close();}
+});
 
 test('board-order migration backfills the prior global canonical order with spaced ranks',async()=>{
   const db=new DatabaseSync(':memory:'),directory=new URL('../migrations/',import.meta.url);

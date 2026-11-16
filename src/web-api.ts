@@ -147,8 +147,8 @@ webApi.get('/folders',async(c)=>{
   return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor));
 });
 webApi.get('/archives',async(c)=>{
-  const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional()}));
-  return asJson(await store.archivedRecords(c.env,q.limit,q.cursor,q.query));
+  const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional(),kind:recordKind.optional(),sort:z.enum(['archived','oldest','name','path']).optional()}));
+  return asJson(await store.archivedRecords(c.env,q.limit,q.cursor,q.query,q.kind,q.sort));
 });
 webApi.get('/folders/:id',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;

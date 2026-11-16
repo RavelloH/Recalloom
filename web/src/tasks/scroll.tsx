@@ -13,11 +13,11 @@ export function useTaskIntersection(root:HTMLElement|null,enabled:boolean,onVisi
  },[root,enabled]);
  return ref;
 }
-export function TaskLoadMore({root,hasMore,loading,error,onLoad}:{root:HTMLElement|null;hasMore:boolean;loading:boolean;error:boolean;onLoad:()=>void}){
+export function TaskLoadMore({root,hasMore,loading,error,onLoad,animateWidth=true,loadingLabel='正在加载更多任务…'}:{root:HTMLElement|null;hasMore:boolean;loading:boolean;error:boolean;onLoad:()=>void;animateWidth?:boolean;loadingLabel?:string}){
  const ref=useTaskIntersection(root,hasMore&&!loading&&!error,onLoad);
  const state=loading?'loading':error?'error':hasMore?'more':'done';
- return <div className="tasks-load-more" ref={ref}><AutoResizer animateWidth><AutoTransition transitionKey={state}>
-  {loading?<Spinner size="sm" label="正在加载更多任务…"/>:error?<Button label="加载失败，重试" variant="ghost" size="sm" onClick={onLoad}/>:hasMore?<Button label="加载更多" variant="ghost" size="sm" onClick={onLoad}/>:null}
+ return <div className="tasks-load-more" ref={ref}><AutoResizer animateWidth={animateWidth}><AutoTransition transitionKey={state}>
+  {loading?<Spinner size="sm" label={loadingLabel}/>:error?<Button label="加载失败，重试" variant="ghost" size="sm" onClick={onLoad}/>:hasMore?<Button label="加载更多" variant="ghost" size="sm" onClick={onLoad}/>:null}
  </AutoTransition></AutoResizer></div>;
 }
 /** Measure the remaining shell viewport, including record headers above an embedded list. */

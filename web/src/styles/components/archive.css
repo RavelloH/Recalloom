@@ -1,0 +1,58 @@
+.page.archive-page { max-width: 1260px; padding-bottom: 16px; }
+.archive-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--rk-border-soft); }
+.archive-search { flex: 1; min-width: 220px; max-width: 420px; }
+.archive-count { margin-inline-start: auto; white-space: nowrap; }
+.archive-content { min-height: 180px; }
+.archive-scroll { height: 100%; }
+.archive-feedback:empty { display: none; }
+.archive-feedback { padding-block: 12px; }
+.archive-selection-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 12px; }
+.archive-selection-bar > span { margin-inline-end: auto; }
+.archive-list { padding-block: 12px 24px; }
+.archive-table { width: 100%; table-layout: fixed; }
+.archive-table th:first-child { width: 44px; }
+.archive-table th:nth-child(2) { width: 33%; }
+.archive-table th:nth-child(3) { width: 21%; }
+.archive-table th:nth-child(4) { width: 16%; }
+.archive-table th:nth-child(5) { width: 10%; }
+.archive-table th:last-child { width: 112px; }
+.archive-table td { min-width: 0; }
+.archive-table .archive-name { height: auto; min-height: 36px; max-width: 100%; justify-content: flex-start; padding: 4px 0; text-align: start; font-weight: 600; overflow-wrap: anywhere; }
+.archive-name svg { flex-shrink: 0; color: var(--rk-ink-soft); }
+.archive-path { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 2px; }
+.archive-mobile-meta, .archive-mobile-select-label { display: none; }
+.archive-select-all { display: flex; align-items: center; gap: 8px; }
+.archive-group-title { font-size: var(--rk-font-body); font-weight: 600; display: flex; align-items: baseline; gap: 12px; padding: 16px 8px 8px; margin: 0; overflow-wrap: anywhere; }
+.archive-group + .archive-group { margin-top: 16px; }
+.archive-panel-body { display: grid; gap: 20px; padding: 4px 20px 24px; min-width: 0; }
+.archive-panel-body > * { min-width: 0; }
+.archive-panel-body p { margin: 0; }
+.archive-panel-body .settings-property-table { width: 100%; table-layout: fixed; }
+.archive-panel-body .settings-property-table th { width: 32%; font-weight: 400; }
+.archive-panel-body .settings-property-table th, .archive-panel-body .settings-property-table td { overflow-wrap: anywhere; }
+.archive-panel-body .settings-property-table tr:last-child th { border-bottom-width: 0; }
+.archive-panel-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.archive-result-error { color: var(--color-text-error, #d56c6c); overflow-wrap: anywhere; margin-block: 8px; }
+.archive-task-summary > div { display: grid; gap: 6px; padding-block: 14px; border-bottom: 1px solid var(--rk-border-soft); overflow-wrap: anywhere; }
+.archive-task-summary p { white-space: pre-wrap; }
+@media (max-width: 760px) {
+ .archive-toolbar { gap: 10px; }
+ .archive-search { flex-basis: 100%; max-width: none; }
+ .archive-table, .archive-table tbody { display: block; }
+ .archive-table thead { display: block; }
+ .archive-table thead tr { display: block; }
+ .archive-table thead th:first-child { display: block; width: auto; max-width: none; }
+ .archive-table thead th:not(:first-child) { display: none; }
+ .archive-table .archive-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--rk-border-soft); }
+ .archive-table .archive-item:last-child { border-bottom-width: 0; }
+ .archive-table td { display: block; padding: 12px 4px; max-width: none; border-bottom-width: 0; }
+ .archive-table td:nth-child(3), .archive-table td:nth-child(4), .archive-table td:nth-child(5) { display: none; }
+ .archive-mobile-meta { display: flex; gap: 8px; line-height: 1.6; }
+ .archive-mobile-meta time { flex: none; }
+ .archive-mobile-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+ .archive-mobile-select-label { display: inline; }
+ .archive-page .page-actions { width: 100%; }
+ .archive-count { margin-inline: 0 auto; }
+ .archive-panel-body { padding-inline: 16px; }
+}
