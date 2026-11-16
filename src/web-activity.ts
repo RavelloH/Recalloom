@@ -33,10 +33,28 @@ export async function activityDetail(env:Env,seq:number){
 }
 
 /** Populate older OAuth actors after their next authenticated MCP call. */
+const actorLookups=new WeakMap<Env['DB'],Map<string,Promise<boolean>>>();
 export async function rememberOAuthActor(env:Env,actorId:string,clientId?:string,knownName?:string){
  if(!/^[a-f0-9-]{36}$/.test(actorId))return;
+ let lookups=actorLookups.get(env.DB);
+ if(!lookups){lookups=new Map();actorLookups.set(env.DB,lookups);}
+ let pending=lookups.get(actorId);
+ if(!pending){
+  pending=populateOAuthActor(env,actorId,clientId,knownName);
+  lookups.set(actorId,pending);
+  if(lookups.size>512)lookups.delete(lookups.keys().next().value!);
+ }
+ try{
+  if(!await pending&&lookups.get(actorId)===pending)lookups.delete(actorId);
+ }catch(error){
+  if(lookups.get(actorId)===pending)lookups.delete(actorId);
+  throw error;
+ }
+}
+
+async function populateOAuthActor(env:Env,actorId:string,clientId?:string,knownName?:string){
  const prior=await env.DB.prepare('SELECT 1 AS found FROM oauth_actor_names WHERE actor_id=?').bind(actorId).first();
- if(prior)return;
+ if(prior)return true;
  let name=knownName?.trim();
  if(!name&&clientId){
   let cursor:string|undefined;
@@ -47,7 +65,8 @@ export async function rememberOAuthActor(env:Env,actorId:string,clientId?:string
    cursor=result.cursor;if(!cursor)break;
   }
  }
- if(!name)return;
+ if(!name)return false;
  await env.DB.prepare('INSERT OR IGNORE INTO oauth_actor_names(actor_id,client_name,created_at) VALUES(?,?,?)')
   .bind(actorId,name.slice(0,200),new Date().toISOString()).run();
+ return true;
 }

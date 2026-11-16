@@ -152,6 +152,52 @@ const inputSchemas=new Map<z.ZodTypeAny,unknown>([...Object.values(toolSchemas),
   return [schema,{'~standard':{...schema['~standard'],jsonSchema:{...schema['~standard'].jsonSchema,input:()=>json}}}];
 }));
 
+type ToolDefinition={schema:z.ZodTypeAny;write:boolean;action:(env:Env,actor:string,input:any)=>Promise<unknown>};
+const toolDefinitions:Record<RecalloomToolName,ToolDefinition>={
+  get_help:{schema:toolSchemas.get_help,write:false,action:(env,actor,x)=>Promise.resolve(getHelp(x.topic,{component:x.component,node:x.node,kind:x.kind}))},
+  browse:{schema:toolSchemas.browse,write:false,action:(env,actor,x)=>store.browse(env,x.folderId??null,x.limit,x.cursor)},
+  resolve_path:{schema:toolSchemas.resolve_path,write:false,action:(env,actor,x)=>store.resolvePath(env,x.path)},
+  create_folder:{schema:toolSchemas.create_folder,write:true,action:(env,actor,x)=>store.createFolder(env,x.name,x.parentId??null,x.description,actor)},
+  manage_folder:{schema:toolSchemas.manage_folder,write:true,action:(env,actor,x)=>store.manageFolder(env,x.id,x,actor)},
+  delete_folder:{schema:toolSchemas.delete_folder,write:true,action:async (env,actor,x)=>x.dryRun===false
+    ?lifecycle.deleteFolder(env,x.id,x.expectedMetadataRevision,x.previewToken??'',actor)
+    :lifecycle.previewDeleteFolder(env,x.id,x.expectedMetadataRevision)},
+  create_record:{schema:toolSchemas.create_record,write:true,action:(env,actor,x)=>store.createRecord(env,x,actor)},
+  read_record:{schema:toolSchemas.read_record,write:false,action:(env,actor,x)=>store.readRecord(env,x.id,x)},
+  edit_record:{schema:editSchema,write:true,action:async (env,actor,x:z.infer<typeof editSchema>)=>{
+      const row=await store.getRecord(env,x.id);
+      return store.editRecord(env,x.id,x.expectedRevision,mappedEdit(x,row.content),x.message??'Edited',actor,x.dryRun??false);
+    }},
+  manage_record:{schema:toolSchemas.manage_record,write:true,action:(env,actor,x)=>store.updateMeta(env,x.id,x,actor)},
+  list_archived:{schema:toolSchemas.list_archived,write:false,action:(env,actor,x)=>store.archivedRecords(env,x.limit,x.cursor,x.query)},
+  delete_archived_record:{schema:toolSchemas.delete_archived_record,write:true,action:(env,actor,x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor)},
+  tag_record:{schema:toolSchemas.tag_record,write:true,action:(env,actor,x)=>store.tagRecord(env,x.id,x.tag,x.action,actor)},
+  query_tasks:{schema:toolSchemas.query_tasks,write:false,action:async (env,actor,x)=>taskResult(await queryTasks(env,x))},
+  read_tasks:{schema:toolSchemas.read_tasks,write:false,action:async (env,actor,x)=>taskResult(await readTasks(env,x.ids))},
+  mutate_tasks:{schema:toolSchemas.mutate_tasks,write:true,action:async (env,actor,x)=>taskResult(await mutateTasks(env,x,actor))},
+  version_history:{schema:toolSchemas.version_history,write:false,action:(env,actor,x)=>store.listVersions(env,x.id,x.limit,x.cursor)},
+  restore_record:{schema:toolSchemas.restore_record,write:true,action:(env,actor,x)=>store.restoreRecord(env,x.id,x.targetRevision,x.expectedRevision,actor)},
+  changes:{schema:toolSchemas.changes,write:false,action:(env,actor,x)=>store.changesSince(env,x.cursor,x.limit)},
+  search:{schema:toolSchemas.search,write:false,action:async (env,actor,x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};}},
+  index_diagnostics:{schema:toolSchemas.index_diagnostics,write:false,action:async (env,actor)=>{const [counts,failures,vectorCleanup]=await Promise.all([
+      indexOverview(env),
+      env.DB.prepare("SELECT id,record_id,revision,indexed_revision,state,stage,attempts,last_error,started_at,next_retry_at,lease_expires_at FROM index_jobs WHERE state IN ('retry','failed') ORDER BY created_at DESC LIMIT 20").all(),
+      env.DB.prepare('SELECT record_id AS recordId,state,attempts,last_error AS lastError FROM vector_delete_jobs ORDER BY created_at DESC LIMIT 20').all()
+    ]);return {...counts,recentFailures:failures.results,vectorCleanup:vectorCleanup.results};}},
+  index_pending:{schema:toolSchemas.index_pending,write:true,action:async (env,actor,x)=>{if(x.recordId)await retryIndex(env,x.recordId,x.rebuild);return {vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3,x.recordId)};}},
+  read_many:{schema:toolSchemas.read_many,write:false,action:(env,actor,x)=>agent.readMany(env,x.items,x.maxChars)},
+  diff_revisions:{schema:toolSchemas.diff_revisions,write:false,action:(env,actor,x)=>agent.diffRevisions(env,x.id,x.fromRevision,x.toRevision)},
+  list_tags:{schema:toolSchemas.list_tags,write:false,action:(env,actor,x)=>agent.listTags(env,x.limit,x.cursor)},
+  list_links:{schema:toolSchemas.list_links,write:false,action:(env,actor,x)=>agent.links(env,x.id,'list',undefined,undefined,actor,x.cursor)},
+  related_records:{schema:toolSchemas.related_records,write:false,action:(env,actor,x)=>recordRelations(env,x.id,{semantic:x.semantic!==false,limit:x.limit})},
+  get_knowledge_graph:{schema:toolSchemas.get_knowledge_graph,write:false,action:(env,actor,x)=>graphView(env,{focusId:x.focusId,limit:x.limit,semantic:x.semantic!==false})},
+  manage_link:{schema:toolSchemas.manage_link,write:true,action:(env,actor,x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor)},
+  get_overview:{schema:toolSchemas.get_overview,write:false,action:(env,actor,x)=>agent.getOverview(env,x.folderId??null,x.depth,x.budget,x.cursor)},
+  get_outline:{schema:toolSchemas.get_outline,write:false,action:(env,actor,x)=>agent.getOutline(env,x.id,x.revision,x.limit,x.cursor)},
+  export_snapshot:{schema:toolSchemas.export_snapshot,write:false,action:(env,actor,x)=>agent.exportSnapshot(env,x.cursor??null,x.limit)},
+  import_snapshot:{schema:toolSchemas.import_snapshot,write:true,action:(env,actor,x)=>agent.importSnapshot(env,x.bundle,x.dryRun??true,actor)}
+};
+
 export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-client',onWrite?:()=>void,requestedTool?:RecalloomToolName) {
   const mcp=new McpServer({name:'recalloom',version:'0.1.0'}, {instructions:SERVER_INSTRUCTIONS,capabilities:{tools:{},resources:{}}});
   // Same canonical Markdown as get_help: MCP clients may discover/read these
@@ -192,82 +238,9 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
       }
     });
   };
-  register('get_help',toolSchemas.get_help,false,(x)=>Promise.resolve(getHelp(x.topic,{component:x.component,node:x.node,kind:x.kind})));
-  register('browse',toolSchemas.browse,false,
-    (x)=>store.browse(env,x.folderId??null,x.limit,x.cursor));
-  register('resolve_path',toolSchemas.resolve_path,false,
-    (x)=>store.resolvePath(env,x.path));
-  register('create_folder',toolSchemas.create_folder,true,
-    (x)=>store.createFolder(env,x.name,x.parentId??null,x.description,actor));
-  register('manage_folder',toolSchemas.manage_folder,true,(x)=>store.manageFolder(env,x.id,x,actor));
-  register('delete_folder',toolSchemas.delete_folder,true,async(x)=>x.dryRun===false
-    ?lifecycle.deleteFolder(env,x.id,x.expectedMetadataRevision,x.previewToken??'',actor)
-    :lifecycle.previewDeleteFolder(env,x.id,x.expectedMetadataRevision));
-  register('create_record',toolSchemas.create_record,true,
-    (x)=>store.createRecord(env,x,actor));
-  register('read_record',toolSchemas.read_record,false,
-    (x)=>store.readRecord(env,x.id,x));
-  register('edit_record',editSchema,true,
-    async (x:z.infer<typeof editSchema>)=>{
-      const row=await store.getRecord(env,x.id);
-      return store.editRecord(env,x.id,x.expectedRevision,mappedEdit(x,row.content),x.message??'Edited',actor,x.dryRun??false);
-    });
-  register('manage_record',toolSchemas.manage_record,true,
-    (x)=>store.updateMeta(env,x.id,x,actor));
-  register('list_archived',toolSchemas.list_archived,false,(x)=>store.archivedRecords(env,x.limit,x.cursor,x.query));
-  register('delete_archived_record',toolSchemas.delete_archived_record,true,(x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor));
-  register('tag_record',toolSchemas.tag_record,true,
-    (x)=>store.tagRecord(env,x.id,x.tag,x.action,actor));
-  register('query_tasks',toolSchemas.query_tasks,false,async(x)=>taskResult(await queryTasks(env,x)));
-  register('read_tasks',toolSchemas.read_tasks,false,
-    async(x)=>taskResult(await readTasks(env,x.ids)));
-  register('mutate_tasks',toolSchemas.mutate_tasks,true,async(x)=>taskResult(await mutateTasks(env,x,actor)));
-  register('version_history',toolSchemas.version_history,false,
-    (x)=>store.listVersions(env,x.id,x.limit,x.cursor));
-  register('restore_record',toolSchemas.restore_record,true,
-    (x)=>store.restoreRecord(env,x.id,x.targetRevision,x.expectedRevision,actor));
-  register('changes',toolSchemas.changes,false,
-    (x)=>store.changesSince(env,x.cursor,x.limit));
-  register('search',toolSchemas.search,false,async (x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};});
-  register('index_diagnostics',toolSchemas.index_diagnostics,false,
-    async()=>{const [counts,failures,vectorCleanup]=await Promise.all([
-      indexOverview(env),
-      env.DB.prepare("SELECT id,record_id,revision,indexed_revision,state,stage,attempts,last_error,started_at,next_retry_at,lease_expires_at FROM index_jobs WHERE state IN ('retry','failed') ORDER BY created_at DESC LIMIT 20").all(),
-      env.DB.prepare('SELECT record_id AS recordId,state,attempts,last_error AS lastError FROM vector_delete_jobs ORDER BY created_at DESC LIMIT 20').all()
-    ]);return {...counts,recentFailures:failures.results,vectorCleanup:vectorCleanup.results};});
-  register('index_pending',toolSchemas.index_pending,true,
-    async(x)=>{if(x.recordId)await retryIndex(env,x.recordId,x.rebuild);return {vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3,x.recordId)};});
-  register('read_many',
-    toolSchemas.read_many,false,
-    (x)=>agent.readMany(env,x.items,x.maxChars));
-  register('diff_revisions',
-    toolSchemas.diff_revisions,false,
-    (x)=>agent.diffRevisions(env,x.id,x.fromRevision,x.toRevision));
-  register('list_tags',
-    toolSchemas.list_tags,false,
-    (x)=>agent.listTags(env,x.limit,x.cursor));
-  register('list_links',
-    toolSchemas.list_links,false,(x)=>agent.links(env,x.id,'list',undefined,undefined,actor,x.cursor));
-  register('related_records',
-    toolSchemas.related_records,false,
-    (x)=>recordRelations(env,x.id,{semantic:x.semantic!==false,limit:x.limit}));
-  register('get_knowledge_graph',
-    toolSchemas.get_knowledge_graph,false,
-    (x)=>graphView(env,{focusId:x.focusId,limit:x.limit,semantic:x.semantic!==false}));
-  register('manage_link',
-    toolSchemas.manage_link,true,
-    (x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor));
-  register('get_overview',
-    toolSchemas.get_overview,false,
-    (x)=>agent.getOverview(env,x.folderId??null,x.depth,x.budget,x.cursor));
-  register('get_outline',
-    toolSchemas.get_outline,false,
-    (x)=>agent.getOutline(env,x.id,x.revision,x.limit,x.cursor));
-  register('export_snapshot',
-    toolSchemas.export_snapshot,false,
-    (x)=>agent.exportSnapshot(env,x.cursor??null,x.limit));
-  register('import_snapshot',
-    toolSchemas.import_snapshot,true,
-    (x)=>agent.importSnapshot(env,x.bundle,x.dryRun??true,actor));
+  for(const name of requestedTool?[requestedTool]:Object.keys(toolDefinitions) as RecalloomToolName[]){
+    const definition=toolDefinitions[name];
+    register(name,definition.schema,definition.write,input=>definition.action(env,actor,input));
+  }
   return mcp;
 }

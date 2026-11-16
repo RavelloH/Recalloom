@@ -1,6 +1,7 @@
 import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
+import {handleMcpRequest,MCP_MAX_REQUEST_BODY_SIZE} from './mcp-http.js';
 import { processIndexJobs } from './search.js';
 import {drainIndexJobs,cleanupIndexVectors} from './indexing.js';
 import {pruneIndexRuns} from './index-observability.js';
@@ -126,8 +127,8 @@ function provider(env:Env,request:Request){
         // invoking this factory. Discovery and legacy clients keep the full catalog.
         const name=mcpRequest.headers.get('Mcp-Name');
         const requestedTool=mcpRequest.headers.get('MCP-Protocol-Version')==='2026-07-28'&&mcpRequest.headers.get('Mcp-Method')==='tools/call'&&name&&Object.hasOwn(TOOL_GUIDANCE,name)?name as RecalloomToolName:undefined;
-        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown'),()=>ctx.waitUntil(drainIndexJobs(requestEnv).catch(e=>console.error('MCP indexing failed',e))),requestedTool),{legacy:'stateless'});
-        return handler.fetch(mcpRequest);
+        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown'),()=>ctx.waitUntil(drainIndexJobs(requestEnv).catch(e=>console.error('MCP indexing failed',e))),requestedTool),{legacy:'stateless',maxRequestBodySize:MCP_MAX_REQUEST_BODY_SIZE});
+        return handleMcpRequest(handler,mcpRequest);
       }
     },
     defaultHandler:{
