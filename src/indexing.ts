@@ -1,7 +1,6 @@
 import type {Env} from './types.js';
 import {StorageError} from './types.js';
-import {paragraphChunks,paragraphChunkSpans} from './search-ranking.js';
-import {projectSearchChunk} from './search-excerpt.js';
+import {paragraphChunks} from './search-ranking.js';
 import {sha256} from './version.js';
 export const EMBEDDING_MODEL = '@cf/google/embeddinggemma-2';
 export const EMBEDDING_DIMENSIONS = 512;
@@ -59,8 +58,7 @@ export async function processIndexJobs(env:Env,limit=3,recordId?:string,deadline
    const record=await env.DB.prepare('SELECT r.id,r.name,r.status,c.content,c.revision,r.metadata_revision FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.id=?').bind(job.record_id).first<{id:string;name:string;status:string;content:string;revision:number;metadata_revision:number}>();
    if(!record||record.revision!==job.revision)throw new StorageError('INDEX_SUPERSEDED');
    const old=(await env.DB.prepare('SELECT chunk_id FROM search_chunks WHERE record_id=?').bind(record.id).all<{chunk_id:string}>()).results.map(row=>row.chunk_id);
-   const spans=record.status==='archived'?[]:paragraphChunkSpans(record.name+'\n'+record.content);
-   const chunks=spans.map(span=>span.text);total=chunks.length;
+   const chunks=record.status==='archived'?[]:splitText(record.name+'\n'+record.content);total=chunks.length;
    // Attempt-scoped IDs prevent late writers or cleanup from touching a newer index.
    const prefix=(await sha256(record.id+':'+job.generation+':'+token)).slice(0,40);
    const ids=chunks.map((_,i)=>prefix+':'+i);
@@ -77,7 +75,7 @@ export async function processIndexJobs(env:Env,limit=3,recordId?:string,deadline
    const guard="EXISTS(SELECT 1 FROM index_jobs WHERE id=? AND generation=? AND lease_token=? AND lease_expires_at>? AND state='running') AND EXISTS(SELECT 1 FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.id=? AND r.metadata_revision=? AND c.revision=?)";
    const args=[job.id,job.generation,token,iso(),record.id,record.metadata_revision,record.revision];
    const statements=[env.DB.prepare('DELETE FROM search_chunks WHERE record_id=? AND '+guard).bind(record.id,...args)];
-   for(let i=0;i<chunks.length;i++)statements.push(env.DB.prepare('INSERT INTO search_chunks(chunk_id,record_id,revision,chunk_index,content,excerpt_projection) SELECT ?,?,?,?,?,? WHERE '+guard).bind(ids[i],record.id,record.revision,i,chunks[i],JSON.stringify(projectSearchChunk(record,spans[i]!)),...args));
+   for(let i=0;i<chunks.length;i++)statements.push(env.DB.prepare('INSERT INTO search_chunks(chunk_id,record_id,revision,chunk_index,content) SELECT ?,?,?,?,? WHERE '+guard).bind(ids[i],record.id,record.revision,i,chunks[i],...args));
    if(old.length)statements.push(env.DB.prepare('INSERT INTO index_vector_garbage(id,chunk_ids,not_before) SELECT ?,?,? WHERE '+guard).bind(token+'-old',JSON.stringify(old),iso(),...args));
    statements.push(env.DB.prepare('DELETE FROM index_vector_garbage WHERE id=? AND '+guard).bind(token,...args));
    statements.push(env.DB.prepare("UPDATE index_jobs SET state='done',stage='submitted',indexed_revision=?,completed_chunks=?,total_chunks=?,finished_at=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL WHERE "+guard+' AND id=?').bind(job.revision,total,total,iso(),...args,job.id));
