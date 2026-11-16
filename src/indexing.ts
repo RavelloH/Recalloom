@@ -22,6 +22,9 @@ export async function embed(env:Env,texts:string[]):Promise<number[][]> {
 }
 type Job={id:string;record_id:string;revision:number;generation:number;attempts:number};
 const iso=()=>new Date().toISOString();
+// Reserve useful processing time before claiming another document. A drain may
+// otherwise spend an attempt on a large document with milliseconds remaining.
+const MIN_NEXT_JOB_BUDGET_MS=20_000;
 export async function cleanupIndexVectors(env:Env){
  const rows=(await env.DB.prepare('SELECT id,chunk_ids FROM index_vector_garbage WHERE not_before<=? LIMIT 10').bind(iso()).all<{id:string;chunk_ids:string}>()).results;
  for(const row of rows)try{
@@ -37,7 +40,7 @@ export async function processIndexJobs(env:Env,limit=3,recordId?:string,deadline
  const jobs=(await env.DB.prepare("SELECT id,record_id,revision,generation,attempts FROM index_jobs WHERE (state='pending' OR (state='retry' AND next_retry_at<=?)) AND (? IS NULL OR record_id=?) ORDER BY updated_at,created_at LIMIT ?").bind(now,recordId??null,recordId??null,Math.max(1,Math.min(10,limit))).all<Job>()).results;
  const results:Array<{id:string;chunks?:number;skipped?:string;error?:string}>=[];
  for(const job of jobs){
-  if(Date.now()>=deadline)break;
+  if(Date.now()>=deadline||(results.length>0&&deadline-Date.now()<MIN_NEXT_JOB_BUDGET_MS))break;
   const token=crypto.randomUUID(),start=Date.now(),expires=new Date(start+90_000).toISOString();
   const claimed=await env.DB.prepare("UPDATE index_jobs SET state='running',stage='preparing',started_at=?,lease_token=?,lease_expires_at=?,attempts=attempts+1 WHERE id=? AND generation=? AND state IN ('pending','retry')").bind(iso(),token,expires,job.id,job.generation).run();
   if(!claimed.meta.changes){results.push({id:job.id,skipped:'claimed_elsewhere'});continue;}
@@ -99,5 +102,5 @@ async function logRun(env:Env,id:string,job:Job,outcome:string,chunks:number,dur
 export async function drainIndexJobs(env:Env){
  if(env.INDEX_BACKGROUND_ENABLED==='false')return;
  const deadline=Date.now()+24_000;
- do{const result=await processIndexJobs(env,1,undefined,deadline);if(!result.processed)break;}while(Date.now()<deadline);
+ do{const result=await processIndexJobs(env,1,undefined,deadline);if(!result.processed)break;}while(deadline-Date.now()>=MIN_NEXT_JOB_BUDGET_MS);
 }

@@ -80,6 +80,27 @@ test('background drain finishes queued records without waiting for a scheduled t
  await drainIndexJobs(f.env);assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM index_jobs WHERE state='done'").get()!.n,2);
 });
 
+test('background drain leaves the next document pending when its budget is nearly exhausted',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.now()});
+ const f=fixture();await createRecord(f.env,{name:'first.md',content:'first'});await createRecord(f.env,{name:'next.md',content:'next'});
+ f.onEmbed(async()=>{t.mock.timers.tick(23_000);});
+ await drainIndexJobs(f.env);
+ const jobs=f.sql.prepare('SELECT state,attempts,last_error FROM index_jobs ORDER BY state').all();
+ assert.deepEqual(jobs.map(job=>[job.state,job.attempts,job.last_error]),[['done',1,null],['pending',0,null]]);
+ assert.equal(f.embeddings.length,1);
+ assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM index_runs').get()!.n,1);
+});
+
+test('scheduled batches reserve processing time before claiming another document',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.now()});
+ const f=fixture();await createRecord(f.env,{name:'first.md',content:'first'});await createRecord(f.env,{name:'next.md',content:'next'});
+ f.onEmbed(async()=>{t.mock.timers.tick(74_000);});
+ const result=await processIndexJobs(f.env,5);
+ assert.equal(result.processed,1);assert.equal(result.results[0].chunks,1);
+ const pending=f.sql.prepare("SELECT attempts,last_error FROM index_jobs WHERE state='pending'").get()!;
+ assert.equal(pending.attempts,0);assert.equal(pending.last_error,null);
+});
+
 test('upgrade coalesces legacy revisions without changing document content',()=>{
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');
  for(const file of readdirSync('migrations').filter(n=>n.endsWith('.sql')&&n<'0020').sort())db.exec(readFileSync('migrations/'+file,'utf8'));
