@@ -6,6 +6,7 @@ import {Card} from '@astryxdesign/core/Card';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Badge} from '@astryxdesign/core/Badge';
+import {Table,TableHeader,TableBody,TableRow,TableHeaderCell,TableCell} from '@astryxdesign/core/Table';
 import {api,queryString} from './api';
 import {useConfirmDialog} from './confirm-dialog';
 import {AutoResizer,AutoTransition} from './motion-primitives';
@@ -48,8 +49,19 @@ export function SettingsIndexing(){
   </Card>
   <p className="muted small">归档文稿不计入覆盖率。最早等待 {fmt(data?.last.waitingSince??undefined)} · 统计基于当前任务，查看页面时计算。</p>
   {data&&<IndexChart title="待处理任务" emptyTitle="无待处理任务" description="距最近入队的时间，含等待重试；不是累计排队耗时" data={count('pending')+count('retry')>0?data.ageBuckets:[]} kind="bar" fields={[{key:'pending',label:'等待处理'},{key:'retry',label:'等待重试'}]}/>}
-  <Card padding={4}><div className="index-toolbar"><h3>文稿索引任务</h3><div className="index-filters"><TextInput label="搜索文稿" isLabelHidden placeholder="搜索文稿…" value={query} onChange={setQuery} size="sm"/><Selector label="任务状态" size="sm" value={state} onChange={setState} options={[{value:'all',label:'全部状态'},{value:'waiting',label:'等待处理 / 重试'},...Object.entries(stateLabels).map(([value,label])=>({value,label}))]}/></div></div>
-   <AutoResizer><AutoTransition transitionKey={state+search+(tasks.isPending?'loading':'ready')+items.map(t=>t.record_id).join('|')}>{tasks.isPending?<Loading/>:tasks.isError?<ErrorText error={tasks.error}/>:!items.length?<Empty title="没有符合条件的任务"/>:<div className="index-task-list">{items.map(task=><Button variant="ghost" className="index-task-row" key={task.record_id} label={task.name} children={<AutoTransition as="span" className="index-task-content" transitionKey={task.name+task.state+task.stage+task.completed_chunks+task.revision}><span className="index-task-name"><strong>{task.name}</strong><span className="muted small">{task.indexed_revision?'R'+task.indexed_revision:'未索引'} → R{task.revision}{task.record_status==='archived'?' · 已归档':''}</span></span><span><Badge variant={task.state==='failed'?'error':task.state==='running'?'info':'neutral'} label={stateLabels[task.state]}/><span className="muted small">{task.state==='running'?(stageLabels[task.stage]??task.stage)+(task.total_chunks?' · '+task.completed_chunks+'/'+task.total_chunks+' 块':''):task.state==='retry'?'重试于 '+fmt(task.next_retry_at??undefined):fmt(task.finished_at??task.updated_at??task.created_at)}</span></span></AutoTransition>} onClick={()=>open(task)}/>)}</div>}</AutoTransition></AutoResizer>
+  <Card padding={4}><div className="index-toolbar"><h3>文稿索引任务</h3><div className="index-filters"><TextInput label="搜索文稿" isLabelHidden placeholder="搜索文稿…" value={query} onChange={setQuery} size="sm"/><Selector label="任务状态" isLabelHidden size="sm" value={state} onChange={setState} options={[{value:'all',label:'全部状态'},{value:'waiting',label:'等待处理 / 重试'},...Object.entries(stateLabels).map(([value,label])=>({value,label}))]}/></div></div>
+   <AutoResizer><AutoTransition transitionKey={state+search+(tasks.isPending?'loading':'ready')+items.map(t=>t.record_id).join('|')}>{tasks.isPending?<Loading/>:tasks.isError?<ErrorText error={tasks.error}/>:!items.length?<Empty title="没有符合条件的任务"/>:<Table aria-label="文稿索引任务" className="index-task-list" dividers="rows" density="balanced" verticalAlign="top" textOverflow="wrap" hasHover>
+    <TableHeader><TableRow isHeaderRow><TableHeaderCell scope="col">文稿</TableHeaderCell><TableHeaderCell scope="col">状态</TableHeaderCell><TableHeaderCell scope="col">处理时间</TableHeaderCell></TableRow></TableHeader>
+    <TableBody>{items.map(task=><TableRow key={task.record_id} onClick={()=>open(task)}>
+     <TableCell><AutoResizer><AutoTransition transitionKey={task.name+task.revision+task.indexed_revision+task.record_status}>
+      <div className="index-task-name"><Button variant="ghost" className="index-task-title" label={task.name}/><span className="muted small">{task.indexed_revision?'R'+task.indexed_revision:'未索引'} → R{task.revision}{task.record_status==='archived'?' · 已归档':''}</span></div>
+     </AutoTransition></AutoResizer></TableCell>
+     <TableCell><AutoResizer><AutoTransition transitionKey={task.state+task.stage+task.completed_chunks+task.total_chunks}>
+      <div className="index-task-status"><Badge variant={task.state==='failed'?'error':task.state==='running'?'info':'neutral'} label={stateLabels[task.state]}/>{task.state==='running'&&<span className="muted small">{stageLabels[task.stage]??task.stage}{task.total_chunks?' · '+task.completed_chunks+'/'+task.total_chunks+' 块':''}</span>}</div>
+     </AutoTransition></AutoResizer></TableCell>
+     <TableCell><AutoTransition transitionKey={task.state+task.next_retry_at+task.finished_at+task.updated_at}><span className="muted small">{task.state==='retry'?'重试于 ':''}{fmt((task.state==='retry'?task.next_retry_at:task.finished_at??task.updated_at??task.created_at)??undefined)}</span></AutoTransition></TableCell>
+    </TableRow>)}</TableBody>
+   </Table>}</AutoTransition></AutoResizer>
    <div ref={more}>{tasks.hasNextPage&&<Button variant="ghost" label="加载更多" isLoading={tasks.isFetchingNextPage} onClick={()=>void tasks.fetchNextPage()}/>}</div>
   </Card>
 

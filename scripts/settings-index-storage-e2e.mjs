@@ -57,6 +57,20 @@ try{
  await page.screenshot({path:'tmp/settings-storage-desktop-'+engine+'.png'});
  await page.goto('about:blank');await page.setViewportSize({width:390,height:844});await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('button',{name:one.name,exact:true}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No mobile horizontal overflow');
+ const taskTable=page.getByRole('table',{name:'文稿索引任务',exact:true});await taskTable.scrollIntoViewIfNeeded();
+ assert.equal(await taskTable.getByRole('columnheader').count(),3);
+ const cells=taskTable.locator('tbody tr').first().getByRole('cell');
+ const bounds=await Promise.all([0,1,2].map(i=>cells.nth(i).boundingBox()));
+ assert.ok(bounds.every(Boolean)&&bounds[0].x<bounds[1].x&&bounds[1].x<bounds[2].x,'Mobile task fields remain in three distinct columns');
+ const titleBounds=await taskTable.getByRole('button',{name:one.name,exact:true}).boundingBox();
+ const cardBounds=await taskTable.locator('xpath=ancestor::*[contains(@class,"astryx-card")][1]').boundingBox();
+ assert.ok(titleBounds.x>=cardBounds.x+8,'Mobile title retains its card inset');
+ await page.screenshot({path:'tmp/settings-index-task-table-mobile-'+engine+'.png'});
+ await taskTable.getByRole('button',{name:one.name,exact:true}).focus();await page.keyboard.press('Enter');
+ await page.getByRole('dialog',{name:'索引详情：'+one.name,exact:true}).waitFor();
+ await page.getByRole('dialog',{name:'索引详情：'+one.name,exact:true}).getByRole('button',{name:'关闭',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('[data-workspace-panel^="index-"]'));
+
  await page.locator('.index-config-card').scrollIntoViewIfNeeded();
  await page.waitForFunction(()=>!document.querySelector('.index-config-card').getAnimations({subtree:true}).some(a=>a.playState==='running'));
  assert.ok(await page.getByRole('table',{name:'索引配置参数',exact:true}).evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Configuration table wraps on mobile');
