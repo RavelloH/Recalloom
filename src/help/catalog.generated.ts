@@ -2,8 +2,8 @@
 /* Canonical sources: src/help/manifest.json and src/help/*.md */
 export const HELP_META = {
   "schemaVersion": 1,
-  "helpVersion": "1.f5c6405803a4",
-  "contentHash": "f5c6405803a4a0494634af3231f81982c6cc3b256470de71ffd08e6d8ffdfc9a"
+  "helpVersion": "1.9fb10623ee02",
+  "contentHash": "9fb10623ee02dc9311e7ccee88bf1830d10684255b63281da7f34bbe20729256"
 } as const;
 export const HELP_PAGES = {
   "overview": {
@@ -46,7 +46,7 @@ export const HELP_PAGES = {
     "title": "检索与知识关系",
     "summary": "字面/语义检索、索引延迟、反向链接及图谱",
     "uri": "recalloom://help/search",
-    "content": "# 搜索、向量索引与知识关系\n\nRecalloom 具有元数据、字面文本、语义向量和混合检索，以及手动关系、自动 Wiki 引用、反向链接和有界知识图谱。不同来源的结果可信度与时效不同。\n\n## 检索选择\n\n| 需求 | 推荐模式 |\n| --- | --- |\n| 已知完整路径 | resolve_path |\n| 精确名称/描述 | search mode=metadata |\n| 刚写入的关键词或源码片段 | search mode=literal |\n| 按语义寻找相关资料 | search mode=semantic |\n| 综合检索 | search mode=hybrid 或 auto |\n| 浏览某目录及近期内容 | browse、get_overview |\n| 读取最终权威正文 | read_record、read_many |\n\nsemantic 使用 Vectorize，异步分块索引可能滞后；不可把“未检索到”视作“内容不存在”。minScore 是**原始语义相似度阈值**，默认 0.43，不适用于字面分数。搜索结果只是候选，需要继续读取正文验证。\n\n## 关系的不同类型\n\n- 手动显式关系：由 manage_link 创建、移除，list_links 可读取。\n- Wiki 自动引用：来自 Markdown [[id:UUID]]、[[/路径.md]] 与 RMD 1.0 的 ::: embed 目标 :::，不会由 manage_link 自动等价创建；其目标身份与索引见 wiki 帮助。\n- 语义候选：Vectorize 根据文本相似度推荐，**不是已确认关系，不会自动保存为手动链接**。\n- 同目录关系：关系图可展示同目录近邻，不能当作内容相互引用的证据。\n\nrelated_records 返回已确认的入站/出站关系及可选语义候选，注意 semanticStatus。get_knowledge_graph 提供**有界图谱**：focusId 限定中心及近邻，省略时返回近期子图（最多 100 个节点），不是全库完整遍历。\n\n关系图默认包含语义建议，可用 semantic=false 关闭。近期子图只抽样至多 6 篇已完成当前版本索引的文稿，并限制每个节点至多 4 条语义连线；没有语义边不代表文稿之间不存在相似内容。关注一篇文稿时会单独查询其语义近邻。\n\n## 索引操作\n\n新增或更新正文后会事务性合并索引任务，并在响应后立即后台处理。每篇文稿保留一个目标版本；失败会退避重试，Cron 每 15 分钟兜底处理遗漏和超时任务。使用 index_diagnostics 查看覆盖率、阶段、任务年龄分布与失败；index_pending 可处理有限批任务，或指定 recordId 重试一篇文稿（已完成任务需 rebuild=true）。这些操作修改索引，不编辑正文。已提交索引不代表已经验证语义查询可见。设置里的“索引”管理执行状态，“存储”展示实际容量、逻辑文本大小和向量估算；不同口径不能相加。执行记录保留 30 天用于排错；页面按需统计当前任务和容量，不保存周期性快照。\n\n## 读取与分页\n\n列表类结果使用 items、page；如需完整结果根据 page.nextCursor 继续。get_outline 和 read_many 可减少长文档一次性载入的开销。不要用图谱节点摘要或搜索摘录替代权威正文。\n"
+    "content": "# 搜索、向量索引与知识关系\n\nRecalloom 具有元数据、字面文本、语义向量和混合检索，以及手动关系、自动 Wiki 引用、反向链接和有界知识图谱。不同来源的结果可信度与时效不同。\n\n## 检索选择\n\n| 需求 | 推荐模式 |\n| --- | --- |\n| 已知完整路径 | resolve_path |\n| 精确名称/描述 | search mode=metadata |\n| 刚写入的关键词或源码片段 | search mode=literal |\n| 按语义寻找相关资料 | search mode=semantic |\n| 综合检索 | search mode=hybrid 或 auto |\n| 浏览某目录及近期内容 | browse、get_overview |\n| 读取最终权威正文 | read_record、read_many |\n\nsemantic 使用 Vectorize，异步分块索引可能滞后；不可把“未检索到”视作“内容不存在”。minScore 是**原始语义相似度阈值**，Gemma 512 维默认 0.68，不适用于字面分数，也不表示答案正确概率；需要更宽泛候选时可以显式调低。搜索结果只是候选，需要继续读取正文验证。混合搜索优先精确匹配文稿自身名称、主标题；README 也可通过所在目录名称定位。摘要优先展示命中词附近的原文窗口，纯语义改写没有词面命中时回退块首。\n\n## 关系的不同类型\n\n- 手动显式关系：由 manage_link 创建、移除，list_links 可读取。\n- Wiki 自动引用：来自 Markdown [[id:UUID]]、[[/路径.md]] 与 RMD 1.0 的 ::: embed 目标 :::，不会由 manage_link 自动等价创建；其目标身份与索引见 wiki 帮助。\n- 语义候选：Vectorize 根据文本相似度推荐，**不是已确认关系，不会自动保存为手动链接**。\n- 同目录关系：关系图可展示同目录近邻，不能当作内容相互引用的证据。\n\nrelated_records 返回已确认的入站/出站关系及可选语义候选，注意 semanticStatus。get_knowledge_graph 提供**有界图谱**：focusId 限定中心及近邻，省略时返回近期子图（最多 100 个节点），不是全库完整遍历。\n\n关系图默认包含语义建议，可用 semantic=false 关闭。近期子图只抽样至多 6 篇已完成当前版本索引的文稿，并限制每个节点至多 4 条语义连线；没有语义边不代表文稿之间不存在相似内容。关注一篇文稿时会单独查询其语义近邻。\n\n## 索引操作\n\n新增或更新正文后会事务性合并索引任务，并在响应后立即后台处理。每篇文稿保留一个目标版本；失败会退避重试，Cron 每 15 分钟兜底处理遗漏和超时任务。使用 index_diagnostics 查看覆盖率、阶段、任务年龄分布与失败；index_pending 可处理有限批任务，或指定 recordId 重试一篇文稿（已完成任务需 rebuild=true）。这些操作修改索引，不编辑正文。已提交索引不代表已经验证语义查询可见。设置里的“索引”管理执行状态，“存储”展示实际容量、逻辑文本大小和向量估算；不同口径不能相加。执行记录保留 30 天用于排错；页面按需统计当前任务和容量，不保存周期性快照。\n\n## 读取与分页\n\n列表类结果使用 items、page；如需完整结果根据 page.nextCursor 继续。get_outline 和 read_many 可减少长文档一次性载入的开销。不要用图谱节点摘要或搜索摘录替代权威正文。\n"
   },
   "tasks": {
     "title": "结构化任务",

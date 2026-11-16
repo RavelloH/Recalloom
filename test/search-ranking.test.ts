@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { paragraphChunks, semanticIntentScore, reciprocalRankFusion } from '../src/search-ranking.js';
+import { paragraphChunks, semanticIntentScore, reciprocalRankFusion, DEFAULT_MIN_SEMANTIC_SCORE,searchTitleMatch } from '../src/search-ranking.js';
 import { search } from '../src/search.js';
 import type { Env } from '../src/types.js';
 
@@ -26,7 +26,7 @@ test('intent-aware reranking penalizes negated topics while rewarding desired to
   const stepper=semanticIntentScore(q,'步进电机丝杆定位：通过微步调整机械定位',0.611);
   const robot=semanticIntentScore(q,'双轮差速机器人 PID 控制直线运动，左右电机 PWM 调整',0.604);
   assert.ok(robot>stepper,JSON.stringify({robot,stepper}));
-  assert.ok(semanticIntentScore('OAuth code verifier','授权服务器认证',0.3)<0.43);
+  assert.ok(semanticIntentScore('OAuth code verifier','授权服务器认证',0.3)<DEFAULT_MIN_SEMANTIC_SCORE);
 });
 
 test('reciprocal rank fusion is bounded, rewards agreement and avoids raw-score bias',()=>{
@@ -72,7 +72,7 @@ function fixture(similarities:Record<string,number>,lexicalMatches:string[]=[]){
 }
 
 test('semantic results reject irrelevant vectors but allow caller threshold override',async()=>{
-  const data=fixture({robot:0.36,motor:0.34});
+  const data=fixture({robot:0.63,motor:0.61});
   const empty=await search(data.env,{query:'查询一个完全无关的话题',mode:'semantic'});
   assert.equal(empty.count,0);
   assert.equal(data.calls(),0,'skip D1 for below-threshold vectors');
@@ -81,7 +81,7 @@ test('semantic results reject irrelevant vectors but allow caller threshold over
 });
 
 test('semantic reranking resolves robot vs stepper negation ambiguity in search',async()=>{
-  const data=fixture({motor:0.611,robot:0.604});
+  const data=fixture({motor:0.851,robot:0.844});
   const result=await search(data.env,{query:'要用 PID 控制左右驱动轮直线运动，而不是丝杆定位',mode:'semantic'});
   assert.equal(result.count,2);
   assert.equal(result.results[0]?.id,'robot');
@@ -90,7 +90,7 @@ test('semantic reranking resolves robot vs stepper negation ambiguity in search'
 });
 
 test('hybrid mode uses rank fusion instead of literal score 1 vs cosine score',async()=>{
-  const data=fixture({motor:0.64,robot:0.65},['motor']);
+  const data=fixture({motor:0.74,robot:0.75},['motor']);
   const result=await search(data.env,{query:'丝杆定位',mode:'hybrid'});
   assert.equal(result.count,2);
   assert.equal(result.results[0]?.id,'motor','a document found by both methods should rank ahead');
@@ -104,4 +104,13 @@ test('metadata and literal search skip embedding and preserve literal source',as
   assert.equal(result.count,1);
   assert.equal(result.results[0]?.id,'robot');
   assert.equal(result.results[0]?.source,'literal');
+});
+
+
+test('own titles support Markdown extensions, formatting separators and empty queries',()=>{
+ assert.equal(searchTitleMatch('索引配置',['索引配置.md']),3);
+ assert.equal(searchTitleMatch('Recalloom Embedding',['README.md','Recalloom Embedding']),3);
+ assert.equal(searchTitleMatch('向量检索',['向量检索与成本']),2);
+ assert.equal(searchTitleMatch('不存在',['README.md']),0);
+ assert.equal(searchTitleMatch('',['README.md']),0);
 });

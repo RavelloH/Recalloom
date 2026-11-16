@@ -1,6 +1,8 @@
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
-import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, semanticIntentScore } from './search-ranking.js';
+import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, semanticIntentScore,searchTitleMatch } from './search-ranking.js';
+import {parseMarkdownOutline} from './outline.js';
+import {searchSnippet} from './search-snippet.js';
 
 export {EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,splitText,processIndexJobs} from './indexing.js';
 import {embed} from './indexing.js';
@@ -17,6 +19,7 @@ export async function search(env:Env,input:{
   const metadata=mode!=='semantic';
   const semantic=mode==='semantic'||mode==='hybrid'||mode==='auto';
   const lexicalResults:SearchRow[]=[];
+  const titleMatches=new Map<string,number>();
   const semanticById=new Map<string,SearchRow>();
   const filterSql=["r.status != 'archived'"];
   const bind:(string|number)[]=[];
@@ -27,24 +30,29 @@ export async function search(env:Env,input:{
     bind.push(input.tag);
   }
   if(metadata){
+    const folderMatch="(lower(r.name) IN ('readme','readme.md') AND instr(lower(COALESCE(f.name,'')),lower(?))>0)";
     const clause=mode==='metadata'
-      ?'(instr(lower(r.name),lower(?))>0 OR instr(lower(r.description),lower(?))>0)'
-      :'(instr(lower(r.name),lower(?))>0 OR instr(lower(c.content),lower(?))>0)';
+      ?'(instr(lower(r.name),lower(?))>0 OR instr(lower(r.description),lower(?))>0 OR '+folderMatch+')'
+      :'(instr(lower(r.name),lower(?))>0 OR instr(lower(c.content),lower(?))>0'+(mode==='literal'?'':' OR '+folderMatch)+')';
     const records=(await env.DB.prepare(
-      'SELECT r.id,r.name,r.kind,r.status,c.revision,c.content FROM records r JOIN record_contents c ON c.record_id=r.id WHERE '
-      +filterSql.join(' AND ')+' AND '+clause+' ORDER BY r.updated_at DESC LIMIT ?'
-    ).bind(...bind,query,query,Math.min(90,limit*3)).all()).results as Array<{
-      id:string;name:string;kind:string;status:string;revision:number;content:string
+      'SELECT r.id,r.name,r.kind,r.status,c.revision,c.content,f.name AS folderName FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE '
+      +filterSql.join(' AND ')+' AND '+clause+" ORDER BY CASE WHEN lower(r.name)=lower(?) OR lower(r.name)=lower(?)||'.md' OR (lower(r.name) IN ('readme','readme.md') AND lower(f.name)=lower(?)) THEN 0 ELSE 1 END,r.updated_at DESC LIMIT ?"
+    ).bind(...bind,query,query,...(mode==='literal'?[]:[query]),query,query,query,Math.min(90,Math.max(30,limit*3))).all()).results as Array<{
+      id:string;name:string;kind:string;status:string;revision:number;content:string;folderName?:string|null
     }>;
     for(const row of records){
+      const heading=parseMarkdownOutline(row.content.slice(0,8192),1).headings[0];
+      const titles=[row.name,heading?.level===1?heading.title:''];
+      if(/^readme(?:\.md)?$/i.test(row.name)&&row.folderName)titles.push(row.folderName);
+      titleMatches.set(row.id,searchTitleMatch(query,titles));
       const pos=row.content.toLowerCase().indexOf(query.toLowerCase());
       lexicalResults.push({id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
         score:mode==='metadata'?0.8:pos<0?0.8:1,
         source:mode==='metadata'?'metadata':'literal',
-        snippet:pos<0?row.content.slice(0,200):row.content.slice(Math.max(0,pos-80),pos+200)});
+        snippet:searchSnippet(query,row.content)});
     }
-    // Exact content hits rank above title-only hits while preserving recency for ties.
-    lexicalResults.sort((a,b)=>b.score-a.score);
+    // Own titles rank above body mentions, with recency preserved for ties.
+    lexicalResults.sort((a,b)=>(titleMatches.get(b.id)!-titleMatches.get(a.id)!)||b.score-a.score);
   }
   if(semantic){
     const vector=(await embed(env,['task: search result | query: '+query]))[0]!;
@@ -69,14 +77,14 @@ export async function search(env:Env,input:{
       const byChunk=new Map(rows.map(row=>[row.chunk_id,row]));
       for(const hit of candidates){
         const row=byChunk.get(hit.id);
-        if(!row||row.revision!==Number(hit.metadata!.revision))continue;
+        if(!row||row.id!==hit.metadata!.record_id||row.revision!==Number(hit.metadata!.revision))continue;
         const score=semanticIntentScore(query,row.name+'\n'+row.content,hit.score);
         if(score<minScore)continue;
         const prior=semanticById.get(row.id);
         if(prior&&prior.score>=score)continue;
         semanticById.set(row.id,{
           id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
-          score,semanticScore:hit.score,source:'semantic',snippet:row.content.slice(0,350)
+          score,semanticScore:hit.score,source:'semantic',snippet:searchSnippet(query,row.content)
         });
       }
     }
@@ -101,7 +109,7 @@ export async function search(env:Env,input:{
     else combined.set(row.id,{...row,semanticRank:i+1});
   }
   const results=[...combined.values()].map(({lexicalRank,semanticRank,...row})=>({
-    ...row,score:reciprocalRankFusion(lexicalRank,semanticRank)
+    ...row,score:titleMatches.get(row.id)===3?1:reciprocalRankFusion(lexicalRank,semanticRank)
   })).sort((a,b)=>b.score-a.score || (b.semanticScore??0)-(a.semanticScore??0)).slice(0,limit);
   return {results,count:results.length,mode,indexMayLag:true};
 }

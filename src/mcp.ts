@@ -183,7 +183,7 @@ export function createRecalloomServer(env:Env,scopes:string[],actor='oauth-clien
   register('search',z.object({
     query:z.string().min(1).max(4000).describe('Query text, title terms, or a natural-language question.'),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).describe('metadata: names/descriptions; literal: exact substring; semantic: vectors; hybrid/auto: combined.').optional(),
     folderId:uuid.optional(),tag:z.string().max(64).optional(),status:statuses.optional(),limit:z.number().int().min(1).max(30).optional(),
-    minScore:z.number().min(0).max(1).describe('Raw semantic similarity threshold, default 0.43; unrelated to lexical search.').optional()
+    minScore:z.number().min(0).max(1).describe('Raw semantic similarity threshold, default 0.68 for Gemma 512; candidate relevance only, not answer confidence.').optional()
   }),false,async (x)=>{const {results,...rest}=await search(env,x);return {...rest,items:results,page:{hasMore:false,nextCursor:null}};});
   register('index_diagnostics',z.object({}),false,
     async()=>{const [counts,failures,vectorCleanup]=await Promise.all([

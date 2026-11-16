@@ -3,25 +3,40 @@
  * Semantic confidence is evaluated before lexical intent hints. This prevents
  * a stray token match from promoting irrelevant vector results.
  */
-export const DEFAULT_MIN_SEMANTIC_SCORE = 0.43;
+// Gemma 512 calibration on the current multilingual library. Callers may lower
+// this candidate filter for exploratory recall. It does not measure answerability.
+export const DEFAULT_MIN_SEMANTIC_SCORE = 0.68;
 const FUSION_K = 60;
+
+export function searchTerms(query:string):string[]{
+  const words=query.toLowerCase().match(/[a-z][a-z0-9_-]{1,}|[\u3400-\u9fff]{2,}/g)??[];
+  const tokens=new Set<string>();
+  for(const word of words){
+    if(/^[\u3400-\u9fff]+$/.test(word)){
+      for(let i=0;i<word.length-1&&tokens.size<64;i++)tokens.add(word.slice(i,i+2));
+    }else if(word.length>2)tokens.add(word);
+    if(tokens.size>=64)break;
+  }
+  return [...tokens];
+}
+
+/** Prefer a document's own title to mentions in another document's body. */
+export function searchTitleMatch(query:string,titles:string[]):number{
+  const normalize=(text:string)=>text.toLowerCase().replace(/\.md$/,'').replace(/[\s|｜·:_—–-]+/g,'');
+  const needle=normalize(query),values=titles.map(normalize).filter(Boolean);
+  if(!needle)return 0;
+  if(values.includes(needle))return 3;
+  return needle.length>=2&&values.some(title=>title.includes(needle))?2:0;
+}
 
 export function semanticIntentScore(query: string, passage: string, similarity: number): number {
   const negative = [...query.matchAll(/(?:而不是|不是|而非|不使用|不用|排除|instead of|rather than|without)\s*([^，。！？,;；.!?\n]{2,30})/gi)]
     .map(match => match[1]!.trim().toLowerCase());
   const positiveQuery = query.replace(/(?:而不是|不是|而非|不使用|不用|排除|instead of|rather than|without)\s*[^，。！？,;；.!?\n]{2,30}/gi,'');
   const lower = passage.toLowerCase();
-  const source = positiveQuery.toLowerCase();
-  // Include English/code identifiers as whole tokens and Chinese 2-grams.
-  const words = source.match(/[a-z][a-z0-9_-]{1,}|[\u3400-\u9fff]{2,}/g) ?? [];
-  const tokens = new Set<string>();
-  for (const word of words) {
-    if (/^[\u3400-\u9fff]+$/.test(word)) {
-      for(let i=0; i<word.length-1;i++)tokens.add(word.slice(i,i+2));
-    } else if(word.length>2)tokens.add(word);
-  }
-  const matched = [...tokens].filter(token=>lower.includes(token)).length;
-  const coverage=tokens.size ? matched/tokens.size : 0;
+  const tokens=searchTerms(positiveQuery);
+  const matched = tokens.filter(token=>lower.includes(token)).length;
+  const coverage=tokens.length ? matched/tokens.length : 0;
   const excluded = negative.some(phrase => lower.includes(phrase));
   return Math.min(1,Math.max(0,similarity + 0.06*coverage - (excluded ? 0.15 : 0)));
 }

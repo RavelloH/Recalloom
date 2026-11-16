@@ -7,6 +7,7 @@ import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllI
 import {createFolder,createRecord,editRecord,updateMeta} from '../src/storage.js';
 import {previewDeleteFolder,deleteFolder} from '../src/lifecycle.js';
 import type {Env} from '../src/types.js';
+import {search} from '../src/search.js';
 
 function fixture(){
  const sql=new DatabaseSync(':memory:');sql.exec('PRAGMA foreign_keys=ON');
@@ -158,4 +159,30 @@ test('daily retention removes old execution diagnostics without touching live ta
  f.sql.prepare("INSERT INTO index_runs(id,record_id,revision,outcome,chunks,duration_ms,created_at) VALUES('old',?,1,'done',1,1,'2000-01-01')").run(record.id);
  await pruneIndexRuns(f.env);assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM index_runs').get()!.n,1);
  assert.equal(f.sql.prepare('SELECT state FROM index_jobs').get()!.state,'done');
+});
+
+test('search prioritizes a README folder alias over newer body references even at limit one',async()=>{
+ const f=fixture(),folder=await createFolder(f.env,'向量模型迁移研究',null);
+ const primary=await createRecord(f.env,{name:'README.md',folderId:folder.id,content:'# 嵌入模型实测\n\n实际研究结论。'});
+ for(let i=0;i<35;i++)await createRecord(f.env,{name:'引用-'+i+'.md',content:'参见向量模型迁移研究，本文仅记录引用。'});
+ Object.assign(f.env.VECTORIZE,{query:async()=>({matches:[]})});
+ for(const mode of ['metadata','hybrid','auto'] as const){
+  const result=await search(f.env,{query:'向量模型迁移研究',mode,limit:1});
+  assert.equal(result.results[0]?.id,primary.id,mode);
+ }
+ assert.equal((await search(f.env,{query:'向量模型迁移研究',mode:'literal',limit:30})).results.some(row=>row.id===primary.id),false);
+ assert.equal((await search(f.env,{query:'向量模型迁移研究',mode:'hybrid',folderId:'missing',limit:1})).count,0);
+ await updateMeta(f.env,primary.id,{status:'archived'});
+ assert.equal((await search(f.env,{query:'向量模型迁移研究',mode:'hybrid',limit:30})).results.some(row=>row.id===primary.id),false);
+});
+
+test('own H1 titles outrank citations and snippets expose late evidence through real D1 queries',async()=>{
+ const f=fixture(),title='独立检索回归方案';
+ const primary=await createRecord(f.env,{name:'方案.md',content:'# '+title+'\n\n'+'背景资料。'.repeat(90)+'\nEVIDENCE512 使用当前正文修订。'});
+ await createRecord(f.env,{name:'引用.md',content:'```md\n# '+title+'\n```\n\n这是代码里的标题引用。'});
+ Object.assign(f.env.VECTORIZE,{query:async()=>({matches:[]})});
+ assert.equal((await search(f.env,{query:title,mode:'hybrid',limit:1})).results[0]?.id,primary.id);
+ const literal=await search(f.env,{query:'EVIDENCE512',mode:'literal'});
+ assert.ok(literal.results[0]?.snippet.includes('EVIDENCE512 使用当前正文修订'));
+ assert.ok(literal.results[0]!.snippet.length<=350);
 });
