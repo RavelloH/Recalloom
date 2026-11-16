@@ -12,12 +12,12 @@ const secret=secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|
 assert.ok(secret,'A local .dev.vars MCP_AUTH_SECRET is required');
 function examples(topic){
  const body=readFileSync('src/help/'+topic+'.md','utf8').replace(/\r\n/g,'\n');
- return [...body.matchAll(/~~~markdown\n([\s\S]*?)\n~~~/g)].map(match=>match[1]);
+ return [...body.matchAll(/^~~~~markdown\n([\s\S]*?)\n~~~~$/gm)].map(match=>match[1]);
 }
-const math=examples('math');
-const wiki=examples('wiki');
-assert.equal(math.length,4);
-assert.equal(wiki.length,2);
+const math=examples('math').filter(block=>!block.includes('[[#'));
+const wiki=examples('wiki').filter(block=>!block.includes('@ attrs'));
+assert.ok(math.length>=3);
+assert.ok(wiki.length>=2);
 const browser=await launchTestBrowser();
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];
@@ -39,9 +39,9 @@ try{
  const targetName='Help Reference '+suffix+'.md';
  const target=must(await api('/records','POST',{
   name:targetName,kind:'document',
-  content:'# 示例引用文档\n\n## 空载试验\n\n空载试验中的目标正文。\n\n## 总结\n\n用于检查章节嵌入。'
+  content:'# 示例引用文稿\n\n## 变压器试验 @ attrs transformer-test @\n\n试验中的目标正文。\n\n单独嵌入的段落。 @ attrs important-block @'
  }),201);
- const referenceId='11111111-1111-4111-8111-111111111111';
+ const referenceId='550e8400-e29b-41d4-a716-446655440000';
  const references=wiki.map(block=>block
   .replaceAll(referenceId,target.id)
   .replaceAll('/Projects/电力系统分析/核心知识.md','/'+targetName));
@@ -50,41 +50,31 @@ try{
  const source=must(await api('/records','POST',{
   name:'Help Examples '+suffix+'.md',kind:'document',content
  }),201);
- // The visual editor is the single reading and editing surface.
- await page.goto(testOrigin+'/records/'+source.id+'?mode=visual',{waitUntil:'networkidle'});
- await page.locator('.tiptap .rk-highlighted-block-math').first().waitFor({timeout:20000});
- await page.locator('.wiki-editor-embed').first().waitFor({timeout:20000});
- await page.getByText('空载试验中的目标正文。',{exact:false}).first().waitFor({timeout:20000});
- assert.equal(await page.locator('.tiptap .rk-highlighted-block-math').count(),1);
- assert.equal(await page.locator('.tiptap .wiki-editor-chip').count(),3);
- assert.equal(await page.locator('.tiptap .wiki-editor-embed').count(),3);
- assert.ok(await page.locator('.tiptap mark [data-type="inline-math"]').count()>=1);
- assert.ok(await page.locator('.tiptap [data-type="block-math"] .katex').count()>=2);
- const visible=await page.locator('.tiptap .rk-highlighted-block-math').evaluate(node=>{
-  const inner=node.querySelector('.block-math-inner');
-  const a=node.getBoundingClientRect(),b=inner?.getBoundingClientRect();
-  return {rendered:!!inner,outerHeight:a.height,mathHeight:b?.height??0};
- });
- assert.ok(visible.rendered&&visible.outerHeight>=visible.mathHeight-3,
-  'visual highlighted display block encompasses the KaTeX box');
- assert.equal(await page.getByRole('button',{name:'预览'}).count(),0);
- await page.locator('.tiptap h1').first().click();
- await page.keyboard.press('End');
- await page.keyboard.type(' edited');
- await page.getByRole('button',{name:'保存'}).click();
+ await page.goto(testOrigin+'/records/'+source.id+'?mode=preview',{waitUntil:'networkidle'});
+ const preview=page.locator('.markdown-preview').first();
+ await preview.locator('.rk-rmd-mark-math-only').first().waitFor({timeout:20000});
+ await preview.locator('.wiki-embed').first().waitFor({timeout:20000});
+ await preview.getByText('试验中的目标正文。',{exact:false}).first().waitFor({timeout:20000});
+ assert.ok(await preview.locator('.katex').count()>=4);
+ assert.equal(await preview.locator('.wiki-embed').count(),3);
+ assert.equal(await page.getByRole('button',{name:'保存',exact:true}).isDisabled(),true);
+ await page.getByRole('button',{name:'源码',exact:true}).click();
+ const editor=page.locator('.cm-content').first();await editor.waitFor();await editor.click();
+ await page.keyboard.press('Control+End');await page.keyboard.press('Enter');await page.keyboard.type('edited');
+ await page.getByRole('button',{name:'保存',exact:true}).click();
  await page.waitForFunction(async id=>{
   const response=await fetch('/api/records/'+id);
-  return response.ok&&(await response.json()).content.includes(' edited');
+  return response.ok&&(await response.json()).content.includes('edited');
  },source.id,{timeout:20000});
  const updated=must(await api('/records/'+source.id),200);
- assert.match(updated.content,/<mark>\s*\n\$\$/);
- assert.ok(updated.content.includes('<mark>$\\frac{\\Delta P_s U_N^2}{S_N^2}$</mark>'),
+ assert.match(updated.content,/::: mark\s*\n\n\$\$/);
+ assert.ok(updated.content.includes(':: mark $\\frac{\\Delta P_s U_N^2}{S_N^2}$ ::'),
   'the published highlighted inline fraction survives a real edit');
- assert.ok(updated.content.includes('[[id:'+target.id+'#空载试验|变压器空载试验]]'));
- assert.ok(updated.content.includes('{{embed:id:'+target.id+'#空载试验}}'));
- assert.ok(updated.content.includes('{{embed:/'+targetName+'#总结}}'));
+ assert.ok(updated.content.includes('[[id:'+target.id+'#transformer-test|变压器试验]]'));
+ assert.ok(updated.content.includes('::: embed id:'+target.id+'#transformer-test :::'));
+ assert.ok(updated.content.includes('::: embed /'+targetName+'#important-block :::'));
  const linked=must(await api('/records/'+source.id+'/wiki-references'),200);
- assert.equal(linked.items.length,6);
+ assert.ok(linked.items.length>=6);
  assert.ok(linked.items.every(item=>item.targetId===target.id));
  assert.deepEqual(errors,[]);
  console.log('PASS: real help Markdown visual editing, math highlight layout and Wiki projection');

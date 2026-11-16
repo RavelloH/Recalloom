@@ -44,6 +44,8 @@ function compileCatalog(){
    '/* Canonical sources: src/help/manifest.json and src/help/*.md */',
    'export const HELP_META = '+JSON.stringify(meta,null,2)+' as const;',
    'export const HELP_PAGES = '+JSON.stringify(pages,null,2)+' as const;',
+   'export const HELP_SYNTAX_GUIDES = '+JSON.stringify({intro:readFileSync(join(root,'markdown.md'),'utf8').replace(/\r\n/g,'\n'),math:pages.math.content,wiki:pages.wiki.content},null,2)+' as const;',
+   'export const HELP_RMD_REFERENCE = '+JSON.stringify(reference)+';',
    'export const HELP_RMD_COMPONENTS = '+JSON.stringify(details.components,null,2)+' as const;',
    'export const HELP_RMD_NODES = '+JSON.stringify(details.nodes,null,2)+' as const;',
    ''

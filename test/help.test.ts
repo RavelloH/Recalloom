@@ -11,7 +11,7 @@ import {parseRmdVisual} from '../web/src/rmd-visual';
 import {serializeRmdVisual} from '../web/src/rmd-serialize';
 import {lexRmd} from '../web/src/rmd-lexer';
 const examples=(doc:string)=>[
- ...[...doc.matchAll(/~~~~markdown\n([\s\S]*?)\n~~~~/g)].map(x=>x[1]!),
+ ...[...doc.matchAll(/~~~~(?:markdown|rmd-example)\n([\s\S]*?)\n~~~~/g)].map(x=>x[1]!),
  ...[...doc.matchAll(/~~~markdown\n([\s\S]*?)\n~~~/g)].map(x=>x[1]!)
 ];
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
@@ -59,7 +59,7 @@ test('Wiki help contains real canonical link and standalone embed syntax',()=>{
  const all=snippets.flatMap(extractWikiReferences);
  assert.ok(all.filter(x=>x.kind==='link').length>=3,JSON.stringify(all));
  assert.ok(all.filter(x=>x.kind==='embed').length>=3,JSON.stringify(all));
- assert.ok(all.some(x=>x.kind==='embed'&&x.anchor==='总结'),JSON.stringify(all));
+ assert.ok(all.some(x=>x.kind==='embed'&&x.anchor==='important-block'),JSON.stringify(all));
  assert.equal(parseWikiTarget('只有名称'),null);
  assert.equal(extractWikiReferences('~~~md\n::: embed id:550e8400-e29b-41d4-a716-446655440000 :::\n~~~').length,0);
 });
@@ -67,8 +67,8 @@ test('Markdown help documents complete RMD schema and visual constraints',()=>{
  const md=getHelp('markdown').content;
  for(const token of ['CommonMark/GFM','KaTeX',':: mark',':: highlight','::: embed','@ attrs','CriticMarkup','%%',':: badge'])
   assert.ok(md.includes(token),'missing RMD syntax: '+token);
- assert.match(md,/不.*当作.*元数据|不是.*数据库元数据/);
- assert.match(md,/不能.*==|不支持.*==/);
+ assert.ok(md.includes('文稿名称、路径和标签在文稿信息中设置'));
+ assert.ok(md.includes('未识别或格式无效的片段会保留为原文'));
  assert.ok(parser.parse(md).children.some(x=>x.type==='code'),'no fenced examples');
 });
 test('help metadata exposes deterministic version/hash across tool and resources',()=>{

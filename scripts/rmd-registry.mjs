@@ -38,7 +38,7 @@ export function readRegistry(){
 }
 const code=(s,live=false)=>'~~~~'+(live?'rmd-example':'markdown')+'\n'+s+'\n~~~~';
 const types={inline:'行内',block:'多行块级',leaf:'独立单行块级'};
-const main={required:'必填',optional:'选填',forbidden:'禁止'};
+const main={required:'必填',optional:'选填',forbidden:'留空'};
 function valueHint(t,r){
  switch(t){
  case 'id':return '字母开头、字母数字连字符、最长 '+r.constraints.idMaximumLength+' 字符（统一小写）';
@@ -56,54 +56,52 @@ function valueHint(t,r){
 function params(attrs,positions=[],required=[],defaults={},r){
  if(!Object.keys(attrs).length)return '无具名参数。\n';
  return [
- '| 参数 | 类型 | 位置 | 必填 | 默认值 | 合法范围 |',
- '| --- | --- | --- | --- | --- | --- |',
+ '| 参数 | 类型与取值 | 填写方式 | 默认值 |',
+ '| --- | --- | --- | --- |',
  ...Object.entries(attrs).map(([k,v])=>{
   const i=positions.indexOf(k);
-  return '| `'+k+'` | `'+v+'` | '+(i<0?'无':'第 '+(i+1)+' 个')+' | '+(required.includes(k)?'是':'否')+' | '+(Object.hasOwn(defaults,k)?'`'+defaults[k]+'`':'未声明')+' | '+valueHint(v,r)+' |';
+  return '| `'+k+'` | `'+v+'` · '+valueHint(v,r)+' | '+(required.includes(k)?'必填':'选填')+(i<0?'':'，可作第 '+(i+1)+' 个位置参数')+' | '+(Object.hasOwn(defaults,k)?'`'+defaults[k]+'`':'—')+' |';
  })
  ].join('\n')+'\n';
 }
-export function renderComponent(c,r){
+export function renderComponent(c,r,detail=false){
  const exampleSyntax=c.type==='inline'?':: '+c.name+(c.main==='required'?' 正文':c.main==='optional'?' [正文]':'')+' [| 参数] ::':
  c.type==='leaf'?'::: '+c.name+' 目标 [| 参数] :::':
  '::: '+c.name+(c.main==='required'?' 标题':c.main==='optional'?' [标题]':'')+' [| 参数]\n\nMarkdown 正文\n\n:::';
  const out=[
- '## `'+c.name+'` · '+types[c.type],
+ detail?'## '+types[c.type]+'写法':'## `'+c.name+'` · '+types[c.type],
  '',
  c.summary,'',
- '- **类型**：'+types[c.type]+'。',
- '- **主文本／标题**：'+main[c.main]+'。',
- '- **位置参数**：'+(c.positions.length?c.positions.map((p,i)=>(i+1)+'. `'+p+'`').join('；'):'无')+'；位置参数必须位于具名参数前。',
- '- **语法模板（占位符，不能直接作为正文）**：','','~~~~text\n'+exampleSyntax+'\n~~~~','',
+ (c.type==='leaf'?'目标':c.type==='inline'?'正文':'标题')+main[c.main]+'。'+(c.positions.length?'位置参数依次为 '+c.positions.map(p=>'`'+p+'`').join('、')+'，填写在具名参数前。':''),'',
+ '### 基本写法','','将下面的占位内容替换为自己的文字。','','~~~~text\n'+exampleSyntax+'\n~~~~','',
+ '### 参数','',
  params(c.attributes,c.positions,c.requiredAttributes??[],c.defaults??{},r)
  ];
- if(c.allowedParents)out.push('**合法父容器**：'+c.allowedParents.map(x=>'`'+x+'`').join('、')+'。','');
- if(c.children)out.push('**合法子容器**：'+c.children.map(x=>'`'+x+'`').join('、')+'。','');
- if(c.orderedChildren)out.push('**子容器顺序与数量**：'+c.orderedChildren.map(x=>'`'+x+'`').join(' → ')+'；必须恰好一次。','');
- if(c.note)out.push('**额外约束**：'+c.note,'');
- if(c.name==='highlight')out.push('**默认黄色手绘荧光笔**；颜色可以省略。它与规整的语义 `mark` 是不同组件，历史的 `highlight` 文档仍可解析。','');
- if(c.name==='embed')out.push('**目标**：`id:UUID` 或绝对虚拟路径；标题和段落统一使用 `#anchor-id`。','');
- if(c.name==='link-card')out.push('**目标**：HTTP(S) URL，不允许 javascript: 等脚本协议。','');
- out.push('**完整示例**：','',code(c.example,true),'');
+ if(c.allowedParents)out.push('放置在 '+c.allowedParents.map(x=>'`'+x+'`').join('、')+' 容器中。','');
+ if(c.children)out.push('内部使用 '+c.children.map(x=>'`'+x+'`').join('、')+' 子容器。','');
+ if(c.orderedChildren)out.push('子容器按 '+c.orderedChildren.map(x=>'`'+x+'`').join(' → ')+' 顺序排列，每种各一组。','');
+ if(c.note)out.push(c.note,'');
+ if(c.name==='highlight')out.push('默认使用黄色手绘荧光笔效果，颜色选填。','');
+ if(c.name==='embed')out.push('目标填写 `id:UUID` 或完整虚拟路径，使用 `#anchor-id` 选择标题或段落。','');
+ if(c.name==='link-card')out.push('目标填写完整的 HTTP(S) 网址。','');
+ out.push('### 示例','',code(c.example,true),'');
  return out.join('\n');
 }
-export function renderNode(n,r){
+export function renderNode(n,r,detail=false){
  return [
-  '## `@ attrs` · '+n.label+'（`'+n.node+'`）','',
+  ...(detail?[]:['## `@ attrs` · '+n.label+'（`'+n.node+'`）','']),
   n.summary,'',
-  '属性选填；稳定 ID 可作为首个位置参数（`@ attrs my-id @`），也可写为具名 `id=my-id`，不能重复。','',
+  '属性选填。稳定 ID 可以写为首个位置参数 `@ attrs my-id @`，或使用具名参数 `id=my-id`，两种形式任选一种。','',
+  '### 参数','',
   params(n.attributes,[],[],{},r),
-  ...(n.editorIdPrefix?['**可视化编辑器的 ID 规则**：ID 须以 `'+n.editorIdPrefix+'` 开头；源码级 RMD 解析器仍接受所有合法 ID。','']:[]),
-  '**可视化编辑限制**：字符串参数不超过 '+r.constraints.stringEditorMaximumLength+' 字符、不能包含换行；这些限制不等于源码 `string` 解析器的最大长度。','',
-  '**完整示例**：','',code(n.example,true),''
+  ...(n.editorIdPrefix?['在块编辑面板中设置 ID 时，使用 `'+n.editorIdPrefix+'` 前缀。','']:[]),
+  '块编辑面板中的文本参数使用单行文字，最多 '+r.constraints.stringEditorMaximumLength+' 字符。','',
+  '### 示例','',code(n.example,true),''
  ].join('\n');
 }
 export function renderRegistry(r){
  return [
- '# RMD 1.0 完整语法参考（自动生成）','',
- '> 来源：`src/rmd/registry.json`。请勿直接手改生成文件。',
- '',
+ '# RMD 1.0 完整语法参考','',
  '已定义 '+r.components.length+' 种语法形式、'+new Set(r.components.map(c=>c.name)).size+' 个不同组件名称及 '+r.nodes.length+' 类块属性目标。',
  '行内使用 `:: 名称 正文 | 参数 ::`；多行块级使用独立的 `::: 名称` 和 `:::`；独立块级使用 `::: 名称 目标 :::`。',
  '允许最多 '+r.constraints.containerDepthMaximum+' 层嵌套；围栏冒号不超过 '+r.constraints.fenceLengthMaximum+' 个；超限、未知或非法语法全部保留原文。',
@@ -119,13 +117,14 @@ export function renderRegistry(r){
  ...r.nodes.map(n=>'| '+n.label+' | '+Object.keys(n.attributes).map(p=>'`'+p+'`').join('、')+' |'),
  '',
  ...r.nodes.map(n=>renderNode(n,r)),
- '## 统一规则与错误回退','',
+ '## 参数填写与使用提示','',
  '- 属性值非空；使用空格包围的 ` | ` 分隔参数；位置参数必须先于具名参数。',
  '- 普通值可不带引号，含分隔竖线等特殊字符使用 JSON 风格双引号及转义。',
- '- `@ attrs` 仅修饰合法 Markdown 块，同行附着当前块或下一行紧贴前一完整块；不得猜测跨空行归属。',
+ '- 将 `@ attrs` 放在对应块的同行末尾，或紧贴整个块之后的独立行。',
  '- 代码、公式、HTML 与链接 URL 中的伪语法不会被解释成 RMD 组件。',
- '- 文档路径、标签及权限是数据库元信息，不从 YAML Front Matter 推导。',
- '- 未注册的组件、属性和非法参数直接显示为原文，不创建半成品组件。',
+ '- 文稿名称、路径和标签在文稿信息中设置，权限通过授权管理。',
+ '- 默认值栏中的 — 表示此处没有指定默认值。',
+ '- 格式无效的内容按原文显示，可以检查组件名称、参数与闭合标记。',
  ''
  ].join('\n');
 }
@@ -134,9 +133,9 @@ export function registryDetailCatalog(r){
  for(const c of r.components){
   if(!components[c.name])components[c.name]={name:c.name,title:'RMD 组件 '+c.name,forms:[],formContent:{},content:''};
   components[c.name].forms.push(c.type);
-  components[c.name].formContent[c.type]='# RMD 组件：'+c.name+'（'+types[c.type]+'）\n\n'+renderComponent(c,r);
+  components[c.name].formContent[c.type]='# '+c.name+'\n\n'+renderComponent(c,r,true);
  }
- for(const [name,page] of Object.entries(components))page.content='# RMD 组件：'+name+'\n\n'+r.components.filter(c=>c.name===name).map(c=>renderComponent(c,r)).join('\n');
- for(const n of r.nodes)nodes[n.node]={name:n.node,title:'RMD 块属性：'+n.label,content:'# RMD 块属性：'+n.label+'\n\n'+renderNode(n,r)};
+ for(const [name,page] of Object.entries(components))page.content='# '+name+'\n\n'+r.components.filter(c=>c.name===name).map(c=>renderComponent(c,r,true)).join('\n');
+ for(const n of r.nodes)nodes[n.node]={name:n.node,title:n.label+'属性',content:'# '+n.label+'属性\n\n'+renderNode(n,r,true)};
  return {components,nodes};
 }

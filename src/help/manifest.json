@@ -7,7 +7,7 @@
   {
     "topic": "markdown",
     "title": "Markdown 与扩展语法",
-    "summary": "GFM、RMD 42 种语法（含九种无动画手绘标记 Highlight/Circle/Box 等）、六类 @ attrs、KaTeX、Wiki、Astryx Chat/Tabs、CriticMarkup、代码与 Mermaid"
+    "summary": "Markdown 入门、RMD 组件与参数、数学公式、标记、会话、学习卡片和块属性"
   },
   {
     "topic": "math",

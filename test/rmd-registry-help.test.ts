@@ -63,7 +63,7 @@ test('RMD component runtime schema and docs share the same registry with no miss
 
 test('MCP full markdown help includes machine-generated complete component and attrs reference',()=>{
  const page=getHelp('markdown');
- assert.match(page.content,/RMD 1\.0 完整语法参考（自动生成）/);
+ assert.match(page.content,/RMD 1\.0 完整语法参考/);
  for(const component of RMD_COMPONENT_NAMES)assert.ok(page.content.includes('`'+component+'`'),component);
  for(const node of RMD_NODE_NAMES)assert.ok(page.content.includes('`'+node+'`'),node);
  assert.equal(getHelp('markdown',{component:'mark'}).content.includes('行内'),true);
