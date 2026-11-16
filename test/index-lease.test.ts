@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {processIndexJobs,cleanupIndexVectors,drainIndexJobs} from '../src/indexing.js';
 import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllIndexes,pruneIndexRuns} from '../src/index-observability.js';
-import {createFolder,createRecord,editRecord,updateMeta} from '../src/storage.js';
+import {createFolder,createRecord,editRecord,updateMeta,readRecord} from '../src/storage.js';
 import {previewDeleteFolder,deleteFolder} from '../src/lifecycle.js';
 import type {Env} from '../src/types.js';
 import {search} from '../src/search.js';
@@ -185,4 +185,22 @@ test('own H1 titles outrank citations and snippets expose late evidence through 
  const literal=await search(f.env,{query:'EVIDENCE512',mode:'literal'});
  assert.ok(literal.results[0]?.snippet.includes('EVIDENCE512 使用当前正文修订'));
  assert.ok(literal.results[0]!.snippet.length<=350);
+});
+
+test('semantic and hybrid summaries expose readable evidence with usable pinned source lines',async()=>{
+ const f=fixture(),body='# 证据定位\n\n'+('背景内容。\n'.repeat(180))+'\n**EVIDENCE512** [模型指南](https://example.com/reference)\n\n$P=UI$';
+ const record=await createRecord(f.env,{name:'source.md',content:body});await processIndexJobs(f.env,1);
+ const chunks=f.sql.prepare('SELECT * FROM search_chunks WHERE record_id=? ORDER BY chunk_index').all(record.id);
+ const hit=chunks.find(chunk=>String(chunk.content).includes('EVIDENCE512'))!;
+ Object.assign(f.env.VECTORIZE,{query:async()=>({matches:[{id:hit.chunk_id,score:.9,metadata:{record_id:record.id,revision:1}}]})});
+ for(const mode of ['semantic','hybrid','literal'] as const){
+  const result=await search(f.env,{query:'EVIDENCE512',mode,limit:1}),row=result.results[0]!;
+  assert.equal(row.snippetFormat,'text');assert.equal(row.revision,1);
+  assert.ok(row.snippet.includes('EVIDENCE512 模型指南'));
+  assert.equal(row.snippet.includes('**'),false);assert.equal(row.snippet.includes('https://'),false);
+  assert.equal('sourceText' in row,false);
+  if(mode==='semantic')assert.equal(row.chunkIndex,hit.chunk_index);
+  const raw=await readRecord(f.env,row.id,{revision:row.revision,lineStart:row.lineStart,maxLines:row.lineEnd!-row.lineStart!+1});
+  assert.ok('content' in raw&&raw.content.includes('**EVIDENCE512** [模型指南](https://example.com/reference)'));
+ }
 });

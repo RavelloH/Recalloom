@@ -2,11 +2,11 @@ import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, semanticIntentScore,searchTitleMatch } from './search-ranking.js';
 import {parseMarkdownOutline} from './outline.js';
-import {searchSnippet} from './search-snippet.js';
+import {searchExcerpt,type SearchDocument} from './search-excerpt.js';
 
 export {EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,splitText,processIndexJobs} from './indexing.js';
 import {embed} from './indexing.js';
-type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;snippet:string;semanticScore?:number};
+type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;sourceText:string;chunkIndex?:number;semanticScore?:number};
 
 export async function search(env:Env,input:{
   query:string;mode?:'metadata'|'literal'|'semantic'|'hybrid'|'auto';
@@ -20,6 +20,19 @@ export async function search(env:Env,input:{
   const semantic=mode==='semantic'||mode==='hybrid'||mode==='auto';
   const lexicalResults:SearchRow[]=[];
   const titleMatches=new Map<string,number>();
+  const documents=new Map<string,SearchDocument>();
+  const finish=async(rows:SearchRow[])=>{
+    const missing=rows.filter(row=>row.chunkIndex!==undefined&&!documents.has(row.id));
+    if(missing.length){
+      const originals=(await env.DB.prepare("SELECT r.id,r.name,c.revision,c.content FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.status<>'archived' AND r.id IN ("+missing.map(()=>'?').join(',')+")").bind(...missing.map(row=>row.id)).all()).results as Array<SearchDocument&{id:string}>;
+      for(const document of originals)documents.set(document.id,document);
+    }
+    return rows.flatMap(({sourceText,...row})=>{
+      const document=documents.get(row.id);
+      if((document&&document.revision!==row.revision)||(missing.some(candidate=>candidate.id===row.id)&&!document))return [];
+      return [{...row,...searchExcerpt(query,sourceText,document,row.chunkIndex)}];
+    });
+  };
   const semanticById=new Map<string,SearchRow>();
   const filterSql=["r.status != 'archived'"];
   const bind:(string|number)[]=[];
@@ -41,6 +54,7 @@ export async function search(env:Env,input:{
       id:string;name:string;kind:string;status:string;revision:number;content:string;folderName?:string|null
     }>;
     for(const row of records){
+      documents.set(row.id,row);
       const heading=parseMarkdownOutline(row.content.slice(0,8192),1).headings[0];
       const titles=[row.name,heading?.level===1?heading.title:''];
       if(/^readme(?:\.md)?$/i.test(row.name)&&row.folderName)titles.push(row.folderName);
@@ -49,7 +63,7 @@ export async function search(env:Env,input:{
       lexicalResults.push({id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
         score:mode==='metadata'?0.8:pos<0?0.8:1,
         source:mode==='metadata'?'metadata':'literal',
-        snippet:searchSnippet(query,row.content)});
+        sourceText:row.content});
     }
     // Own titles rank above body mentions, with recency preserved for ties.
     lexicalResults.sort((a,b)=>(titleMatches.get(b.id)!-titleMatches.get(a.id)!)||b.score-a.score);
@@ -68,11 +82,11 @@ export async function search(env:Env,input:{
       const where=["s.chunk_id IN ("+chunkIds.map(()=>'?').join(',')+")",
         's.revision=c.revision',...filterSql];
       const rows=(await env.DB.prepare(
-        'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision '+
+        'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision,s.chunk_index '+
         'FROM search_chunks s JOIN records r ON r.id=s.record_id '+
         'JOIN record_contents c ON c.record_id=r.id WHERE '+where.join(' AND ')
       ).bind(...chunkIds,...bind).all()).results as Array<{
-        chunk_id:string;content:string;id:string;name:string;kind:string;status:string;revision:number
+        chunk_id:string;chunk_index?:number;content:string;id:string;name:string;kind:string;status:string;revision:number
       }>;
       const byChunk=new Map(rows.map(row=>[row.chunk_id,row]));
       for(const hit of candidates){
@@ -84,18 +98,18 @@ export async function search(env:Env,input:{
         if(prior&&prior.score>=score)continue;
         semanticById.set(row.id,{
           id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
-          score,semanticScore:hit.score,source:'semantic',snippet:searchSnippet(query,row.content)
+          score,semanticScore:hit.score,source:'semantic',sourceText:row.content,chunkIndex:row.chunk_index
         });
       }
     }
   }
   if(mode==='metadata'||mode==='literal'){
-    const results=lexicalResults.slice(0,limit);
+    const results=await finish(lexicalResults.slice(0,limit));
     return {results,count:results.length,mode,indexMayLag:false};
   }
   const vectorResults=[...semanticById.values()].sort((a,b)=>b.score-a.score);
   if(mode==='semantic'){
-    const results=vectorResults.slice(0,limit);
+    const results=await finish(vectorResults.slice(0,limit));
     return {results,count:results.length,mode,indexMayLag:true};
   }
   // Reciprocal Rank Fusion puts lexical and semantic rankings on the same
@@ -105,11 +119,12 @@ export async function search(env:Env,input:{
   for(const [i,row] of vectorResults.entries()){
     const existing=combined.get(row.id);
     if(existing)combined.set(row.id,{...row,source:'hybrid',lexicalRank:existing.lexicalRank,semanticRank:i+1,
-      snippet:existing.snippet});
+      sourceText:existing.sourceText,chunkIndex:existing.chunkIndex});
     else combined.set(row.id,{...row,semanticRank:i+1});
   }
-  const results=[...combined.values()].map(({lexicalRank,semanticRank,...row})=>({
+  const ranked=[...combined.values()].map(({lexicalRank,semanticRank,...row})=>({
     ...row,score:titleMatches.get(row.id)===3?1:reciprocalRankFusion(lexicalRank,semanticRank)
   })).sort((a,b)=>b.score-a.score || (b.semanticScore??0)-(a.semanticScore??0)).slice(0,limit);
+  const results=await finish(ranked);
   return {results,count:results.length,mode,indexMayLag:true};
 }

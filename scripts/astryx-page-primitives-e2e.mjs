@@ -148,7 +148,7 @@ try{
  await settledView(loginTransition);
  const stamp='page-primitives-'+Date.now();
  const folder=await api('/folders',{name:'Page primitives '+stamp});
- const make=name=>api('/records',{name:name+' '+stamp+'.md',kind:'document',folderId:folder.id,content:'# '+name+'\n\nPage primitive regression.'});
+ const make=name=>api('/records',{name:name+' '+stamp+'.md',kind:'document',folderId:folder.id,content:'# '+name+'\n\n**Page primitive regression.** [Readable link](https://example.test/long/path) and $P=UI$.'});
  const record=await make('Metadata'),fresh=await make('Search');
 
  console.log('PAGE STEP settings desktop');
@@ -272,6 +272,9 @@ try{
  const result=page.locator('a.search-result[href="/records/'+fresh.id+'"]');
  console.log('PAGE STEP search result visible');
  await result.waitFor();
+ const summaryText=await result.locator('.search-snippet').textContent();
+ assert.ok(summaryText.includes('Readable link')&&summaryText.includes('P=UI'));
+ assert.ok(!summaryText.includes('**')&&!summaryText.includes('https://')&&!summaryText.includes('$'),'Search displays readable Markdown summaries');
  const preload=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/records/'+fresh.id,{timeout:10000});
  console.log('PAGE STEP search result preload');
  await result.hover();await preload;

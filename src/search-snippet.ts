@@ -2,8 +2,13 @@ import {searchTerms} from './search-ranking.js';
 
 /** Bounded source excerpt around the strongest lexical evidence in a hit chunk. */
 export function searchSnippet(query:string,content:string,maxChars=350):string{
+ const {start,end}=searchSnippetRange(query,content,maxChars);
+ return (start?'…':'')+content.slice(start,end).trim()+(end<content.length?'…':'');
+}
+
+export function searchSnippetRange(query:string,content:string,maxChars=350):{start:number;end:number}{
  const size=Math.max(40,Math.floor(maxChars));
- if(content.length<=size)return content;
+ if(content.length<=size)return {start:0,end:content.length};
  const width=size-2,lower=content.toLowerCase(),needle=query.toLowerCase();
  const exact=needle?lower.indexOf(needle):-1;
  let anchor=Math.max(0,exact);
@@ -36,5 +41,5 @@ export function searchSnippet(query:string,content:string,maxChars=350):string{
  if(start>0&&/[\uDC00-\uDFFF]/.test(content[start]!))start--;
  let end=Math.min(content.length,start+width);
  if(end<content.length&&/[\uDC00-\uDFFF]/.test(content[end]!))end--;
- return (start?'…':'')+content.slice(start,end).trim()+(end<content.length?'…':'');
+ return {start,end};
 }

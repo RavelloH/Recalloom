@@ -52,15 +52,21 @@ export function reciprocalRankFusion(lexicalRank?:number,semanticRank?:number):n
  * lies near the desired chunk length. Retain a small overlap for continuity.
  */
 export function paragraphChunks(content:string,maxChars=1200):string[] {
+  return paragraphChunkSpans(content,maxChars).map(chunk=>chunk.text);
+}
+
+/** UTF-16 source positions use the same boundaries as the embedding input. */
+export function paragraphChunkSpans(content:string,maxChars=1200):Array<{text:string;start:number;end:number}>{
   const text=content.trim();
   if(!text)return [];
+  const offset=content.length-content.trimStart().length;
   const max=Math.max(160,Math.floor(maxChars));
   const overlap=Math.min(120,Math.floor(max/10));
-  const chunks:string[]=[];
+  const chunks:Array<{text:string;start:number;end:number}>=[];
   let start=0;
   while(start<text.length && chunks.length<500){
     if(text.length-start<=max) {
-      chunks.push(text.slice(start));
+      chunks.push({text:text.slice(start),start:start+offset,end:text.length+offset});
       break;
     }
     const desired=start+max;
@@ -75,7 +81,7 @@ export function paragraphChunks(content:string,maxChars=1200):string[] {
       }
     }
     if(end<0)end=desired;
-    chunks.push(text.slice(start,end));
+    chunks.push({text:text.slice(start,end),start:start+offset,end:end+offset});
     const next=Math.max(start+1,end-overlap);
     start=next;
   }
