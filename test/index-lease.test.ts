@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {processIndexJobs,cleanupIndexVectors,drainIndexJobs} from '../src/indexing.js';
-import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllIndexes,sampleIndexState} from '../src/index-observability.js';
+import {indexOverview,storageOverview,retryIndex,previewIndexRebuild,rebuildAllIndexes,pruneIndexRuns} from '../src/index-observability.js';
 import {createFolder,createRecord,editRecord,updateMeta} from '../src/storage.js';
 import {previewDeleteFolder,deleteFolder} from '../src/lifecycle.js';
 import type {Env} from '../src/types.js';
@@ -26,7 +26,7 @@ test('transactional enqueues coalesce content and same-revision metadata edits',
  const rows=f.sql.prepare('SELECT * FROM index_jobs').all();assert.equal(rows.length,1);assert.equal(rows[0].revision,2);assert.equal(rows[0].generation,3);
  const result=await processIndexJobs(f.env,1);assert.equal(result.results[0].chunks,1);
  const job=f.sql.prepare('SELECT * FROM index_jobs').get()!;assert.equal(job.state,'done');assert.equal(job.indexed_revision,2);assert.equal(f.vectors.size,1);
- const report=await indexOverview(f.env);assert.equal(report.coverage?.indexed,1);assert.equal(report.runs.length,1);
+ const report=await indexOverview(f.env);assert.equal(report.coverage?.indexed,1);assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM index_runs').get()!.n,1);
  const capacity=await storageOverview(f.env);assert.equal(capacity.remote.count,1);assert.equal(capacity.databaseBytes,4096);assert.equal(capacity.chunks?.count,1);
 });
 
@@ -80,10 +80,13 @@ test('background drain finishes queued records without waiting for a scheduled t
 
 test('upgrade coalesces legacy revisions without changing document content',()=>{
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');
- for(const file of readdirSync('migrations').filter(n=>n.endsWith('.sql')&&!n.startsWith('0020')).sort())db.exec(readFileSync('migrations/'+file,'utf8'));
+ for(const file of readdirSync('migrations').filter(n=>n.endsWith('.sql')&&n<'0020').sort())db.exec(readFileSync('migrations/'+file,'utf8'));
  db.exec("INSERT INTO records(id,name,kind,status,created_at,updated_at) VALUES('r','old.md','document','active','2026-11-01','2026-11-02'); INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES('r','preserved body',2,'hash'); INSERT INTO index_jobs(id,record_id,revision,created_at,state) VALUES('j1','r',1,'2026-11-01','done'),('j2','r',2,'2026-11-02','pending');");
  db.exec("INSERT INTO records(id,name,kind,status,created_at,updated_at) VALUES('ready','ready.md','document','active','2026-11-01','2026-11-01'); INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES('ready','ready body',1,'hash'); INSERT INTO index_jobs(id,record_id,revision,created_at,state) VALUES('ready-job','ready',1,'2026-11-01','done'); INSERT INTO search_chunks(chunk_id,record_id,revision,chunk_index,content) VALUES('ready:0','ready',1,0,'ready body');");
  db.exec(readFileSync('migrations/0020_index_workspace.sql','utf8'));
+ db.exec("INSERT INTO index_samples(hour,pending,running,failed,documents,chunks,text_bytes,sampled_at) VALUES('old',0,0,0,0,0,0,'2026-11-01')");
+ db.exec(readFileSync('migrations/0021_retire_index_samples.sql','utf8'));
+ assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='index_samples'").get()!.n,0);
  const completed=db.prepare("SELECT * FROM index_jobs WHERE record_id='ready'").get()!;assert.equal(completed.state,'done');assert.equal(completed.indexed_revision,1);
  const jobs=db.prepare("SELECT * FROM index_jobs WHERE record_id='r'").all();assert.equal(jobs.length,1);assert.equal(jobs[0].revision,2);assert.equal(jobs[0].state,'pending');assert.equal(db.prepare("SELECT content FROM record_contents WHERE record_id='r'").get()!.content,'preserved body');
 });
@@ -110,12 +113,26 @@ test('exhausted tasks stop advertising a retry time and new writes clear obsolet
  await editRecord(f.env,record.id,1,'new version');const pending=f.sql.prepare('SELECT * FROM index_jobs').get()!;assert.equal(pending.state,'pending');assert.equal(pending.attempts,0);assert.equal(pending.total_chunks,0);assert.equal(pending.completed_chunks,0);
 });
 
-test('scheduled remote sampling records real counts without depending on storage page reads',async()=>{
- const f=fixture();f.vectors.set('vector-a',{});await sampleIndexState(f.env,true);
- assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1);
- await sampleIndexState(f.env);assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1);
- Object.assign(f.env.VECTORIZE,{describe:async()=>{throw Error('service unavailable');}});
- await sampleIndexState(f.env,true);assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,1,'A failed refresh preserves the last real count within the hour');
- f.sql.exec('DELETE FROM index_samples');await sampleIndexState(f.env,true);
- assert.equal(f.sql.prepare('SELECT vector_count FROM index_samples').get()!.vector_count,null,'A missing sample is never replaced with a fake zero');
+test('on-demand reports aggregate current data without writing snapshots',async()=>{
+ const f=fixture(),now=Date.now();
+ for(const [index,seconds] of [30,120,600,3600].entries()){
+  const record=await createRecord(f.env,{name:'age-'+index+'.md',content:index===0?'小文稿':'x'.repeat(index===1?10241:102401)});
+  f.sql.prepare('UPDATE index_jobs SET state=?,updated_at=? WHERE record_id=?').run(index%2?'retry':'pending',new Date(now-seconds*1000).toISOString(),record.id);
+ }
+ f.vectors.set('remote',{});
+ const before=f.sql.prepare('SELECT total_changes() AS n').get()!.n;
+ const summary=await indexOverview(f.env,now),storage=await storageOverview(f.env);
+ assert.deepEqual(summary.ageBuckets.map(b=>[b.pending,b.retry]),[[1,0],[0,1],[1,0],[0,1]]);
+ assert.deepEqual(storage.sizeBuckets.map(b=>b.count),[1,1,2]);assert.equal(storage.remote.count,1);
+ assert.equal(f.sql.prepare('SELECT total_changes() AS n').get()!.n,before,'Reading reports must not write to D1');
+ assert.equal(f.sql.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name='index_samples'").get()!.n,0);
+ Object.assign(f.env.VECTORIZE,{describe:async()=>{throw Error('unavailable');}});
+ assert.equal((await storageOverview(f.env)).remote.count,null);
+});
+
+test('daily retention removes old execution diagnostics without touching live tasks',async()=>{
+ const f=fixture(),record=await createRecord(f.env,{name:'one.md',content:'one'});await processIndexJobs(f.env,1);
+ f.sql.prepare("INSERT INTO index_runs(id,record_id,revision,outcome,chunks,duration_ms,created_at) VALUES('old',?,1,'done',1,1,'2000-01-01')").run(record.id);
+ await pruneIndexRuns(f.env);assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM index_runs').get()!.n,1);
+ assert.equal(f.sql.prepare('SELECT state FROM index_jobs').get()!.state,'done');
 });

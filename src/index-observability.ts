@@ -4,18 +4,18 @@ import {EMBEDDING_DIMENSIONS,EMBEDDING_MODEL} from './indexing.js';
 import {INDEX_JOB_UPSERT} from './index-queue.js';
 import {sha256} from './version.js';
 
-export async function indexOverview(env:Env,days=7){
- const [counts,coverage,runs,samples,cleanup]=await Promise.all([
+export async function indexOverview(env:Env,nowMs=Date.now()){
+ const [counts,coverage,ages,cleanup]=await Promise.all([
   env.DB.prepare('SELECT state,COUNT(*) AS count FROM index_jobs GROUP BY state').all(),
   env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN j.state='done' AND j.indexed_revision=c.revision THEN 1 ELSE 0 END) AS indexed FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN index_jobs j ON j.record_id=r.id WHERE r.status<>'archived'").first(),
-  env.DB.prepare("SELECT strftime(?,created_at) AS time,SUM(outcome='done') AS completed,SUM(outcome='failed') AS failed,AVG(CASE WHEN outcome='done' THEN duration_ms END) AS durationMs FROM index_runs WHERE created_at>=? GROUP BY time ORDER BY time").bind(days===1?'%Y-%m-%dT%H:00:00Z':'%Y-%m-%d',new Date(Date.now()-days*86400_000).toISOString()).all(),
-  env.DB.prepare('SELECT hour AS time,pending,running,failed,sampled_at AS sampledAt FROM index_samples WHERE hour>=? ORDER BY hour').bind(new Date(Date.now()-days*86400_000).toISOString()).all(),
+  env.DB.prepare("WITH queued AS (SELECT state,? - CAST(strftime('%s',COALESCE(updated_at,created_at)) AS INTEGER) AS age FROM index_jobs WHERE state IN ('pending','retry')) SELECT CASE WHEN age IS NULL THEN 4 WHEN age<60 THEN 0 WHEN age<300 THEN 1 WHEN age<1800 THEN 2 ELSE 3 END AS bucket,SUM(state='pending') AS pending,SUM(state='retry') AS retry FROM queued GROUP BY bucket").bind(Math.floor(nowMs/1000)).all<{bucket:number;pending:number;retry:number}>(),
   env.DB.prepare("SELECT (SELECT COUNT(*) FROM vector_delete_jobs) AS records,(SELECT COUNT(*) FROM index_vector_garbage) AS batches").first()
  ]);
  const last=await env.DB.prepare("SELECT MAX(finished_at) AS completedAt,MIN(CASE WHEN state IN ('pending','retry') THEN COALESCE(updated_at,created_at) END) AS waitingSince FROM index_jobs").first();
- const durations=(await env.DB.prepare("SELECT duration_ms AS ms FROM index_runs WHERE outcome='done' ORDER BY created_at DESC LIMIT 1000").all<{ms:number}>()).results.map(r=>r.ms).sort((a,b)=>a-b);
- const performance={samples:durations.length,meanMs:durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:null,p95Ms:durations.length?durations[Math.ceil(durations.length*.95)-1]:null};
- return {counts:counts.results,coverage,runs:runs.results,samples:samples.results,cleanup,last,performance,model:EMBEDDING_MODEL,dimensions:EMBEDDING_DIMENSIONS,sampledAt:new Date().toISOString()};
+ const labels=['<1 分钟','1–5 分钟','5–30 分钟','≥30 分钟'];
+ const ageBuckets=labels.map((time,bucket)=>({time,pending:ages.results.find(r=>r.bucket===bucket)?.pending??0,retry:ages.results.find(r=>r.bucket===bucket)?.retry??0}));
+ const unknown=ages.results.find(r=>r.bucket===4);if(unknown)ageBuckets.push({time:'时间未知',pending:unknown.pending,retry:unknown.retry});
+ return {counts:counts.results,coverage,ageBuckets,cleanup,last,model:EMBEDDING_MODEL,dimensions:EMBEDDING_DIMENSIONS,sampledAt:new Date(nowMs).toISOString()};
 }
 
 type RemoteIndexInfo={status:string;count:number|null;dimensions:number|null;processedAt:string|null;sampledAt:string};
@@ -33,29 +33,19 @@ async function readRemoteIndex(env:Env):Promise<RemoteIndexInfo>{
 
 export async function storageOverview(env:Env){
  const [documents,chunks,histories]=await Promise.all([
-  env.DB.prepare("SELECT COUNT(*) AS count,COALESCE(SUM(status='archived'),0) AS archived,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM records JOIN record_contents ON record_id=records.id").all(),
+  env.DB.prepare("WITH sizes AS (SELECT status,length(CAST(content AS BLOB)) AS bytes FROM records JOIN record_contents ON record_id=records.id) SELECT COUNT(*) AS count,COALESCE(SUM(status='archived'),0) AS archived,COALESCE(SUM(bytes),0) AS bytes,COALESCE(SUM(bytes<=10240),0) AS small,COALESCE(SUM(bytes>10240 AND bytes<=102400),0) AS medium,COALESCE(SUM(bytes>102400),0) AS large FROM sizes").all(),
   env.DB.prepare('SELECT COUNT(*) AS count,COUNT(DISTINCT record_id) AS documents,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM search_chunks').first(),
   env.DB.prepare('SELECT (SELECT COUNT(*) FROM revisions) AS revisions,COALESCE(SUM(length(CAST(history_metadata AS BLOB))),0) AS bytes FROM record_histories').first()
  ]);
  const remote=await readRemoteIndex(env);
- await sampleIndexState(env,remote);
- const samples=await env.DB.prepare('SELECT hour AS time,documents,chunks,text_bytes AS textBytes,vector_count AS vectorCount,database_bytes AS databaseBytes FROM index_samples ORDER BY hour DESC LIMIT 720').all();
- return {documents:documents.results[0],chunks,histories,databaseBytes:documents.meta.size_after??null,remote,samples:samples.results.reverse(),sampledAt:new Date().toISOString()};
+ const doc=documents.results[0] as {count:number;archived:number;bytes:number;small:number;medium:number;large:number};
+ const sizeBuckets=[{time:'≤10 KiB',count:doc.small},{time:'10–100 KiB',count:doc.medium},{time:'>100 KiB',count:doc.large}];
+ return {documents:doc,chunks,histories,databaseBytes:documents.meta.size_after??null,remote,sizeBuckets,sampledAt:new Date().toISOString()};
 }
 
-export async function sampleIndexState(env:Env,remoteInfo?:RemoteIndexInfo|true){
- const remote=remoteInfo===true?await readRemoteIndex(env):remoteInfo;
- const [counts,size]=await Promise.all([
-  env.DB.prepare("SELECT SUM(state IN ('pending','retry')) AS pending,SUM(state='running') AS running,SUM(state='failed') AS failed FROM index_jobs").first<{pending:number;running:number;failed:number}>(),
-  env.DB.prepare('SELECT (SELECT COUNT(*) FROM records) AS documents,COUNT(*) AS chunks,COALESCE(SUM(length(CAST(content AS BLOB))),0) AS bytes FROM search_chunks').all<{documents:number;chunks:number;bytes:number}>()
- ]);
- const at=new Date().toISOString(),row=size.results[0];
- await env.DB.prepare('INSERT INTO index_samples(hour,pending,running,failed,documents,chunks,text_bytes,database_bytes,vector_count,sampled_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(hour) DO UPDATE SET pending=excluded.pending,running=excluded.running,failed=excluded.failed,documents=excluded.documents,chunks=excluded.chunks,text_bytes=excluded.text_bytes,database_bytes=excluded.database_bytes,vector_count=COALESCE(excluded.vector_count,index_samples.vector_count),sampled_at=excluded.sampled_at')
-  .bind(at.slice(0,13)+':00:00.000Z',counts?.pending??0,counts?.running??0,counts?.failed??0,row.documents,row.chunks,row.bytes,size.meta.size_after??null,remote?.count??null,at).run();
- await env.DB.batch([
-  env.DB.prepare('DELETE FROM index_runs WHERE created_at<?').bind(new Date(Date.now()-30*86400_000).toISOString()),
-  env.DB.prepare('DELETE FROM index_samples WHERE hour<?').bind(new Date(Date.now()-90*86400_000).toISOString())
- ]);
+/** Event diagnostics are retained for 30 days; this performs no sampling. */
+export async function pruneIndexRuns(env:Env){
+ await env.DB.prepare('DELETE FROM index_runs WHERE created_at<?').bind(new Date(Date.now()-30*86400_000).toISOString()).run();
 }
 
 export async function indexTasks(env:Env,state?:string,query='',offset=0){

@@ -321,10 +321,7 @@ webApi.get('/overview',async(c)=>{
   const q=parseQuery(c.req.url,z.object({folderId:uuid.optional(),depth:z.coerce.number().int().min(0).max(5).optional(),budget:z.coerce.number().int().min(1000).max(30000).optional(),cursor:z.string().max(4096).optional()}));
   return asJson(await agent.getOverview(c.env,q.folderId??null,q.depth,q.budget,q.cursor));
 });
-webApi.get('/index',async(c)=>{
-  const q=parseQuery(c.req.url,z.object({days:z.coerce.number().pipe(z.union([z.literal(1),z.literal(7),z.literal(30)])).optional()}));
-  return asJson(await indexOverview(c.env,q.days??7));
-});
+webApi.get('/index',async(c)=>asJson(await indexOverview(c.env)));
 webApi.get('/index/tasks',async(c)=>{
  const q=parseQuery(c.req.url,z.object({state:z.enum(['pending','running','retry','failed','done','waiting']).optional(),query:z.string().max(200).optional(),offset:z.coerce.number().int().min(0).max(1000000).optional()}));
  return asJson(await indexTasks(c.env,q.state,q.query,q.offset));

@@ -116,7 +116,7 @@ export const TOOL_GUIDANCE={
  },
  index_diagnostics:{
   title:'Inspect vector indexing health',
-  description:'Read current-version coverage, queue counts, stage/retry errors, processing trends and vector cleanup status without processing jobs.',
+  description:'Read current-version coverage, queue counts, stage/retry errors, current pending-task age distribution and vector cleanup status without processing jobs.',
   destructive:false
  },
  index_pending:{

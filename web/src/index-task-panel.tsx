@@ -10,7 +10,7 @@ import {ErrorText,Loading,Empty,fmt} from './pages/shared';
 import {stateLabels,stageLabels,type IndexTask,type Run} from './index-status-data';
 
 export function IndexTaskPanel({task:initialTask,open,activation,onOpenChange,onAfterClose,onRetry,busy}:{task:IndexTask;open:boolean;activation:number;onOpenChange:(v:boolean)=>void;onAfterClose:()=>void;onRetry:(task:IndexTask)=>void;busy:boolean}){
- const history=useQuery({queryKey:['index-runs',initialTask.record_id],queryFn:()=>api<{task:IndexTask;runs:Run[]}>('/index/tasks/'+initialTask.record_id),enabled:open,refetchInterval:open?5000:false});
+ const history=useQuery({queryKey:['index-runs',initialTask.record_id],queryFn:()=>api<{task:IndexTask;runs:Run[]}>('/index/tasks/'+initialTask.record_id),enabled:open,refetchInterval:query=>!open?false:['pending','running'].includes(query.state.data?.task.state??initialTask.state)?5000:60_000});
  const task=history.data?.task??initialTask;
  return <WorkspacePanel id={'index-'+task.record_id} label={'索引详情：'+task.name} title="索引详情" description={task.name} reserveSpace={false} open={open} activationKey={activation} onOpenChange={onOpenChange} onAfterClose={onAfterClose}>
   <div className="index-task-detail"><div className="index-toolbar"><Link to="/records/$recordId" params={{recordId:task.record_id}}>打开文稿</Link><Button size="sm" variant="secondary" label={task.state==='done'?'重新索引':'重试任务'} isDisabled={task.state==='running'} isLoading={busy} onClick={()=>onRetry(task)}/></div>

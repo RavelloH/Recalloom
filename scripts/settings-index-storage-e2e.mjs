@@ -16,12 +16,11 @@ try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
  const one=(await call('/records',{name:'索引状态测试 · 长标题需要在移动端正常排列.md',content:'# Test\n\nIndex data',kind:'document'})).data;
  const two=(await call('/records',{name:'另一篇索引任务.md',content:'# Another',kind:'document'})).data;
- const summary=await call('/index?days=7');assert.equal(summary.status,200);assert.ok(summary.data.coverage.total>=2);
+ const summary=await call('/index');assert.equal(summary.status,200);assert.ok(summary.data.coverage.total>=2);
  const tasks=await call('/index/tasks');assert.equal(tasks.status,200);assert.ok(tasks.data.items.some(t=>t.record_id===one.id));
  const capacity=await call('/storage');assert.equal(capacity.status,200);assert.ok(capacity.data.documents.bytes>0);assert.equal(capacity.data.remote.count,null,'Unavailable remote metrics are not zero');
- // A bounded fixture gives native charts multi-point history without inventing
- // any application data or writing fake telemetry to the database.
- await page.route('**/api/index?**',async route=>{const request=route.request(),response=await route.fetch(session?{headers:{...await request.allHeaders(),cookie:session}}:undefined),data=await response.json();data.runs=[{time:'2026-11-15',completed:2,failed:1},{time:'2026-11-16',completed:3,failed:0}];data.samples=[{time:'2026-11-15T00:00:00Z',pending:3,running:1},{time:'2026-11-16T00:00:00Z',pending:1,running:0}];await route.fulfill({response,json:data});});
+ assert.equal(summary.data.ageBuckets.reduce((n,row)=>n+row.pending+row.retry,0),2);
+ assert.equal(capacity.data.sizeBuckets.reduce((n,row)=>n+row.count,0),2);
  await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:'索引运行情况',exact:true}).waitFor();
  assert.equal(await page.locator('.settings-nav a.active').count(),1);
@@ -30,7 +29,7 @@ try{
  await rebuildDialog.getByRole('button',{name:'取消',exact:true}).click();
  assert.equal(await page.getByRole('heading',{name:'Wiki 引用索引',exact:true}).count(),0);
  assert.ok(await page.locator('.index-model-title').evaluate(el=>Boolean(el.compareDocumentPosition(document.querySelector('.index-task-list'))&Node.DOCUMENT_POSITION_FOLLOWING)),'Model configuration precedes the infinite task list');
- await page.locator('.index-chart-card svg').first().waitFor();assert.equal(await page.locator('.index-chart-card svg').count(),2);
+ await page.locator('.index-chart-card svg').first().waitFor();assert.equal(await page.locator('.index-chart-card svg').count(),1);
  await page.getByRole('button',{name:one.name,exact:true}).waitFor();await page.screenshot({path:'tmp/settings-index-list-'+engine+'.png'});
  await page.getByRole('button',{name:one.name,exact:true}).click();await page.getByRole('complementary',{name:'索引详情：'+one.name,exact:true}).waitFor();
  await page.getByRole('button',{name:two.name,exact:true}).click();await page.getByRole('complementary',{name:'索引详情：'+two.name,exact:true}).waitFor();
