@@ -272,6 +272,7 @@ try{
  const result=page.locator('a.search-result[href="/records/'+fresh.id+'"]');
  console.log('PAGE STEP search result visible');
  await result.waitFor();
+ await result.locator('.search-snippet').filter({hasText:'Readable link'}).waitFor();
  const summaryText=await result.locator('.search-snippet').textContent();
  assert.ok(summaryText.includes('Readable link')&&summaryText.includes('P=UI'));
  assert.ok(!summaryText.includes('**')&&!summaryText.includes('https://')&&!summaryText.includes('$'),'Search displays readable Markdown summaries');

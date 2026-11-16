@@ -8,7 +8,7 @@ export const queryClient=new QueryClient({defaultOptions:{queries:{retry:1,stale
 
 export type FolderDetail={id:string;name:string;parentId:string|null;description?:string;metadataRevision:number};
 export type SearchMode='auto'|'literal'|'metadata'|'semantic'|'hybrid';
-export type SearchHit={id:string;name:string;kind?:string;description?:string;snippet?:string;snippetFormat?:'text';revision?:number;chunkIndex?:number;lineStart?:number;lineEnd?:number;path?:string;score?:number;semanticScore?:number;source?:'literal'|'metadata'|'semantic'|'hybrid'};
+export type SearchHit={id:string;name:string;kind?:string;description?:string;snippet?:string;snippetFormat?:'text'|'markdown';revision?:number;chunkIndex?:number;lineStart?:number;lineEnd?:number;path?:string;score?:number;semanticScore?:number;source?:'literal'|'metadata'|'semantic'|'hybrid'};
 export type SearchResult={items:SearchHit[];indexMayLag?:boolean;degraded?:boolean};
 
 export const recordQuery=(id:string)=>queryOptions({queryKey:['record',id],queryFn:()=>record(id)});

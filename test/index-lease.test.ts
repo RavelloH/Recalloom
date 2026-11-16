@@ -184,7 +184,7 @@ test('own H1 titles outrank citations and snippets expose late evidence through 
  assert.equal((await search(f.env,{query:title,mode:'hybrid',limit:1})).results[0]?.id,primary.id);
  const literal=await search(f.env,{query:'EVIDENCE512',mode:'literal'});
  assert.ok(literal.results[0]?.snippet.includes('EVIDENCE512 使用当前正文修订'));
- assert.ok(literal.results[0]!.snippet.length<=350);
+ assert.ok(literal.results[0]!.snippet.length<=8192);
 });
 
 test('semantic and hybrid summaries expose readable evidence with usable pinned source lines',async()=>{
@@ -195,9 +195,9 @@ test('semantic and hybrid summaries expose readable evidence with usable pinned 
  Object.assign(f.env.VECTORIZE,{query:async()=>({matches:[{id:hit.chunk_id,score:.9,metadata:{record_id:record.id,revision:1}}]})});
  for(const mode of ['semantic','hybrid','literal'] as const){
   const result=await search(f.env,{query:'EVIDENCE512',mode,limit:1}),row=result.results[0]!;
-  assert.equal(row.snippetFormat,'text');assert.equal(row.revision,1);
-  assert.ok(row.snippet.includes('EVIDENCE512 模型指南'));
-  assert.equal(row.snippet.includes('**'),false);assert.equal(row.snippet.includes('https://'),false);
+  assert.equal(row.snippetFormat,'markdown');assert.equal(row.revision,1);
+  assert.ok(row.snippet.includes('**EVIDENCE512** [模型指南]'));
+  assert.equal(row.snippet.includes('**'),true);assert.equal(row.snippet.includes('https://'),true);
   assert.equal('sourceText' in row,false);
   if(mode==='semantic')assert.equal(row.chunkIndex,hit.chunk_index);
   const raw=await readRecord(f.env,row.id,{revision:row.revision,lineStart:row.lineStart,maxLines:row.lineEnd!-row.lineStart!+1});
@@ -211,5 +211,5 @@ test('literal excerpts focus on body evidence even when the indexed name also ma
  await processIndexJobs(f.env,1);
  const row=(await search(f.env,{query:'EVIDENCE512',mode:'literal',limit:1})).results[0]!;
  assert.equal(row.id,record.id);assert.ok(row.snippet.includes('正文末尾的实际证据'));
- assert.ok(row.lineStart!>1);assert.equal(row.snippet.includes('**'),false);
+ assert.ok(row.lineStart!>1);assert.equal(row.snippet.includes('**'),true);
 });

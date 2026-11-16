@@ -111,7 +111,7 @@ export const TOOL_GUIDANCE={
  },
  search:{
   title:'Find saved knowledge',
-  description:'Search metadata, literal text, semantic vectors or hybrid results. Snippets are readable text. Read original Markdown using id, revision and optional lineStart/lineEnd with read_record. Semantic hits may include zero-based chunkIndex. Prefer literal/metadata for precise or recent content.',
+  description:'Search metadata, literal text, semantic vectors or hybrid results. Snippets contain raw Markdown (snippetFormat=markdown) for client-side display. Read original Markdown using id, revision and optional lineStart/lineEnd with read_record. Semantic hits may include zero-based chunkIndex. Prefer literal/metadata for precise or recent content.',
   destructive:false
  },
  index_diagnostics:{

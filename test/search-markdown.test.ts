@@ -54,7 +54,7 @@ test('semantic excerpts retain symbols when a chunk starts inside a code fence',
  const chunks=paragraphChunks(document.name+'\n'+content);
  const excerpt=searchExcerpt('value_35',chunks[1]!,document,1);
  assert.ok(excerpt.snippet.includes('value_35 = *ptr + C_1; // **literal**'));
- assert.equal(excerpt.snippetFormat,'text');assert.ok(excerpt.lineStart!>1);
+ assert.equal(excerpt.snippetFormat,'markdown');assert.ok(excerpt.lineStart!>1);
  const lines=content.split('\n').slice(excerpt.lineStart!-1,excerpt.lineEnd!);
  assert.ok(lines.join('\n').includes('value_35'));
  assert.ok(lines.join('\n').includes('```cpp'));
@@ -65,8 +65,8 @@ test('mid-table and math excerpts recover labels and source positions without re
  const document={name:'table.md',content:table,revision:2};
  const chunks=paragraphChunks(document.name+'\n'+table);
  const excerpt=searchExcerpt('PARAM_60',chunks[1]!,document,1);
- assert.ok(excerpt.snippet.includes('参数：PARAM_60'),excerpt.snippet);
- assert.ok(excerpt.snippet.includes('数值：60 V'),excerpt.snippet);
+ assert.ok(searchMarkdownText(excerpt.snippet).includes('参数：PARAM_60'),excerpt.snippet);
+ assert.ok(searchMarkdownText(excerpt.snippet).includes('数值：60 V'),excerpt.snippet);
  assert.equal(excerpt.lineStart,1,'The readable labels are included in the pinned source range');
  const math=searchExcerpt('A_40','',{name:'math.md',content:'$$\n'+Array.from({length:100},(_,i)=>'A_'+i+' = B_1 * C_2').join('\n')+'\n$$',revision:1});
  assert.ok(math.snippet.includes('A_40 = B_1 * C_2'));

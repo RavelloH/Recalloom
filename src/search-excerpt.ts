@@ -1,6 +1,5 @@
 import {paragraphChunkSpans} from './search-ranking.js';
 import {searchSnippet,searchSnippetRange} from './search-snippet.js';
-import {searchMarkdownText} from './search-markdown.js';
 
 export type SearchDocument={name:string;content:string;revision:number};
 
@@ -46,12 +45,11 @@ export function searchExcerpt(query:string,raw:string,document?:SearchDocument,c
  }
  if(document&&range){
   const region=sourceRegion(document.content,range.start,range.end);
-  const text=region.plain?region.source:searchMarkdownText(region.source);
-  return {snippet:searchSnippet(query,text),snippetFormat:'text' as const,
+  return {snippet:region.plain?searchSnippet(query,region.source):region.source,snippetFormat:region.plain?'text' as const:'markdown' as const,
    lineStart:1+(document.content.slice(0,region.start).match(/\r\n|\r|\n/g)?.length??0),
    lineEnd:1+(document.content.slice(0,region.end).match(/\r\n|\r|\n/g)?.length??0)};
  }
  const window=searchSnippetRange(query,raw,1200);
  const region=sourceRegion(raw,window.start,window.end);
- return {snippet:searchSnippet(query,region.plain?region.source:searchMarkdownText(region.source)),snippetFormat:'text' as const};
+ return {snippet:region.plain?searchSnippet(query,region.source):region.source,snippetFormat:region.plain?'text' as const:'markdown' as const};
 }
