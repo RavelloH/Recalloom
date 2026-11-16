@@ -46,7 +46,7 @@ export const TOOL_GUIDANCE={
  },
  create_record:{
   title:'Create a versioned record',
-  description:'Create a Markdown document or structured task_list; optional tags. Markdown supports GFM, KaTeX, <mark>, WikiLink and embeds; read get_help on markdown, math or wiki before unfamiliar syntax. Use mutate_tasks for structured task items.',
+  description:'Create a Markdown document or structured task_list; optional tags. Markdown supports GFM, KaTeX, RMD marking and components, WikiLink and embeds; read get_help on markdown, math or wiki before unfamiliar syntax. Use mutate_tasks for structured task items.',
   destructive:false
  },
  read_record:{
