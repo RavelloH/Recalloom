@@ -8,6 +8,7 @@ import {processVectorDeleteJobs} from './lifecycle.js';
 import { webApi } from './web-api.js';
 import { cleanupWebAuth } from './web-auth.js';
 import { rememberOAuthActor } from './web-activity.js';
+import {TOOL_GUIDANCE,type RecalloomToolName} from './mcp-guidance.js';
 import type { Env } from './types.js';
 import { page, escapeHtml, consentForm } from './auth-page.js';
 
@@ -108,9 +109,11 @@ async function authorize(request:Request,env:Env):Promise<Response>{
     return new Response(null,{status:302,headers:approved.headers});
   }catch(e){return oauthErrorResponse(e);}
 }
+let cachedProvider:{origin:string;value:OAuthProvider<Env>}|undefined;
 function provider(env:Env,request:Request){
   const origin=env.MCP_BASE_URL?new URL(env.MCP_BASE_URL).origin:new URL(request.url).origin;
-  return new OAuthProvider<Env>({
+  if(cachedProvider?.origin===origin)return cachedProvider.value;
+  const value=new OAuthProvider<Env>({
     apiRoute:'/mcp',
     apiHandler:{
       async fetch(mcpRequest:Request,requestEnv:Env,ctx:ExecutionContext & {props?:unknown;auth?:{scope?:string[];clientId?:string}}){
@@ -119,7 +122,11 @@ function provider(env:Env,request:Request){
         if(!scopes.includes('notes:read'))return Response.json({error:'insufficient_scope'},{status:403});
         const props=ctx.props&&typeof ctx.props==='object'?ctx.props as {actorId?:string;clientName?:string}:{};
         if(props.actorId)ctx.waitUntil(rememberOAuthActor(requestEnv,props.actorId,ctx.auth?.clientId,props.clientName).catch(e=>console.error('Agent name sync failed',e)));
-        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown'),()=>ctx.waitUntil(drainIndexJobs(requestEnv).catch(e=>console.error('MCP indexing failed',e)))),{legacy:'stateless'});
+        // The modern SDK validates Mcp-Method/Mcp-Name against the body before
+        // invoking this factory. Discovery and legacy clients keep the full catalog.
+        const name=mcpRequest.headers.get('Mcp-Name');
+        const requestedTool=mcpRequest.headers.get('MCP-Protocol-Version')==='2026-07-28'&&mcpRequest.headers.get('Mcp-Method')==='tools/call'&&name&&Object.hasOwn(TOOL_GUIDANCE,name)?name as RecalloomToolName:undefined;
+        const handler=createMcpHandler(()=>createRecalloomServer(requestEnv,scopes,'grant:'+String(props.actorId??'unknown'),()=>ctx.waitUntil(drainIndexJobs(requestEnv).catch(e=>console.error('MCP indexing failed',e))),requestedTool),{legacy:'stateless'});
         return handler.fetch(mcpRequest);
       }
     },
@@ -147,6 +154,8 @@ function provider(env:Env,request:Request){
     refreshTokenTTL:90*24*3600,
     refreshTokenIdleTTL:30*24*3600
   });
+  cachedProvider={origin,value};
+  return value;
 }
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){

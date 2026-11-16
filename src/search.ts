@@ -2,11 +2,11 @@ import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, semanticIntentScore,searchTitleMatch } from './search-ranking.js';
 import {parseMarkdownOutline} from './outline.js';
-import {searchExcerpt,type SearchDocument} from './search-excerpt.js';
+import {searchExcerpt,readSearchProjection,projectedSearchExcerpt,type SearchDocument,type SearchProjection} from './search-excerpt.js';
 
 export {EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,splitText,processIndexJobs} from './indexing.js';
 import {embed} from './indexing.js';
-type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;sourceText:string;chunkIndex?:number;semanticScore?:number};
+type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;sourceText:string;chunkIndex?:number;semanticScore?:number;projection?:SearchProjection};
 
 export async function search(env:Env,input:{
   query:string;mode?:'metadata'|'literal'|'semantic'|'hybrid'|'auto';
@@ -22,15 +22,15 @@ export async function search(env:Env,input:{
   const titleMatches=new Map<string,number>();
   const documents=new Map<string,SearchDocument>();
   const finish=async(rows:SearchRow[])=>{
-    const missing=rows.filter(row=>row.chunkIndex!==undefined&&!documents.has(row.id));
+    const missing=rows.filter(row=>!row.projection&&row.chunkIndex!==undefined&&!documents.has(row.id));
     if(missing.length){
       const originals=(await env.DB.prepare("SELECT r.id,r.name,c.revision,c.content FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.status<>'archived' AND r.id IN ("+missing.map(()=>'?').join(',')+")").bind(...missing.map(row=>row.id)).all()).results as Array<SearchDocument&{id:string}>;
       for(const document of originals)documents.set(document.id,document);
     }
-    return rows.flatMap(({sourceText,...row})=>{
+    return rows.flatMap(({sourceText,projection,...row})=>{
       const document=documents.get(row.id);
       if((document&&document.revision!==row.revision)||(missing.some(candidate=>candidate.id===row.id)&&!document))return [];
-      return [{...row,...searchExcerpt(query,sourceText,document,row.chunkIndex)}];
+      return [{...row,...(projection?projectedSearchExcerpt(query,projection):searchExcerpt(query,sourceText,document,row.chunkIndex))}];
     });
   };
   const semanticById=new Map<string,SearchRow>();
@@ -47,23 +47,36 @@ export async function search(env:Env,input:{
     const clause=mode==='metadata'
       ?'(instr(lower(r.name),lower(?))>0 OR instr(lower(r.description),lower(?))>0 OR '+folderMatch+')'
       :'(instr(lower(r.name),lower(?))>0 OR instr(lower(c.content),lower(?))>0'+(mode==='literal'?'':' OR '+folderMatch)+')';
+    // Keep full documents inside D1 when a current display projection exists.
+    // Matching the raw chunk preserves literal-search semantics for Markdown.
     const records=(await env.DB.prepare(
-      'SELECT r.id,r.name,r.kind,r.status,c.revision,c.content,f.name AS folderName FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE '
-      +filterSql.join(' AND ')+' AND '+clause+" ORDER BY CASE WHEN lower(r.name)=lower(?) OR lower(r.name)=lower(?)||'.md' OR (lower(r.name) IN ('readme','readme.md') AND lower(f.name)=lower(?)) THEN 0 ELSE 1 END,r.updated_at DESC LIMIT ?"
-    ).bind(...bind,query,query,...(mode==='literal'?[]:[query]),query,query,query,Math.min(90,Math.max(30,limit*3))).all()).results as Array<{
-      id:string;name:string;kind:string;status:string;revision:number;content:string;folderName?:string|null
+      `WITH matched AS (SELECT r.id,r.name,r.kind,r.status,c.revision,f.name AS folderName,
+        (SELECT s.excerpt_projection FROM search_chunks s WHERE s.record_id=r.id AND s.revision=c.revision
+          AND s.excerpt_projection IS NOT NULL AND (instr(lower(CASE WHEN s.chunk_index=0 THEN substr(s.content,instr(s.content,char(10))+1) ELSE s.content END),lower(?))>0 OR instr(lower(c.content),lower(?))=0)
+          ORDER BY s.chunk_index LIMIT 1) AS excerptProjection,
+        (SELECT json_extract(s.excerpt_projection,'$.heading') FROM search_chunks s
+          WHERE s.record_id=r.id AND s.revision=c.revision AND s.chunk_index=0) AS cachedHeading,
+        instr(lower(c.content),lower(?)) AS matchPosition,c.content
+        FROM records r JOIN record_contents c ON c.record_id=r.id LEFT JOIN folders f ON f.id=r.folder_id WHERE `
+      +filterSql.join(' AND ')+' AND '+clause+` ORDER BY CASE WHEN lower(r.name)=lower(?) OR lower(r.name)=lower(?)||'.md' OR (lower(r.name) IN ('readme','readme.md') AND lower(f.name)=lower(?)) THEN 0 ELSE 1 END,r.updated_at DESC LIMIT ?)
+      SELECT id,name,kind,status,revision,folderName,excerptProjection,cachedHeading,matchPosition,
+        CASE WHEN excerptProjection IS NULL THEN content ELSE '' END AS content,
+        CASE WHEN cachedHeading IS NULL THEN substr(content,1,8192) ELSE '' END AS titleContent FROM matched`
+    ).bind(query,query,query,...bind,query,query,...(mode==='literal'?[]:[query]),query,query,query,Math.min(90,Math.max(30,limit*3))).all()).results as Array<{
+      id:string;name:string;kind:string;status:string;revision:number;content:string;folderName?:string|null;
+      excerptProjection?:string|null;cachedHeading?:string|null;titleContent?:string;matchPosition?:number
     }>;
     for(const row of records){
       documents.set(row.id,row);
-      const heading=parseMarkdownOutline(row.content.slice(0,8192),1).headings[0];
-      const titles=[row.name,heading?.level===1?heading.title:''];
+      const heading=row.cachedHeading==null?parseMarkdownOutline((row.titleContent??row.content).slice(0,8192),1).headings[0]:undefined;
+      const titles=[row.name,row.cachedHeading??(heading?.level===1?heading.title:'')];
       if(/^readme(?:\.md)?$/i.test(row.name)&&row.folderName)titles.push(row.folderName);
       titleMatches.set(row.id,searchTitleMatch(query,titles));
-      const pos=row.content.toLowerCase().indexOf(query.toLowerCase());
+      const pos=row.matchPosition===undefined?row.content.toLowerCase().indexOf(query.toLowerCase()):row.matchPosition-1;
       lexicalResults.push({id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
         score:mode==='metadata'?0.8:pos<0?0.8:1,
         source:mode==='metadata'?'metadata':'literal',
-        sourceText:row.content});
+        sourceText:row.content,projection:readSearchProjection(row.excerptProjection)});
     }
     // Own titles rank above body mentions, with recency preserved for ties.
     lexicalResults.sort((a,b)=>(titleMatches.get(b.id)!-titleMatches.get(a.id)!)||b.score-a.score);
@@ -82,11 +95,11 @@ export async function search(env:Env,input:{
       const where=["s.chunk_id IN ("+chunkIds.map(()=>'?').join(',')+")",
         's.revision=c.revision',...filterSql];
       const rows=(await env.DB.prepare(
-        'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision,s.chunk_index '+
+        'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision,s.chunk_index,s.excerpt_projection '+
         'FROM search_chunks s JOIN records r ON r.id=s.record_id '+
         'JOIN record_contents c ON c.record_id=r.id WHERE '+where.join(' AND ')
       ).bind(...chunkIds,...bind).all()).results as Array<{
-        chunk_id:string;chunk_index?:number;content:string;id:string;name:string;kind:string;status:string;revision:number
+        chunk_id:string;chunk_index?:number;content:string;id:string;name:string;kind:string;status:string;revision:number;excerpt_projection?:string|null
       }>;
       const byChunk=new Map(rows.map(row=>[row.chunk_id,row]));
       for(const hit of candidates){
@@ -98,7 +111,7 @@ export async function search(env:Env,input:{
         if(prior&&prior.score>=score)continue;
         semanticById.set(row.id,{
           id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
-          score,semanticScore:hit.score,source:'semantic',sourceText:row.content,chunkIndex:row.chunk_index
+          score,semanticScore:hit.score,source:'semantic',sourceText:row.content,chunkIndex:row.chunk_index,projection:readSearchProjection(row.excerpt_projection)
         });
       }
     }
@@ -119,7 +132,7 @@ export async function search(env:Env,input:{
   for(const [i,row] of vectorResults.entries()){
     const existing=combined.get(row.id);
     if(existing)combined.set(row.id,{...row,source:'hybrid',lexicalRank:existing.lexicalRank,semanticRank:i+1,
-      sourceText:existing.sourceText,chunkIndex:existing.chunkIndex});
+      sourceText:existing.sourceText,chunkIndex:existing.chunkIndex,projection:existing.projection});
     else combined.set(row.id,{...row,semanticRank:i+1});
   }
   const ranked=[...combined.values()].map(({lexicalRank,semanticRank,...row})=>({

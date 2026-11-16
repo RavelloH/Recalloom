@@ -1,8 +1,36 @@
 import {paragraphChunkSpans} from './search-ranking.js';
 import {searchSnippet,searchSnippetRange} from './search-snippet.js';
 import {searchMarkdownText} from './search-markdown.js';
+import {parseMarkdownOutline} from './outline.js';
 
 export type SearchDocument={name:string;content:string;revision:number};
+export type SearchProjection={version:1;text:string;start:number;end:number;lineStart:number;lineEnd:number;heading?:string};
+
+/** Stored alongside an immutable chunk, so search only selects a query window. */
+export function projectSearchChunk(document:SearchDocument,span:{start:number;end:number}):SearchProjection{
+ const prefix=document.name.length+1;
+ const start=Math.max(0,span.start-prefix),end=Math.max(0,span.end-prefix);
+ const region=sourceRegion(document.content,start,end);
+ const heading=start===0?parseMarkdownOutline(document.content.slice(0,8192),1).headings[0]:undefined;
+ return {version:1,text:region.plain?region.source:searchMarkdownText(region.source),start,end,
+  ...(start===0?{heading:heading?.level===1?heading.title:''}:{}),
+  lineStart:1+(document.content.slice(0,region.start).match(/\r\n|\r|\n/g)?.length??0),
+  lineEnd:1+(document.content.slice(0,region.end).match(/\r\n|\r|\n/g)?.length??0)};
+}
+
+export function readSearchProjection(value:string|null|undefined):SearchProjection|undefined{
+ if(!value)return;
+ try{
+  const projection=JSON.parse(value) as SearchProjection;
+  if(projection.version===1&&typeof projection.text==='string'&&
+   [projection.start,projection.end,projection.lineStart,projection.lineEnd].every(Number.isInteger)&&
+   projection.start>=0&&projection.end>=projection.start&&projection.lineStart>=1&&projection.lineEnd>=projection.lineStart)return projection;
+ }catch{/* Older or incomplete projections fall back to the authoritative source. */}
+}
+
+export function projectedSearchExcerpt(query:string,projection:SearchProjection){
+ return {snippet:searchSnippet(query,projection.text),snippetFormat:'text' as const,lineStart:projection.lineStart,lineEnd:projection.lineEnd};
+}
 
 /** Read a bounded source region while retaining enclosing code/math context. */
 function sourceRegion(content:string,start:number,end:number){

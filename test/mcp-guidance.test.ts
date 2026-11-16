@@ -1,12 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { InMemoryTransport, LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/server';
+import { InMemoryTransport, LATEST_PROTOCOL_VERSION,createMcpHandler,PROTOCOL_VERSION_META_KEY,CLIENT_CAPABILITIES_META_KEY } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from '../src/mcp.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE } from '../src/mcp-guidance.js';
 import {getHelp,HELP_TOPICS} from '../src/help/index.js';
 import type { Env } from '../src/types.js';
 
 type ResultMessage={jsonrpc:string;id:number;result?:any;error?:any};
+test('modern single-tool serving preserves validation, scope isolation and header checks',async()=>{
+  let factories=0;
+  const handler=(scopes:string[],tool:'get_help'|'create_folder')=>createMcpHandler(()=>{
+    factories++;
+    return createRecalloomServer({} as Env,scopes,'scope-test',undefined,tool);
+  });
+  const request=(tool:string,args:Record<string,unknown>,header=tool)=>new Request('https://recalloom.test/mcp',{
+    method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream',
+      'MCP-Protocol-Version':'2026-07-28','Mcp-Method':'tools/call','Mcp-Name':header},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:tool,arguments:args,
+      _meta:{[PROTOCOL_VERSION_META_KEY]:'2026-07-28',[CLIENT_CAPABILITIES_META_KEY]:{},'io.modelcontextprotocol/clientInfo':{name:'cpu-regression',version:'1'}}}})
+  });
+  const read=handler(['notes:read'],'get_help');
+  const good=await read.fetch(request('get_help',{}));assert.equal(good.status,200,await good.clone().text());
+  assert.equal((await good.json() as any).result.isError,undefined);
+  const invalid=await read.fetch(request('get_help',{kind:'inline'}));
+  assert.match(JSON.stringify(await invalid.json()),/kind requires component/,'Shared schemas retain custom refinements');
+  const before=factories;
+  const mismatch=await read.fetch(request('get_help',{},'create_folder'));
+  assert.equal(mismatch.status,400);assert.equal(factories,before,'SDK rejects mismatched headers before the factory');
+  const denied=handler(['notes:read'],'create_folder');
+  const [writeResponse,readResponse]=await Promise.all([
+    denied.fetch(request('create_folder',{name:'blocked'})),read.fetch(request('get_help',{}))
+  ]);
+  assert.match(JSON.stringify(await writeResponse.json()),/INSUFFICIENT_SCOPE/);
+  assert.equal((await readResponse.json() as any).result.isError,undefined);
+});
+
 test('MCP initialize advertises server usage instructions and tools/list exposes all guidance',async()=>{
   const mcp=createRecalloomServer({} as Env,['notes:read','notes:write'],'guidance-test');
   const [serverTransport,clientTransport]=InMemoryTransport.createLinkedPair();

@@ -204,3 +204,35 @@ test('semantic and hybrid summaries expose readable evidence with usable pinned 
   assert.ok('content' in raw&&raw.content.includes('**EVIDENCE512** [模型指南](https://example.com/reference)'));
  }
 });
+
+test('stored excerpt projections bypass live rendering while old and edited chunks remain searchable',async()=>{
+ const f=fixture(),record=await createRecord(f.env,{name:'cached.md',content:'# 缓存\n\n**PROJECTION512** [可读文本](https://example.com)'});
+ await processIndexJobs(f.env,1);
+ const chunk=f.sql.prepare('SELECT * FROM search_chunks WHERE record_id=?').get(record.id)!;
+ const projection=JSON.parse(String(chunk.excerpt_projection));
+ assert.equal(projection.version,1);assert.ok(projection.text.includes('PROJECTION512 可读文本'));
+ Object.assign(f.env.VECTORIZE,{query:async()=>({matches:[{id:chunk.chunk_id,score:.9,metadata:{record_id:record.id,revision:1}}]})});
+ // A distinct projection makes an accidental fallback observable.
+ f.sql.prepare('UPDATE search_chunks SET excerpt_projection=? WHERE chunk_id=?').run(JSON.stringify({...projection,text:'PROJECTION512 STORED_PROJECTION'}),chunk.chunk_id);
+ for(const mode of ['semantic','hybrid','literal','metadata'] as const){
+  const query=mode==='metadata'?'cached':'PROJECTION512';
+  const row=(await search(f.env,{query,mode})).results[0]!;
+  assert.ok(row.snippet.includes('STORED_PROJECTION'),mode);
+  assert.equal('projection' in row,false);
+ }
+ f.sql.prepare('UPDATE search_chunks SET excerpt_projection=NULL').run();
+ assert.ok((await search(f.env,{query:'PROJECTION512',mode:'semantic'})).results[0]!.snippet.includes('PROJECTION512 可读文本'));
+ await editRecord(f.env,record.id,1,'**PROJECTION512** 新修订正文');
+ assert.equal((await search(f.env,{query:'PROJECTION512',mode:'semantic'})).count,0);
+ const current=(await search(f.env,{query:'PROJECTION512',mode:'literal'})).results[0]!;
+ assert.equal(current.revision,2);assert.ok(current.snippet.includes('新修订正文'));
+});
+
+test('cached literal excerpts focus on body evidence even when the indexed name also matches',async()=>{
+ const f=fixture();
+ const record=await createRecord(f.env,{name:'😀 EVIDENCE512.md',content:'# 正文\n\n'+('背景段落。\n'.repeat(500))+'\n**EVIDENCE512** 正文末尾的实际证据'});
+ await processIndexJobs(f.env,1);
+ const row=(await search(f.env,{query:'EVIDENCE512',mode:'literal',limit:1})).results[0]!;
+ assert.equal(row.id,record.id);assert.ok(row.snippet.includes('正文末尾的实际证据'));
+ assert.ok(row.lineStart!>1);assert.equal(row.snippet.includes('**'),false);
+});
