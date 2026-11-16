@@ -1,11 +1,12 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8815';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
 const binary=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(value=>value&&existsSync(value));
-const secret=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(value=>/^\s*MCP_AUTH_SECRET\s*=/.test(value))?.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
+const secret=readLocalAuthVars().split(/\r?\n/).find(value=>/^\s*MCP_AUTH_SECRET\s*=/.test(value))?.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
 assert.ok(binary&&secret);
 const browser=await chromium.launch({headless:true,executablePath:binary});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
@@ -30,7 +31,7 @@ const select=async(page,paragraph,toolbar)=>{
 };
 const editorOwnsSelection=async page=>page.evaluate(()=>({focus:document.activeElement?.matches('.tiptap[contenteditable="true"]'),selection:getSelection()?.toString()}));
 try{
- await page.goto(base+'/login');await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.goto(base+'/login');await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
  const fixture=await create(page);await page.goto(base+'/records/'+fixture.id+'?mode=visual');
  const paragraph=page.locator('.tiptap p').filter({hasText:text}).first();

@@ -1,10 +1,11 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 // Every record belongs to the isolated temporary D1 created by run-editor-e2e.mjs.
 const base=process.env.RECALLOOM_TEST_BASE;
 assert.match(base??'',/^http:\/\/127\.0\.0\.1:\d+$/);
-const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g,'');
+const secret=readLocalAuthVars().match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g,'');
 const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 const engine=(process.env.RECALLOOM_E2E_BROWSER??process.env.RECALLOOM_TEST_ENGINE)==='webkit'?'webkit':'chromium';
 assert.ok(secret&&(engine==='webkit'||executablePath));
@@ -93,7 +94,7 @@ async function saveReopen(id,expected){
  return persisted;
 }
 try{
- await page.goto(base+'/login');await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.goto(base+'/login');await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/',{timeout:30000});
  for(const width of [1280,390,320]){
   await page.setViewportSize({width,height:engine==='webkit'?1100:width===320?700:900});
@@ -251,7 +252,7 @@ try{
  await panel.getByRole('textbox',{name:'起始编号',exact:true}).fill('7');assert.equal(await page.locator('.tiptap ol').getAttribute('start'),'7');assert.equal(await page.locator('.tiptap ol strong').innerText(),'Alpha');await close(panel);
  console.log('PASS heading selector and ordered-list parameters preserve formatted canvas content');
  await page.unrouteAll({behavior:'wait'});await page.close();page=await browser.newPage({viewport:{width:390,height:engine==='webkit'?1100:900},isMobile:true,hasTouch:true});await configurePage();
- await page.goto(base+'/login');await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/',{timeout:30000});
+ await page.goto(base+'/login');await page.getByPlaceholder('输入授权密钥').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/',{timeout:30000});
  for(const width of [390,320]){
   await page.emulateMedia({colorScheme:width===320?'dark':'light'});await page.setViewportSize({width,height:engine==='webkit'?1100:900});await create();await page.locator('.tiptap p').first().tap();await page.getByRole('button',{name:'编辑当前块',exact:true}).click();
   const touchPanel=panelAt(width);await touchPanel.waitFor();await configurationOnly(touchPanel);await touchPanel.getByRole('textbox',{name:'稳定 ID（可选）'}).fill('touch-config-'+width);assert.match(await raw(touchPanel).inputValue(),new RegExp('touch-config-'+width));

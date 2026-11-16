@@ -1,9 +1,10 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from 'playwright-core';
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8827';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);
-const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
+const secret=readLocalAuthVars().match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
 const binary=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 assert.ok(secret&&binary);
 const browser=await chromium.launch({headless:true,executablePath:binary,args:['--no-sandbox']});
@@ -12,7 +13,7 @@ const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const source='# Block inspector E2E\n\nFirst paragraph.\n\nSecond paragraph.\n\n::: warning 注意\n\nTest callout.\n\n:::';
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  for(const width of [1280,390]){

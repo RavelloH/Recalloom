@@ -1,9 +1,10 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Visual-only regression: no production data or MCP changes. */
 import assert from 'node:assert/strict';
 import {browserBin,launchTestBrowser,testOrigin} from './local-browser.mjs';
-import {existsSync,readFileSync,mkdirSync} from 'node:fs';
+import {mkdirSync} from 'node:fs';
 
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 assert.ok(browserBin&&secretLine,'A local browser and test secret are required');
 const secret=secretLine.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const base=testOrigin;
@@ -66,7 +67,7 @@ async function metrics(selector){
 }
 try {
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  const id=await page.evaluate(async content=>{

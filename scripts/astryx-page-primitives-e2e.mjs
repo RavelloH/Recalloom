@@ -1,6 +1,7 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Page primitives and retained native-link behavior; isolated localhost only. */
 import assert from 'node:assert/strict';
-import {existsSync,mkdirSync,readFileSync} from 'node:fs';
+import {existsSync,mkdirSync} from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE;
@@ -9,7 +10,7 @@ const engine=(process.env.RECALLOOM_E2E_BROWSER??process.env.RECALLOOM_TEST_ENGI
 const executable=engine==='chromium'?[process.env.RECALLOOM_BROWSER_PATH,
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(path=>path&&existsSync(path)):undefined;
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret,'A local test secret is required');
 const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(executable?{executablePath:executable}:{})});
@@ -141,10 +142,20 @@ async function nativeLinkSurface(locator,href){
 try{
  console.log('PAGE STEP login');
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  const loginTransition=await transitionCount();
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
+ const sessionState=await page.evaluate(async()=>{
+  const response=await fetch('/api/auth/session');
+  if(!response.ok)throw Error('Session check failed '+response.status);
+  return response.json();
+ });
+ const activeSession=sessionState.session;
+ assert.equal(activeSession.expiresAt-activeSession.createdAt,30*86400000,'Login starts with thirty-day inactivity expiry');
+ const sessionCookie=(await context.cookies()).find(cookie=>cookie.name==='__Host-recalloom_session');
+ assert.ok(sessionCookie?.httpOnly&&sessionCookie.secure);
+ assert.ok(Math.abs(sessionCookie.expires*1000-activeSession.createdAt-90*86400000)<2000,'Cookie reaches the ninety-day absolute cap');
  await settledView(loginTransition);
  const stamp='page-primitives-'+Date.now();
  const folder=await api('/folders',{name:'Page primitives '+stamp});

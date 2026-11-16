@@ -60,7 +60,7 @@ function fixture(){
   };
   const request=async(path:string,body?:unknown)=>{
     const token='t'.repeat(43),now=Date.now();
-    db.prepare('INSERT OR REPLACE INTO web_sessions(id,token_hash,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?)').run('session',await webHmacHex(env.MCP_AUTH_SECRET,'session',token),now,now,now+60000);
+    db.prepare('INSERT OR REPLACE INTO web_sessions(id,token_hash,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?)').run('session',await webHmacHex(env.MCP_AUTH_SECRET!,'session',token),now,now,now+60000);
     return webApi.fetch(new Request('https://tasks.test/api'+path,{method:body===undefined?'GET':'POST',headers:{cookie:WEB_COOKIE+'='+token,origin:'https://tasks.test','content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})}),env);
   };
   return {db,env,folder,list,request};

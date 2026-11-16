@@ -1,15 +1,16 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from 'playwright-core';
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8825';
-const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
+const secret=readLocalAuthVars().match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
 const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 assert.ok(secret&&bin);
 const browser=await chromium.launch({headless:true,executablePath:bin,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  const content='# Drag block\n\n::: warning Alpha\n\nAlpha inside.\n\n:::\n\nBeta.\n\nGamma.';

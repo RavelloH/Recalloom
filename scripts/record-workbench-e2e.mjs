@@ -1,6 +1,7 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import {chromium,webkit} from 'playwright-core';
-import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 
 const engine=(process.env.RECALLOOM_E2E_BROWSER??process.env.RECALLOOM_TEST_ENGINE)==='webkit'?'webkit':'chromium';
@@ -9,7 +10,7 @@ const executablePath=engine==='chromium'&&[
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'
 ].find(value=>value&&existsSync(value));
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok((engine==='webkit'||executablePath)&&secret,'Isolated browser and local secret required');
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
@@ -222,7 +223,7 @@ try{
   await route.continue();
  });
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  if(engine==='webkit')assert.ok(sessionCookie,'WebKit loopback login cookie must be bridged');

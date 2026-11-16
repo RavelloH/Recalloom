@@ -3,7 +3,7 @@
 ```bash
 pnpm install
 cp .dev.vars.example .dev.vars
-# 在 .dev.vars 中填写本地测试用 MCP_AUTH_SECRET
+# 在 .dev.vars 中填写本地测试用 MAIN_SECRET（兼容 MCP_AUTH_SECRET）
 pnpm db:local
 pnpm dev
 ```

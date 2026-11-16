@@ -1,12 +1,13 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync,mkdirSync} from 'node:fs';
+import {existsSync,mkdirSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE;
 assert.match(base??'',/^http:\/\/127\.0\.0\.1:\d+$/,'Only isolated localhost tests are allowed');
 const browserPath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 assert.ok(browserPath,'Edge or Chrome must be installed');
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 assert.ok(secretLine,'MCP_AUTH_SECRET is required');
 const secret=secretLine.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
 const browser=await chromium.launch({headless:true,executablePath:browserPath,args:['--no-sandbox']});
@@ -22,7 +23,7 @@ try{
   const context=await browser.newContext({viewport:{width:mode.width,height:mode.height},hasTouch:mode.hasTouch,isMobile:mode.isMobile});
   const page=await context.newPage();
   await page.goto(base+'/login');
-  await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+  await page.getByPlaceholder('输入授权密钥').fill(secret);
   await page.getByRole('button',{name:'登录',exact:true}).click();
   await page.waitForURL(base+'/',{timeout:30000});
   await page.goto(base+'/library');

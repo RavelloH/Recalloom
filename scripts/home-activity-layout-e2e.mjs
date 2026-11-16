@@ -84,7 +84,7 @@ const assertCompact=(geometry,width)=>{
 
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
  await page.locator('.home-page').waitFor();
  const suffix=Date.now().toString(36).toUpperCase();

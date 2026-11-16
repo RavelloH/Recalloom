@@ -1,7 +1,8 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import {launchTestBrowser,testOrigin} from './local-browser.mjs';
-import {readFileSync} from 'node:fs';
-const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
+
+const line=readLocalAuthVars().split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 const secret=line?.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret);
 const base=testOrigin;
@@ -17,7 +18,7 @@ const ok=(response,status,label)=>{assert.equal(response.status,status,label+' '
 const wait=locator=>locator.waitFor({state:'visible',timeout:15000});
 try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  const suffix=String(Date.now());

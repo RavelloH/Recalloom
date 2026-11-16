@@ -1,12 +1,13 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync,mkdirSync} from 'node:fs';
+import {existsSync,mkdirSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8807';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Only isolated localhost tests are allowed');
 const browserPath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 assert.ok(browserPath,'Edge or Chrome is required');
-const secret=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line))?.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
+const secret=readLocalAuthVars().split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line))?.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
 assert.ok(secret);
 const kinds=['note','info','tip','success','warning','danger','example','question'];
 const recordSource=['# Tabler 图标视觉测试',...kinds.map(kind=>'::: '+kind+' '+kind+'\n\n组件内容：检查标题颜色、图标对齐和背景。\n\n:::')].join('\n\n');
@@ -18,7 +19,7 @@ const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:25000});
  // The URL changes before the lazy Shell has finished mounting.

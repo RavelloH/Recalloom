@@ -46,7 +46,7 @@ pnpm exec wrangler vectorize create recalloom --dimensions=512 --metric=cosine
 
 Worker 创建后，在其 **Settings → Variables and Secrets** 中添加运行时 **Secret**：
 
-- `MCP_AUTH_SECRET`：用于批准 MCP 客户端授权，也用于 Web 管理 API 登录。请使用高强度随机值，妥善保管。
+- `MAIN_SECRET`：用于网页登录、批准 MCP 客户端授权及派生会话签名密钥。请使用高强度随机值，妥善保管。未设置时回退至 `MCP_AUTH_SECRET`；同时配置时以 `MAIN_SECRET` 为准。迁移变量名并保留相同的值可延续现有有效会话，更换有效密钥会使网页登录会话失效。
 
 不要把密钥放进 GitHub 仓库、Build Variables 或公开配置文件。连接仓库后，对 `main` 分支的提交会触发构建和部署。若需要自定义域名，可在 Worker 中配置 Custom Domain，并按需将 `MCP_BASE_URL` 设为公共站点的 Origin（不包含 `/mcp`）。
 
@@ -58,7 +58,7 @@ Worker 创建后，在其 **Settings → Variables and Secrets** 中添加运行
 https://<你的 Worker 域名>/mcp
 ```
 
-首次连接会打开 OAuth 授权页面。使用上面设置的 `MCP_AUTH_SECRET` 授权客户端，并选择所需的读取或写入权限。读取权限（`notes:read`）即可连接并使用只读工具；写入类工具还需要 `notes:write`。
+首次连接会打开 OAuth 授权页面。使用上面设置的主密钥授权客户端，并选择所需的读取或写入权限。读取权限（`notes:read`）即可连接并使用只读工具；写入类工具还需要 `notes:write`。
 
 服务端同时支持 Client ID Metadata Document（CIMD）和动态客户端注册（DCR），OAuth 端点均保持在同一个域名下。部分客户端的 CIMD 元数据服务器会拦截 Cloudflare Worker 发出的请求；遇到“客户端元数据暂时不可用”时，可在客户端支持的情况下改用 DCR 重新连接。不要使用非官方的元数据代理，也不要关闭客户端元数据验证。
 
@@ -77,3 +77,5 @@ MCP 服务提供简短的全局使用说明、每个工具的操作描述，以�
 实现细节、扩展节点的安全边界、格式回退和回归测试清单见 [Rich Markdown 开发规范](rich-markdown.md)。
 
 帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`。`get_help` 会返回 `schemaVersion`、根据文档内容生成的 `helpVersion` 和完整 SHA-256 `contentHash`；帮助索引 Resource 也展示这些标识，以便识别过期的帮助。修改文档后运行 `pnpm help:generate` 更新编译模块，或在开发时使用 `pnpm help:watch` 自动更新。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
+
+网页登录会话在闲置 30 天后到期，单次登录最长保留 90 天。活跃时间及闲置到期时间每小时按需更新，Cookie 最晚在该次登录的 90 天上限到期。现有有效的旧会话在下次访问时迁移。

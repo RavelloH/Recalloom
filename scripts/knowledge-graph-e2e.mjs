@@ -1,14 +1,15 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Isolated E2E test for D1 links, semantic fallback and Cytoscape workspace.
  * Run only on an isolated local Wrangler D1/KV fixture (default :8897).
  */
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 
 const bin=[process.env.RECALLOOM_BROWSER_PATH,
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(x=>x&&existsSync(x));
-const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
+const line=readLocalAuthVars().split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 const secret=process.env.RECALLOOM_TEST_SECRET||line?.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const engine=process.env.RECALLOOM_E2E_BROWSER==='webkit'?'webkit':'chromium';
 assert.ok((engine==='webkit'||bin)&&secret);
@@ -51,7 +52,7 @@ function expectCode(result,status,label){
 function visible(locator){return locator.waitFor({state:'visible',timeout:15000});}
 try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:40000});
  step('API relationships');

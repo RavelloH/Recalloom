@@ -1,13 +1,14 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import {chromium} from 'playwright-core';
 import {readFileSync,writeFileSync} from 'node:fs';
 const base='http://127.0.0.1:8805';
-const secret=readFileSync('.dev.vars','utf8').match(/MCP_AUTH_SECRET=([^\r\n]+)/)[1];
+const secret=readLocalAuthVars().match(/MCP_AUTH_SECRET=([^\r\n]+)/)[1];
 const report=JSON.parse(readFileSync('tmp/rmd-parity-audit.json'));
 const exe='C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 const browser=await chromium.launch({headless:true,executablePath:exe});
 const page=await browser.newPage();
 const output={};
-await page.goto(base+'/login');await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
+await page.goto(base+'/login');await page.getByPlaceholder('输入授权密钥').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
 for(const [name,obj] of Object.entries(report.results)){
  output[name]={};
  for(const mode of ['visual','preview']){

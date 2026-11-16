@@ -1,3 +1,4 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
@@ -5,7 +6,7 @@ import {chromium,webkit} from 'playwright-core';
 // Run only with run-editor-e2e.mjs: all records belong to its temporary D1.
 const base=process.env.RECALLOOM_TEST_BASE;
 assert.match(base??'',/^http:\/\/127\.0\.0\.1:\d+$/);
-const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g,'');
+const secret=readLocalAuthVars().match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g,'');
 const engine=(process.env.RECALLOOM_E2E_BROWSER??process.env.RECALLOOM_TEST_ENGINE)==='webkit'?'webkit':'chromium';
 const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 assert.ok(secret&&(engine==='webkit'||executablePath));
@@ -44,7 +45,7 @@ async function configure(width,touch){
   if(sessionCookie){await route.fulfill({response:await route.fetch({headers:{...(await request.allHeaders()),cookie:sessionCookie}})});return;}
   await route.continue();
  });
- await page.goto(base+'/login');await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.goto(base+'/login');await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/',{timeout:30000});
  const record=await page.evaluate(async content=>{
   const response=await fetch('/api/records',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'RMD UI '+Date.now()+'.md',kind:'document',content})});

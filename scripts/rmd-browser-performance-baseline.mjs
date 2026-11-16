@@ -1,11 +1,12 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,existsSync,mkdirSync} from 'node:fs';
+import {writeFileSync,existsSync,mkdirSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
 import {chromium} from 'playwright-core';
 const origin='http://127.0.0.1:8788';
 const browserPath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
 assert.ok(browserPath,'local Edge or Chrome required');
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line));
 assert.ok(secretLine,'local development secret required');
 const secret=secretLine.slice(secretLine.indexOf('=')+1).trim().replace(/^[\"']|[\"']$/g,'');
 const calc=samples=>{const sorted=[...samples].sort((a,b)=>a-b); const pick=p=>sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*p)-1)]??null;return {count:sorted.length,medianMs:pick(.5),p95Ms:pick(.95),maxMs:sorted.at(-1)??null};};
@@ -30,7 +31,7 @@ const json=async(endpoint,options)=>page.evaluate(async({endpoint,options})=>{co
 const result={createdAt:new Date().toISOString(),commit:process.env.RMD_BASELINE_COMMIT??'',browser:await browser.version(),browserPath,origin,method:{environment:'127.0.0.1 local Wrangler isolated D1, cached JS assets',input:'12 keydown x events, 40ms delay; time to next animation frame is input responsiveness proxy, not pure handler CPU',measurements:'navigation to editor container and all fixture code blocks mounted (separate milestones), mode switch to visible, long tasks >=50ms, DOM editor key-to-RAF',repetitions:1},cases:[]};
 try{
  await page.goto(origin+'/login',{waitUntil:'domcontentloaded'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(origin+'/',{timeout:35000});
  for(const size of [10,50,100]){

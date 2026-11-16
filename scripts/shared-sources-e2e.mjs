@@ -1,6 +1,7 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Cross-browser atomic route crossfade in an isolated local Worker/D1. */
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE;
@@ -11,7 +12,7 @@ const executable=engine==='chromium'
    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
    'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(x=>x&&existsSync(x)):undefined;
 const secretLine=existsSync('.dev.vars')
- ?readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x)):undefined;
+ ?readLocalAuthVars().split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x)):undefined;
 const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret,'A local test secret is required');
 const browser=await (engine==='webkit'?webkit:chromium).launch({
@@ -188,7 +189,7 @@ const recordPage=async(record)=>{
 
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  const suffix=String(Date.now());

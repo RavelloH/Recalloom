@@ -1,11 +1,12 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Settings indexing/storage browser regression; isolated local D1 only. */
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 const base=process.env.RECALLOOM_TEST_BASE;assert.match(base??'',/^http:\/\/127\.0\.0\.1:\d+$/);
 const engine=process.env.RECALLOOM_E2E_BROWSER==='webkit'?'webkit':'chromium';
 const bin=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
-const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(s=>s.startsWith('MCP_AUTH_SECRET='));
+const line=readLocalAuthVars().split(/\r?\n/).find(s=>s.startsWith('MCP_AUTH_SECRET='));
 const secret=process.env.RECALLOOM_TEST_SECRET||line?.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(engine==='chromium'?{executablePath:bin}:{})});
 const page=await browser.newPage({viewport:{width:1440,height:1000},colorScheme:'dark'});page.setDefaultTimeout(20000);
@@ -13,7 +14,7 @@ const faults=[];page.on('pageerror',e=>faults.push(e.message));let session='';
 if(engine==='webkit')await page.route('**/api/**',async route=>{const request=route.request();const response=await route.fetch(session?{headers:{...await request.allHeaders(),cookie:session}}:undefined);if(new URL(request.url()).pathname==='/api/auth/login')session=/^(__Host-recalloom_session=[^;]+)/.exec(response.headers()['set-cookie']??'')?.[1]??'';await route.fulfill({response});});
 const call=(path,body)=>page.evaluate(async({path,body})=>{const r=await fetch('/api'+path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:undefined);return {status:r.status,data:await r.json()};},{path,body});
 try{
- await page.goto(base+'/login',{waitUntil:'networkidle'});await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
+ await page.goto(base+'/login',{waitUntil:'networkidle'});await page.getByPlaceholder('输入授权密钥').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
  await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:'待处理任务',exact:true}).waitFor();await page.getByText('无待处理任务',{exact:true}).waitFor();
  const one=(await call('/records',{name:'索引状态测试 · 长标题需要在移动端正常排列.md',content:'# Test\n\nIndex data',kind:'document'})).data;

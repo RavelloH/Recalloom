@@ -1,12 +1,13 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/,'Only isolated loopback E2E is permitted');
 const browserPath=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(file=>file&&existsSync(file));
 assert.ok(browserPath,'Chromium/Edge required for bundle-loading E2E');
-const raw=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const raw=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 const secret=process.env.RECALLOOM_TEST_SECRET??raw?.slice(raw.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret,'Local test secret is required');
 const browser=await chromium.launch({executablePath:browserPath,headless:true,args:['--no-first-run','--disable-extensions']});
@@ -21,7 +22,7 @@ const requested=(page)=>{
 const has=(urls,name)=>urls.some(url=>url.includes('/'+name+'-'));
 const login=async page=>{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  await page.getByRole('heading',{name:'概览'}).waitFor();
@@ -32,11 +33,11 @@ try{
  const urls=requested(page),errors=[];
  page.on('pageerror',error=>errors.push(error.message));
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').waitFor();
+ await page.getByPlaceholder('输入授权密钥').waitFor();
  for(const name of ['home','library','record','settings','command-palette','motion-primitives','overlayscrollbars','visual-editor'])
   assert.ok(!has(urls,name),'Lazy '+name+' unexpectedly loaded on login screen: '+JSON.stringify(urls));
  console.log('PASS login only fetches the shell and login route, no editor/graph/palette/scrollbar engine');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  await page.getByRole('heading',{name:'概览'}).waitFor();

@@ -1,8 +1,9 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from 'playwright-core';
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8827';
-const secret=fs.readFileSync('.dev.vars','utf8').match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
+const secret=readLocalAuthVars().match(/^MCP_AUTH_SECRET\s*=\s*(.+)$/m)?.[1]?.trim();
 const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
 assert.ok(secret&&executablePath);
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
@@ -15,7 +16,7 @@ const input=['RMD 容器 ID 唯一性验收：以下标题保留在正文，以�
 ':::: tabs Options | id=tabs-one','','::: tab First','','First tab content.','',':::','','::: tab Second','','Second tab content.','',':::','','::::'].join('\n');
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:30000});
  await page.context().grantPermissions(['clipboard-read','clipboard-write']);

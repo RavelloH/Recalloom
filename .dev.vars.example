@@ -1,6 +1,6 @@
 # Generate a strong value using node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-MCP_AUTH_SECRET=replace-with-a-random-secret
-# The same MCP_AUTH_SECRET is used to approve MCP OAuth clients and log into the Web API.
+MAIN_SECRET=replace-with-a-random-secret
+# Legacy deployments may keep MCP_AUTH_SECRET. MAIN_SECRET takes precedence.
 # Server-side HMAC derives only internal signing/session keys; no second login password is needed.
 # Web authentication rate limiting is ON by default (when unset).
 # Optional local-only E2E override, effective ONLY on 127.0.0.1 / localhost / ::1:

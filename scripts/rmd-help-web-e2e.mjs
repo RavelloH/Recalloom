@@ -1,3 +1,4 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {chromium} from 'playwright-core';
@@ -8,7 +9,7 @@ const executablePath=[
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'
 ].find(existsSync);
-const envLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line));
+const envLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^MCP_AUTH_SECRET\s*=/.test(line));
 assert.ok(executablePath&&envLine,'local browser and isolated test secret required');
 const secret=envLine.slice(envLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
@@ -19,7 +20,7 @@ const expectHelpContent=async text=>assert.ok((await page.locator('.rk-help-pros
 
 try{
  await page.goto(base+'/login',{waitUntil:'domcontentloaded'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:25000});
 

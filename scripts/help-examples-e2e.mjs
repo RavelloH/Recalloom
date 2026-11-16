@@ -1,3 +1,4 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {launchTestBrowser,testOrigin} from './local-browser.mjs';
@@ -5,7 +6,7 @@ import {launchTestBrowser,testOrigin} from './local-browser.mjs';
 // Runs only against a local Worker. The fixtures are taken directly from
 // the published help pages, not a separately maintained copy of the syntax.
 assert.match(testOrigin,/^http:\/\/127\.0\.0\.1:\d+$/);
-const secretLine=readFileSync('.dev.vars','utf8')
+const secretLine=readLocalAuthVars()
  .split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 const secret=secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret,'A local .dev.vars MCP_AUTH_SECRET is required');
@@ -31,7 +32,7 @@ const api=(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{
 const must=(result,status)=>{assert.equal(result.status,status,JSON.stringify(result.data));return result.data;};
 try{
  await page.goto(testOrigin+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(testOrigin+'/',{timeout:30000});
  const suffix=String(Date.now());

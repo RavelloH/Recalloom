@@ -1,3 +1,4 @@
+import {mainSecret,hasMainSecret} from './auth-secret.js';
 import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createRecalloomServer } from './mcp.js';
@@ -49,7 +50,7 @@ function safeEqual(a:string,b:string):boolean{
 }
 async function authorize(request:Request,env:Env):Promise<Response>{
   if(request.method!=='GET'&&request.method!=='POST')return new Response('Method not allowed',{status:405});
-  if(!env.MCP_AUTH_SECRET||env.MCP_AUTH_SECRET==='replace-with-a-random-secret')return new Response('MCP_AUTH_SECRET is not configured',{status:503});
+  if(!hasMainSecret(env))return new Response('MAIN_SECRET is not configured (MCP_AUTH_SECRET fallback is supported)',{status:503});
   const oauth=env.OAUTH_PROVIDER;
   try{
     if(request.method==='GET'){
@@ -84,7 +85,7 @@ async function authorize(request:Request,env:Env):Promise<Response>{
     const attempts=Number(await env.OAUTH_KV.get(attemptsKey)??'0');
     if(attempts>=MAX_AUTH_FAILURES)return page('授权已暂停','<h1>尝试次数过多</h1><p>请稍后重新发起授权。</p>',429);
     const supplied=String(form.get('secret')??'');
-    if(!safeEqual(supplied,env.MCP_AUTH_SECRET)){
+    if(!safeEqual(supplied,mainSecret(env))){
       await env.OAUTH_KV.put(attemptsKey,String(attempts+1),{expirationTtl:AUTH_FAILURE_TTL});
       const parsed = await oauth.parseAuthRequest(request);
       const details = await oauth.describeConsent(parsed);

@@ -6,7 +6,8 @@ export interface Env {
   OAUTH_PROVIDER: OAuthHelpers;
   VECTORIZE: VectorizeIndex;
   AI: Ai;
-  MCP_AUTH_SECRET: string;
+  MAIN_SECRET?: string;
+  MCP_AUTH_SECRET?: string;
   MCP_BASE_URL?: string;
   /** Local E2E only: literal "false" disables Web login rate limiting on loopback. Defaults on. */
   WEB_AUTH_RATE_LIMIT_ENABLED?: string;

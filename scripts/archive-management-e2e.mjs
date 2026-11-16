@@ -1,11 +1,12 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Destructive lifecycle regression on an ISOLATED local Wrangler D1/KV instance.
  * Never run this against production.
  */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 const executablePath=['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(existsSync);
-const line=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
+const line=readLocalAuthVars().split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x));
 assert.ok(executablePath&&line,'local browser and .dev.vars are needed');
 const secret=line.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
@@ -50,7 +51,7 @@ async function deletePreview(record){
 }
 try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:25000});
  const u='lifecycle-'+Date.now(),parent=await makeFolder(u),folderId=parent.id;

@@ -1,5 +1,6 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {chromium,webkit} from 'playwright-core';
 
 const base=process.env.RECALLOOM_TEST_BASE;
@@ -8,7 +9,7 @@ const engine=process.env.RECALLOOM_TEST_ENGINE==='webkit'?'webkit':'chromium';
 const bin=engine==='chromium'?[process.env.RECALLOOM_BROWSER_PATH,
  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
  'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(x=>x&&existsSync(x)):undefined;
-const secretLine=readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
+const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line));
 const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.split('=').slice(1).join('=').trim().replace(/^["']|["']$/g,'');
 assert.ok(secret);
 const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(bin?{executablePath:bin}:{})});
@@ -34,7 +35,7 @@ const faults=[];
 page.on('pageerror',error=>faults.push(error.message));
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  const content='# Original heading\n\nFirst paragraph with **bold** and [link](https://example.org).\n\n';

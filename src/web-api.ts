@@ -66,10 +66,12 @@ webApi.use('*',async(c,next)=>{
   if(!['GET','HEAD','OPTIONS'].includes(method)&&!checkOrigin(c.req.raw))return err('INVALID_ORIGIN',403);
   if(method==='OPTIONS')return err('METHOD_NOT_ALLOWED',405);
   if((path==='/api/auth/cap/challenge'||path==='/api/auth/cap/redeem'||path==='/api/auth/login')&&method==='POST')return next();
-  const who=await session(c.req.raw,c.env);
+  let renewal:{token:string;expiresAt:number}|undefined;
+  const who=await session(c.req.raw,c.env,(token,expiresAt)=>{renewal={token,expiresAt};});
   if(!who)return err('UNAUTHORIZED',401);
   c.set('webSession',who);
-  return next();
+  await next();
+  if(renewal&&!c.res.headers.has('set-cookie'))c.header('set-cookie',cookie(renewal.token,renewal.expiresAt));
 });
 webApi.post('/auth/cap/challenge',(c)=>capChallenge(c.req.raw,c.env));
 webApi.post('/auth/cap/redeem',async(c)=>capRedeem(c.req.raw,c.env,await jsonBody(c.req.raw,z.unknown(),16000)));

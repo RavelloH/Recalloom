@@ -1,8 +1,9 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-import {existsSync,mkdirSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 const url=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
-const secretLine=existsSync('.dev.vars')?readFileSync('.dev.vars','utf8').split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line)):undefined;
+const secretLine=existsSync('.dev.vars')?readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SECRET\s*=/.test(line)):undefined;
 const localSecret=secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'')??'';
 const secret=process.env.RECALLOOM_TEST_SECRET||localSecret;
 if(!secret)throw Error('Set RECALLOOM_TEST_SECRET or provide MCP_AUTH_SECRET in local .dev.vars');
@@ -28,7 +29,7 @@ page.on('response',response=>{
 try{
  await page.goto(url+'/library',{waitUntil:'networkidle'});
  await page.waitForURL('**/login',{timeout:15000});
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(url+'/',{timeout:120000});
  await page.getByRole('heading',{name:'概览'}).waitFor({timeout:18000});

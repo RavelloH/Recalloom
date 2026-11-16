@@ -1,10 +1,11 @@
+import {readLocalAuthVars} from './local-auth-config.mjs';
 /** Recalloom document workspace flows against an isolated local Worker. */
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 
 const bin=[process.env.RECALLOOM_BROWSER_PATH,'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/chromium','/usr/bin/google-chrome'].find(path=>path&&existsSync(path));
-const line=existsSync('.dev.vars')?readFileSync('.dev.vars','utf8').split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x)):undefined;
+const line=existsSync('.dev.vars')?readLocalAuthVars().split(/\r?\n/).find(x=>/^\s*MCP_AUTH_SECRET\s*=/.test(x)):undefined;
 const secret=process.env.RECALLOOM_TEST_SECRET||line?.slice(line.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(bin&&secret,'A local browser and test secret are required');
 const base=process.env.RECALLOOM_TEST_BASE||'http://127.0.0.1:8897';
@@ -21,7 +22,7 @@ const json=path=>page.evaluate(async p=>{const r=await fetch('/api'+p);if(!r.ok)
 const until=async(check,message)=>{for(let i=0;i<60;i++){if(await check())return;await page.waitForTimeout(250);}throw Error('Timed out: '+message);};
 try{
  await page.goto(base+'/login');
- await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);
+ await page.getByPlaceholder('输入授权密钥').fill(secret);
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/',{timeout:120000});
  // A leading digit keeps the fixture folder within the first page of the root tree.

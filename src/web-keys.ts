@@ -1,5 +1,5 @@
-/** Purpose-separated server-side HMAC keys rooted in the existing OAuth secret.
- * Users enter MCP_AUTH_SECRET directly for Web login; only signing, nonce,
+/** Purpose-separated server-side HMAC keys rooted in the effective main secret.
+ * Users enter the configured main secret directly for Web login; only signing, nonce,
  * rate-limit and session keys are derived. No extra password or secret exists.
  */
 const encoder=new TextEncoder();
