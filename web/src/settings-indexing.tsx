@@ -12,6 +12,7 @@ import {AutoResizer,AutoTransition} from './motion-primitives';
 import {ErrorText,Empty,Loading,fmt} from './pages/shared';
 import {IndexChart} from './index-status-chart';
 import {IndexTaskPanel} from './index-task-panel';
+import {SettingsPropertyTable} from './settings-property-table';
 import {stateLabels,stageLabels,type IndexTask,type IndexState,type IndexSummary} from './index-status-data';
 
 export function SettingsIndexing(){
@@ -34,7 +35,17 @@ export function SettingsIndexing(){
    {label:'正在处理',value:count('running'),filter:'running',hint:'正在生成或提交索引'},
    {label:'处理失败',value:count('failed'),filter:'failed',hint:'已停止自动重试'}
   ].map(metric=><Card padding={4} className="index-metric-card" key={metric.label}><span className="muted small">{metric.label}</span><AutoTransition transitionKey={String(metric.value)}><strong className="storage-value">{metric.value}</strong></AutoTransition><p className="muted small">{metric.hint}</p><Button className="index-metric-action" variant="ghost" label={'筛选：'+metric.label} children={<span aria-hidden="true"/>} onClick={()=>setState(metric.filter)}/></Card>)}</div>}</AutoTransition></AutoResizer>
-  <Card padding={4}><div className="index-toolbar"><AutoResizer><AutoTransition transitionKey={data?.model??'loading'}><div className="index-model-title"><h3>索引配置</h3><Badge label={data?.model.split('/').at(-1)?.toUpperCase()??'读取中…'}/>{data&&<Badge variant="info" label={data.dimensions+' 维'}/>}</div></AutoTransition></AutoResizer><div className="index-toolbar"><Button href="/settings/storage" size="sm" variant="ghost" label="查看存储"/><Button size="sm" variant="secondary" label="重新索引全部有效文稿" isLoading={busy==='all'} onClick={()=>void rebuild()}/></div></div><p className="index-model-id muted small">嵌入模型 <code>{data?.model??'—'}</code></p><p className="muted small">每项任务最多尝试 5 次，自动退避重试。待清理文稿 {data?.cleanup.records??'—'} · 待清理向量批次 {data?.cleanup.batches??'—'}</p></Card>
+  <Card padding={4} className="index-config-card">
+   <div className="index-model-title"><h3>索引配置</h3><AutoTransition transitionKey={data?.model??'loading'}><Badge label={data?.model.split('/').at(-1)?.toUpperCase()??'读取中…'}/></AutoTransition></div>
+   <SettingsPropertyTable label="索引配置参数" rows={[
+    {label:'嵌入模型',value:<code>{data?.model??'—'}</code>,transitionKey:data?.model??'loading'},
+    {label:'向量维度',value:data?data.dimensions+' 维':'—',transitionKey:String(data?.dimensions)},
+    {label:'重试策略',value:'最多尝试 5 次，自动退避重试',transitionKey:'retry'},
+    {label:'待清理文稿',value:data?.cleanup.records??'—',transitionKey:String(data?.cleanup.records)},
+    {label:'待清理向量批次',value:data?.cleanup.batches??'—',transitionKey:String(data?.cleanup.batches)}
+   ]}/>
+   <div className="index-config-actions"><Button href="/settings/storage" size="sm" variant="ghost" label="查看存储"/><Button size="sm" variant="secondary" label="重新索引全部有效文稿" isLoading={busy==='all'} onClick={()=>void rebuild()}/></div>
+  </Card>
   <p className="muted small">归档文稿不计入覆盖率。最早等待 {fmt(data?.last.waitingSince??undefined)} · 统计基于当前任务，查看页面时计算。</p>
   {data&&<IndexChart title="待处理任务" emptyTitle="无待处理任务" description="距最近入队的时间，含等待重试；不是累计排队耗时" data={count('pending')+count('retry')>0?data.ageBuckets:[]} kind="bar" fields={[{key:'pending',label:'等待处理'},{key:'retry',label:'等待重试'}]}/>}
   <Card padding={4}><div className="index-toolbar"><h3>文稿索引任务</h3><div className="index-filters"><TextInput label="搜索文稿" isLabelHidden placeholder="搜索文稿…" value={query} onChange={setQuery} size="sm"/><Selector label="任务状态" size="sm" value={state} onChange={setState} options={[{value:'all',label:'全部状态'},{value:'waiting',label:'等待处理 / 重试'},...Object.entries(stateLabels).map(([value,label])=>({value,label}))]}/></div></div>

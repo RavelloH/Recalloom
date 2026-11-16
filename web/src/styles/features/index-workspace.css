@@ -6,7 +6,14 @@
 .index-toolbar p { margin: 6px 0 0; }
 .index-model-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .index-model-title h3 { margin: 0; }
-.index-model-id code { overflow-wrap: anywhere; }
+.index-config-card { min-width: 0; }
+.index-config-card .settings-property-table { margin-block: 16px; }
+.index-config-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+.settings-property-table { width: 100%; table-layout: fixed; }
+.settings-property-table th { width: 36%; font-weight: 400; }
+.settings-property-table tr:last-child th { border-bottom-width: 0; }
+.settings-property-table th, .settings-property-table td { overflow-wrap: anywhere; }
+.settings-property-table code { font-size: inherit; }
 .index-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
 .index-metric-card { position: relative; min-width: 0; }
 .index-metric-card .index-metric-action { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; border-radius: inherit; }
@@ -22,9 +29,6 @@
 .index-task-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .index-task-content { display: flex; gap: 12px; align-items: center; justify-content: space-between; width: 100%; }
 .index-task-name + span { display: grid; justify-items: end; gap: 5px; flex: none; }
-.index-properties { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,2fr); gap: 12px 20px; margin-block: 20px; line-height: 1.6; }
-.index-properties dt { color: var(--color-text-secondary); }
-.index-properties dd { margin: 0; overflow-wrap: anywhere; }
 .index-task-detail { padding: 16px 20px 24px; display: grid; gap: 16px; }
 .index-run { border-top: 1px solid var(--color-border); padding-block: 12px; }
 .index-error { overflow-wrap: anywhere; white-space: pre-wrap; }
@@ -37,5 +41,4 @@
  .index-task-name + span { justify-items: start; }
  .index-filters { width: 100%; }
  .index-filters > :first-child { flex: 1; min-width: 120px; }
- .index-properties { gap: 10px; }
 }
