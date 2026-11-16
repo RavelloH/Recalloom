@@ -7,6 +7,8 @@ test('snippets locate exact phrases beyond the old block prefix',()=>{
  const snippet=searchSnippet('EVIDENCE512',content);
  assert.ok(snippet.includes('EVIDENCE512 使用父章节恢复证据'));
  assert.ok(snippet.startsWith('…'));assert.ok(snippet.length<=350);
+ const nearEnd=searchSnippet('EVIDENCE512','背景说明。'.repeat(100)+'\nEVIDENCE512 最终结论。');
+ assert.ok(nearEnd.length<120,'An evidence window near the end does not pad itself with old boilerplate');
 });
 
 test('partial query matches prefer a window with more distinct terms',()=>{

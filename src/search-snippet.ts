@@ -28,9 +28,9 @@ export function searchSnippet(query:string,content:string,maxChars=350):string{
    if(counts.size>best){best=counts.size;anchor=matches[left]!.start;}
   }
  }
- let start=Math.min(Math.max(0,anchor-60),content.length-width);
+ let start=Math.max(0,anchor-60);
  // Preserve a nearby line or sentence boundary without dropping the evidence.
- const boundary=content.slice(start,Math.min(anchor,start+40)).match(/[\n。！？.!?][^\n。！？.!?]*$/);
+ const boundary=[...content.slice(start,Math.min(anchor,start+40)).matchAll(/\n|[。！？]|[.!?](?=\s)/g)].at(-1);
  if(boundary?.index!==undefined)start+=boundary.index+1;
  // Keep UTF-16 cuts outside surrogate pairs.
  if(start>0&&/[\uDC00-\uDFFF]/.test(content[start]!))start--;
