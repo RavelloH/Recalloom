@@ -1,4 +1,5 @@
 import React,{useMemo,useRef} from 'react';
+import {searchPreviewHighlight} from './search-preview-highlight';
 // Preview is a lazily loaded route. The shared RMD component stylesheet must
 // also be loaded here; importing it only from VisualEditor loses highlight
 // colors, interactive rich component styling and layout on direct preview.
@@ -62,13 +63,13 @@ const components:Components={
 };
 
 /** Safe, read-only preview: GFM, math, and bounded wiki transclusion. */
-function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparison,isRevisionPreview=false,idScope}:{
+function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparison,isRevisionPreview=false,idScope,isSearchPreview=false,searchQuery}:{
  content:string;sourceId?:string;trail?:string[];depth?:number;
  referenceIndex?:ReturnType<typeof collectRmdPreviewRefs>;comparison?:{content:string;side:'added'|'removed'}
- isRevisionPreview?:boolean;idScope?:string;
+ isRevisionPreview?:boolean;idScope?:string;isSearchPreview?:boolean;searchQuery?:string;
 }){
  const sketchRef=useRef<HTMLElement>(null);
- useSketchAnnotations(sketchRef,true,content);
+ useSketchAnnotations(sketchRef,!isSearchPreview,content);
  const {frontmatter,body:syntaxSource,analysis,parseSource}=useMemo(()=>prepareMarkdownPreview(content),[content]);
  const refIndex=useMemo(()=>referenceIndex??collectRmdPreviewRefs(syntaxSource,analysis),[referenceIndex,syntaxSource,analysis]);
  const highlight=useMemo(()=>comparison?revisionWordHighlight(comparison.content,comparison.side):null,[comparison?.content,comparison?.side]);
@@ -131,7 +132,7 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
    const id=String(props['data-id']??props.dataId??'');
    if(!isRmdId(id))return null;
    const item=refIndex.get(id);
-   return item?isRevisionPreview?<span className="rk-cross-reference-read">{item.label}</span>:<a href={'#'+anchor(id)} className="rk-cross-reference-read">{item.label}</a>
+   return item?(isRevisionPreview||isSearchPreview)?<span className="rk-cross-reference-read">{item.label}</span>:<a href={'#'+anchor(id)} className="rk-cross-reference-read">{item.label}</a>
     :<span className="rk-cross-reference-read rk-cross-reference-missing" title={'缺少目标块 '+id}>{'引用不存在：'+id}</span>;
   },
   'rk-numbered-math':({node:_node,...props}:Record<string,unknown>)=>{
@@ -148,6 +149,7 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
    const kind=String(props['data-kind']??props.dataKind??'info'),title=String(props['data-title']??props.dataTitle??'');
    const rawId=String(props['data-id']??props.dataId??'');
    const content=()=>{
+   if(isSearchPreview)return <section><strong>{richTitle(kind,title)}</strong>{props.children as React.ReactNode}</section>;
    if(kind==='flashcard')return <FlashcardPreview title={title}>{props.children as React.ReactNode}</FlashcardPreview>;
    if(kind==='front')return <Card variant="muted" padding={3} className="rk-flashcard-panel rk-flashcard-front">
     <FlashcardSideTitle side="front"/>
@@ -201,11 +203,23 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
     sourceId={sourceId} trail={chain} depth={depth}
     render={(body,id,next,nextDepth)=><MarkdownPreview content={body} sourceId={id} trail={next} depth={nextDepth}/>}/>
  };
- return <article className="markdown-preview" ref={sketchRef}>
+ const searchComponents=isSearchPreview?{
+  a:({children}:{children?:React.ReactNode})=><span>{children}</span>,
+  img:({alt}:{alt?:string})=><span>{alt||'图片'}</span>,
+  pre:({children}:{children?:React.ReactNode})=><pre>{children}</pre>,
+  'wiki-ref':(props:Record<string,unknown>)=><span>{wikiDecode(String(props['data-alias']??props['data-target']??''))}</span>,
+  'wiki-embed':()=><span>嵌入文稿</span>,
+  'rk-link-card':(props:Record<string,unknown>)=><span>{String(props['data-title']??props.dataTitle??'链接')}</span>,
+  'rk-figure':()=><span>图片</span>,
+  'rk-abbr':({children}:{children?:React.ReactNode})=><span>{children}</span>,
+  'rk-tooltip':({children}:{children?:React.ReactNode})=><span>{children}</span>,
+  'rk-cloze':({children}:{children?:React.ReactNode})=><span>{children}</span>
+ }:{};
+ return <article className="markdown-preview" ref={sketchRef} inert={isSearchPreview||undefined}>
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter}</p>}
   <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource,analysis)]}
-   rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,previewSchema],...(scopeIds?[scopeIds]:[]),...(highlight?[highlight]:[]),rehypeKatex]}
-   components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
+   rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,previewSchema],...(scopeIds?[scopeIds]:[]),...(highlight?[highlight]:[]),...(searchQuery?[[searchPreviewHighlight,searchQuery] as const]:[]),rehypeKatex]}
+   components={{...components,...custom,...searchComponents} as Components}>{parseSource}</ReactMarkdown>
  </article>;
 }
 

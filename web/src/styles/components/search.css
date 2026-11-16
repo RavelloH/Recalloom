@@ -144,6 +144,17 @@ html[data-effective-theme="dark"] .search-highlight {
   word-break: normal;
 }
 
+.search-snippet .markdown-preview {
+  max-height: 22rem;
+  overflow: hidden;
+  white-space: normal;
+  font-size: inherit;
+}
+
+.search-snippet .markdown-preview > :first-child {
+  margin-top: 0;
+}
+
 .search-result .muted.tiny {
   font-size: var(--rk-font-small);
 }

@@ -273,6 +273,9 @@ try{
  console.log('PAGE STEP search result visible');
  await result.waitFor();
  await result.locator('.search-snippet').filter({hasText:'Readable link'}).waitFor();
+ await result.locator('.search-snippet strong').filter({hasText:'Page primitive regression.'}).waitFor();
+ assert.equal(await result.locator('.search-snippet .katex').count(),1,'Search renders formula markup');
+ assert.equal(await result.locator('.search-snippet a').count(),0,'Result previews keep one navigation target');
  const summaryText=await result.locator('.search-snippet').textContent();
  assert.ok(summaryText.includes('Readable link')&&summaryText.includes('P=UI'));
  assert.ok(!summaryText.includes('**')&&!summaryText.includes('https://')&&!summaryText.includes('$'),'Search displays readable Markdown summaries');
