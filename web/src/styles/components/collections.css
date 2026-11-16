@@ -1,68 +1,33 @@
-/* Recalloom styles — owned by components / collections */
-
-.grant-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-top: 1px solid var(--color-border,rgba(128,128,128,.15));
-}
-
-.grant-row:first-of-type {
-  border-top: 0;
-}
-
-.grant-row > button {
-  flex: none;
-}
-
-.access-title,
-.grant-scopes {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.access-details {
-  padding-block: 4px;
-}
-
-.access-agent {
-  overflow-wrap: anywhere;
-}
-
-.grant-details {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.grant-details strong {
-  font-size: var(--rk-font-body);
-  font-weight: 620;
-}
-
-.grant-details p {
-  margin: 6px 0 0;
-}
-
-.grant-scopes {
-  color: var(--color-text-secondary,#888);
-  font-size: var(--rk-font-small);
-  word-break: break-word;
-}
-
+/* Access management shares one row rhythm across grants and browser sessions. */
+.access-section-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.access-section-header > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.settings-panel .access-section-header h2 { margin: 0; }
+.settings-panel .access-section-description { margin: 12px 0 20px; max-width: 65ch; }
+.access-list { position: relative; }
+.access-entry { border-top: 1px solid var(--rk-border-soft); }
+.grant-row, .session-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 20px 0; }
+.grant-row > button, .session-row > button { justify-self: end; }
+.access-icon { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--rk-border-soft); border-radius: 10px; color: var(--rk-ink-soft); }
+.session-row.is-current .access-icon { background: var(--color-background-muted); color: var(--color-text-primary); }
+.session-details, .grant-details { min-width: 0; overflow-wrap: anywhere; }
+.access-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 28px; }
+.access-title strong { font-size: var(--rk-font-body); font-weight: 620; }
+.settings-panel .access-meta { font-size: var(--rk-font-small); margin: 4px 0 0; line-height: 1.6; }
+.grant-scopes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.access-disclosure { margin-top: 8px; }
+.access-disclosure > button { padding-inline: 0; height: auto; min-height: 28px; color: var(--rk-ink-soft); }
+.access-chevron { display: inline-flex; }
+.access-details { margin-top: 8px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-text-primary,#666) 5%, var(--rk-canvas)); }
+.settings-panel .access-details p { font-size: var(--rk-font-small); margin: 0; }
+.access-details p + p { margin-top: 8px; }
+.access-agent { overflow-wrap: anywhere; }
+.access-agent code { font-size: inherit; white-space: normal; }
+.access-load-more { display: flex; justify-content: center; padding-top: 12px; }
 @media (max-width: 720px) {
-
-.grant-row {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.grant-row > button {
-  align-self: flex-end;
-}
+ .settings-panel.access-panel { --container-padding-inline-start: 16px; --container-padding-inline-end: 16px; }
+ .grant-row, .session-row { grid-template-columns: 30px minmax(0, 1fr); gap: 10px 12px; padding-block: 16px; }
+ .access-icon { width: 30px; height: 30px; border-radius: 8px; }
+ .grant-row > button, .session-row > button { grid-column: 2; justify-self: end; }
+ .access-title { align-items: flex-start; }
+ .settings-panel .access-section-description { margin-bottom: 16px; }
 }

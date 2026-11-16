@@ -14,7 +14,7 @@ const secretLine=readLocalAuthVars().split(/\r?\n/).find(line=>/^\s*MCP_AUTH_SEC
 const secret=process.env.RECALLOOM_TEST_SECRET||secretLine?.slice(secretLine.indexOf('=')+1).trim().replace(/^["']|["']$/g,'');
 assert.ok(secret,'A local test secret is required');
 const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(executable?{executablePath:executable}:{})});
-const context=await browser.newContext({viewport:{width:1365,height:900}});
+const context=await browser.newContext({viewport:{width:1365,height:900},colorScheme:process.env.RECALLOOM_TEST_COLOR_SCHEME==='dark'?'dark':'light'});
 await context.addInitScript(()=>{
  window.__pageTransitions=[];
  if(document.startViewTransition){
@@ -59,10 +59,22 @@ page.on('pageerror',error=>{
  else faults.push(notice);
 });
 let sessionCookie='',emptyGraph=false;
+let accessGrants=[{id:'fixture-grant',clientId:'fixture-client',clientName:'测试 Agent · 知识库助手',scope:['notes:read','notes:write'],createdAt:1794700000,expiresAt:null,redirectHost:'agent.example.test'}];
+let extraSessions=[{id:'fixture-session',createdAt:Date.now()-86400000,lastSeenAt:Date.now()-3600000,expiresAt:Date.now()+86400000,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 Version/27.0.1 Mobile/15E148 Safari/604.1'}];
 await page.route('**/api/**',async route=>{
  const request=route.request(),url=new URL(request.url());
  if(url.pathname==='/api/auth/oauth-grants'&&request.method()==='GET'){
-  await route.fulfill({json:{items:[{id:'fixture-grant',clientId:'fixture-client',clientName:'测试 Agent · 知识库助手',scope:['notes:read','notes:write'],createdAt:1794700000,expiresAt:null,redirectHost:'agent.example.test'}],cursor:null}});return;
+  await route.fulfill({json:{items:accessGrants,cursor:null}});return;
+ }
+ if(url.pathname==='/api/auth/oauth-grants/fixture-extra'&&request.method()==='DELETE'){
+  accessGrants=accessGrants.filter(grant=>grant.id!=='fixture-extra');await route.fulfill({json:{revoked:true}});return;
+ }
+ if(url.pathname==='/api/auth/sessions'&&request.method()==='GET'){
+  const response=await route.fetch(sessionCookie?{headers:{...await request.allHeaders(),cookie:sessionCookie}}:undefined);
+  const data=await response.json();await route.fulfill({json:{...data,items:[...data.items,...extraSessions]}});return;
+ }
+ if(url.pathname==='/api/auth/sessions/fixture-session'&&request.method()==='DELETE'){
+  extraSessions=[];await route.fulfill({json:{revoked:true}});return;
  }
  if(emptyGraph&&url.pathname==='/api/graph'){
   await route.fulfill({json:{nodes:[],edges:[],focusId:null,semanticStatus:'disabled',limit:80,scope:'recent'}});
@@ -179,6 +191,18 @@ try{
  await page.getByText('测试 Agent · 知识库助手',{exact:true}).waitFor();
  await page.getByText('读取内容',{exact:true}).waitFor();
  await page.getByRole('button',{name:'撤销授权',exact:true}).waitFor();
+ const grantRow=page.locator('.grant-row').filter({hasText:'测试 Agent · 知识库助手'});
+ await grantRow.getByRole('button',{name:'授权详情',exact:true}).click();
+ await grantRow.getByText('fixture-client',{exact:true}).waitFor();
+ accessGrants.push({id:'fixture-extra',clientId:'extra-client',clientName:'第二个 Agent',scope:['notes:read'],createdAt:1794700000,expiresAt:null,redirectHost:'second.example.test'});
+ await page.getByRole('button',{name:'刷新',exact:true}).click();
+ const extraGrant=page.locator('.grant-row').filter({hasText:'第二个 Agent'});
+ await extraGrant.waitFor();
+ assert.equal(await grantRow.getByRole('button',{name:'授权详情',exact:true}).getAttribute('aria-expanded'),'true','Adding a grant preserves expanded details');
+ await extraGrant.getByRole('button',{name:'撤销授权',exact:true}).click();
+ await page.getByRole('alertdialog',{name:'撤销 Agent 授权？',exact:true}).getByRole('button',{name:'撤销授权',exact:true}).click();
+ await extraGrant.waitFor({state:'detached'});
+ assert.equal(await grantRow.getByRole('button',{name:'授权详情',exact:true}).getAttribute('aria-expanded'),'true','Removing a grant preserves other rows');
  await page.screenshot({path:'tmp/settings-oauth-'+engine+'.png'});
  const activeTab=settings.getByRole('link',{name:'Agent 授权',exact:true});
  assert.ok(await activeTab.evaluate(el=>el.classList.contains('active')&&getComputedStyle(el).backgroundColor!=='rgba(0, 0, 0, 0)'),'Current settings tab has a visible background');
@@ -190,6 +214,11 @@ try{
  await currentRow.getByRole('button',{name:'退出此会话',exact:true}).waitFor();
  await currentRow.getByRole('button',{name:'会话详情',exact:true}).click();
  await currentRow.getByText(/到期时间/).waitFor();
+ const otherRow=page.locator('.session-row').filter({hasText:'Safari · iPhone'});
+ await otherRow.getByRole('button',{name:'撤销会话',exact:true}).click();
+ await page.getByRole('alertdialog',{name:'撤销登录会话？',exact:true}).getByRole('button',{name:'撤销会话',exact:true}).click();
+ await otherRow.waitFor({state:'detached'});
+ assert.equal(await currentRow.getByRole('button',{name:'会话详情',exact:true}).getAttribute('aria-expanded'),'true','Revoking another session preserves current details');
  await currentRow.getByRole('button',{name:'退出此会话',exact:true}).click({trial:true});
  await page.screenshot({path:'tmp/settings-sessions-'+engine+'.png'});
  console.log('PAGE STEP settings mobile resize');
@@ -197,6 +226,9 @@ try{
  await noPageOverflow();
  const sessionButton=currentRow.getByRole('button',{name:'退出此会话',exact:true});
  assert.ok(await sessionButton.evaluate(el=>el.getBoundingClientRect().right<=innerWidth),'Session action remains within the mobile viewport');
+ await page.waitForTimeout(450);
+ assert.ok(await sessionButton.evaluate(el=>el.getBoundingClientRect().bottom<=el.closest('.access-panel').getBoundingClientRect().bottom),'Session actions fit after their resize animation');
+ await page.screenshot({path:'tmp/settings-sessions-mobile-'+engine+'.png'});
  await page.screenshot({path:'tmp/settings-sessions-mobile-'+engine+'.png'});
  const backup=settings.getByRole('link',{name:'备份',exact:true});
  const backupTransition=await transitionCount();
@@ -306,6 +338,49 @@ try{
  await result.focus();await result.press('Enter');await page.waitForURL(base+'/records/'+fresh.id);
  await settledView(recordTransition);
  assert.equal(await page.evaluate(()=>window.__pageSpaSentinel),'retained','Keyboard card activation remains SPA');
+
+ console.log('PAGE STEP compact search previews');
+ await page.route('**/api/search?**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.searchParams.get('query')!=='layout-preview'){await route.fallback();return;}
+  await new Promise(resolve=>setTimeout(resolve,650));
+  await route.fulfill({json:{items:url.searchParams.get('mode')==='metadata'?[]:[
+   {id:fresh.id,name:'layout-preview.md',kind:'document',source:'literal',path:'/Projects/layout-preview.md',snippetFormat:'markdown',snippet:'# Search heading\n\n'+Array.from({length:16},(_,i)=>'Paragraph '+i+' with **bold content**, a [readable link](https://example.test), and layout-preview.').join('\n\n')},
+   {id:record.id,name:'Semantic preview',kind:'document',source:'semantic',snippetFormat:'text',snippet:'layout-preview semantic text. '.repeat(90)},
+   {id:record.id,name:'Description only',kind:'document',source:'metadata',description:'A long layout-preview description. '.repeat(100)}
+  ]}});
+ });
+ await page.goto(base+'/search?q=layout-preview',{waitUntil:'domcontentloaded'});
+ await page.getByRole('status',{name:'正在搜索…',exact:true}).waitFor();
+ const previewCard=page.locator('.search-result-card').filter({has:page.locator('a[href="/records/'+fresh.id+'"]')});
+ await previewCard.getByRole('button',{name:'展开片段',exact:true}).waitFor();
+ const clip=previewCard.locator('.search-snippet');
+ const clipped=await clip.evaluate(el=>({height:el.getBoundingClientRect().height,mask:getComputedStyle(el).maskImage,truncated:el.hasAttribute('data-truncated')}));
+ assert.ok(clipped.truncated&&clipped.height<=180&&clipped.mask.includes('linear-gradient'),JSON.stringify(clipped));
+ assert.equal(await previewCard.locator('a a, a button').count(),0,'Preview controls are outside document links');
+ const beforeExpand=page.url();
+ await previewCard.getByRole('button',{name:'展开片段',exact:true}).click();
+ await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute('data-expanded'),await clip.getAttribute('id'));
+ assert.equal(page.url(),beforeExpand,'Expanding a snippet keeps the search page');
+ await previewCard.getByRole('button',{name:'收起片段',exact:true}).click();
+ await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute('data-truncated'),await clip.getAttribute('id'));
+ const semanticCard=page.locator('.search-result-card').filter({hasText:'Semantic preview'});
+ assert.equal(await semanticCard.locator('.search-highlight').count(),0,'Semantic-only snippets do not imply exact matches');
+ const descriptionCard=page.locator('.search-result-card').filter({hasText:'Description only'});
+ await descriptionCard.getByRole('button',{name:'展开片段',exact:true}).waitFor();
+ assert.equal(await descriptionCard.locator('.search-snippet').getAttribute('data-truncated'),'true','Long descriptions share the bounded preview');
+ await page.waitForTimeout(350);
+ await page.screenshot({path:'tmp/search-compact-'+engine+'.png'});
+ await page.getByRole('radio',{name:'名称',exact:true}).click();
+ await page.getByRole('heading',{name:'未找到结果',exact:true}).waitFor();
+ await page.getByRole('radio',{name:'智能',exact:true}).click();
+ await previewCard.getByRole('button',{name:'展开片段',exact:true}).waitFor();
+ await page.setViewportSize({width:390,height:900});
+ await noPageOverflow();
+ assert.ok(await clip.evaluate(el=>el.getBoundingClientRect().height<=140),'Mobile snippets use a compact preview height');
+ await page.waitForTimeout(450);
+ assert.ok(await previewCard.evaluate(el=>el.querySelector('.search-result-footer').getBoundingClientRect().top-el.querySelector('.search-snippet').getBoundingClientRect().bottom<40),'Preview footer follows the clipped content after resizing');
+ await page.screenshot({path:'tmp/search-compact-mobile-'+engine+'.png'});
 
  console.log('PAGE STEP graph');
  emptyGraph=true;
