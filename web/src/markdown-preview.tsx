@@ -218,7 +218,7 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
  return <article className="markdown-preview" ref={sketchRef} inert={isSearchPreview||undefined}>
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter}</p>}
   <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource,analysis)]}
-   rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,previewSchema],...(scopeIds?[scopeIds]:[]),...(highlight?[highlight]:[]),...(searchQuery?[[searchPreviewHighlight,searchQuery] as const]:[]),rehypeKatex]}
+   rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,previewSchema],...(scopeIds?[scopeIds]:[]),...(highlight?[highlight]:[]),...(searchQuery?[[searchPreviewHighlight,searchQuery] as [typeof searchPreviewHighlight,string]]:[]),rehypeKatex]}
    components={{...components,...custom,...searchComponents} as Components}>{parseSource}</ReactMarkdown>
  </article>;
 }

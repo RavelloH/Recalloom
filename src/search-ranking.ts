@@ -21,24 +21,37 @@ export function searchTerms(query:string):string[]{
 }
 
 /** Prefer a document's own title to mentions in another document's body. */
-export function searchTitleMatch(query:string,titles:string[]):number{
+export function prepareTitleMatch(query:string){
   const normalize=(text:string)=>text.toLowerCase().replace(/\.md$/,'').replace(/[\s|｜·:_—–-]+/g,'');
-  const needle=normalize(query),values=titles.map(normalize).filter(Boolean);
-  if(!needle)return 0;
-  if(values.includes(needle))return 3;
-  return needle.length>=2&&values.some(title=>title.includes(needle))?2:0;
+  const needle=normalize(query);
+  return (titles:string[])=>{
+    const values=titles.map(normalize).filter(Boolean);
+    if(!needle)return 0;
+    if(values.includes(needle))return 3;
+    return needle.length>=2&&values.some(title=>title.includes(needle))?2:0;
+  };
 }
 
-export function semanticIntentScore(query: string, passage: string, similarity: number): number {
+export function searchTitleMatch(query:string,titles:string[]):number{
+  return prepareTitleMatch(query)(titles);
+}
+
+export function prepareSemanticIntent(query:string){
   const negative = [...query.matchAll(/(?:而不是|不是|而非|不使用|不用|排除|instead of|rather than|without)\s*([^，。！？,;；.!?\n]{2,30})/gi)]
     .map(match => match[1]!.trim().toLowerCase());
   const positiveQuery = query.replace(/(?:而不是|不是|而非|不使用|不用|排除|instead of|rather than|without)\s*[^，。！？,;；.!?\n]{2,30}/gi,'');
-  const lower = passage.toLowerCase();
   const tokens=searchTerms(positiveQuery);
-  const matched = tokens.filter(token=>lower.includes(token)).length;
-  const coverage=tokens.length ? matched/tokens.length : 0;
-  const excluded = negative.some(phrase => lower.includes(phrase));
-  return Math.min(1,Math.max(0,similarity + 0.06*coverage - (excluded ? 0.15 : 0)));
+  return (passage:string,similarity:number)=>{
+    const lower=passage.toLowerCase();
+    const matched=tokens.filter(token=>lower.includes(token)).length;
+    const coverage=tokens.length?matched/tokens.length:0;
+    const excluded=negative.some(phrase=>lower.includes(phrase));
+    return Math.min(1,Math.max(0,similarity+0.06*coverage-(excluded?0.15:0)));
+  };
+}
+
+export function semanticIntentScore(query:string,passage:string,similarity:number){
+ return prepareSemanticIntent(query)(passage,similarity);
 }
 
 export function reciprocalRankFusion(lexicalRank?:number,semanticRank?:number):number {
@@ -56,7 +69,7 @@ export function paragraphChunks(content:string,maxChars=1200):string[] {
 }
 
 /** UTF-16 source positions use the same boundaries as the embedding input. */
-export function paragraphChunkSpans(content:string,maxChars=1200):Array<{text:string;start:number;end:number}>{
+export function paragraphChunkSpans(content:string,maxChars=1200,maxChunks=500):Array<{text:string;start:number;end:number}>{
   const text=content.trim();
   if(!text)return [];
   const offset=content.length-content.trimStart().length;
@@ -64,7 +77,7 @@ export function paragraphChunkSpans(content:string,maxChars=1200):Array<{text:st
   const overlap=Math.min(120,Math.floor(max/10));
   const chunks:Array<{text:string;start:number;end:number}>=[];
   let start=0;
-  while(start<text.length && chunks.length<500){
+  while(start<text.length && chunks.length<Math.min(500,maxChunks)){
     if(text.length-start<=max) {
       chunks.push({text:text.slice(start),start:start+offset,end:text.length+offset});
       break;

@@ -213,3 +213,15 @@ test('literal excerpts focus on body evidence even when the indexed name also ma
  assert.equal(row.id,record.id);assert.ok(row.snippet.includes('正文末尾的实际证据'));
  assert.ok(row.lineStart!>1);assert.equal(row.snippet.includes('**'),true);
 });
+
+test('candidate prefixes preserve late body matches and authoritative line ranges',async()=>{
+ const f=fixture();
+ const content='# 大文稿\n\n'+('背景内容。\n'.repeat(3000))+'\nLATE_MATCH_8192 命中尾部正文';
+ const record=await createRecord(f.env,{name:'large.md',content});
+ const result=await search(f.env,{query:'LATE_MATCH_8192',mode:'literal',limit:1});
+ const row=result.results[0]!;
+ assert.equal(row.id,record.id);assert.equal(row.score,1);
+ assert.ok(row.snippet.includes('命中尾部正文'));
+ const raw=await readRecord(f.env,row.id,{revision:row.revision,lineStart:row.lineStart,maxLines:row.lineEnd!-row.lineStart!+1});
+ assert.ok('content' in raw&&raw.content.includes('LATE_MATCH_8192'));
+});

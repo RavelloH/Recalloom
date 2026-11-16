@@ -5,9 +5,7 @@ import { getRecord,revisionContent } from './storage.js';
 export type MarkdownHeading={level:number;title:string;lineStart:number;lineEnd:number};
 
 /** Extract structural Markdown headings without evaluating MDX, HTML or embedded code. */
-export function parseMarkdownOutline(content:string,limit=100,cursor=0){
-  const lines=content.split(/\r\n|\r|\n/);
-  const headings:Array<Omit<MarkdownHeading,'lineEnd'>>=[];
+function* scanMarkdownHeadings(lines:string[]):Generator<Omit<MarkdownHeading,'lineEnd'>>{
   let fenceChar='',fenceLength=0;
   let frontmatter=lines[0]?.trim()==='---';
   for(let i=0;i<lines.length;i++){
@@ -26,15 +24,24 @@ export function parseMarkdownOutline(content:string,limit=100,cursor=0){
     const atx=line.match(/^ {0,3}(#{1,6})(?:[ \t]+|$)(.*)$/);
     if(atx){
       const title=atx[2]!.trim().replace(/[ \t]+#+[ \t]*$/,'').trim();
-      if(title)headings.push({level:atx[1]!.length,title,lineStart:i+1});
+      if(title)yield {level:atx[1]!.length,title,lineStart:i+1};
       continue;
     }
     const underline=lines[i+1]?.match(/^ {0,3}(=+|-+)[ \t]*$/);
     if(underline&&line.trim()&&!/^\s*(?:[-+*]\s|\d+[.)]\s|>|<|\||#)/.test(line)){
-      headings.push({level:underline[1]![0]==='='?1:2,title:line.trim(),lineStart:i+1});
+      yield {level:underline[1]![0]==='='?1:2,title:line.trim(),lineStart:i+1};
       i++;
     }
   }
+}
+
+export function firstMarkdownHeading(content:string){
+ return scanMarkdownHeadings(content.split(/\r\n|\r|\n/)).next().value;
+}
+
+export function parseMarkdownOutline(content:string,limit=100,cursor=0){
+  const lines=content.split(/\r\n|\r|\n/);
+  const headings=[...scanMarkdownHeadings(lines)];
   const expanded:MarkdownHeading[]=headings.map((h,i)=>{
     const next=headings.slice(i+1).find(n=>n.level<=h.level);
     return {...h,lineEnd:next?next.lineStart-1:lines.length};

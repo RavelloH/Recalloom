@@ -62,6 +62,7 @@ function fixture(similarities:Record<string,number>,lexicalMatches:string[]=[]){
             if(sql.includes('SELECT r.id,r.name,r.kind')) return {results:docs.filter(d=>lexicalMatches.includes(d.id)).map(d=>({
               ...d,kind:'document',status:'active',revision:1
             }))};
+            if(sql.includes('SELECT r.id,r.name,c.revision,c.content'))return {results:docs.filter(d=>_args.includes(d.id)).map(d=>({...d,revision:1}))};
             throw Error('Unexpected SQL: '+sql);
           }
         })
