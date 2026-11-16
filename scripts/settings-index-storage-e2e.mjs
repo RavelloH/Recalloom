@@ -14,6 +14,8 @@ if(engine==='webkit')await page.route('**/api/**',async route=>{const request=ro
 const call=(path,body)=>page.evaluate(async({path,body})=>{const r=await fetch('/api'+path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:undefined);return {status:r.status,data:await r.json()};},{path,body});
 try{
  await page.goto(base+'/login',{waitUntil:'networkidle'});await page.getByPlaceholder('输入 MCP_AUTH_SECRET').fill(secret);await page.getByRole('button',{name:'登录',exact:true}).click();await page.waitForURL(base+'/');
+ await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
+ await page.getByRole('heading',{name:'待处理任务',exact:true}).waitFor();await page.getByText('无待处理任务',{exact:true}).waitFor();
  const one=(await call('/records',{name:'索引状态测试 · 长标题需要在移动端正常排列.md',content:'# Test\n\nIndex data',kind:'document'})).data;
  const two=(await call('/records',{name:'另一篇索引任务.md',content:'# Another',kind:'document'})).data;
  const summary=await call('/index');assert.equal(summary.status,200);assert.ok(summary.data.coverage.total>=2);
@@ -24,6 +26,9 @@ try{
  await page.goto(base+'/settings/indexing',{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:'索引运行情况',exact:true}).waitFor();
  assert.equal(await page.locator('.settings-nav a.active').count(),1);
+ const metricStyle=await page.locator('.index-metric-card').first().evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.borderTopColor,s.borderTopWidth,s.borderRadius,s.padding];});
+ await page.getByRole('button',{name:'筛选：等待处理 / 重试',exact:true}).click();
+ await page.getByRole('button',{name:one.name,exact:true}).waitFor();
  await page.getByRole('button',{name:'重新索引全部有效文稿',exact:true}).click();
  const rebuildDialog=page.getByRole('alertdialog',{name:'重新索引全部有效文稿？',exact:true});await rebuildDialog.waitFor();
  await rebuildDialog.getByRole('button',{name:'取消',exact:true}).click();
@@ -40,6 +45,7 @@ try{
  await page.getByRole('complementary',{name:'索引详情：'+one.name,exact:true}).getByRole('button',{name:'关闭',exact:true}).click();
  await page.getByRole('navigation',{name:'设置页面'}).getByRole('link',{name:'存储',exact:true}).click();await page.waitForURL(base+'/settings/storage');
  await page.getByRole('heading',{name:'存储容量',exact:true}).waitFor();await page.getByText('逻辑数据量',{exact:true}).waitFor();
+ assert.deepEqual(await page.locator('.index-metrics > .astryx-card').first().evaluate(el=>{const s=getComputedStyle(el);return [s.backgroundColor,s.borderTopColor,s.borderTopWidth,s.borderRadius,s.padding];}),metricStyle,'Index metrics match native storage cards');
  await page.waitForFunction(()=>!document.querySelector('.index-workspace').getAnimations({subtree:true}).some(a=>a.playState==='running'));
  assert.equal(await page.getByRole('heading',{name:'索引与清理',exact:true}).count(),0);
  await page.screenshot({path:'tmp/settings-storage-desktop-'+engine+'.png'});
