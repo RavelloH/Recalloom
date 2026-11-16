@@ -60,7 +60,10 @@ function projectControls(source:string,tree:Node):string{
   const label=visibleArguments(match[2]!,false);return label||'链接';
  },true);
  replace(/^ {0,3}:{3,}[ \t]*$/gm,()=> '');
- replace(/@ attrs(?:[ \t]+([^@\r\n]*?))?[ \t]+@/g,match=>visibleArguments(match[1]??'',false),true);
+ replace(/@ attrs(?:[ \t]+([^@\r\n]*?))?[ \t]+@/g,match=>{
+  const label=visibleArguments(match[1]??'',false);
+  return label?'\n\n'+label+'\n\n':'';
+ },true);
  replace(/%%[\s\S]*?%%/g,()=> '');
  let result=source;
  for(const patch of patches.sort((a,b)=>b.start-a.start))result=result.slice(0,patch.start)+patch.text+result.slice(patch.end);

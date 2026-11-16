@@ -17,6 +17,7 @@ test('RMD controls and Wiki UUIDs disappear while labels, captions and chat send
  const text=searchMarkdownText(source);
  for(const value of ['参数说明','稳定版','重要','P=UI','模型研究','用户甲','请保留消息正文','项目：电压','数值：220 V','电气参数','嵌入文稿','项目主页'])assert.ok(text.includes(value),value+'\n'+text);
  for(const marker of [':::',':: badge','open=true','role=user','@ attrs','table-one',id,'https://','| ---'])assert.equal(text.includes(marker),false,marker);
+ assert.equal(text.includes('项目：电气参数'),false,'A table caption is not a table data row');
 });
 
 test('code and math protect literal Markdown, RMD, comments and Wiki expressions',()=>{
