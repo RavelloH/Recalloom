@@ -42,7 +42,10 @@ export function arrangeGraph(nodes:KnowledgeNode[],edges:KnowledgeEdge[],focusId
   const width=Math.max(120,viewport.width-160),height=Math.max(100,viewport.height-140);
   const points=[...positions.values()];
   const radiusX=Math.max(1,...points.map(point=>Math.abs(point.x))),radiusY=Math.max(1,...points.map(point=>Math.abs(point.y)));
-  const scaleX=width/(2*radiusX),scaleY=height/(2*radiusY);
+  // Preserve model-space separation. The camera scales node bodies and their
+  // positions together, while this stretch follows the viewport's aspect ratio.
+  const fitScale=Math.min(1,width/(2*radiusX),height/(2*radiusY));
+  const scaleX=width/(2*radiusX)/fitScale,scaleY=height/(2*radiusY)/fitScale;
   for(const [id,point] of positions)positions.set(id,{x:point.x*scaleX,y:point.y*scaleY});
  }
  return {positions,neighbors};

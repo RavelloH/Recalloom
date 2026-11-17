@@ -4,6 +4,8 @@
  --activity-system: var(--rk-ink-faint);
  --activity-unknown: var(--rk-border-soft);
 }
+.activity-type-filter { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.activity-type-filter > :first-child { flex: 1; min-width: 0; }
 .activity-extra-filters { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; padding: 0 0 22px; }
 .activity-custom-range { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .activity-custom-range > :first-child, .activity-custom-range > :nth-child(3) { width: 170px; }
@@ -55,6 +57,11 @@
 .activity-task-change > div { margin-top: 5px; font-size: var(--rk-font-small); }
 .activity-detail-note, .activity-detail-error { margin-top: 18px; line-height: 1.7; font-size: var(--rk-font-small); }
 
+@media (max-width: 720px) {
+ .activity-page .workspace-toolbar-filters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .activity-page .workspace-toolbar-filters > * { width: 100%; }
+ .activity-type-filter { grid-column: 1 / -1; }
+}
 @media (max-width: 640px) {
  .activity-period { gap: 6px; }
  .activity-period > span { width: 100%; }

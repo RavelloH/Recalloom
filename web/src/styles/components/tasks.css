@@ -168,6 +168,19 @@
 }
 
 @media (max-width: 720px) {
+  .tasks-page .workspace-toolbar-filters {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .tasks-page .workspace-toolbar-filters > .tasks-view-switch {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .tasks-page .workspace-toolbar-meta {
+    display: none;
+  }
 
 .task-item {
   gap: 9px;

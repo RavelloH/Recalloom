@@ -10,14 +10,16 @@ const edge=(from:number,to:number,type:KnowledgeEdge['type']='explicit',score=.9
 });
 
 describe('knowledge graph exploration layout',()=>{
- it('fits wide and portrait viewports without clipping the outer context',()=>{
+ it('adapts the aspect ratio without compressing nodes into each other',()=>{
   for(const viewport of [{width:1100,height:600},{width:360,height:470}]){
    const result=arrangeGraph(nodes,[edge(0,1),edge(2,0)],nodes[0].id,viewport);
    assert.deepEqual(result.positions.get(nodes[0].id),{x:0,y:0});
-   for(const point of result.positions.values()){
-    assert.ok(Math.abs(point.x)<= (viewport.width-160)/2+.01);
-    assert.ok(Math.abs(point.y)<= (viewport.height-140)/2+.01);
-   }
+   const points=[...result.positions.values()];
+   for(let a=0;a<points.length;a++)for(let b=a+1;b<points.length;b++)
+    assert.ok(Math.hypot(points[a].x-points[b].x,points[a].y-points[b].y)>40,'Model-space nodes stay separated');
+   const width=Math.max(...points.map(point=>Math.abs(point.x)))*2;
+   const height=Math.max(...points.map(point=>Math.abs(point.y)))*2;
+   assert.ok(Math.abs(width/height-(viewport.width-160)/(viewport.height-140))<.001,'World layout follows the canvas aspect ratio');
   }
  });
  it('keeps every background document while centering incoming and outgoing neighbors',()=>{

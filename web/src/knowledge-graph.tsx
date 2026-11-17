@@ -16,7 +16,7 @@ import {AutoResizer,AutoTransition} from './motion-primitives';
 import {PageTitle,LoadingRows} from './pages/shared';
 import {useGraphData} from './graph-data';
 import {semanticMessage,type KnowledgeEdge} from './graph-types';
-import {GraphCanvas,useGraphViewHeight} from './graph-canvas';
+import {GraphCanvas,useGraphViewHeight,fitGraphViewport} from './graph-canvas';
 import {GraphDocumentsPanel,GraphNodePanel,type GraphConnection,type GraphNodeSession} from './graph-panels';
 
 const edgeOptions:Array<{value:KnowledgeEdge['type'];label:string}>=[
@@ -102,7 +102,7 @@ export default function KnowledgeGraphPage(){
     <div className="graph-zoom" role="group" aria-label="画布缩放">
      <IconButton size="sm" variant="ghost" label="缩小" icon={<Icon name="zoomOut" size="sm"/>} onClick={()=>zoom(.8)}/>
      <IconButton size="sm" variant="ghost" label="放大" icon={<Icon name="zoomIn" size="sm"/>} onClick={()=>zoom(1.25)}/>
-     <IconButton size="sm" variant="ghost" label="适应视图" icon={<Icon name="maximize" size="sm"/>} onClick={()=>cy.current?.fit(undefined,40)}/>
+     <IconButton size="sm" variant="ghost" label="适应视图" icon={<Icon name="maximize" size="sm"/>} onClick={()=>{if(cy.current)fitGraphViewport(cy.current);}}/>
     </div>
    </div>
   </div>

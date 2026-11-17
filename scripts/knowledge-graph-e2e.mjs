@@ -349,6 +349,26 @@ try{
  await mobileDetail.getByRole('button',{name:'关闭',exact:true}).click();
  await mobileDetail.waitFor({state:'hidden'});
  await page.waitForFunction(()=>!document.querySelector('.workspace-panel-sheet'));
+ step('dense mobile overview fits at real zoom');
+ const denseNodes=Array.from({length:80},(_,index)=>({id:'dense-'+index,name:'Mobile document '+index,kind:'document',status:'active',folderId:null,updatedAt:'2026-11-17',revision:1}));
+ await page.route('**/api/graph?**',route=>route.fulfill({json:{nodes:denseNodes,edges:[],focusId:null,semanticStatus:'disabled',limit:80,scope:'recent'}}));
+ await page.goto(base+'/graph',{waitUntil:'networkidle'});
+ await page.waitForFunction(()=>document.querySelector('.knowledge-graph-canvas')?._cyreg?.cy?.nodes().length===80);
+ await settle();
+ const dense=await canvas.evaluate(element=>{
+  const cy=element._cyreg.cy;
+  return {zoom:cy.zoom(),width:cy.width(),height:cy.height(),nodes:cy.nodes().map(node=>({x:node.renderedPosition().x,y:node.renderedPosition().y,radius:node.renderedWidth()/2}))};
+ });
+ assert.ok(dense.zoom<.8,'Dense mobile overview uses camera zoom '+JSON.stringify(dense));
+ const bodyWidth=Math.max(...dense.nodes.map(node=>node.x+node.radius))-Math.min(...dense.nodes.map(node=>node.x-node.radius));
+ const bodyHeight=Math.max(...dense.nodes.map(node=>node.y+node.radius))-Math.min(...dense.nodes.map(node=>node.y-node.radius));
+ assert.ok(Math.abs(Math.max(bodyWidth/(dense.width-80),bodyHeight/(dense.height-80))-1)<.04,'Automatic fit uses the available canvas without fitting fixed-size labels');
+ for(const node of dense.nodes)assert.ok(node.x-node.radius>=0&&node.x+node.radius<=dense.width&&node.y-node.radius>=0&&node.y+node.radius<=dense.height,'All node bodies fit inside the canvas');
+ for(let a=0;a<dense.nodes.length;a++)for(let b=a+1;b<dense.nodes.length;b++){
+  const left=dense.nodes[a],right=dense.nodes[b];
+  assert.ok(Math.hypot(left.x-right.x,left.y-right.y)>left.radius+right.radius,'Dense mobile node bodies stay separate');
+ }
+ await page.screenshot({path:'tmp/knowledge-graph-dense-mobile-'+engine+'.png'});
  assert.deepEqual(errors,[],'no browser runtime failures');
 
  console.log('PASS knowledge graph ('+engine+'): progressive semantics, task header, center navigation, outer context, temporary focus restoration, manual viewport, wheel, filters, theme, independent panels, relationships and mobile sheets');

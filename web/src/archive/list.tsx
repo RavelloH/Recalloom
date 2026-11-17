@@ -15,11 +15,11 @@ export function ArchiveList({items,selected,onSelect,onPreview,onRestore,onResto
  const count=items.filter(item=>selected.has(item.id)).length;
  return <Table className="archive-table" aria-label="归档内容" dividers="rows" density="compact" verticalAlign="middle" textOverflow="wrap" hasHover>
   <TableHeader><TableRow isHeaderRow>
-   <TableHeaderCell scope="col"><div className="archive-select-all"><CheckboxInput label="选择本组已加载内容" isLabelHidden value={count===items.length?true:count?'indeterminate':false} isDisabled={busy} onChange={value=>onSelect(items.map(item=>item.id),value)}/><span className="archive-mobile-select-label muted small">选择已加载内容</span></div></TableHeaderCell>
+   <TableHeaderCell scope="col"><div className="archive-select-all"><CheckboxInput size="sm" label="选择本组已加载内容" isLabelHidden value={count===items.length?true:count?'indeterminate':false} isDisabled={busy} onChange={value=>onSelect(items.map(item=>item.id),value)}/><span className="archive-mobile-select-label muted small">选择已加载内容</span></div></TableHeaderCell>
    {['名称','原位置','归档时间','类型','操作'].map(label=><TableHeaderCell scope="col" key={label}>{label}</TableHeaderCell>)}
   </TableRow></TableHeader>
   <TableBody>{items.map(item=><TableRow key={item.id} className="archive-item">
-   <TableCell><CheckboxInput label={'选择 '+item.name} isLabelHidden value={selected.has(item.id)} isDisabled={busy} onChange={value=>onSelect([item.id],value)}/></TableCell>
+   <TableCell><CheckboxInput size="sm" label={'选择 '+item.name} isLabelHidden value={selected.has(item.id)} isDisabled={busy} onChange={value=>onSelect([item.id],value)}/></TableCell>
    <TableCell><Button className="archive-name" variant="ghost" label={item.kind==='document'?documentDisplayName(item.name):item.name} icon={<Icon name={item.kind==='document'?'document':'taskList'} size="sm"/>} onClick={()=>onPreview(item)}/><span className="archive-mobile-meta muted small"><span className="archive-mobile-path" title={item.archivedFromPath??undefined}>{originalFolder(item)}</span><time dateTime={item.archivedAt??undefined}>{fmt(item.archivedAt??undefined)}</time></span></TableCell>
    <TableCell><span className="archive-path muted small" title={item.archivedFromPath??undefined}>{originalFolder(item)}</span></TableCell>
    <TableCell><time className="muted small" dateTime={item.archivedAt??undefined}>{fmt(item.archivedAt??undefined)}</time></TableCell>

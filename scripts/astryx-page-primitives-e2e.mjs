@@ -460,6 +460,23 @@ try{
    if(width<=720){
     assert.ok(geometry.search.bottom<=geometry.filters.top,'Mobile search leads the filters '+path);
     assert.ok(Math.abs(geometry.search.left-geometry.header.left)<2&&Math.abs(geometry.search.right-geometry.header.right)<2,'Mobile search spans the shared header '+path);
+    if(path==='/tasks'){
+     const rows=await page.evaluate(()=>{
+      const box=selector=>document.querySelector(selector).getBoundingClientRect();
+      const status=box('.tasks-filter-status'),source=box('.tasks-filter-source'),view=box('.tasks-view-switch');
+      return {statusY:status.top,sourceY:source.top,viewBottom:view.bottom,count:getComputedStyle(document.querySelector('.workspace-toolbar-meta')).display};
+     });
+     assert.ok(Math.abs(rows.statusY-rows.sourceY)<1&&rows.viewBottom<rows.statusY,'Mobile task filters share the row below the view switch');
+     assert.equal(rows.count,'none','Mobile tasks hide the result count');
+    }
+    if(path==='/activity'){
+     const row=await page.locator('.activity-type-filter').evaluate(element=>{
+      const field=element.firstElementChild.getBoundingClientRect(),button=element.querySelector('button[aria-label="更多筛选"]').getBoundingClientRect();
+      return {fieldY:(field.top+field.bottom)/2,buttonY:(button.top+button.bottom)/2};
+     });
+     assert.ok(Math.abs(row.fieldY-row.buttonY)<2,'Additional activity filters stay beside the type selector');
+    }
+
    }else{
     assert.ok(geometry.filters.right<=geometry.search.left,'Desktop filters precede the right-hand search '+path);
     assert.ok(Math.abs(geometry.search.right-geometry.header.right)<2,'Search is aligned to the page right edge '+path);

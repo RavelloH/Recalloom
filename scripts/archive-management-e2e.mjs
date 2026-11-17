@@ -248,6 +248,8 @@ try{
  // Load the two responsive viewports independently in that engine.
  if(process.env.RECALLOOM_TEST_BROWSER==='webkit')await page.goto('about:blank');
  await page.setViewportSize({width:390,height:844});
+ assert.ok(await page.locator('.archive-table .astryx-checkbox-input[data-size="sm"]').count()>0,'Archive uses compact Astryx checkboxes');
+ assert.equal(await page.locator('.archive-table .astryx-checkbox-input:not([data-size="sm"])').count(),0,'Every row and select-all checkbox uses the compact size');
  await page.emulateMedia({colorScheme:'dark'});
  await page.goto(base+'/archive',{waitUntil:'networkidle'});
  await page.waitForTimeout(600);

@@ -93,6 +93,15 @@ export function useGraphViewHeight(){
  return {ref,height};
 }
 
+/** Labels keep their screen size while zooming, so fit the node bodies only. */
+export function fitGraphViewport(view:Core){
+ const bounds=view.nodes().boundingBox({includeLabels:false,includeOverlays:false});
+ if(!view.nodes().length)return;
+ view.resize();view.stop();
+ const zoom=Math.max(view.minZoom(),Math.min(1,(view.width()-80)/Math.max(1,bounds.w),(view.height()-80)/Math.max(1,bounds.h)));
+ view.viewport({zoom,pan:{x:(view.width()-zoom*(bounds.x1+bounds.x2))/2,y:(view.height()-zoom*(bounds.y1+bounds.y2))/2}});
+}
+
 export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,types,activation,viewportReady}:{
  nodes:KnowledgeNode[];edges:KnowledgeEdge[];selected:string|null;focusId?:string;
  onSelect:(id:string)=>void;cyRef:RefObject<Core|null>;query:string;types:KnowledgeEdge['type'][];activation:number;viewportReady:boolean;
@@ -102,9 +111,9 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
  const layoutAnimation=useRef<cytoscape.Layouts|null>(null);
  const fitted=useRef(false);
  const [size,setSize]=useState({width:0,height:0});
- const previousSize=useRef('');
  const layout=useRef({signature:'',focusId:focusId as string|undefined,ready:false});
  type View={pan:{x:number;y:number};zoom:number};
+ const automaticView=useRef<View|null>(null);
  const reveal=useRef<{before:View;expected:View}|null>(null),lastFocus=useRef(focusId);
  useEffect(()=>{
   if(!host.current)return;
@@ -166,6 +175,8 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
   const cy=cyRef.current;if(!cy)return;
   if(!viewportReady||size.width<1||size.height<1)return;
   const arrangement=arrangeGraph(nodes,edges,focusId,size);
+  const camera=automaticView.current,pan=cy.pan();
+  const autoFit=!fitted.current||Boolean(camera&&Math.abs(camera.zoom-cy.zoom())<.001&&Math.abs(camera.pan.x-pan.x)<1&&Math.abs(camera.pan.y-pan.y)<1);
   const ids=new Set([...nodes.map(node=>node.id),...edges.map(edge=>edge.id)]);
   const additions:ElementDefinition[]=[];
   cy.batch(()=>{
@@ -192,10 +203,14 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
   if(nodes.length&&previous.signature!==signature){
    const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?0:320;
    layoutAnimation.current?.stop();
-   const nextLayout=cy.layout({name:'preset',positions:Object.fromEntries(arrangement.positions),animate:previous.ready&&fitted.current&&duration>0,
+   const nextLayout=cy.layout({name:'preset',positions:Object.fromEntries(arrangement.positions),animate:previous.ready&&fitted.current&&!autoFit&&duration>0,
     animationDuration:duration,animationEasing:'ease-out-cubic',fit:false});
    layoutAnimation.current=nextLayout;nextLayout.run();
-   if(fitted.current&&(previous.focusId!==focusId||previousSize.current!==size.width+':'+size.height)){
+   if(autoFit){
+    fitGraphViewport(cy);
+    automaticView.current={zoom:cy.zoom(),pan:{...cy.pan()}};
+    fitted.current=true;
+   }else if(previous.focusId!==focusId){
     cy.stop();
     // New centers occupy the origin; keep zoom and make the camera follow them.
     const zoom=Math.min(1,cy.zoom());
@@ -203,14 +218,7 @@ export function GraphCanvas({nodes,edges,selected,focusId,onSelect,cyRef,query,t
    }
    layout.current={signature,focusId,ready:true};
   }
-  // The route measures its viewport on the first frame. A cached API response
-  // can arrive sooner (notably WebKit); never fit a zero-height canvas.
-  if(viewportReady&&!fitted.current&&nodes.length){
-   cy.resize();cy.stop();cy.zoom(1);cy.pan({x:cy.width()/2,y:cy.height()/2-10});
-   fitted.current=true;
-  }
   labels.current();
-  previousSize.current=size.width+':'+size.height;
  },[nodes,edges,focusId,cyRef,viewportReady,size]);
  useEffect(()=>{
   const cy=cyRef.current;if(!cy)return;
