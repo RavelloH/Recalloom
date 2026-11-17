@@ -14,10 +14,22 @@ Recalloom 将 Markdown **正文**、记录**元信息**以及 text-version 历�
 | 多处精确替换 | `edit_record mode=replace_many` |
 | 按 Unified Diff 修改 | `edit_record mode=patch` |
 | 按行插入、替换、删除 | `edit_record mode=lines` |
-| 记录重命名、移动、归档 | `manage_record` |
+| 记录重命名、移动、描述、归档 | `manage_record` |
+| 添加或移除标签 | `tag_record`（`action=add` 或 `remove`） |
 | 结构化任务条目 | `mutate_tasks`，不能伪装成普通 `edit_record` |
 
 **写入流程**：先定位 UUID → `read_record` 读取正文及当前 Revision → 准备最小差异 → 以 `expectedRevision` 写入 → 检查返回内容及 Revision → 必要时重新读取确认。若 Revision 冲突，必须读取最新正文并重新合并，不能用旧内容强行覆盖另一个 Agent 的工作。精确替换要检查预期命中次数；重大修改建议先 `dryRun`。无修改意图时只读，不产生版本。
+
+## 长文读取与版本号
+
+`read_record` 可以用 `metadataOnly=true` 先读取元数据。未指定行范围时，超过 300,000 个 UTF-16 代码单元的正文会返回 `READ_REQUIRES_RANGE`，需要改为分段读取。
+
+- `lineStart` 从 1 开始，`maxLines` 最多为 2,000。只传 `lineStart` 时，默认读取 200 行。
+- 使用返回的 `returnedLines` 推进下一次的 `lineStart`，通过 `truncated` 判断后面是否还有正文。连续读取时固定 `revision`，保证所有片段来自同一版本。
+- 读取历史时，`revision` 是所选历史版本，`currentRevision` 是当前正文版本。编辑与恢复的 `expectedRevision` 应取最新的当前版本。
+- `read_many` 每批最多读取 12 个记录，`maxChars` 是整批 JSON 的共享字符预算，默认 20,000、最多 60,000。正文可能分片返回，按各项的 `nextOffsetChars` 继续读取；`page.nextIndex` 指示本批尚未返回的输入项。
+
+标签使用 `tag_record` 独立增删，工具当前不接收 `expectedMetadataRevision`，也不增加正文 revision。可以先用 `list_tags` 查看已有标签。需要重命名、移动或归档记录时，使用 `manage_record` 并传入最新的 `expectedMetadataRevision`。
 
 ## Web 的可视化、源码与预览
 

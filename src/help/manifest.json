@@ -37,7 +37,7 @@
   {
     "topic": "tasks",
     "title": "结构化任务",
-    "summary": "task_list 的任务状态、优先级和并发修改"
+    "summary": "task_list 的固定状态、全局排序、原子批量修改和并发保护"
   },
   {
     "topic": "lifecycle",
