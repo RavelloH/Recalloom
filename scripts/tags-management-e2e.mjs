@@ -84,6 +84,7 @@ try {
   assert.equal((await api('/records/' + record.id)).tags.length, 2);
   await page.goto(base + '/tags/' + source.id);
   await page.locator('.tag-record-row').filter({ hasText: 'Tag test.md' }).waitFor();
+  assert.match(await page.getByRole('button', {name: /^标签组合/}).innerText(), /1 个标签/);
   await page.getByRole('button', { name: '管理标签', exact: true }).click();
   await waitForPanel();
   await page.getByRole('textbox', { name: '名称', exact: true }).fill('Research notes');

@@ -253,6 +253,7 @@ function TagDetail({ id }: { id: string }) {
           <>
             <MultiSelector
               label="标签组合"
+              formatValue={(items) => items.length + ' 个标签'}
               isLabelHidden
               size="sm"
               hasSearch
