@@ -55,7 +55,7 @@ function TagCloud({ tags, usage }: { tags: Tag[]; usage: TagFilter['usage'] }) {
 function TagCatalog({ managing }: { managing: boolean }) {
   const [query, setQuery] = useState('');
   const [usage, setUsage] = useState<TagFilter['usage']>('all');
-  const [sort, setSort] = useState<TagFilter['sort']>('name');
+  const [sort, setSort] = useState<TagFilter['sort']>('count');
   const [editing, setEditing] = useState<Tag | null | undefined>();
   const search = useDeferredValue(query);
   const results = useInfiniteQuery(tagPages({ query: search, usage, sort }, managing ? 60 : 200));
@@ -110,8 +110,8 @@ function TagCatalog({ managing }: { managing: boolean }) {
               size="sm"
               value={sort}
               options={[
-                { value: 'name', label: '名称顺序' },
                 { value: 'count', label: '使用最多' },
+                { value: 'name', label: '名称顺序' },
                 { value: 'updated', label: '最近修改' }
               ]}
               onChange={(value) => setSort(value as TagFilter['sort'])}

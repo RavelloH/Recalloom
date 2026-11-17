@@ -1,4 +1,4 @@
-.page.rk-help-page { max-width: 1360px; padding-bottom: 16px; }
+.page.rk-help-page { padding-bottom: 16px; }
 .rk-help-layout { --rk-help-height: calc(100dvh - 160px); height: var(--rk-help-height); display: grid; grid-template-columns: 232px minmax(0,1fr); align-items: stretch; gap: 24px; min-height: 320px; min-width: 0; }
 .rk-help-navigation { border: 1px solid var(--rk-border-soft); border-radius: 12px; padding: 12px; min-width: 0; min-height: 0; overflow: hidden; }
 .rk-help-navigation-body { display: flex; flex-direction: column; height: calc(var(--rk-help-height) - 26px); min-height: 0; }

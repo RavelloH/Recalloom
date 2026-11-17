@@ -178,8 +178,14 @@ export async function queryTags(env: Env, input: TagQuery = {}) {
   const version = await catalogVersion(env),
     query = normalizeTagKey(input.query ?? ''),
     usage = input.usage ?? 'all',
-    sort = input.sort ?? 'name',
-    scope = JSON.stringify([query, usage, sort]);
+    sort = input.sort ?? 'count';
+  const countColumn = {
+    all: 'count',
+    active: 'activeCount',
+    archived: 'archivedCount',
+    unused: 'count'
+  }[usage];
+  const scope = JSON.stringify([query, usage, sort, sort === 'count' ? countColumn : sort]);
   let offset = 0;
   if (input.cursor) {
     try {
@@ -208,7 +214,7 @@ export async function queryTags(env: Env, input: TagQuery = {}) {
           : '1';
   const order =
     sort === 'count'
-      ? 'count DESC,t.normalized_name,t.id'
+      ? countColumn + ' DESC,t.normalized_name,t.id'
       : sort === 'updated'
         ? 't.updated_at DESC,t.id'
         : 't.normalized_name,t.id';

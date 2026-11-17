@@ -56,7 +56,7 @@ export function TasksPage({recordId,focusTaskId,recordActions}:{recordId?:string
  const sourceFilter=!recordId&&<div className="tasks-filter-source"><Selector label="所属任务列表" isLabelHidden size="sm" variant="secondary" width="100%" value={source} onChange={setSource} onFocus={()=>setCatalogNeeded(true)} onClick={()=>setCatalogNeeded(true)} hasSearch presentation="adaptive" options={[{value:'all',label:'所有任务列表'},...catalogLists.map(list=>({value:list.id,label:list.name,description:list.path}))]}/></div>;
  const searchField=<div className={recordId?'tasks-filter-search':undefined} data-task-search><WorkspaceSearch label="搜索任务" value={search} onChange={value=>setSearch(value.slice(0,200))} placeholder="搜索任务…"/></div>;
  const contentState=listsQuery.isError&&!lists.length?'error':!statuses.length?'no-status':view==='board'?'board':listsQuery.isPending?'list-loading':lists.length?'list-ready':'list-empty';
- return <div className={recordId?'tasks-workspace embedded-tasks':'page workspace-page tasks-page tasks-workspace'} data-task-workspace>
+ return <div className={recordId?'tasks-workspace embedded-tasks':'page workspace-page workspace-full-page tasks-page tasks-workspace'} data-task-workspace>
   {!recordId&&<PageTitle title="任务" description="按状态推进任务，按列表保留上下文。" actions={createButton}/>}
   {recordId?<div className="tasks-toolbar">
    <TasksViewSwitcher view={view} onChange={setView}/>

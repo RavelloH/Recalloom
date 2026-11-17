@@ -477,7 +477,7 @@ try{
   // Start each viewport without a live canvas so WebKit can release its buffers.
   await page.goto('about:blank');
   await page.setViewportSize({width,height:900});
-  let baseline;
+  const baselines=new Map();
   for(const path of ['/tasks','/activity','/archive','/graph']){
    await page.goto(base+path,{waitUntil:'networkidle'});
    await page.locator('.workspace-toolbar-search input').waitFor();
@@ -512,10 +512,12 @@ try{
     assert.ok(geometry.filters.right<=geometry.search.left,'Desktop filters precede the right-hand search '+path);
     assert.ok(Math.abs(geometry.search.right-geometry.header.right)<2,'Search is aligned to the page right edge '+path);
    }
+   const frame=path==='/tasks'||path==='/graph'?'full':'standard';
+   const baseline=baselines.get(frame);
    if(baseline){
     assert.ok(Math.abs(geometry.header.left-baseline.header.left)<2&&Math.abs(geometry.header.top-baseline.header.top)<2,'Shared page header origin '+path);
     assert.ok(Math.abs(geometry.search.width-baseline.search.width)<2&&Math.abs(geometry.input.height-baseline.input.height)<2&&Math.abs(geometry.input.width-baseline.input.width)<2,'Shared search dimensions '+path);
-   }else baseline=geometry;
+   }else baselines.set(frame,geometry);
    await noPageOverflow();
    if(width!==820)await page.screenshot({path:'tmp/workspace-header-'+path.slice(1)+'-'+width+'-'+engine+'.png'});
   }

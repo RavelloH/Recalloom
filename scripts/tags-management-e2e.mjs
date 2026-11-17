@@ -65,20 +65,75 @@ try {
   await page.getByPlaceholder('输入授权密钥').fill(secret);
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await page.waitForURL(base + '/');
+  async function frame() {
+    return page.locator('.page').evaluate((element) => {
+      const style = getComputedStyle(element),
+        bounds = element.getBoundingClientRect();
+      return { top: style.paddingTop, width: bounds.width, left: bounds.left };
+    });
+  }
+  await page.getByRole('heading', { name: '概览', exact: true }).waitFor();
+  const homeFrame = await frame();
+  const ordinaryRoutes = [
+    ['/archive', '归档'],
+    ['/activity', '活动'],
+    ['/search', '搜索'],
+    ['/settings', '设置'],
+    ['/help', 'RMD 语法帮助'],
+    ['/tags', '标签']
+  ];
+  for (const [path, title] of ordinaryRoutes) {
+    await page.goto(base + path);
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
+    const actual = await frame();
+    assert.equal(actual.top, homeFrame.top, path + ' shares home top spacing');
+    assert.ok(Math.abs(actual.width - homeFrame.width) < 2, path + ' shares home width');
+    assert.ok(Math.abs(actual.left - homeFrame.left) < 2, path + ' shares home alignment');
+  }
+  for (const [path, title] of [
+    ['/tasks', '任务'],
+    ['/graph', '知识关系网']
+  ]) {
+    await page.goto(base + path);
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
+    const actual = await frame();
+    assert.ok(actual.width > homeFrame.width + 100, path + ' retains full width');
+    assert.equal(actual.top, '28px');
+  }
+  const docHeader = await api('/records', 'POST', { name: 'Header document.md' });
+  const taskHeader = await api('/records', 'POST', { name: 'Header task list', kind: 'task_list' });
+  const recordRoutes = [
+    ['/library', '知识库'],
+    ['/records/' + docHeader.id, 'Header document'],
+    ['/records/' + taskHeader.id, 'Header task list']
+  ];
+  for (const [path, title] of recordRoutes) {
+    await page.goto(base + path);
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
+    const actual = await frame();
+    assert.equal(actual.top, homeFrame.top, path + ' shares home top spacing');
+    assert.ok(Math.abs(actual.width - homeFrame.width) < 2, path + ' shares home width');
+  }
   await page.goto(base + '/tags');
   await page.getByRole('heading', { name: '标签', exact: true }).waitFor();
+  assert.match(
+    await page.getByRole('combobox', { name: '标签排序', exact: true }).innerText(),
+    /使用最多/
+  );
   const tagNames = Array.from(
     { length: 84 },
     (_, index) => 'dense-tag-' + String(index).padStart(2, '0')
   );
   for (const name of tagNames) await api('/tags', 'POST', { name });
+  await api('/records', 'POST', { name: 'Usage order.md', tags: ['dense-tag-83'] });
   await page.reload();
   await page.locator('.tag-cloud-token').filter({ hasText: 'dense-tag-83' }).waitFor();
   assert.equal(await page.locator('.tag-cloud-token').count(), 85);
+  assert.match(await page.locator('.tag-cloud-token').first().innerText(), /dense-tag-83/);
   const geometry = await page
     .locator('.tags-page')
     .evaluate((element) => ({ width: element.getBoundingClientRect().width }));
-  assert.ok(geometry.width <= 1040);
+  assert.ok(Math.abs(geometry.width - homeFrame.width) < 2);
   const positions = await page
     .locator('.tag-cloud-token')
     .evaluateAll((elements) =>
@@ -155,6 +210,17 @@ try {
   assert.ok((await api('/tags/' + target.id)).item.aliases.includes('Knowledg'));
   assert.equal((await api('/records/' + untagged.id)).revision, 1);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + '/');
+  await page.getByRole('heading', { name: '概览', exact: true }).waitFor();
+  const mobileHome = await frame();
+  for (const [path, title] of [...ordinaryRoutes, ...recordRoutes]) {
+    await page.goto(base + path);
+    await page.getByRole('heading', { name: title, exact: true }).waitFor();
+    const actual = await frame();
+    assert.equal(actual.top, mobileHome.top, path + ' shares mobile home top spacing');
+    assert.ok(Math.abs(actual.width - mobileHome.width) < 2, path + ' shares mobile home width');
+    await noOverflow();
+  }
   await page.goto(base + '/tags/manage');
   await page.getByRole('textbox', { name: '搜索标签', exact: true }).fill('Knowledge');
   await page.locator('.tag-catalog-row').filter({ hasText: 'Knowledge' }).waitFor();

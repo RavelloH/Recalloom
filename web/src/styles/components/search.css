@@ -2,7 +2,6 @@
 .search-highlight { color: inherit; background: var(--rk-search-hit-background); border-radius: 2px; padding: 0 1px; }
 html[data-effective-theme="dark"] .search-highlight { background: var(--rk-search-hit-background-dark); color: #fff; }
 .search-trigger { display: flex; align-items: center; gap: 10px; border-radius: 7px; color: var(--color-text-secondary,#777); font-size: var(--rk-font-small); background: none; border: 0; padding: 0; }
-.page.search-page { max-width: 1100px; }
 .search-surface { margin-bottom: 24px; }
 .search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-bottom: 14px; }
 .search-query-field { min-width: 0; width: 100%; }

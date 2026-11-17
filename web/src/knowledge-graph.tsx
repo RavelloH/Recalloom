@@ -66,7 +66,7 @@ export default function KnowledgeGraphPage(){
  const scope=focus?(nodeMap.get(focus)?.name??'当前文稿'):'最近更新的文稿';
  const semanticSummary=semanticLoading?'正在补充语义关联…':semanticStatus==='ready'?'语义建议 '+edges.filter(edge=>edge.type==='semantic').length:
   semanticStatus==='indexing'?'语义索引准备中':semanticStatus==='unavailable'?'语义索引暂不可用':'语义关联已关闭';
- return <div ref={viewport.ref} className="page workspace-page knowledge-graph-page" style={{height:viewport.height}}>
+ return <div ref={viewport.ref} className="page workspace-page workspace-full-page knowledge-graph-page" style={{height:viewport.height}}>
   <PageTitle title="知识关系网" description="以文稿为中心探索关联，保留周围的知识上下文。" actions={<>
     {focus&&<Button size="sm" variant="secondary" label="返回概览" onClick={()=>focusOn()}/>}
     <Tooltip placement="below" content={<span className="graph-help">单击文稿将其设为中心，通过详情按钮查看和管理关联。中心周围展示直接关联，外围保留其他文稿。虚线表示语义建议，点线表示同目录。{semanticMessage(semanticStatus)}</span>}>

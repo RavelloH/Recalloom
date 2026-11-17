@@ -319,6 +319,8 @@ test('tag record browsing supports all/any, archived counts and stable paginatio
       (await queryTaggedRecords(f.env, { tagIds: [b.id], status: 'archived' })).items[0]?.id,
       two
     );
+    assert.equal((await queryTags(f.env)).items[0]?.id, b.id);
+    assert.equal((await queryTags(f.env, { usage: 'active' })).items[0]?.id, a.id);
     assert.equal((await queryTags(f.env, { usage: 'archived' })).items[0]?.id, b.id);
     assert.ok(
       (await queryTags(f.env, { usage: 'unused' })).items.some((tag) => tag.name === 'checkpoint')

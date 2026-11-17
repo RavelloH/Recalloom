@@ -1,6 +1,8 @@
-/* Collection pages share header geometry and predictable search/filter placement. */
-.page.workspace-page { max-width: none; width: 100%; padding: 28px clamp(20px,2.8vw,42px) 16px; }
-.workspace-page > .page-header { flex: none; margin-bottom: 26px; }
+/* Ordinary collection pages inherit the same bounded frame and top gap as home. */
+.workspace-page > .page-header { flex: none; }
+/* The global tasks page and knowledge graph occupy the full workspace. */
+.page.workspace-page.workspace-full-page { max-width: none; width: 100%; padding: 28px clamp(20px,2.8vw,42px) 16px; }
+.workspace-full-page > .page-header { margin-bottom: 26px; }
 .workspace-toolbar { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px,280px); align-items: center; gap: 12px 16px; min-width: 0; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--rk-border-soft); }
 .workspace-toolbar-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .workspace-toolbar-filters > * { min-width: 0; max-width: 100%; }
@@ -8,11 +10,11 @@
 .workspace-toolbar-search > * { width: 100%; }
 .workspace-toolbar-meta { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; white-space: nowrap; color: var(--rk-ink-soft); font-size: var(--rk-font-small); }
 @media (min-width: 721px) {
- .sidebar-collapsed .page.workspace-page { padding-block-start: 74px; }
+ .sidebar-collapsed .page.workspace-page.workspace-full-page { padding-block-start: 74px; }
 }
 @media (max-width: 720px) {
- .page.workspace-page { padding: 22px var(--rk-gutter) 8px; }
- .workspace-page > .page-header { margin-bottom: 22px; }
+ .page.workspace-page.workspace-full-page { padding: 22px var(--rk-gutter) 8px; }
+ .workspace-full-page > .page-header { margin-bottom: 22px; }
  .workspace-page > .page-header > .page-title-copy { flex: 1 1 160px; width: auto; }
  .workspace-page > .page-header > .page-actions { flex: none; width: auto; margin-inline-start: auto; justify-content: flex-end; }
  .workspace-toolbar { grid-template-columns: minmax(0,1fr); gap: 12px 10px; padding-bottom: 12px; margin-bottom: 12px; }

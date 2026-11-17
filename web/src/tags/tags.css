@@ -1,4 +1,3 @@
-.page.workspace-page.tags-page{max-width:1040px;margin-inline:auto;}
 .tags-page .page-actions{display:flex;align-items:center;gap:14px;}
 .tag-cloud{display:flex;align-items:center;align-content:flex-start;flex-wrap:wrap;gap:10px 8px;padding-block:4px 24px;}
 .tag-cloud>*{max-width:100%;min-width:0;}

@@ -117,9 +117,9 @@ async function assertTaskRecordLayout(width){
  });
  assert.ok(layout.header&&layout.toolbar&&layout.actions&&layout.more&&layout.create&&layout.view,
   'Task record exposes its compact header and grouped actions at '+width+'px: '+JSON.stringify(layout));
- const topGap=layout.header.y-Math.max(layout.viewport.top,layout.topbarBottom);
- assert.ok(topGap>=0&&topGap<=24,
-  'Task record begins near the top bar at '+width+'px: '+topGap);
+ const expectedHeaderTop=layout.viewport.top+(width<=720?20:width<=1000?92:96);
+ assert.ok(Math.abs(layout.header.y-expectedHeaderTop)<2,
+  'Task record uses the ordinary page top gap at '+width+'px: '+JSON.stringify(layout));
  assert.ok(layout.identity&&layout.identity.y>=layout.topbarBottom&&layout.identity.height>=20,
   'Task list type and revision stay below the fixed top bar at '+width+'px: '+JSON.stringify(layout));
  assert.ok(Math.abs(layout.more.y+layout.more.height/2-layout.create.y-layout.create.height/2)<2&&
@@ -133,8 +133,8 @@ async function assertTaskRecordLayout(width){
  assert.ok(layout.view.bottom<=layout.viewport.bottom+2&&layout.view.height>=180,
   'Task view fits the remaining viewport at '+width+'px: '+JSON.stringify(layout));
  assert.ok(layout.overflow<=1,'Task record has no page overflow at '+width+'px');
- if(width>1000)assert.ok(layout.view.height>layout.viewport.height*.6,
-  'Desktop task board uses the space released above its header');
+ if(width>1000)assert.ok(Math.abs(layout.view.bottom-(layout.viewport.bottom-16))<3,
+  'Desktop task board fills the space below its ordinary page header');
  await page.screenshot({path:join(artifactDir,'record-'+width+'-light.png')});
 }
 const api=(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{
