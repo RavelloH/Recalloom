@@ -174,6 +174,36 @@ try{
  const make=name=>api('/records',{name:name+' '+stamp+'.md',kind:'document',folderId:folder.id,content:'# '+name+'\n\n**Page primitive regression.** [Readable link](https://example.test/long/path) and $P=UI$.'});
  const record=await make('Metadata'),fresh=await make('Search');
 
+ console.log('PAGE STEP cold search renderer styles');
+ const styleRecord=await api('/records',{name:'cold-render-'+stamp+'.md',kind:'document',content:'# Shared rendering\n\nParagraph with **bold text** and $U=IR$.\n\n> Shared quote\n\n| Name | Value |\n| --- | --- |\n| Item | 42 |\n\n:: mark Shared mark ::\n\n:: circle Shared circle | color=blue ::\n\n:::: chat Shared transcript\n\n::: message User | sender=user\n\nShared message\n\n:::\n\n::::'});
+ await page.goto(base+'/search?q='+encodeURIComponent(styleRecord.name),{waitUntil:'networkidle'});
+ const coldCard=page.locator('.search-result-card').filter({has:page.locator('a.search-result[href="/records/'+styleRecord.id+'"]')});
+ await coldCard.locator('.markdown-preview .katex').waitFor();
+ await coldCard.locator('.rk-chat-transcript').waitFor({state:'attached'});
+ await coldCard.locator('.rk-sketch-overlay').waitFor({state:'attached'});
+ const proseStyles=element=>{
+  const style=selector=>{
+   const node=selector?element.querySelector(selector):element,css=getComputedStyle(node);
+   return {fontSize:css.fontSize,lineHeight:css.lineHeight,fontWeight:css.fontWeight,color:css.color,background:css.backgroundColor,padding:css.padding,borderBottom:css.borderBottom,marginBottom:css.marginBottom,position:css.position,borderRadius:css.borderRadius};
+  };
+  return {body:{fontSize:getComputedStyle(element).fontSize,lineHeight:getComputedStyle(element).lineHeight,color:getComputedStyle(element).color},heading:style('h1'),paragraph:style('p'),quote:style('blockquote'),cell:style('td'),chat:style('.rk-chat-transcript'),sketch:style('.rk-sketch-overlay')};
+ };
+ const coldStyles=await coldCard.locator('.markdown-preview').evaluate(proseStyles);
+ assert.equal(coldStyles.body.fontSize,'16px','Cold search uses the shared document text size');
+ assert.equal(coldStyles.heading.fontWeight,'720','Cold search applies the real heading weight');
+ assert.ok(coldStyles.chat.borderRadius.includes('12px')&&coldStyles.chat.borderBottom.startsWith('1px'),'Cold search loads transcript styling');
+ assert.equal(coldStyles.sketch.position,'absolute','Cold search loads sketch positioning');
+ assert.ok(coldStyles.heading.borderBottom.startsWith('1px'),'Cold search applies heading separators');
+ await page.goto(base+'/records/'+styleRecord.id+'?mode=preview',{waitUntil:'networkidle'});
+ const documentPreview=page.locator('.record-main .markdown-preview').first();
+ await documentPreview.locator('td').first().waitFor();
+ assert.deepEqual(await documentPreview.evaluate(proseStyles),coldStyles,'Cold search and real document preview share prose styling');
+ await page.goto(base+'/search?q='+encodeURIComponent(styleRecord.name),{waitUntil:'networkidle'});
+ await coldCard.locator('.markdown-preview .katex').waitFor();
+ await coldCard.locator('.rk-chat-transcript').waitFor({state:'attached'});
+ await coldCard.locator('.rk-sketch-overlay').waitFor({state:'attached'});
+ assert.deepEqual(await coldCard.locator('.markdown-preview').evaluate(proseStyles),coldStyles,'Visiting the record route does not change search styling');
+
  console.log('PAGE STEP settings desktop');
  await page.goto(base+'/settings',{waitUntil:'networkidle'});
  const settings=page.getByRole('navigation',{name:'设置页面'});
@@ -371,7 +401,7 @@ try{
  assert.ok(clipped.truncated&&clipped.height<=180&&clipped.mask.includes('linear-gradient'),JSON.stringify(clipped));
  assert.equal(await previewCard.locator('a a, a button').count(),0,'Preview controls are outside document links');
  const renderedHeading=previewCard.locator('.markdown-preview h1');
- assert.equal(await renderedHeading.evaluate(el=>getComputedStyle(el).fontSize),'25px','Search uses document heading typography');
+ assert.ok(await renderedHeading.evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=25&&getComputedStyle(el).fontWeight==='720'),'Search uses the shared document heading typography');
  assert.equal(await previewCard.locator('.markdown-preview[data-embedded]').count(),1,'Search uses the shared embedded renderer');
  assert.ok(await previewCard.locator('.markdown-preview a[href="https://example.test"]').count()>0,'Search keeps real renderer links');
  const assertOverlay=async()=>{
@@ -397,6 +427,7 @@ try{
  await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute('data-truncated'),await clip.getAttribute('id'));
  const semanticCard=page.locator('.search-result-card').filter({hasText:'Semantic preview'});
  assert.equal(await semanticCard.locator('.search-highlight').count(),0,'Semantic-only snippets do not imply exact matches');
+ assert.equal(await semanticCard.locator('.markdown-preview').evaluate(el=>getComputedStyle(el).fontSize),'16px','Plain source fragments share document text styling');
  const descriptionCard=page.locator('.search-result-card').filter({hasText:'Description only'});
  await descriptionCard.getByRole('button',{name:'展开片段',exact:true}).waitFor();
  assert.equal(await descriptionCard.locator('.search-snippet').getAttribute('data-truncated'),'true','Long descriptions share the bounded preview');

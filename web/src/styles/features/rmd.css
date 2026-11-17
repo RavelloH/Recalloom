@@ -1,6 +1,55 @@
-/* Recalloom styles — owned by features / rmd */
+/* Shared RMD rendering, including previews mounted outside the record page. */
+.rmd-preview-surface { min-width: 0; }
+:is(.record-main,.rmd-preview-surface) {
+  --rk-document-leading: 1.82;
+  --rk-document-ink: var(--color-text-primary, #202020);
+  --rk-document-muted: var(--color-text-secondary, #737373);
+  --rk-document-border: var(--color-border, rgba(128,128,128,.22));
+  --rk-document-wash: var(--color-background-muted, rgba(128,128,128,.045));
+  --rk-prose-measure: 100%;
+  --rk-wide-measure: 100%;
+  --rk-document-pad: 0px;
+}
 
-.record-main :is(.tiptap, .markdown-preview) > :is(
+:is(.record-main,.rmd-preview-surface) .rk-numbered-math-projection {
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  position: relative;
+  gap: .75rem;
+  max-width: 100%;
+  padding-inline: .6rem;
+  margin-block: 1rem;
+}
+
+:is(.record-main,.rmd-preview-surface) .rk-numbered-math-content {
+  min-width: 0;
+  overflow-x: auto;
+  flex: 1;
+  max-width: 100%;
+}
+
+:is(.record-main,.rmd-preview-surface) .rk-numbered-math-label {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: .85rem;
+}
+
+:is(.record-main,.rmd-preview-surface) .rk-cross-reference-read {
+  color: var(--color-primary,#3988dc);
+  text-decoration: underline;
+  text-underline-offset: .16em;
+  white-space: nowrap;
+}
+
+:is(.record-main,.rmd-preview-surface) .rk-cross-reference-read.rk-cross-reference-missing {
+  text-decoration-style: dashed;
+  color: var(--color-danger,#b94a48);
+}
+
+
+
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(
   h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, hr
 ) {
   box-sizing: border-box;
@@ -8,7 +57,7 @@
   margin-inline: auto;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > :is(
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(
   pre, table, figure, .tableWrapper, .katex-display, .tiptap-mathematics-render[data-type="block-math"]
 ) {
   box-sizing: border-box;
@@ -17,7 +66,7 @@
   margin-inline: auto;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6) {
   color: var(--rk-document-ink);
   font-weight: 680;
   line-height: 1.34;
@@ -25,7 +74,7 @@
   overflow-wrap: anywhere;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > h1 {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > h1 {
   font-size: clamp(25px, 2.15vw, 32px);
   font-weight: 720;
   letter-spacing: -.035em;
@@ -34,84 +83,84 @@
   border-bottom: 1px solid var(--rk-document-border);
 }
 
-.record-main :is(.tiptap, .markdown-preview) > h2 {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > h2 {
   font-size: clamp(21px, 1.75vw, 25px);
   margin-block: 36px 16px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > h3 {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > h3 {
   font-size: clamp(18px, 1.55vw, 20px);
   margin-block: 28px 12px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > :is(h4,h5,h6) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(h4,h5,h6) {
   font-size: 16px;
   margin-block: 24px 10px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6):first-child {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(h1,h2,h3,h4,h5,h6):first-child {
   margin-block-start: 0;
 }
 
-.record-main :is(.tiptap, .markdown-preview) p {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) p {
   line-height: inherit;
   margin-block: 0 1.05em;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :is(ul,ol) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :is(ul,ol) {
   margin-block: .85em 1.2em;
   padding-inline-start: 1.7em;
   line-height: inherit;
   list-style-position: outside;
 }
 
-.record-main :is(.tiptap, .markdown-preview) ul:not([data-type="taskList"]) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) ul:not([data-type="taskList"]) {
   list-style-type: disc;
 }
 
-.record-main :is(.tiptap, .markdown-preview) ol {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) ol {
   list-style-type: decimal;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :is(ul,ol) :is(ul,ol) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :is(ul,ol) :is(ul,ol) {
   margin-block: .35em .55em;
 }
 
-.record-main :is(.tiptap, .markdown-preview) li {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) li {
   padding-inline-start: .16em;
   margin-block: .18em;
 }
 
-.record-main :is(.tiptap, .markdown-preview) li::marker {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) li::marker {
   color: var(--rk-document-muted);
 }
 
-.record-main :is(.tiptap, .markdown-preview) li > p {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) li > p {
   margin-block: .2em;
 }
 
-.record-main :is(.tiptap, .markdown-preview) strong {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) strong {
   font-weight: 680;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :is(a,a:visited) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :is(a,a:visited) {
   color: var(--color-text-link, #2269b5);
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
   text-underline-offset: .18em;
 }
 
-.record-main :is(.tiptap, .markdown-preview) a:hover {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) a:hover {
   text-decoration-color: currentColor;
 }
 
-.record-main :is(.tiptap, .markdown-preview) a:focus-visible {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) a:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;
   border-radius: 2px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) blockquote {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) blockquote {
   border-inline-start: 3px solid var(--rk-document-border);
   border-radius: 0 8px 8px 0;
   background: var(--rk-document-wash);
@@ -120,17 +169,17 @@
   margin-block: 22px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) blockquote > :last-child {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) blockquote > :last-child {
   margin-block-end: 0;
 }
 
-.record-main :is(.tiptap, .markdown-preview) hr {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) hr {
   border: 0;
   border-top: 1px solid var(--rk-document-border);
   margin-block: 34px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :not(pre) > code {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :not(pre) > code {
   border-radius: 5px;
   padding: .12em .34em;
   background: var(--rk-document-wash);
@@ -139,13 +188,13 @@
   overflow-wrap: anywhere;
 }
 
-.record-main :is(.tiptap, .markdown-preview) mark:has(code) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) mark:has(code) {
   padding-block: .18em;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
-.record-main :is(.tiptap, .markdown-preview) mark code {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) mark code {
   color: var(--rk-mark-foreground);
   -webkit-text-fill-color: var(--rk-mark-foreground);
   background: transparent;
@@ -159,7 +208,7 @@
   box-decoration-break: clone;
 }
 
-.record-main :is(.tiptap, .markdown-preview) code:has(> mark) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) code:has(> mark) {
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -167,7 +216,7 @@
   line-height: inherit;
 }
 
-.record-main :is(.tiptap, .markdown-preview) code > mark {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) code > mark {
   color: var(--rk-mark-foreground);
   -webkit-text-fill-color: var(--rk-mark-foreground);
   background: var(--rk-mark-background);
@@ -178,7 +227,7 @@
   box-decoration-break: clone;
 }
 
-.record-main :is(.tiptap, .markdown-preview) mark:has(.katex) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) mark:has(.katex) {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -192,7 +241,7 @@
   border-radius: 3px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) mark :is(.katex, [data-type="inline-math"]) {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
@@ -205,7 +254,7 @@
   line-height: normal;
 }
 
-.record-main .tiptap [data-type="block-math"].rk-highlighted-block-math > .block-math-inner {
+:is(.record-main,.rmd-preview-surface) .tiptap [data-type="block-math"].rk-highlighted-block-math > .block-math-inner {
   color: var(--rk-mark-foreground);
   background: var(--rk-mark-background);
   border-radius: 4px;
@@ -213,7 +262,7 @@
   box-sizing: border-box;
 }
 
-.record-main .markdown-preview [data-highlighted-math] .katex-display {
+:is(.record-main,.rmd-preview-surface) .markdown-preview [data-highlighted-math] .katex-display {
   color: var(--rk-mark-foreground);
   background: var(--rk-mark-background);
   border-radius: 4px;
@@ -227,13 +276,13 @@
   overflow: visible;
 }
 
-.record-main .markdown-preview [data-highlighted-math] .katex-display > .katex {
+:is(.record-main,.rmd-preview-surface) .markdown-preview [data-highlighted-math] .katex-display > .katex {
   display: inline-block;
   width: max-content;
   max-width: none;
 }
 
-.record-main :is(.tiptap, .markdown-preview) pre {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) pre {
   overflow: auto;
   overscroll-behavior-inline: contain;
   margin-block: 22px;
@@ -245,7 +294,7 @@
   tab-size: 2;
 }
 
-.record-main :is(.tiptap, .markdown-preview) pre code {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) pre code {
   display: block;
   padding: 0;
   border: 0;
@@ -255,7 +304,7 @@
   overflow-wrap: normal;
 }
 
-.record-main :is(.tiptap, .markdown-preview) table {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) table {
   display: block;
   border-collapse: collapse;
   overflow-x: auto;
@@ -266,7 +315,7 @@
   scrollbar-width: thin;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :is(th,td) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :is(th,td) {
   padding: 10px 13px;
   min-width: 88px;
   border: 1px solid var(--rk-document-border);
@@ -274,17 +323,17 @@
   text-align: start;
 }
 
-.record-main :is(.tiptap, .markdown-preview) th {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) th {
   font-weight: 670;
   white-space: nowrap;
   background: var(--rk-document-wash);
 }
 
-.record-main :is(.tiptap, .markdown-preview) tr:nth-child(even) td {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) tr:nth-child(even) td {
   background: color-mix(in srgb, var(--rk-document-wash) 45%, transparent);
 }
 
-.record-main :is(.tiptap, .markdown-preview) img {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) img {
   display: block;
   width: auto;
   max-width: 100%;
@@ -293,7 +342,7 @@
   border-radius: 8px;
 }
 
-.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) figure.rk-rich-figure {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -303,14 +352,14 @@
   min-width: 0;
 }
 
-.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure > img {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) figure.rk-rich-figure > img {
   display: block;
   max-width: 100%;
   margin: 0;
   object-fit: contain;
 }
 
-.record-main :is(.tiptap,.markdown-preview) figure.rk-rich-figure > figcaption {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) figure.rk-rich-figure > figcaption {
   text-align: center;
   font-size: .88rem;
   line-height: 1.55;
@@ -319,7 +368,7 @@
   overflow-wrap: anywhere;
 }
 
-.record-main .rk-rich-figure-controls {
+:is(.record-main,.rmd-preview-surface) .rk-rich-figure-controls {
   display: flex;
   gap: .65rem;
   flex-wrap: wrap;
@@ -330,34 +379,34 @@
   width: min(100%,42rem);
 }
 
-.record-main .rk-rich-figure-controls > :first-child {
+:is(.record-main,.rmd-preview-surface) .rk-rich-figure-controls > :first-child {
   flex: 2;
   min-width: 13rem;
 }
 
-.record-main .rk-rich-figure-controls > :not(:first-child) {
+:is(.record-main,.rmd-preview-surface) .rk-rich-figure-controls > :not(:first-child) {
   flex: 1;
   min-width: 7rem;
 }
 
-.record-main .rk-rich-figure-selected {
+:is(.record-main,.rmd-preview-surface) .rk-rich-figure-selected {
   outline: 1px solid var(--rk-document-border);
   outline-offset: .35rem;
 }
 
-.record-main .rk-rich-figure-invalid {
+:is(.record-main,.rmd-preview-surface) .rk-rich-figure-invalid {
   color: var(--color-text-secondary);
   font-size: .9rem;
 }
 
-.record-main .markdown-preview .katex-display > .katex {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .katex-display > .katex {
   display: inline-block;
   width: max-content;
   max-width: none;
   text-align: initial;
 }
 
-.record-main .markdown-preview .katex-display {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .katex-display {
   width: 100%;
   max-width: 100%;
   text-align: center;
@@ -367,7 +416,7 @@
   overscroll-behavior-y: auto;
 }
 
-.record-main .markdown-preview [data-highlighted-math] {
+:is(.record-main,.rmd-preview-surface) .markdown-preview [data-highlighted-math] {
   display: flex;
   justify-content: safe center;
   max-width: 100%;
@@ -378,56 +427,56 @@
   overscroll-behavior-y: auto;
 }
 
-.record-main .markdown-preview .rk-numbered-math-content {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-numbered-math-content {
   overflow-x: clip;
   overflow-y: visible;
   overscroll-behavior-y: auto;
 }
 
-.record-main .markdown-preview .katex-display.rk-math-scroll-active {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .katex-display.rk-math-scroll-active {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-y: auto;
 }
 
-.record-main .markdown-preview [data-highlighted-math].rk-math-scroll-active {
+:is(.record-main,.rmd-preview-surface) .markdown-preview [data-highlighted-math].rk-math-scroll-active {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-y: auto;
 }
 
-.record-main .markdown-preview .rk-numbered-math-content.rk-math-scroll-active {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-numbered-math-content.rk-math-scroll-active {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-y: auto;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only.rk-math-scroll-active {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only.rk-math-scroll-active {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-y: auto;
 }
 
-.record-main .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only .tiptap-mathematics-render[data-type="block-math"] {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only .tiptap-mathematics-render[data-type="block-math"] {
   overflow: visible;
   width: max-content;
   max-width: none;
 }
 
-.record-main .markdown-preview :is(.rk-numbered-math-content,[data-highlighted-math]) .katex-display {
+:is(.record-main,.rmd-preview-surface) .markdown-preview :is(.rk-numbered-math-content,[data-highlighted-math]) .katex-display {
   overflow: visible;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .katex-display {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .katex-display {
   margin-block: 24px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) input[type="checkbox"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) input[type="checkbox"] {
   accent-color: var(--color-text-primary, currentColor);
   margin-inline-end: .3em;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-site-favicon {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-site-favicon {
   display: inline-block;
   width: 1.18em;
   height: 1.18em;
@@ -441,18 +490,18 @@
   box-shadow: inset 0 0 0 1px rgba(15,23,42,.28),0 1px 2px rgba(15,23,42,.18);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-link-fallback {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-link-fallback {
   display: inline-block;
   vertical-align: -.16em;
   margin-right: .25em;
   opacity: .7;
 }
 
-.record-main .tiptap .rk-hscroll[data-rk-table-id] {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-hscroll[data-rk-table-id] {
   counter-increment: rk-table;
 }
 
-.record-main .tiptap .tableWrapper.rk-hscroll:has(> .rk-table-caption) {
+:is(.record-main,.rmd-preview-surface) .tiptap .tableWrapper.rk-hscroll:has(> .rk-table-caption) {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch;
@@ -460,7 +509,7 @@
   max-width: 100%;
 }
 
-.record-main .tiptap .tableWrapper.rk-hscroll > .rk-scroll-viewport {
+:is(.record-main,.rmd-preview-surface) .tiptap .tableWrapper.rk-hscroll > .rk-scroll-viewport {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -468,7 +517,7 @@
   order: 1;
 }
 
-.record-main .tiptap .rk-table-caption {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-table-caption {
   box-sizing: border-box;
   width: 100%;
   flex: none;
@@ -483,17 +532,17 @@
   overflow-wrap: anywhere;
 }
 
-.record-main .tiptap .rk-hscroll[data-rk-table-id] .rk-table-caption::before {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-hscroll[data-rk-table-id] .rk-table-caption::before {
   content: '表 ' counter(rk-table) '：';
   font-weight: 650;
   margin-inline-end: .2em;
 }
 
-.record-main .tiptap .rk-table-caption[hidden] {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-table-caption[hidden] {
   display: none;
 }
 
-.record-main .markdown-preview {
+:is(.record-main,.rmd-preview-surface) .markdown-preview {
   max-width: none;
   width: 100%;
   margin-inline: 0;
@@ -501,7 +550,7 @@
   counter-reset: rk-table-preview;
 }
 
-.record-main .markdown-preview .rk-table-caption-read {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-table-caption-read {
   counter-increment: rk-table-preview;
   text-align: center;
   font-size: .87rem;
@@ -512,17 +561,17 @@
   padding: .35rem .6rem;
 }
 
-.record-main .markdown-preview .rk-table-caption-read::before {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-table-caption-read::before {
   content: '表 ' counter(rk-table-preview) '：';
   font-weight: 650;
   margin-inline-end: .2em;
 }
 
-.record-main .rk-numbered-math-projection .katex-display {
+:is(.record-main,.rmd-preview-surface) .rk-numbered-math-projection .katex-display {
   margin-block: .3rem;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark {
   --rk-rmd-block-background: var(--rk-mark-background);
   display: flow-root;
   width: 100%;
@@ -536,63 +585,63 @@
   overflow-x: auto;
 }
 
-.record-main .tiptap .rk-rmd-block-mark:not([data-rk-color]) .rk-directive-body :is(p,li,blockquote,span) {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark:not([data-rk-color]) .rk-directive-body :is(p,li,blockquote,span) {
   color: var(--rk-mark-foreground);
 }
 
-.record-main .markdown-preview .rk-rmd-block-mark:not([data-rk-color]) :is(p,li,blockquote,span) {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-rmd-block-mark:not([data-rk-color]) :is(p,li,blockquote,span) {
   color: var(--rk-mark-foreground);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color] {
   color: inherit;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="red"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="red"] {
   --rk-rmd-block-background: var(--color-background-red,#fddede);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="orange"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="orange"] {
   --rk-rmd-block-background: var(--color-background-orange,#ffe8d5);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="yellow"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="yellow"] {
   --rk-rmd-block-background: var(--color-background-yellow,#fff0ba);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="green"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="green"] {
   --rk-rmd-block-background: var(--color-background-green,#d7f3df);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="blue"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="blue"] {
   --rk-rmd-block-background: var(--color-background-blue,#dceaff);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="purple"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="purple"] {
   --rk-rmd-block-background: var(--color-background-purple,#ecdfff);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="pink"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="pink"] {
   --rk-rmd-block-background: var(--color-background-pink,#ffe0ed);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="cyan"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="cyan"] {
   --rk-rmd-block-background: var(--color-background-cyan,#d4f5fb);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="teal"] {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark[data-rk-color="teal"] {
   --rk-rmd-block-background: var(--color-background-teal,#d6efef);
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :first-child {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :first-child {
   margin-top: 0;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :last-child {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > :last-child {
   margin-bottom: 0;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display {
   background: transparent !important;
   color: inherit;
   width: max-content;
@@ -602,31 +651,31 @@
   padding: 0;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display > .katex {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark > .katex-display > .katex {
   display: inline-block;
   width: max-content;
   max-width: none;
 }
 
-.record-main .tiptap .rk-rmd-block-mark .rk-directive-body {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark .rk-directive-body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.record-main .tiptap .rk-rmd-block-mark .tiptap-mathematics-render[data-type="block-math"] {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark .tiptap-mathematics-render[data-type="block-math"] {
   display: flex;
   justify-content: safe center;
   max-width: 100%;
   overflow-x: auto;
 }
 
-.record-main .tiptap .rk-rmd-block-mark .block-math-inner {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark .block-math-inner {
   background: transparent !important;
   color: inherit;
   margin-inline: auto;
 }
 
-.record-main .tiptap .rk-rmd-comment-block {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-comment-block {
   color: var(--color-text-tertiary,var(--rk-ink-faint));
   font-size: .89em;
   line-height: 1.58;
@@ -637,80 +686,80 @@
   margin-block: .7rem;
 }
 
-.record-main .rk-rmd-callout {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout {
   --rk-callout-accent: #53687d;
   min-width: 0;
 }
 
-.record-main .markdown-preview .rk-rmd-callout {
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-rmd-callout {
   margin-block: 1rem;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="note"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="note"] {
   --rk-callout-accent: #53687d;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="info"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="info"] {
   --rk-callout-accent: #216ca5;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="tip"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="tip"] {
   --rk-callout-accent: #267852;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="success"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="success"] {
   --rk-callout-accent: #1b7548;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="warning"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="warning"] {
   --rk-callout-accent: #916013;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="danger"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="danger"] {
   --rk-callout-accent: #ad414a;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="example"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="example"] {
   --rk-callout-accent: #7354a7;
 }
 
-.record-main .rk-rmd-callout[data-rk-kind="question"] {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="question"] {
   --rk-callout-accent: #346fa7;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="note"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="note"] {
   --rk-callout-accent: #aabed4;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="info"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="info"] {
   --rk-callout-accent: #81b9ed;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="tip"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="tip"] {
   --rk-callout-accent: #80d3ac;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="success"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="success"] {
   --rk-callout-accent: #78d5a1;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="warning"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="warning"] {
   --rk-callout-accent: #f0c278;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="danger"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="danger"] {
   --rk-callout-accent: #f099a0;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="example"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="example"] {
   --rk-callout-accent: #c0a7ef;
 }
 
-html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="question"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-rmd-callout[data-rk-kind="question"] {
   --rk-callout-accent: #94bfee;
 }
 
-.record-main .rk-rmd-callout .astryx-banner {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout .astryx-banner {
   --rk-callout-label-size: .875rem;
   align-items: center;
   border-inline-start: 0 !important;
@@ -719,34 +768,34 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   color: var(--rk-callout-accent) !important;
 }
 
-.record-main .rk-rmd-callout-title {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout-title {
   color: var(--rk-callout-accent);
   font-size: var(--rk-callout-label-size) !important;
 }
 
-.record-main .tiptap .tableWrapper.rk-hscroll .rk-scroll-viewport > table {
+:is(.record-main,.rmd-preview-surface) .tiptap .tableWrapper.rk-hscroll .rk-scroll-viewport > table {
   margin-inline: auto !important;
   min-width: 0 !important;
 }
 
-.record-main .markdown-preview table {
+:is(.record-main,.rmd-preview-surface) .markdown-preview table {
   width: max-content;
   min-width: 0;
   max-width: min(100%,var(--rk-wide-measure));
   margin-inline: auto !important;
 }
 
-.record-main .tiptap .tableWrapper.rk-hscroll > .rk-table-caption {
+:is(.record-main,.rmd-preview-surface) .tiptap .tableWrapper.rk-hscroll > .rk-table-caption {
   text-align: center;
 }
 
-.record-main .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only > .rk-directive-body {
+:is(.record-main,.rmd-preview-surface) .tiptap .rk-rmd-block-mark.rk-rmd-mark-math-only > .rk-directive-body {
   display: block;
   width: max-content;
   max-width: none;
 }
 
-.record-main :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap,.markdown-preview) .rk-rmd-block-mark.rk-rmd-mark-math-only {
   overflow-x: clip;
   overflow-y: visible;
   overscroll-behavior-y: auto;
@@ -757,7 +806,7 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   max-width: 100% !important;
 }
 
-.record-main .wiki-embed-body > .markdown-preview {
+:is(.record-main,.rmd-preview-surface) .wiki-embed-body > .rmd-preview-surface > .markdown-preview {
   min-height: 0;
   max-width: 100%;
   width: 100%;
@@ -767,7 +816,7 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   line-height: inherit;
 }
 
-.record-main :is(.tiptap, .markdown-preview) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) {
   width: 100%;
   min-width: 0;
   margin-inline: auto;
@@ -784,19 +833,19 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   max-width: 100%;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > :is(.code-block, .tableWrapper) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > :is(.code-block, .tableWrapper) {
   width: 100%;
   max-width: 100%;
   margin-inline: 0;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .rk-hscroll {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .rk-hscroll {
   overflow: hidden;
   margin-block: 22px;
   scrollbar-width: none;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .rk-hscroll table {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .rk-hscroll table {
   display: table;
   width: auto;
   min-width: 0;
@@ -805,13 +854,13 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   overflow: visible;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .code-block {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .code-block {
   border: 1px solid var(--rk-document-border);
   border-radius: 10px;
   background: var(--rk-document-wash);
 }
 
-.record-main :is(.tiptap, .markdown-preview) .code-block pre {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .code-block pre {
   width: max-content;
   min-width: 100%;
   margin: 0;
@@ -821,30 +870,30 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
   overflow: visible;
 }
 
-.record-main .markdown-preview ul.contains-task-list {
+:is(.record-main,.rmd-preview-surface) .markdown-preview ul.contains-task-list {
   list-style: none;
   padding-inline-start: 0;
 }
 
-.record-main .markdown-preview li.task-list-item {
+:is(.record-main,.rmd-preview-surface) .markdown-preview li.task-list-item {
   position: relative;
   list-style: none;
   padding-inline-start: 25px;
   margin: 4px 0;
 }
 
-.record-main .markdown-preview li.task-list-item > input[type="checkbox"] {
+:is(.record-main,.rmd-preview-surface) .markdown-preview li.task-list-item > input[type="checkbox"] {
   position: absolute;
   inset-inline-start: 0;
   top: .5em;
   margin: 0;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .rk-hscroll :is(th, td) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .rk-hscroll :is(th, td) {
   min-width: 7.5em;
 }
 
-.record-main .rk-rmd-callout .astryx-banner-icon {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout .astryx-banner-icon {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -857,54 +906,66 @@ html[data-effective-theme="dark"] .record-main .rk-rmd-callout[data-rk-kind="que
 }
 
 @media (max-width: 720px) {
+:is(.record-main,.rmd-preview-surface) {
+  --rk-document-pad: 16px;
+  --rk-document-leading: 1.75;
+}
 
-.record-main :is(.tiptap, .markdown-preview) {
+
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) {
   padding: 22px var(--rk-document-pad) 42px;
   font-size: 16px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > h1 {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > h1 {
   font-size: 25px;
   margin-block-end: 20px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > h2 {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > h2 {
   font-size: 21px;
   margin-block-start: 27px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) blockquote {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) blockquote {
   padding: 9px 12px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) pre {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) pre {
   padding: 13px 14px;
   font-size: 12.5px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) table {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) table {
   font-size: 12.5px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) :is(th,td) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) :is(th,td) {
   padding: 8px 10px;
   min-width: 66px;
 }
 
-.record-main :is(.tiptap, .markdown-preview) .rk-hscroll {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) .rk-hscroll {
   margin-block: 18px;
 }
 }
 
 @media print {
 
-.record-main :is(.tiptap, .markdown-preview) {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) {
   padding: 0;
   font-size: 11pt;
   max-width: 100%;
 }
 
-.record-main :is(.tiptap, .markdown-preview) > * {
+:is(.record-main,.rmd-preview-surface) :is(.tiptap, .markdown-preview) > * {
   max-width: 100%;
 }
+}
+
+/* Embedded previews share typography while fitting their host card's geometry. */
+.rmd-preview-surface > .markdown-preview[data-embedded] {
+  min-height: 0;
+  padding: 0;
+  max-width: none;
 }

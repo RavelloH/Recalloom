@@ -202,12 +202,12 @@ function MarkdownPreview({content,sourceId,trail,depth=0,referenceIndex,comparis
     sourceId={sourceId} trail={chain} depth={depth}
     render={(body,id,next,nextDepth)=><MarkdownPreview content={body} sourceId={id} trail={next} depth={nextDepth} embedded/>}/>
  };
- return <article className="markdown-preview" ref={sketchRef} data-embedded={embedded||undefined}>
+ return <div className="rmd-preview-surface"><article className="markdown-preview" ref={sketchRef} data-embedded={embedded||undefined}>
   {frontmatter&&<p className="rk-verbatim-document-text">{frontmatter}</p>}
   <ReactMarkdown remarkPlugins={[remarkGfm,remarkMath,()=>remarkRmdSyntax(syntaxSource,analysis)]}
    rehypePlugins={[rehypeRaw,rehypeAlignment,rehypeHeadingIds,[rehypeSanitize,previewSchema],...(scopeIds?[scopeIds]:[]),...(highlight?[highlight]:[]),...(searchQuery?[[searchPreviewHighlight,searchQuery] as [typeof searchPreviewHighlight,string]]:[]),rehypeKatex]}
    components={{...components,...custom} as Components}>{parseSource}</ReactMarkdown>
- </article>;
+ </article></div>;
 }
 
 // Inspector state changes must not reparse and rebuild unchanged prose/math.

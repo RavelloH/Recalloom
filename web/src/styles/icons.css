@@ -13,7 +13,7 @@
 }
 
 /* Preserve Astryx Banner's 16px status icon slot and alignment. */
-.record-main .rk-rmd-callout .astryx-banner-icon > .rk-icon {
+:is(.record-main,.rmd-preview-surface) .rk-rmd-callout .astryx-banner-icon > .rk-icon {
   width: 100% !important;
   height: 100% !important;
 }

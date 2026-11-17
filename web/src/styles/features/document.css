@@ -10,12 +10,6 @@
   overflow-wrap: anywhere;
 }
 
-.markdown-preview[data-embedded] {
-  min-height: 0;
-  padding: 0;
-  max-width: none;
-}
-
 .markdown-preview h1 {
   font-size: 25px;
 }

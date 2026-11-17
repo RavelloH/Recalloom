@@ -20,7 +20,7 @@
 | components/status.css | 错误、警告、成功与进度状态 |
 | components/controls.css | 通用按钮、标签、卡片等控件 |
 | components/overlays.css | 对话框、弹窗、命令面板、登录与遮罩 |
-| features/rmd.css | RMD 块、标注、扩展语法的显示行为（由记录编辑器和 Markdown 预览加载） |
+| features/rmd.css | 共享正文排版、RMD 块与标注，同时覆盖 `.record-main` 和独立预览的 `.rmd-preview-surface`（由记录编辑器和 Markdown 预览加载） |
 | features/editor-chrome.css | 可视化编辑器工具栏与浮动操作（由记录编辑器加载） |
 | features/records.css | Record 页面与其余编辑器外围样式（随记录页面加载） |
 | features/document.css | Markdown、文档排版与内容呈现 |

@@ -204,35 +204,35 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
 }
 
 /* Rich Markdown: editable Astryx directives and consistently visible annotations. */
-.record-main .rk-directive {margin-block: 1rem;}
-.record-main .rk-directive-body {min-width:0;overflow-wrap:anywhere;}
-.record-main .rk-directive-body > :first-child {margin-top:0;}
-.record-main .rk-directive-body > :last-child {margin-bottom:0;}
+:is(.record-main,.rmd-preview-surface) .rk-directive {margin-block: 1rem;}
+:is(.record-main,.rmd-preview-surface) .rk-directive-body {min-width:0;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-directive-body > :first-child {margin-top:0;}
+:is(.record-main,.rmd-preview-surface) .rk-directive-body > :last-child {margin-bottom:0;}
 /* Callout/Details/Tabs headers are document text, not input fields.
  * Preserve the Banner's own typography and box size through focus/typing. */
-.record-main .rk-directive-title-hit[contenteditable="true"]{
+:is(.record-main,.rmd-preview-surface) .rk-directive-title-hit[contenteditable="true"]{
  display:inline;min-width:0;max-width:100%;border:0;outline:none;
  padding:0;margin:0;background:transparent;box-shadow:none;
  font:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;
  white-space:pre-wrap;overflow-wrap:anywhere;
  cursor:text;caret-color:currentColor;vertical-align:baseline;
 }
-.record-main .rk-directive-title-hit[contenteditable="true"]:focus,
-.record-main .rk-directive-title-hit[contenteditable="true"]:focus-visible{
+:is(.record-main,.rmd-preview-surface) .rk-directive-title-hit[contenteditable="true"]:focus,
+:is(.record-main,.rmd-preview-surface) .rk-directive-title-hit[contenteditable="true"]:focus-visible{
  outline:none;background:transparent;box-shadow:none;
 }
-.record-main .rk-details-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;
+:is(.record-main,.rmd-preview-surface) .rk-details-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;
  font-size:var(--text-large-size,17px);font-weight:var(--font-weight-semibold,600);color:var(--color-text-primary);}
-.record-main .rk-details-title{flex:1;min-width:0;}
-.record-main .rk-details-toggle.astryx-button{flex:none;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;}
-.record-main .rk-details-chevron{width:var(--text-large-size,17px);height:var(--text-large-size,17px);}
-.record-main .rk-details-content{padding-block-start:var(--spacing-1,4px);}
-.record-main .rk-details-content[hidden]{display:none;}
-.record-main .rk-rich-inline {display:inline;}
-.record-main .rk-inline-editable {display:inline;}
-.record-main .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
-.record-main .rk-inline-tooltip {text-decoration:underline dashed;text-underline-offset:.17em;cursor:help;}
-.record-main .rk-comment,
+:is(.record-main,.rmd-preview-surface) .rk-details-title{flex:1;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .rk-details-toggle.astryx-button{flex:none;width:24px;height:24px;min-width:24px;min-height:24px;padding:0;}
+:is(.record-main,.rmd-preview-surface) .rk-details-chevron{width:var(--text-large-size,17px);height:var(--text-large-size,17px);}
+:is(.record-main,.rmd-preview-surface) .rk-details-content{padding-block-start:var(--spacing-1,4px);}
+:is(.record-main,.rmd-preview-surface) .rk-details-content[hidden]{display:none;}
+:is(.record-main,.rmd-preview-surface) .rk-rich-inline {display:inline;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-editable {display:inline;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-abbr {text-decoration:underline dotted;text-underline-offset:.17em;cursor:help;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-tooltip {text-decoration:underline dashed;text-underline-offset:.17em;cursor:help;}
+:is(.record-main,.rmd-preview-surface) .rk-comment,
 .record-main .tiptap [data-rk-comment] {
   color:var(--color-text-tertiary,var(--rk-ink-faint));
   font-size:.89em;
@@ -241,7 +241,7 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
   background:transparent;
   white-space:pre-wrap;
 }
-.record-main .rk-comment::before {content:'·';margin-inline-end:.24em;opacity:.75;}
+:is(.record-main,.rmd-preview-surface) .rk-comment::before {content:'·';margin-inline-end:.24em;opacity:.75;}
 
 /* Shiki decorates the outer Tiptap React NodeView wrapper too. That wrapper
  * was retaining an opaque WHITE background behind the rounded code card,
@@ -253,17 +253,17 @@ body.rk-block-drag-active .rk-editor-dropcursor{display:none!important;}
 /* Shiki code blocks use Astryx controls and the effective (not OS) theme.
  * Use the SAME opaque surface for every layer; transparent nested pre and
  * OverlayScrollbars corners must never expose a contrasting background. */
-.record-main {
+:is(.record-main,.rmd-preview-surface) {
  --rk-code-surface:#f6f8fa;
  --rk-code-ink:#17212b;
  --rk-code-stroke:#cfd6df;
 }
-html[data-effective-theme="dark"] .record-main {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) {
  --rk-code-surface:#171b22;
  --rk-code-ink:#eef2f7;
  --rk-code-stroke:#394351;
 }
-.record-main .rk-code-block {
+:is(.record-main,.rmd-preview-surface) .rk-code-block {
  display:block;
  position:relative;
  isolation:isolate;
@@ -275,7 +275,7 @@ html[data-effective-theme="dark"] .record-main {
  min-width:0;
  overflow:hidden;
 }
-.record-main .rk-code-header {
+:is(.record-main,.rmd-preview-surface) .rk-code-header {
  display:flex;align-items:center;justify-content:space-between;gap:.5rem;
  padding:5px 9px;
  border-bottom:1px solid var(--rk-code-stroke);
@@ -283,47 +283,47 @@ html[data-effective-theme="dark"] .record-main {
  font-size:12px;
  background:var(--rk-code-surface)!important;
 }
-.record-main .rk-code-title,.record-main .rk-code-actions {
+:is(.record-main,.rmd-preview-surface) .rk-code-title,:is(.record-main,.rmd-preview-surface) .rk-code-actions {
  display:inline-flex;align-items:center;gap:.25rem;min-width:0;
 }
-.record-main .rk-code-title {flex:1;}
-.record-main .rk-code-title-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.record-main .rk-code-title-hit.astryx-button{cursor:text;display:inline-grid;min-width:0;min-height:0;height:auto;
+:is(.record-main,.rmd-preview-surface) .rk-code-title {flex:1;}
+:is(.record-main,.rmd-preview-surface) .rk-code-title-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+:is(.record-main,.rmd-preview-surface) .rk-code-title-hit.astryx-button{cursor:text;display:inline-grid;min-width:0;min-height:0;height:auto;
  padding:0;border:0;border-radius:3px;font:inherit;color:inherit;background:transparent;text-underline-offset:.18em;}
-@media (hover: hover) and (pointer: fine){.record-main .rk-code-title-hit:hover{text-decoration:underline dotted;}}
-.record-main .rk-code-title-hit:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
-.record-main .rk-code-title input {max-width:260px;}
-.record-main .rk-code-viewport {
+@media (hover: hover) and (pointer: fine){:is(.record-main,.rmd-preview-surface) .rk-code-title-hit:hover{text-decoration:underline dotted;}}
+:is(.record-main,.rmd-preview-surface) .rk-code-title-hit:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
+:is(.record-main,.rmd-preview-surface) .rk-code-title input {max-width:260px;}
+:is(.record-main,.rmd-preview-surface) .rk-code-viewport {
  overflow-x:auto;overscroll-behavior-inline:contain;
  background:var(--rk-code-surface)!important;
 }
-.record-main .rk-code-block :is(pre,.shiki,.rk-shiki-html) {
+:is(.record-main,.rmd-preview-surface) .rk-code-block :is(pre,.shiki,.rk-shiki-html) {
  border:0!important;border-radius:0!important;
  background:transparent!important;
  color:var(--rk-code-ink);
 }
-.record-main .rk-code-block pre {margin:0!important;overflow:visible;padding:14px 18px;}
-.record-main .rk-code-block pre code {white-space:pre;}
-.record-main .rk-code-block.rk-code-wrap pre code {white-space:pre-wrap;overflow-wrap:anywhere;}
-.record-main .rk-code-folded .rk-code-viewport {max-height:18rem;overflow-y:hidden;}
-.record-main .rk-code-fold-button {
+:is(.record-main,.rmd-preview-surface) .rk-code-block pre {margin:0!important;overflow:visible;padding:14px 18px;}
+:is(.record-main,.rmd-preview-surface) .rk-code-block pre code {white-space:pre;}
+:is(.record-main,.rmd-preview-surface) .rk-code-block.rk-code-wrap pre code {white-space:pre-wrap;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-code-folded .rk-code-viewport {max-height:18rem;overflow-y:hidden;}
+:is(.record-main,.rmd-preview-surface) .rk-code-fold-button {
  display:flex;justify-content:center;
  background:var(--rk-code-surface);border-top:1px solid var(--rk-code-stroke);
 }
 /* Tiptap's Shiki plugin places --shiki-dark on token spans without
  * requiring a .shiki ancestor. Target the actual dual-theme tokens, not
  * the ancestor class; the previous selector missed editable code entirely. */
-.record-main .rk-code-block span[style*="--shiki-dark"] {
+:is(.record-main,.rmd-preview-surface) .rk-code-block span[style*="--shiki-dark"] {
  /* Light Shiki tokens already have correct inline colors. Do not replace
   * every token with --rk-code-ink or all syntax categories become monochrome. */
  background:transparent!important;
 }
-html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shiki-dark"] {
+html[data-effective-theme="dark"] :is(.record-main,.rmd-preview-surface) .rk-code-block span[style*="--shiki-dark"] {
  color:var(--shiki-dark,var(--rk-code-ink))!important;
 }
 /* Prevent native scrollbar corner paints from bleeding white at rounded edges. */
-.record-main .rk-code-viewport::-webkit-scrollbar-corner,
-.record-main .rk-code-block pre::-webkit-scrollbar-corner {background:var(--rk-code-surface);}
+:is(.record-main,.rmd-preview-surface) .rk-code-viewport::-webkit-scrollbar-corner,
+:is(.record-main,.rmd-preview-surface) .rk-code-block pre::-webkit-scrollbar-corner {background:var(--rk-code-surface);}
 
 /* Rich semantic highlights inherit Astryx neutral palette in both themes. */
 .record-main :is(.tiptap,.markdown-preview) mark[data-rk-color] {color:inherit;}
@@ -338,7 +338,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main :is(.tiptap,.markdown-preview) mark[data-rk-color="teal"] {background:var(--color-background-teal,#d6efef)!important;}
 
 /* Mermaid is derived from editable fenced source and never stored as Markdown. */
-.record-main .rk-mermaid {
+:is(.record-main,.rmd-preview-surface) .rk-mermaid {
  margin:0.5rem 0 0.75rem;
  padding:1rem;
  overflow-x:auto;
@@ -346,66 +346,66 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  background:var(--rk-document-wash);
  border-radius:0 0 10px 10px;
 }
-.record-main .rk-mermaid-svg {width:100%;min-width:0;text-align:center;}
-.record-main .rk-mermaid-svg > img {display:inline-block;max-width:100%;height:auto!important;}
-.record-main .rk-mermaid-error,.record-main .rk-mermaid-loading {
+:is(.record-main,.rmd-preview-surface) .rk-mermaid-svg {width:100%;min-width:0;text-align:center;}
+:is(.record-main,.rmd-preview-surface) .rk-mermaid-svg > img {display:inline-block;max-width:100%;height:auto!important;}
+:is(.record-main,.rmd-preview-surface) .rk-mermaid-error,:is(.record-main,.rmd-preview-surface) .rk-mermaid-loading {
  display:flex;align-items:center;justify-content:center;gap:.5rem;
  color:var(--color-text-secondary);padding:1rem;font-size:.9rem;
 }
-.record-main .rk-link-card {width:100%;max-width:100%;min-width:0;border:1px solid var(--rk-document-border);border-radius:12px;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease;}
-.record-main .rk-link-card:hover {border-color:color-mix(in srgb,var(--color-primary,#3988dc) 45%,var(--rk-document-border));box-shadow:0 5px 18px rgba(0,0,0,.08);}
-.record-main .rk-link-card-row {display:flex;min-width:0;gap:1rem;align-items:stretch;justify-content:space-between;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card {width:100%;max-width:100%;min-width:0;border:1px solid var(--rk-document-border);border-radius:12px;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card:hover {border-color:color-mix(in srgb,var(--color-primary,#3988dc) 45%,var(--rk-document-border));box-shadow:0 5px 18px rgba(0,0,0,.08);}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-row {display:flex;min-width:0;gap:1rem;align-items:stretch;justify-content:space-between;}
 .record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {display:block;width:128px;max-width:32%;height:108px;aspect-ratio:auto;object-fit:contain;flex-shrink:0;margin:0;border:1px solid var(--rk-document-border);border-radius:8px;background:var(--rk-document-wash);}
 @media(max-width:480px){.record-main :is(.tiptap,.markdown-preview) .rk-link-card-image {width:84px;height:80px;}.record-main .rk-link-card-row{gap:.6rem;}.record-main .rk-link-card-title{font-size:.92rem;}}
-.record-main .rk-link-card-text {display:flex;flex-direction:column;gap:.3rem;min-width:0;flex:1;justify-content:center;}
-.record-main .rk-link-card-head {display:flex;align-items:center;gap:.38rem;color:var(--color-text-secondary);font-size:.76rem;letter-spacing:.01em;min-width:0;}
-.record-main .rk-link-card-title {font-size:1rem;line-height:1.45;font-weight:650;letter-spacing:-.01em;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.record-main .rk-link-card-desc {color:var(--color-text-secondary);font-size:.81rem;line-height:1.5;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
-.record-main .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.78rem;line-height:1.5;text-decoration:none!important;margin-top:.15rem;}
-.record-main .rk-link-card-open:hover{text-decoration:underline!important;}
-.record-main .rk-rich-link-card .rk-link-card-title[role='button']{cursor:text;border-radius:3px;text-underline-offset:.16em;}
-@media (hover: hover) and (pointer: fine){.record-main .rk-rich-link-card .rk-link-card-title[role='button']:hover{text-decoration:underline dotted;}}
-.record-main .rk-rich-link-card .rk-link-card-title[role='button']:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-text {display:flex;flex-direction:column;gap:.3rem;min-width:0;flex:1;justify-content:center;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-head {display:flex;align-items:center;gap:.38rem;color:var(--color-text-secondary);font-size:.76rem;letter-spacing:.01em;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-title {font-size:1rem;line-height:1.45;font-weight:650;letter-spacing:-.01em;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-desc {color:var(--color-text-secondary);font-size:.81rem;line-height:1.5;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-open {display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.78rem;line-height:1.5;text-decoration:none!important;margin-top:.15rem;}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-open:hover{text-decoration:underline!important;}
+:is(.record-main,.rmd-preview-surface) .rk-rich-link-card .rk-link-card-title[role='button']{cursor:text;border-radius:3px;text-underline-offset:.16em;}
+@media (hover: hover) and (pointer: fine){:is(.record-main,.rmd-preview-surface) .rk-rich-link-card .rk-link-card-title[role='button']:hover{text-decoration:underline dotted;}}
+:is(.record-main,.rmd-preview-surface) .rk-rich-link-card .rk-link-card-title[role='button']:focus-visible{outline:2px solid var(--color-text-link,#527cb7);outline-offset:3px;}
 
-.record-main .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
-.record-main .rk-rich-link-card {margin-block:1rem;}
-.record-main .rk-rich-link-card > button {margin-block:.3rem;}
-.record-main .rk-footnote-definition {margin-block:1rem;}
-.record-main .rk-footnote-definition-title {font-size:.85rem;color:var(--color-text-secondary);display:flex;align-items:center;gap:.3rem;margin-bottom:.45rem;}
-.record-main .rk-footnote-definition-content > :first-child {margin-top:0;}
-.record-main .rk-footnote-definition-content > :last-child {margin-bottom:0;}
-.record-main .rk-footnote-ref {font-size:.82em;vertical-align:super;color:var(--color-text-secondary);}
+:is(.record-main,.rmd-preview-surface) .rk-link-card-loading {font-size:.8rem;color:var(--color-text-tertiary);}
+:is(.record-main,.rmd-preview-surface) .rk-rich-link-card {margin-block:1rem;}
+:is(.record-main,.rmd-preview-surface) .rk-rich-link-card > button {margin-block:.3rem;}
+:is(.record-main,.rmd-preview-surface) .rk-footnote-definition {margin-block:1rem;}
+:is(.record-main,.rmd-preview-surface) .rk-footnote-definition-title {font-size:.85rem;color:var(--color-text-secondary);display:flex;align-items:center;gap:.3rem;margin-bottom:.45rem;}
+:is(.record-main,.rmd-preview-surface) .rk-footnote-definition-content > :first-child {margin-top:0;}
+:is(.record-main,.rmd-preview-surface) .rk-footnote-definition-content > :last-child {margin-bottom:0;}
+:is(.record-main,.rmd-preview-surface) .rk-footnote-ref {font-size:.82em;vertical-align:super;color:var(--color-text-secondary);}
 
 /* Structured terms have explicit Markdown fence boundaries: no ambiguous
  * [DO]: ... continuation or implicit document metadata fields. */
 .record-main :is(.tiptap,.markdown-preview) :is(.rk-glossary-edit,.rk-glossary-read) {margin-block:1.15rem;}
-.record-main .markdown-preview .rk-glossary-read .rk-definition-read {margin-block:1rem;}
-.record-main .rk-glossary-title {font-weight:650;margin-bottom:.8rem;color:var(--rk-document-ink);}
-.record-main .rk-glossary-entries {display:flex;flex-direction:column;gap:.8rem;}
-.record-main :is(.rk-definition-edit,.rk-definition-read) {border-inline-start:2px solid var(--rk-document-border);padding-inline-start:.8rem;margin:0;}
-.record-main .rk-definition-term {font-weight:650;color:var(--rk-document-ink);margin-bottom:.25rem;}
-.record-main .rk-definition-body {margin:0;min-width:0;overflow-wrap:anywhere;}
-.record-main .rk-definition-body > :first-child {margin-block-start:0;}
-.record-main .rk-definition-body > :last-child {margin-block-end:0;}
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-glossary-read .rk-definition-read {margin-block:1rem;}
+:is(.record-main,.rmd-preview-surface) .rk-glossary-title {font-weight:650;margin-bottom:.8rem;color:var(--rk-document-ink);}
+:is(.record-main,.rmd-preview-surface) .rk-glossary-entries {display:flex;flex-direction:column;gap:.8rem;}
+:is(.record-main,.rmd-preview-surface) :is(.rk-definition-edit,.rk-definition-read) {border-inline-start:2px solid var(--rk-document-border);padding-inline-start:.8rem;margin:0;}
+:is(.record-main,.rmd-preview-surface) .rk-definition-term {font-weight:650;color:var(--rk-document-ink);margin-bottom:.25rem;}
+:is(.record-main,.rmd-preview-surface) .rk-definition-body {margin:0;min-width:0;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-definition-body > :first-child {margin-block-start:0;}
+:is(.record-main,.rmd-preview-surface) .rk-definition-body > :last-child {margin-block-end:0;}
 
 /* Knowledge flashcards: editor shows both sides for editing; reader only
  * reveals the answer on demand with Astryx Collapsible. No reveal state is saved. */
-.record-main .rk-flashcard {margin-block:1.15rem;max-width:100%;}
-.record-main .rk-flashcard-heading {font-weight:650;font-size:.9rem;color:var(--color-text-secondary);margin-bottom:.7rem;}
-.record-main .rk-flashcard-body {display:flex;flex-direction:column;gap:.7rem;min-width:0;}
-.record-main .rk-flashcard-panel {margin:0!important;min-width:0;}
-.record-main .rk-flashcard-panel-title {font-size:.78rem;color:var(--color-text-secondary);font-weight:600;margin-bottom:.4rem;}
-.record-main .rk-flashcard-content {min-width:0;overflow-wrap:anywhere;}
-.record-main .rk-flashcard-content > :first-child {margin-block-start:0;}
-.record-main .rk-flashcard-content > :last-child {margin-block-end:0;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard {margin-block:1.15rem;max-width:100%;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-heading {font-weight:650;font-size:.9rem;color:var(--color-text-secondary);margin-bottom:.7rem;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-body {display:flex;flex-direction:column;gap:.7rem;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-panel {margin:0!important;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-panel-title {font-size:.78rem;color:var(--color-text-secondary);font-weight:600;margin-bottom:.4rem;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-content {min-width:0;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-content > :first-child {margin-block-start:0;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-content > :last-child {margin-block-end:0;}
 /* The Notion-style visual editor is also the reader: flashcard answer
  * disclosure works here, while its ProseMirror content stays mounted. */
-.record-main :is(.rk-flashcard-edit,.rk-flashcard-read) .rk-flashcard-heading {display:flex;align-items:center;gap:.7rem;justify-content:space-between;flex-wrap:wrap;}
-.record-main .rk-flashcard-read[data-rk-answer-open="false"] .rk-flashcard-back {display:none!important;}
-.record-main .markdown-preview .rk-flashcard-read :is(.rk-flashcard-front,.rk-flashcard-back) {padding-block:12px;}
-.record-main .rk-flashcard-edit[data-rk-answer-open="false"] .rk-directive-back {display:none!important;}
+:is(.record-main,.rmd-preview-surface) :is(.rk-flashcard-edit,.rk-flashcard-read) .rk-flashcard-heading {display:flex;align-items:center;gap:.7rem;justify-content:space-between;flex-wrap:wrap;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-read[data-rk-answer-open="false"] .rk-flashcard-back {display:none!important;}
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-flashcard-read :is(.rk-flashcard-front,.rk-flashcard-back) {padding-block:12px;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-edit[data-rk-answer-open="false"] .rk-directive-back {display:none!important;}
 .record-main .tiptap .rk-flashcard-front {padding-block:.25rem .55rem;}
-.record-main .rk-flashcard-answer {padding-top:.5rem;}
+:is(.record-main,.rmd-preview-surface) .rk-flashcard-answer {padding-top:.5rem;}
 /* Static tooltip inside ProseMirror: pure CSS pseudo element, no DOM
  * mutations or dynamic overlays. Match Astryx token colors and geometry. */
 .record-main .tiptap .rk-tooltip-inline[data-rk-tooltip] {position:relative;cursor:help;
@@ -422,7 +422,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  white-space:pre-wrap;overflow-wrap:anywhere;
  font-size:.84rem;font-weight:400;line-height:1.45;
  pointer-events:none;text-decoration:none;}
-.record-main .rk-tooltip-inline:focus-visible {outline:2px solid var(--color-text-secondary);outline-offset:2px;}
+:is(.record-main,.rmd-preview-surface) .rk-tooltip-inline:focus-visible {outline:2px solid var(--color-text-secondary);outline-offset:2px;}
 .astryx-tooltip:has(.rk-read-tooltip-content){max-width:min(28rem,70vw);
  background:var(--color-background-primary,var(--color-background-surface));
  color:var(--color-text-primary);border:1px solid var(--color-border);border-radius:.5rem;
@@ -430,122 +430,122 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .rk-read-tooltip-content{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.84rem;font-weight:400;line-height:1.45;}
 
 /* Keyboard shortcut uses native kbd semantics and Astryx design tokens. */
-.record-main .rk-keycap {display:inline-block;vertical-align:baseline;
+:is(.record-main,.rmd-preview-surface) .rk-keycap {display:inline-block;vertical-align:baseline;
  font:600 .8em/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
  padding:.08em .43em;border-radius:.3em;
  border:1px solid var(--rk-document-border);border-bottom-width:2px;
  background:var(--rk-document-wash);color:var(--rk-document-ink);
  box-shadow:0 1px 0 color-mix(in srgb,var(--rk-document-ink) 6%,transparent);}
-.record-main .rk-inline-kbd {display:inline;white-space:nowrap;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-kbd {display:inline;white-space:nowrap;}
 
 /* Cloze is visible and editable in the authoring surface. In readonly
  * transclusion it is a keyboard-accessible reveal button with no saved state. */
-.record-main .rk-inline-cloze {display:inline;border-bottom:1px dashed var(--color-text-secondary);
+:is(.record-main,.rmd-preview-surface) .rk-inline-cloze {display:inline;border-bottom:1px dashed var(--color-text-secondary);
  background:var(--rk-document-wash);padding-inline:.14em;border-radius:.2em;}
-.record-main .rk-cloze-label {font-size:.7em;font-weight:650;margin-inline-end:.26em;
+:is(.record-main,.rmd-preview-surface) .rk-cloze-label {font-size:.7em;font-weight:650;margin-inline-end:.26em;
  color:var(--color-text-secondary);user-select:none;}
-.record-main .rk-inline-cloze {display:inline;white-space:normal;}
-.record-main .rk-cloze-trigger.astryx-button {cursor:pointer;display:inline-grid;min-width:0;min-height:0;height:auto;line-height:normal;font:inherit;font-size:.83em;
+:is(.record-main,.rmd-preview-surface) .rk-inline-cloze {display:inline;white-space:normal;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-trigger.astryx-button {cursor:pointer;display:inline-grid;min-width:0;min-height:0;height:auto;line-height:normal;font:inherit;font-size:.83em;
  background:var(--rk-document-wash);color:var(--color-text-secondary);
  border:1px dashed var(--rk-document-border);border-radius:.28em;padding:.07em .3em;}
-.record-main .rk-cloze-trigger:hover,.record-main .rk-cloze-trigger:focus-visible {color:var(--rk-document-ink);border-color:var(--color-text-secondary);}
-.record-main .rk-inline-cloze[data-rk-cloze-open="false"] .rk-cloze-editor-answer {display:none!important;}
-.record-main .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-editor-answer {display:inline;}
-.record-main .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-trigger {border-style:solid;}
-.record-main .rk-cloze-editor-answer {font-weight:550;}
-.record-main .rk-cloze-read {display:inline;}
-.record-main .rk-cloze-reveal.astryx-button {cursor:pointer;display:inline-grid;vertical-align:baseline;min-width:0;min-height:0;height:auto;font:inherit;line-height:inherit;
+:is(.record-main,.rmd-preview-surface) .rk-cloze-trigger:hover,:is(.record-main,.rmd-preview-surface) .rk-cloze-trigger:focus-visible {color:var(--rk-document-ink);border-color:var(--color-text-secondary);}
+:is(.record-main,.rmd-preview-surface) .rk-inline-cloze[data-rk-cloze-open="false"] .rk-cloze-editor-answer {display:none!important;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-editor-answer {display:inline;}
+:is(.record-main,.rmd-preview-surface) .rk-inline-cloze[data-rk-cloze-open="true"] .rk-cloze-trigger {border-style:solid;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-editor-answer {font-weight:550;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-read {display:inline;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-reveal.astryx-button {cursor:pointer;display:inline-grid;vertical-align:baseline;min-width:0;min-height:0;height:auto;font:inherit;line-height:inherit;
  border:1px dashed var(--rk-document-border);border-radius:.28em;
  background:var(--rk-document-wash);color:var(--rk-document-muted);
  padding:.06em .35em;max-width:100%;white-space:normal;overflow-wrap:anywhere;}
-.record-main .rk-cloze-reveal:hover,.record-main .rk-cloze-reveal:focus-visible {
+:is(.record-main,.rmd-preview-surface) .rk-cloze-reveal:hover,:is(.record-main,.rmd-preview-surface) .rk-cloze-reveal:focus-visible {
  border-color:var(--color-text-secondary);color:var(--rk-document-ink);}
-.record-main .rk-cloze-open .rk-cloze-reveal {color:var(--rk-document-ink);
+:is(.record-main,.rmd-preview-surface) .rk-cloze-open .rk-cloze-reveal {color:var(--rk-document-ink);
  border-style:solid;background:transparent;}
-.record-main .rk-cloze-trigger-label{font:inherit;color:inherit;line-height:inherit;white-space:normal;overflow-wrap:anywhere;}
-.record-main .rk-cloze-read-answer{margin-inline-start:.26em;}
-.record-main .rk-cloze-read-answer[hidden]{display:none;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-trigger-label{font:inherit;color:inherit;line-height:inherit;white-space:normal;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-read-answer{margin-inline-start:.26em;}
+:is(.record-main,.rmd-preview-surface) .rk-cloze-read-answer[hidden]{display:none;}
 
 /* YAML-looking header text is not a metadata card, and never writes DB fields. */
-.record-main .rk-verbatim-document-text {white-space:pre-wrap;overflow-wrap:anywhere;}
+:is(.record-main,.rmd-preview-surface) .rk-verbatim-document-text {white-space:pre-wrap;overflow-wrap:anywhere;}
 /* Astryx Tabs: interactive even in the canonical Notion-style visual editor.
  * Inactive panels are CSS-hidden but remain mounted editable ProseMirror nodes. */
-.record-main .rk-tabs-edit,.record-main .rk-tabs-preview {max-width:100%;min-width:0;}
-.record-main .markdown-preview .rk-tabs-preview {margin-block:1rem;}
-.record-main .rk-tabs-editor-body {display:flex;flex-direction:column;gap:.8rem;padding-top:.8rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit,:is(.record-main,.rmd-preview-surface) .rk-tabs-preview {max-width:100%;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .markdown-preview .rk-tabs-preview {margin-block:1rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-editor-body {display:flex;flex-direction:column;gap:.8rem;padding-top:.8rem;}
 /* Editor panels are real ProseMirror nodes: tab switching only changes
  * visibility. Never unmount or replace NodeViewContent on tab click. */
-.record-main .rk-tabs-edit[data-rk-active-tab] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer > [data-rk-kind="tab"] {display:none;}
-.record-main .rk-tabs-edit[data-rk-active-tab="0"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(1) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="1"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(2) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="2"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(3) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="3"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(4) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="4"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(5) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="5"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(6) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="6"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(7) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="7"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(8) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="8"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(9) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="9"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(10) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="10"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(11) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="11"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(12) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="12"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(13) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="13"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(14) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="14"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(15) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="15"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(16) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="16"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(17) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="17"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(18) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="18"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(19) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="19"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(20) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="20"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(21) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="21"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(22) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="22"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(23) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="23"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(24) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="24"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(25) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="25"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(26) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="26"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(27) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="27"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(28) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="28"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(29) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="29"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(30) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="30"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(31) > [data-rk-kind="tab"] {display:block;}
-.record-main .rk-tabs-edit[data-rk-active-tab="31"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(32) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer > [data-rk-kind="tab"] {display:none;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="0"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(1) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="1"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(2) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="2"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(3) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="3"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(4) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="4"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(5) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="5"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(6) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="6"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(7) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="7"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(8) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="8"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(9) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="9"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(10) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="10"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(11) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="11"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(12) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="12"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(13) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="13"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(14) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="14"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(15) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="15"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(16) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="16"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(17) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="17"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(18) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="18"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(19) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="19"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(20) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="20"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(21) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="21"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(22) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="22"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(23) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="23"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(24) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="24"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(25) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="25"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(26) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="26"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(27) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="27"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(28) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="28"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(29) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="29"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(30) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="30"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(31) > [data-rk-kind="tab"] {display:block;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-edit[data-rk-active-tab="31"] .rk-tabs-editor-body > [data-node-view-content-react] > .react-renderer:nth-child(32) > [data-rk-kind="tab"] {display:block;}
 /* Beyond the 32-panel UI cap, keep all panels accessible rather than hide. */
-.record-main .rk-tab-edit {margin:0!important;min-width:0;}
-.record-main .rk-tab-title {font-weight:600;margin-bottom:.5rem;}
-.record-main .rk-tabs-heading {font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.5rem;}
-.record-main .rk-tabs-read-panel {min-height:2rem;padding-top:.8rem;}
-.record-main .rk-tabs-read-panel .rk-tab-edit {margin:0;}
-.record-main .rk-tabs-read-panel .rk-tab-title {margin-bottom:.5rem;}
-.record-main .rk-tabs-read-panel[hidden] {display:none;}
-.record-main .rk-tabs-unscoped {border-top:1px solid var(--rk-document-border);padding-top:.5rem;}
-.record-main .rk-tabs-read-panel .rk-tab-pane > :first-child {margin-top:0;}
-.record-main .rk-tabs-read-panel .rk-tab-pane > :last-child {margin-bottom:0;}
+:is(.record-main,.rmd-preview-surface) .rk-tab-edit {margin:0!important;min-width:0;}
+:is(.record-main,.rmd-preview-surface) .rk-tab-title {font-weight:600;margin-bottom:.5rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-heading {font-size:.82rem;color:var(--color-text-secondary);margin-bottom:.5rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel {min-height:2rem;padding-top:.8rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel .rk-tab-edit {margin:0;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel .rk-tab-title {margin-bottom:.5rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel[hidden] {display:none;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-unscoped {border-top:1px solid var(--rk-document-border);padding-top:.5rem;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel .rk-tab-pane > :first-child {margin-top:0;}
+:is(.record-main,.rmd-preview-surface) .rk-tabs-read-panel .rk-tab-pane > :last-child {margin-bottom:0;}
 
 /* CriticMarkup is a visible review annotation, not accepted body text.
  * Keep comments subdued but never display:none or remove from the editor. */
-.record-main .rk-critic {display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;
+:is(.record-main,.rmd-preview-surface) .rk-critic {display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;
  border-radius:.28em;padding:.08em .18em;overflow-wrap:anywhere;font-size:inherit;}
-.record-main .rk-critic-content {display:inline;}
-.record-main .rk-critic-indicator {font-size:.74em;font-weight:700;margin-inline-end:.18em;user-select:none;}
-.record-main .rk-critic-addition {background:color-mix(in srgb,var(--color-success,#4a9d66) 13%,transparent);
+:is(.record-main,.rmd-preview-surface) .rk-critic-content {display:inline;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-indicator {font-size:.74em;font-weight:700;margin-inline-end:.18em;user-select:none;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-addition {background:color-mix(in srgb,var(--color-success,#4a9d66) 13%,transparent);
  text-decoration:underline;text-decoration-color:var(--color-success,#4a9d66);text-underline-offset:.15em;}
-.record-main .rk-critic-deletion {background:color-mix(in srgb,var(--color-danger,#bd5d5d) 11%,transparent);}
-.record-main .rk-critic-deletion .rk-critic-content {text-decoration:line-through;text-decoration-thickness:1px;opacity:.72;}
-.record-main .rk-critic-substitution {background:var(--rk-document-wash);}
-.record-main .rk-critic-before-wrapper,.record-main .rk-critic-substitution .rk-critic-before {color:var(--color-text-secondary);}
+:is(.record-main,.rmd-preview-surface) .rk-critic-deletion {background:color-mix(in srgb,var(--color-danger,#bd5d5d) 11%,transparent);}
+:is(.record-main,.rmd-preview-surface) .rk-critic-deletion .rk-critic-content {text-decoration:line-through;text-decoration-thickness:1px;opacity:.72;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-substitution {background:var(--rk-document-wash);}
+:is(.record-main,.rmd-preview-surface) .rk-critic-before-wrapper,:is(.record-main,.rmd-preview-surface) .rk-critic-substitution .rk-critic-before {color:var(--color-text-secondary);}
 /* Astryx normalizes all SVG to display:block; inside an inline review
  * suggestion this creates a forced line break on narrow screens.
  * Keep review icons on the same baseline as their editable text. */
-.record-main .rk-critic svg {display:inline-block;vertical-align:-.12em;flex-shrink:0;}
-.record-main .rk-critic-before-wrapper {display:inline-flex;align-items:baseline;gap:.16em;max-width:100%;vertical-align:baseline;}
-.record-main .rk-critic-substitution svg,.record-main .rk-critic-comment svg {margin-inline:0 .18em;}
-.record-main .rk-critic-comment > span[contenteditable="false"] {display:inline-flex;vertical-align:baseline;align-items:center;}
-.record-main .rk-critic-substitution .rk-critic-before {text-decoration:line-through;}
-.record-main .rk-critic-substitution .rk-critic-content {text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.15em;}
-.record-main .rk-critic-comment {font-size:.85em;opacity:.73;color:var(--color-text-secondary);
+:is(.record-main,.rmd-preview-surface) .rk-critic svg {display:inline-block;vertical-align:-.12em;flex-shrink:0;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-before-wrapper {display:inline-flex;align-items:baseline;gap:.16em;max-width:100%;vertical-align:baseline;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-substitution svg,:is(.record-main,.rmd-preview-surface) .rk-critic-comment svg {margin-inline:0 .18em;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-comment > span[contenteditable="false"] {display:inline-flex;vertical-align:baseline;align-items:center;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-substitution .rk-critic-before {text-decoration:line-through;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-substitution .rk-critic-content {text-decoration:underline;text-decoration-style:dotted;text-underline-offset:.15em;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-comment {font-size:.85em;opacity:.73;color:var(--color-text-secondary);
  background:var(--rk-document-wash);border:1px dotted var(--rk-document-border);}
-.record-main .rk-critic-highlight {background:color-mix(in srgb,var(--color-warning,#a88520) 15%,transparent);
+:is(.record-main,.rmd-preview-surface) .rk-critic-highlight {background:color-mix(in srgb,var(--color-warning,#a88520) 15%,transparent);
  border-bottom:1px dashed var(--color-warning,#a88520);}
-.record-main .rk-critic-comment:focus-within {opacity:1;}
+:is(.record-main,.rmd-preview-surface) .rk-critic-comment:focus-within {opacity:1;}
 
 /* Markdown-sourced stable block IDs: numbering is a presentation counter,
  * never a persisted database attribute. References read the live editor AST. */
@@ -554,25 +554,25 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 .record-main .tiptap [data-rk-equation-id]::after {content:'(' counter(rk-equation) ')';
  position:absolute;inset-inline-end:.55rem;top:50%;transform:translateY(-50%);
  color:var(--color-text-secondary);font-size:.85rem;font-variant-numeric:tabular-nums;pointer-events:none;}
-.record-main .rk-cross-reference {display:inline;white-space:nowrap;}
-.record-main .rk-cross-reference > a {color:var(--color-primary,#3988dc);text-decoration:underline;
+:is(.record-main,.rmd-preview-surface) .rk-cross-reference {display:inline;white-space:nowrap;}
+:is(.record-main,.rmd-preview-surface) .rk-cross-reference > a {color:var(--color-primary,#3988dc);text-decoration:underline;
  text-underline-offset:.16em;cursor:pointer;}
-.record-main .rk-cross-reference-missing > a {color:var(--color-danger,#b94a48);text-decoration-style:dashed;}
-.record-main .rk-cross-caption-number {margin-inline-end:.3em;font-weight:600;white-space:nowrap;}
+:is(.record-main,.rmd-preview-surface) .rk-cross-reference-missing > a {color:var(--color-danger,#b94a48);text-decoration-style:dashed;}
+:is(.record-main,.rmd-preview-surface) .rk-cross-caption-number {margin-inline-end:.3em;font-weight:600;white-space:nowrap;}
 
 /* Editing the caption lives outside TableView's ProseMirror-managed cells. */
-.record-main .rk-table-caption-editor {position:absolute;z-index:14;left:12px;right:12px;
+:is(.record-main,.rmd-preview-surface) .rk-table-caption-editor {position:absolute;z-index:14;left:12px;right:12px;
  display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,2fr) auto;
  align-items:end;gap:.75rem;padding:.8rem;background:var(--rk-popover,var(--color-background));
  border:1px solid var(--rk-document-border);border-radius:.65rem;
  box-shadow:0 8px 22px rgba(0,0,0,.12);}
-.record-main .rk-table-caption-editor-actions {display:flex;gap:.4rem;align-items:center;}
-@media(max-width:650px){.record-main .rk-table-caption-editor{
+:is(.record-main,.rmd-preview-surface) .rk-table-caption-editor-actions {display:flex;gap:.4rem;align-items:center;}
+@media(max-width:650px){:is(.record-main,.rmd-preview-surface) .rk-table-caption-editor{
  grid-template-columns:1fr;max-height:min(65vh,26rem);overflow-y:auto;}}
 
 /* Compact, explicit CriticMarkup review controls. No hidden actions and no
  * state mutation until a user clicks; stays accessible on touch devices. */
-.record-main .rk-critic-actions {display:inline-flex;gap:.14rem;margin-inline-start:.3em;
+:is(.record-main,.rmd-preview-surface) .rk-critic-actions {display:inline-flex;gap:.14rem;margin-inline-start:.3em;
  vertical-align:middle;align-items:center;white-space:nowrap;}
 
 
@@ -622,7 +622,7 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
 
 /* Document-owned titles and captions are the text-editing surface itself.
  * Neither click nor focus should replace rendered text with an input field. */
-.record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+:is(.record-main,.rmd-preview-surface) :is(.rk-rich-figure .rk-figure-caption-hit,
  .rk-rich-link-card .rk-link-card-direct-title,
  .tiptap .rk-table-caption[contenteditable="true"]){
  cursor:text;caret-color:var(--color-text-link,#527cb7);
@@ -630,20 +630,20 @@ html[data-effective-theme="dark"] .record-main .rk-code-block span[style*="--shi
  outline-offset:3px;white-space:pre-wrap;overflow-wrap:anywhere;
 }
 @media (hover: hover) and (pointer: fine){
- .record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+ :is(.record-main,.rmd-preview-surface) :is(.rk-rich-figure .rk-figure-caption-hit,
  .rk-rich-link-card .rk-link-card-direct-title,
  .tiptap .rk-table-caption[contenteditable="true"]):hover{
   text-decoration:underline dotted;
  }
 }
-.record-main :is(.rk-rich-figure .rk-figure-caption-hit,
+:is(.record-main,.rmd-preview-surface) :is(.rk-rich-figure .rk-figure-caption-hit,
  .rk-rich-link-card .rk-link-card-direct-title,
  .tiptap .rk-table-caption[contenteditable="true"]):focus-visible{
  outline:none;
  background:color-mix(in srgb,var(--color-text-link,#527cb7) 8%,transparent);
  box-shadow:inset 0 -1.5px var(--color-text-link,#527cb7);
 }
-.record-main .rk-rich-link-card .rk-link-card-direct-title:focus{
+:is(.record-main,.rmd-preview-surface) .rk-rich-link-card .rk-link-card-direct-title:focus{
  overflow:visible;-webkit-line-clamp:unset;display:block;
 }
 .record-main .tiptap .rk-table-caption[contenteditable="true"]{

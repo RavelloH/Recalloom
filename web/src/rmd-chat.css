@@ -1,7 +1,7 @@
 /* A static RMD transcript uses Astryx's chat primitives. This stylesheet
  * adapts their layout to document prose and Tiptap NodeView boundaries;
  * it does not restyle the underlying Astryx bubbles or sender alignment. */
-.record-main .rk-chat-embed {
+:is(.record-main,.rmd-preview-surface) .rk-chat-embed {
   box-sizing: border-box;
   width: 100%;
   max-width: min(100%, 720px);
@@ -10,7 +10,7 @@
   font-size: .875rem;
   line-height: 1.55;
 }
-.record-main .rk-chat-embed-title {
+:is(.record-main,.rmd-preview-surface) .rk-chat-embed-title {
   padding: .55rem .9rem;
   font-size: .78rem;
   font-weight: 650;
@@ -21,7 +21,7 @@
   border-radius: 12px 12px 0 0;
   background: var(--rk-document-wash, var(--color-background-muted));
 }
-.record-main .rk-chat-transcript {
+:is(.record-main,.rmd-preview-surface) .rk-chat-transcript {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -31,11 +31,11 @@
   background: color-mix(in srgb, var(--rk-document-wash, transparent) 45%, transparent);
   overflow: visible;
 }
-.record-main .rk-chat-embed:has(> .rk-chat-embed-title) .rk-chat-transcript {
+:is(.record-main,.rmd-preview-surface) .rk-chat-embed:has(> .rk-chat-embed-title) .rk-chat-transcript {
   border-start-start-radius: 0;
   border-start-end-radius: 0;
 }
-.record-main .rk-chat-row {
+:is(.record-main,.rmd-preview-surface) .rk-chat-row {
   min-width: 0;
   width: 100%;
   margin: 0;
@@ -43,7 +43,7 @@
 /* Astryx positions the name with the bubble's inline padding, but its
  * default compact name row has a negative bottom margin. A static document
  * transcript reads more clearly with a separate, comfortably spaced line. */
-.record-main .rk-chat-embed .rk-chat-row [data-chat-name] {
+:is(.record-main,.rmd-preview-surface) .rk-chat-embed .rk-chat-row [data-chat-name] {
   height: auto;
   min-height: 1.25rem;
   margin-block-end: .25rem;
@@ -54,25 +54,25 @@
 }
 /* The speaker label itself edits on click; no adjacent pencil participates in
  * the Chat name geometry in either visual or preview mode. */
-.record-main .rk-directive-message .rk-directive-title {position:relative;min-height:1.25rem;}
-.record-main .rk-chat-bubble {
+:is(.record-main,.rmd-preview-surface) .rk-directive-message .rk-directive-title {position:relative;min-height:1.25rem;}
+:is(.record-main,.rmd-preview-surface) .rk-chat-bubble {
   box-sizing: border-box;
   max-width: min(100%, 34rem);
   min-width: 0;
   width: fit-content;
 }
-.record-main .rk-chat-bubble :is(p, ul, ol, blockquote) {
+:is(.record-main,.rmd-preview-surface) .rk-chat-bubble :is(p, ul, ol, blockquote) {
   margin-block: 0;
   font-size: inherit;
   line-height: inherit;
 }
-.record-main .rk-chat-bubble :is(p, ul, ol, blockquote) + :is(p, ul, ol, blockquote) {
+:is(.record-main,.rmd-preview-surface) .rk-chat-bubble :is(p, ul, ol, blockquote) + :is(p, ul, ol, blockquote) {
   margin-block-start: .55em;
 }
-.record-main .rk-chat-bubble :is(ul, ol) {
+:is(.record-main,.rmd-preview-surface) .rk-chat-bubble :is(ul, ol) {
   padding-inline-start: 1.4em;
 }
-.record-main .rk-chat-bubble :is(pre, table, .katex-display) {
+:is(.record-main,.rmd-preview-surface) .rk-chat-bubble :is(pre, table, .katex-display) {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
@@ -82,39 +82,39 @@
  * do not inherit ChatMessageList context, and their wrappers must not add a
  * second round of vertical margins / gap. Message density is passed directly
  * to the Astryx ChatMessage in rmd-chat.tsx. */
-.record-main .rk-directive-chat {
+:is(.record-main,.rmd-preview-surface) .rk-directive-chat {
   width: 100%;
   max-width: min(100%, 720px);
   margin: 1rem auto;
   min-width: 0;
 }
-.record-main .rk-directive-chat > .rk-chat-embed { margin: 0; }
-.record-main .rk-directive-chat .rk-chat-list {
+:is(.record-main,.rmd-preview-surface) .rk-directive-chat > .rk-chat-embed { margin: 0; }
+:is(.record-main,.rmd-preview-surface) .rk-directive-chat .rk-chat-list {
   display: flex;
   flex-direction: column;
   gap: .5rem;
   min-width: 0;
   width: 100%;
 }
-.record-main .rk-directive-chat .rk-directive-message {
+:is(.record-main,.rmd-preview-surface) .rk-directive-chat .rk-directive-message {
   margin-block: 0;
   min-width: 0;
 }
-.record-main .rk-directive-chat .react-renderer {
+:is(.record-main,.rmd-preview-surface) .rk-directive-chat .react-renderer {
   min-width: 0;
 }
-.record-main .rk-chat-message {
+:is(.record-main,.rmd-preview-surface) .rk-chat-message {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.record-main .rk-chat-message > :first-child { margin-block-start: 0; }
-.record-main .rk-chat-message > :last-child { margin-block-end: 0; }
-.record-main .rk-directive-message .rk-directive-title {
+:is(.record-main,.rmd-preview-surface) .rk-chat-message > :first-child { margin-block-start: 0; }
+:is(.record-main,.rmd-preview-surface) .rk-chat-message > :last-child { margin-block-end: 0; }
+:is(.record-main,.rmd-preview-surface) .rk-directive-message .rk-directive-title {
   position: relative;
   min-height: 20px;
 }
 @media (max-width: 480px) {
-  .record-main .rk-chat-embed {
+  :is(.record-main,.rmd-preview-surface) .rk-chat-embed {
     margin-block: .75rem;
   }
 }
