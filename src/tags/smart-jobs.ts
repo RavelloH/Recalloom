@@ -4,7 +4,15 @@ import { relatedSemantic, type KnowledgeNode } from '../graph.js';
 import { tagBatch, tagGuard } from './catalog.js';
 import { smartSettings, smartJobUpsert } from './smart.js';
 
-type Job = { record_id: string; generation: number; attempts: number; propagate: number };
+// Priority 2 dispatches a manual edit, priority 1 refreshes its related documents.
+type Job = {
+  record_id: string;
+  generation: number;
+  attempts: number;
+  propagate: number;
+  analyze: number;
+  priority: number;
+};
 type RecordInput = {
   id: string;
   name: string;
@@ -174,7 +182,12 @@ async function classify(env: Env, model: string, record: RecordInput, relatedIds
 }
 
 /** Lease, input versions and generation fence every asynchronous result. */
-export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.now() + 24_000) {
+export async function processSmartTagJobs(
+  env: Env,
+  limit = 1,
+  deadline = Date.now() + 24_000,
+  urgentOnly = false
+) {
   if (env.INDEX_BACKGROUND_ENABLED === 'false') return { processed: 0 };
   const settings = await smartSettings(env);
   if (!settings.enabled) return { processed: 0 };
@@ -185,21 +198,23 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
     .bind(ts, ts)
     .run();
   // A bounded reconciliation picks up existing indexed records and changed definitions.
-  await env.DB.prepare(
-    "INSERT INTO smart_tag_jobs(record_id,propagate,updated_at) SELECT r.id,0,? FROM records r JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id LEFT JOIN smart_tag_jobs j ON j.record_id=r.id WHERE r.status<>'archived' AND i.state='done' AND i.indexed_revision=c.revision AND (j.record_id IS NULL OR (j.state IN ('done','failed') AND j.definition_version<>?)) LIMIT 3" +
-      smartJobUpsert
-  )
-    .bind(ts, settings.definitionVersion)
-    .run();
-  const jobs = (
+  if (!urgentOnly)
     await env.DB.prepare(
-      "SELECT j.record_id,j.generation,j.attempts,j.propagate FROM smart_tag_jobs j JOIN records r ON r.id=j.record_id JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id WHERE r.status<>'archived' AND i.state='done' AND i.indexed_revision=c.revision AND (j.state='pending' OR (j.state='retry' AND j.next_retry_at<=?)) ORDER BY j.propagate DESC,j.updated_at,j.record_id LIMIT ?"
+      "INSERT INTO smart_tag_jobs(record_id,propagate,updated_at) SELECT r.id,0,? FROM records r JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id LEFT JOIN smart_tag_jobs j ON j.record_id=r.id WHERE r.status<>'archived' AND i.state='done' AND i.indexed_revision=c.revision AND (j.record_id IS NULL OR (j.state IN ('done','failed') AND j.definition_version<>?)) LIMIT 3" +
+        smartJobUpsert
     )
-      .bind(ts, limit)
-      .all<Job>()
-  ).results;
-  let processed = 0;
-  for (const job of jobs) {
+      .bind(ts, settings.definitionVersion)
+      .run();
+  let processed = 0,
+    analysed = 0;
+  // Propagation-only changes can enqueue their targets within this same drain.
+  for (let turn = 0; turn < limit + 4 && analysed < limit; turn++) {
+    const job = await env.DB.prepare(
+      "SELECT j.record_id,j.generation,j.attempts,j.propagate,j.analyze,j.priority FROM smart_tag_jobs j JOIN records r ON r.id=j.record_id JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id WHERE r.status<>'archived' AND ((i.state='done' AND i.indexed_revision=c.revision) OR (j.priority=2 AND i.indexed_revision IS NOT NULL)) AND (?=0 OR j.priority>0) AND (j.state='pending' OR (j.state='retry' AND j.next_retry_at<=?)) ORDER BY j.priority DESC,j.propagate DESC,j.updated_at,j.record_id LIMIT 1"
+    )
+      .bind(Number(urgentOnly), now())
+      .first<Job>();
+    if (!job) break;
     if (deadline - Date.now() < 5000) break;
     const token = crypto.randomUUID();
     const claimed = await env.DB.prepare(
@@ -218,16 +233,34 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const record = await env.DB.prepare(
-        'SELECT r.id,r.name,r.description,r.status,r.metadata_revision,c.content,c.revision FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.id=?'
+        'SELECT r.id,r.name,r.description,r.status,r.metadata_revision,c.content,c.revision,i.state AS indexState,i.indexed_revision AS indexedRevision FROM records r JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id WHERE r.id=?'
       )
         .bind(job.record_id)
-        .first<RecordInput>();
+        .first<RecordInput & { indexState: string; indexedRevision: number }>();
       if (!record || record.status === 'archived') throw new StorageError('INDEX_SUPERSEDED');
+      // Dispatch manual edits first, retaining any previously queued body analysis.
+      const analyze = Boolean(
+        job.priority !== 2 &&
+          job.analyze &&
+          record.indexState === 'done' &&
+          record.indexedRevision === record.revision
+      );
+      if (analyze) analysed++;
       const analysis = (async () => {
-        const neighboursResult = await neighbours(env, record);
+        const neighboursResult = await neighbours(env, {
+          ...record,
+          revision: record.indexedRevision
+        });
         return {
           neighboursResult,
-          recommendations: await classify(env, settings.model, record, neighboursResult.current)
+          recommendations: analyze
+            ? await classify(
+                env,
+                settings.model,
+                record,
+                job.priority === 1 ? neighboursResult.affected : neighboursResult.current
+              )
+            : []
         };
       })();
       const { neighboursResult, recommendations } = await Promise.race([
@@ -239,23 +272,27 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
           );
         })
       ]);
-      const manual = Number(
-        (
-          await env.DB.prepare(
-            "SELECT COUNT(*) AS n FROM record_tags WHERE record_id=? AND source='manual'"
+      const manual = analyze
+        ? Number(
+            (
+              await env.DB.prepare(
+                "SELECT COUNT(*) AS n FROM record_tags WHERE record_id=? AND source='manual'"
+              )
+                .bind(record.id)
+                .first<{ n: number }>()
+            )?.n ?? 0
           )
-            .bind(record.id)
-            .first<{ n: number }>()
-        )?.n ?? 0
-      );
+        : 0;
       const selected = recommendations.slice(0, Math.max(0, 32 - manual));
-      const previous = (
-        await env.DB.prepare(
-          "SELECT tag_id AS tagId,reason,evidence,source_revision AS revision FROM record_tags WHERE record_id=? AND source='auto' ORDER BY tag_id"
-        )
-          .bind(record.id)
-          .all()
-      ).results;
+      const previous = analyze
+        ? (
+            await env.DB.prepare(
+              "SELECT tag_id AS tagId,reason,evidence,source_revision AS revision FROM record_tags WHERE record_id=? AND source='auto' ORDER BY tag_id"
+            )
+              .bind(record.id)
+              .all()
+          ).results
+        : [];
       const desired = selected
         .map((value) => ({ ...value, revision: record.revision }))
         .sort((a, b) => a.tagId.localeCompare(b.tagId));
@@ -263,7 +300,7 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
       const statements = [
         tagGuard(
           env,
-          "EXISTS(SELECT 1 FROM smart_tag_jobs WHERE record_id=? AND generation=? AND lease_token=? AND state='running' AND lease_expires_at>?) AND EXISTS(SELECT 1 FROM records r JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id WHERE r.id=? AND r.metadata_revision=? AND c.revision=? AND r.status<>'archived' AND i.state='done' AND i.indexed_revision=c.revision) AND EXISTS(SELECT 1 FROM smart_tag_settings WHERE id=1 AND enabled=1 AND definition_version=?)",
+          "EXISTS(SELECT 1 FROM smart_tag_jobs WHERE record_id=? AND generation=? AND lease_token=? AND state='running' AND lease_expires_at>?) AND EXISTS(SELECT 1 FROM records r JOIN record_contents c ON c.record_id=r.id JOIN index_jobs i ON i.record_id=r.id WHERE r.id=? AND r.metadata_revision=? AND c.revision=? AND r.status<>'archived' AND ((?=0 AND i.indexed_revision=?) OR (i.state='done' AND i.indexed_revision=c.revision))) AND EXISTS(SELECT 1 FROM smart_tag_settings WHERE id=1 AND enabled=1 AND definition_version=?)",
           [
             record.id,
             job.generation,
@@ -272,6 +309,8 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
             record.id,
             record.metadata_revision,
             record.revision,
+            Number(analyze),
+            record.indexedRevision,
             settings.definitionVersion
           ]
         )
@@ -312,14 +351,23 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
       if (job.propagate)
         statements.push(
           env.DB.prepare(
-            "INSERT INTO smart_tag_jobs(record_id,propagate,updated_at) SELECT id,0,? FROM records WHERE id IN (SELECT value FROM json_each(?)) AND status<>'archived'" +
+            "INSERT INTO smart_tag_jobs(record_id,propagate,priority,updated_at) SELECT id,0,?,? FROM records WHERE id IN (SELECT value FROM json_each(?)) AND status<>'archived'" +
               smartJobUpsert
-          ).bind(now(), JSON.stringify(neighboursResult.affected))
+          ).bind(job.priority === 2 ? 1 : 0, now(), JSON.stringify(neighboursResult.affected))
         );
       statements.push(
         env.DB.prepare(
-          "UPDATE smart_tag_jobs SET state='done',propagate=0,definition_version=?,revision=?,finished_at=?,lease_token=NULL,lease_expires_at=NULL,last_error=NULL WHERE record_id=? AND lease_token=?"
-        ).bind(settings.definitionVersion, record.revision, now(), record.id, token)
+          'UPDATE smart_tag_jobs SET state=?,analyze=?,priority=0,propagate=0,definition_version=?,revision=CASE WHEN ? THEN ? ELSE revision END,finished_at=?,lease_token=NULL,lease_expires_at=NULL,last_error=NULL,next_retry_at=NULL WHERE record_id=? AND lease_token=?'
+        ).bind(
+          job.analyze && !analyze ? 'pending' : 'done',
+          job.analyze && !analyze ? 1 : 0,
+          settings.definitionVersion,
+          Number(analyze),
+          record.revision,
+          now(),
+          record.id,
+          token
+        )
       );
       await tagBatch(env, statements);
     } catch (error) {
@@ -344,5 +392,5 @@ export async function processSmartTagJobs(env: Env, limit = 1, deadline = Date.n
       clearTimeout(timer);
     }
   }
-  return { processed };
+  return { processed, analysed };
 }

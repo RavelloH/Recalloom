@@ -16,7 +16,12 @@ type SmartStatus = {
   metadataRevision: number;
   revision: number;
   waitingForIndex: boolean;
-  job: null | { state: string; lastError: string | null; revision: number | null };
+  job: null | {
+    state: string;
+    lastError: string | null;
+    revision: number | null;
+    priority: number;
+  };
   ignored: Array<{ id: string; name: string }>;
   references: Array<{ id: string; name: string }>;
 };
@@ -76,19 +81,23 @@ export function SmartTagControls({
     ? '正在加载推荐状态…'
     : !status?.settings.enabled
       ? '智能标签已关闭'
-      : status.waitingForIndex
-        ? '等待当前版本索引完成'
-        : status.job?.state === 'running'
-          ? '正在分析标签…'
-          : status.job?.state === 'retry'
-            ? '等待重试'
-            : status.job?.state === 'pending'
-              ? '等待分析'
-              : status.job?.state === 'failed'
-                ? '标签分析失败'
-                : status.job?.state === 'done'
-                  ? '推荐已更新 · R' + status.job.revision
-                  : '索引完成后生成推荐';
+      : status.job?.priority === 2 && ['pending', 'running'].includes(status.job.state)
+        ? '正在安排相关文章更新…'
+        : status.waitingForIndex
+          ? '等待当前版本索引完成'
+          : status.job?.state === 'running'
+            ? '正在分析标签…'
+            : status.job?.state === 'retry'
+              ? '等待重试'
+              : status.job?.state === 'pending'
+                ? '等待分析'
+                : status.job?.state === 'failed'
+                  ? '标签分析失败'
+                  : status.job?.state === 'done'
+                    ? status.job.revision
+                      ? '推荐已更新 · R' + status.job.revision
+                      : '相关文章更新已安排'
+                    : '索引完成后生成推荐';
   return (
     <div className="tag-smart">
       <AutoResizer>

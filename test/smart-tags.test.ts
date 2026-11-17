@@ -403,3 +403,140 @@ test('exhausted failures stop until definitions or model settings change', async
     f.db.close();
   }
 });
+
+test('manual-only tag changes update related documents in the same urgent drain without classifying the source', async () => {
+  const f = fixture();
+  try {
+    const tag = (await createTag(f.env, { name: 'Physics' })).item;
+    const retained = (await createTag(f.env, { name: 'Retained auto' })).item;
+    const source = await f.record('Source.md', '力学来源'),
+      target = await f.record('Target.md', '力学目标');
+    const untouched = await f.record('Old backlog.md', '力学旧任务');
+    f.db
+      .prepare(
+        "INSERT INTO record_tags(record_id,tag_id,source,reason) VALUES(?,?,'auto','保留原推荐')"
+      )
+      .run(source, retained.id);
+    indexed(f, source);
+    indexed(f, target);
+    indexed(f, untouched);
+    f.db
+      .prepare(
+        "UPDATE smart_tag_jobs SET state='done',analyze=0,propagate=0,definition_version=(SELECT definition_version FROM smart_tag_settings)"
+      )
+      .run();
+    f.db
+      .prepare("UPDATE smart_tag_jobs SET state='pending',analyze=1 WHERE record_id=?")
+      .run(untouched);
+    const calls: string[] = [],
+      trusted: Array<unknown[]> = [];
+    model(f, (title) => calls.push(title));
+    const run = f.env.AI.run;
+    f.env.AI.run = (async (modelName: never, input: any) => {
+      trusted.push(JSON.parse(input.messages[1].content).trustedRelatedTags);
+      return run(modelName, input);
+    }) as Env['AI']['run'];
+    (
+      f.env.VECTORIZE as Env['VECTORIZE'] & { queryById: (id: string) => Promise<unknown> }
+    ).queryById = async (id: string) => ({
+      count: 1,
+      matches: [
+        {
+          id: 'chunk-' + (id === 'chunk-' + source ? target : source),
+          score: 0.9,
+          metadata: { record_id: id === 'chunk-' + source ? target : source, revision: 1 }
+        }
+      ]
+    });
+    await assignTag(f.env, source, { tagId: tag.id, action: 'add', expectedMetadataRevision: 1 });
+    const result = await processSmartTagJobs(f.env, 1, Date.now() + 24_000, true);
+    assert.equal(result.processed, 2);
+    assert.deepEqual(calls, ['Target.md']);
+    assert.ok(trusted[0]?.some((value: any) => value.recordId === source && value.id === tag.id));
+    assert.equal(
+      f.db.prepare('SELECT metadata_revision FROM records WHERE id=?').get(source)
+        ?.metadata_revision,
+      2
+    );
+    assert.equal(
+      f.db
+        .prepare('SELECT source FROM record_tags WHERE record_id=? AND tag_id=?')
+        .get(source, tag.id)?.source,
+      'manual'
+    );
+    assert.equal(
+      f.db
+        .prepare('SELECT reason FROM record_tags WHERE record_id=? AND tag_id=?')
+        .get(source, retained.id)?.reason,
+      '保留原推荐'
+    );
+    assert.equal(
+      f.db.prepare('SELECT source FROM record_tags WHERE record_id=?').get(target)?.source,
+      'auto'
+    );
+    assert.equal(
+      f.db.prepare('SELECT state FROM smart_tag_jobs WHERE record_id=?').get(untouched)?.state,
+      'pending'
+    );
+    await assignTag(f.env, source, {
+      tagId: tag.id,
+      action: 'remove',
+      expectedMetadataRevision: 2
+    });
+    calls.length = 0;
+    await processSmartTagJobs(f.env, 1, Date.now() + 24_000, true);
+    assert.deepEqual(calls, ['Target.md']);
+  } finally {
+    f.db.close();
+  }
+});
+
+test('manual propagation uses the last index while a newer source body waits, and the new body is analysed only after its index completes', async () => {
+  const f = fixture();
+  try {
+    const tag = (await createTag(f.env, { name: 'Physics' })).item;
+    const source = await f.record('Source.md', '力学来源'),
+      target = await f.record('Target.md', '力学目标');
+    indexed(f, source);
+    indexed(f, target);
+    f.db
+      .prepare(
+        "UPDATE smart_tag_jobs SET state='done',analyze=0,propagate=0,definition_version=(SELECT definition_version FROM smart_tag_settings)"
+      )
+      .run();
+    f.db
+      .prepare("UPDATE record_contents SET revision=2,content='力学新正文' WHERE record_id=?")
+      .run(source);
+    f.db.prepare("UPDATE index_jobs SET state='pending',revision=2 WHERE record_id=?").run(source);
+    const calls: string[] = [];
+    model(f, (title) => calls.push(title));
+    (
+      f.env.VECTORIZE as Env['VECTORIZE'] & { queryById: (id: string) => Promise<unknown> }
+    ).queryById = async (id: string) => ({
+      count: 1,
+      matches: [
+        {
+          id: 'chunk-' + (id === 'chunk-' + source ? target : source),
+          score: 0.9,
+          metadata: { record_id: id === 'chunk-' + source ? target : source, revision: 1 }
+        }
+      ]
+    });
+    await assignTag(f.env, source, { tagId: tag.id, action: 'add', expectedMetadataRevision: 1 });
+    await processSmartTagJobs(f.env, 1, Date.now() + 24_000, true);
+    assert.deepEqual(calls, ['Target.md']);
+    assert.equal(
+      f.db.prepare('SELECT indexed_revision FROM index_jobs WHERE record_id=?').get(source)
+        ?.indexed_revision,
+      1
+    );
+    f.db.prepare('UPDATE search_chunks SET revision=2 WHERE record_id=?').run(source);
+    f.db
+      .prepare("UPDATE index_jobs SET state='done',indexed_revision=2 WHERE record_id=?")
+      .run(source);
+    await processSmartTagJobs(f.env);
+    assert.deepEqual(calls, ['Target.md', 'Source.md']);
+  } finally {
+    f.db.close();
+  }
+});

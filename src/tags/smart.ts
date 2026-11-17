@@ -6,6 +6,7 @@ import type { SmartSettings } from '../tag-model.js';
 export type { SmartSettings } from '../tag-model.js';
 export const smartJobUpsert = ` ON CONFLICT(record_id) DO UPDATE SET
  generation=smart_tag_jobs.generation+1,
+ analyze=MAX(smart_tag_jobs.analyze,excluded.analyze),priority=MAX(smart_tag_jobs.priority,excluded.priority),
  state=CASE WHEN smart_tag_jobs.state='running' THEN 'running' ELSE 'pending' END,
  propagate=MAX(smart_tag_jobs.propagate,excluded.propagate),attempts=0,next_retry_at=NULL,last_error=NULL,updated_at=excluded.updated_at`;
 
@@ -65,7 +66,7 @@ export async function smartTagStatus(env: Env, id?: string) {
   if (!record) throw new StorageError('RECORD_NOT_FOUND');
   const [job, ignored, references] = await Promise.all([
     env.DB.prepare(
-      'SELECT generation,state,attempts,last_error AS lastError,updated_at AS updatedAt,finished_at AS finishedAt,revision FROM smart_tag_jobs WHERE record_id=?'
+      'SELECT generation,state,attempts,last_error AS lastError,updated_at AS updatedAt,finished_at AS finishedAt,revision,analyze,priority,propagate FROM smart_tag_jobs WHERE record_id=?'
     )
       .bind(id)
       .first(),
@@ -87,7 +88,9 @@ export async function smartTagStatus(env: Env, id?: string) {
     references: references.results,
     metadataRevision: record.metadata_revision,
     revision: record.revision,
-    waitingForIndex: record.index_state !== 'done' || record.indexed_revision !== record.revision
+    waitingForIndex:
+      (record.index_state !== 'done' || record.indexed_revision !== record.revision) &&
+      !(job?.priority === 2 && record.indexed_revision !== null)
   };
 }
 
