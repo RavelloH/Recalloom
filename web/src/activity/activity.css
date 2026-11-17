@@ -4,13 +4,11 @@
  --activity-system: var(--rk-ink-faint);
  --activity-unknown: var(--rk-border-soft);
 }
-.activity-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 28px 0 18px; }
-.activity-search { flex: 1; min-width: 180px; margin-left: auto; max-width: 300px; }
 .activity-extra-filters { display: flex; flex-wrap: wrap; gap: 20px; align-items: end; padding: 0 0 22px; }
 .activity-custom-range { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .activity-custom-range > :first-child, .activity-custom-range > :nth-child(3) { width: 170px; }
 .activity-scope-filter { width: min(100%, 340px); }
-.activity-overview { border-top: 1px solid var(--rk-border-soft); padding-top: 20px; }
+.activity-overview { padding-top: 4px; }
 .activity-period { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: var(--rk-font-small); }
 .activity-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 24px; padding: 24px 0 28px; }
 .activity-metric { min-width: 0; display: grid; gap: 9px; font-size: var(--rk-font-label); }
@@ -56,17 +54,8 @@
 .activity-task-change strong { display: block; font-size: var(--rk-font-label); font-weight: 550; line-height: 1.6; overflow-wrap: anywhere; }
 .activity-task-change > div { margin-top: 5px; font-size: var(--rk-font-small); }
 .activity-detail-note, .activity-detail-error { margin-top: 18px; line-height: 1.7; font-size: var(--rk-font-small); }
-@media (max-width: 720px) {
- .activity-page .page-header { flex-wrap: nowrap; }
- .activity-page .page-title-copy { flex: 1; min-width: 0; width: auto; }
- .activity-page .page-actions { flex: 0 0 auto; width: auto; }
-}
+
 @media (max-width: 640px) {
- .activity-toolbar { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; margin-top: 20px; }
- .activity-toolbar > :first-child, .activity-toolbar > :nth-child(2) { grid-column: span 3; min-width: 0; width: 100%; }
- .activity-toolbar > :nth-child(3) { grid-column: 1 / 6; grid-row: 2; min-width: 0; width: 100%; }
- .activity-search { grid-column: 1 / -1; grid-row: 3; max-width: none; min-width: 0; margin-left: 0; }
- .activity-toolbar > :last-child { grid-column: 6; grid-row: 2; justify-self: end; }
  .activity-period { gap: 6px; }
  .activity-period > span { width: 100%; }
  .activity-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 20px; }

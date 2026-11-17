@@ -43,7 +43,7 @@ const api=(path,body,method=body===undefined?'GET':'POST')=>page.evaluate(async(
  const data=await response.json();if(!response.ok)throw Error(path+' '+response.status+' '+JSON.stringify(data));return data;
 },{path,body,method});
 async function select(label,option){
- await page.locator('.activity-toolbar').scrollIntoViewIfNeeded();
+ await page.locator('.workspace-toolbar').scrollIntoViewIfNeeded();
  await page.getByRole('combobox',{name:new RegExp('^'+label)}).click();
  await page.getByRole('option',{name:option,exact:true}).click();
 }

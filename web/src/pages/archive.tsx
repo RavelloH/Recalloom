@@ -2,7 +2,9 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {Link} from '@tanstack/react-router';
 import {useInfiniteQuery} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
-import {TextInput} from '@astryxdesign/core/TextInput';
+import {IconButton} from '@astryxdesign/core/IconButton';
+import {Icon} from '../icon';
+import {WorkspaceToolbar,WorkspaceSearch} from '../workspace-toolbar';
 import {Selector} from '@astryxdesign/core/Selector';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {archivedRecordsQuery,type ArchivedRecord,type ArchiveFilters} from '../queries';
@@ -44,14 +46,13 @@ export function ArchivePage(){
  const select=(ids:string[],value:boolean)=>setSelected(current=>{const next=new Set(current);for(const id of ids)if(value)next.add(id);else next.delete(id);return next;});
  const preview=(item:ArchivedRecord)=>{const activation=++sequence.current;setPanels(current=>[...current.filter(panel=>panel.item.id!==item.id),{item,open:true,activation}]);};
  const resultKey=actions.results.map(item=>item.id+item.error).join('|');
- return <div className="page archive-page">{actions.confirmation}
-  <PageTitle title="归档" description="保留内容与历史版本，随时查看或恢复。" actions={<><AutoTransition as="span" className="archive-count muted small" transitionKey={q.data?.pages[0]?.total??'loading'}>{q.data?q.data.pages[0].total+' 项':'读取中…'}</AutoTransition><Button label="刷新" size="sm" variant="ghost" isDisabled={actions.busy} onClick={()=>{void q.refetch().then(result=>{if(!result.isError)setRemoved(new Set());});}}/><Link to="/library" className="small text-link">返回知识库</Link></>}/>
-  <div className="archive-toolbar">
-   <div className="archive-search"><TextInput label="搜索归档" isLabelHidden placeholder="搜索名称或原路径" width="100%" value={search} onChange={setSearch}/></div>
-   <Selector label="内容类型" isLabelHidden size="sm" value={kind} onChange={setKind} options={[{value:'all',label:'全部类型'},{value:'document',label:'文稿'},{value:'task_list',label:'任务列表'}]}/>
-   <Selector label="排序" isLabelHidden size="sm" value={grouped?'path':sort} isDisabled={grouped} onChange={value=>setSort(value as typeof sort)} options={[{value:'archived',label:'最近归档'},{value:'oldest',label:'最早归档'},{value:'name',label:'按名称'},{value:'path',label:'按原位置'}]}/>
+ return <div className="page workspace-page archive-page">{actions.confirmation}
+  <PageTitle title="归档" description="保留内容与历史版本，随时查看或恢复。" actions={<><IconButton label="刷新" icon={<Icon name="refresh" size="sm"/>} size="sm" variant="ghost" isDisabled={actions.busy} isLoading={q.isRefetching} onClick={()=>{void q.refetch().then(result=>{if(!result.isError)setRemoved(new Set());});}}/><Link to="/library" className="small text-link">返回知识库</Link></>}/>
+  <WorkspaceToolbar filters={<>
+   <Selector label="内容类型" isLabelHidden size="sm" variant="secondary" value={kind} onChange={setKind} options={[{value:'all',label:'全部类型'},{value:'document',label:'文稿'},{value:'task_list',label:'任务列表'}]}/>
+   <Selector label="排序" isLabelHidden size="sm" variant="secondary" value={grouped?'path':sort} isDisabled={grouped} onChange={value=>setSort(value as typeof sort)} options={[{value:'archived',label:'最近归档'},{value:'oldest',label:'最早归档'},{value:'name',label:'按名称'},{value:'path',label:'按原位置'}]}/>
    <CheckboxInput label="按原文件夹分组" size="sm" value={grouped} onChange={setGrouped}/>
-  </div>
+  </>} search={<WorkspaceSearch label="搜索归档" placeholder="搜索名称或原路径…" value={search} onChange={setSearch}/>} meta={<AutoTransition as="span" className="archive-count muted small" transitionKey={q.data?.pages[0]?.total??'loading'}>{q.data?q.data.pages[0].total+' 项':'读取中…'}</AutoTransition>}/>
   <AutoResizer><AutoTransition transitionKey={actions.busy?'busy':resultKey||'none'}><div className="archive-feedback" role="status" aria-live="polite">
    {actions.busy?<span className="muted small">{actions.progress}</span>:actions.results.length>0&&<><span className="small">{actions.results.filter(item=>!item.error).length} 项已完成{actions.results.some(item=>item.error)?'，'+actions.results.filter(item=>item.error).length+' 项需要处理':''}</span>{actions.results.filter(item=>item.error).map(item=><p className="archive-result-error small" key={item.id}>{item.name} · {item.error}</p>)}</>}
   </div></AutoTransition></AutoResizer>

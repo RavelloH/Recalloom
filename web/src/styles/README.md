@@ -11,6 +11,7 @@
 | layout/shell.css | 应用外壳、导航、侧栏、顶栏、滚动容器、文件树、移动端底栏 |
 | layout/pages.css | 页面框架、页面标题、面包屑、页面操作区 |
 | components/library.css | 文件列表、知识库目录、归档入口 |
+| components/workspace.css | 集合页面的通用标题、操作、筛选和搜索布局 |
 | components/search.css | 搜索表单、搜索结果及匹配反馈 |
 | components/tasks.css | 任务列表及状态 |
 | components/dashboard.css | 概览、最近访问、活动与统计 |
@@ -62,3 +63,15 @@ Astryx 样式在全局入口之前导入，保持组件原有交互、可访问�
 - pnpm check：集成样式、图标、帮助、语法与 TypeScript 检查。
 - pnpm build:web：Vite 样式与资源打包。
 - node scripts/run-editor-e2e.mjs editor-responsive-v5-e2e.mjs editor-toolbar-v4-e2e.mjs editor-block-handle-e2e.mjs：验证编辑器、触屏 iPad 与手机交互。导航和按钮改动需继续加对应布局 E2E。
+
+
+## 集合页面 Header 规则
+
+任务、活动、归档和关系网使用 `workspace-page`、`PageTitle`、`WorkspaceToolbar` 与 `WorkspaceSearch`。
+
+- 第一行左侧为标题和说明，右侧为页面级操作。刷新使用小号图标按钮，新建使用主按钮。
+- 第二行桌面端左侧为视图切换和筛选，右侧为固定宽度的搜索框，列表数量置于筛选组末尾。筛选使用 Astryx 小号 secondary Selector 或 MultiSelector。
+- 720px 及以下，搜索固定在工具栏第一行，筛选在下一行自然换行，数量跟随筛选。标题和操作维持左右对齐，空间不足时操作向右换行。
+- 搜索统一使用 Astryx 小号 TextInput，带搜索图标，保留可访问标签，输入框占满搜索槽。各页负责自己的搜索语义与请求节流。
+- 高级筛选在工具栏下方展开，使用 AutoTransition 和 AutoResizer。选择状态、数量、加载反馈在内容区域过渡。
+- 路由加载器并行准备页面代码与首屏必要数据，避免额外的纯文本 Suspense 占位进入页面切换动画。首次数据加载使用 Astryx Skeleton，后台刷新保留已有内容与画布。

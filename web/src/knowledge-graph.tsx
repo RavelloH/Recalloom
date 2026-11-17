@@ -5,7 +5,7 @@ import {useNavigate,useSearch} from '@tanstack/react-router';
 import type {Core} from 'cytoscape';
 import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
-import {TextInput} from '@astryxdesign/core/TextInput';
+import {WorkspaceToolbar,WorkspaceSearch} from './workspace-toolbar';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
 import {Banner} from '@astryxdesign/core/Banner';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
@@ -13,7 +13,7 @@ import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {Icon} from './icon';
 import {AutoResizer,AutoTransition} from './motion-primitives';
-import {PageTitle} from './pages/shared';
+import {PageTitle,LoadingRows} from './pages/shared';
 import {useGraphData} from './graph-data';
 import {semanticMessage,type KnowledgeEdge} from './graph-types';
 import {GraphCanvas,useGraphViewHeight} from './graph-canvas';
@@ -66,23 +66,22 @@ export default function KnowledgeGraphPage(){
  const scope=focus?(nodeMap.get(focus)?.name??'当前文稿'):'最近更新的文稿';
  const semanticSummary=semanticLoading?'正在补充语义关联…':semanticStatus==='ready'?'语义建议 '+edges.filter(edge=>edge.type==='semantic').length:
   semanticStatus==='indexing'?'语义索引准备中':semanticStatus==='unavailable'?'语义索引暂不可用':'语义关联已关闭';
- return <div ref={viewport.ref} className="page knowledge-graph-page" style={{height:viewport.height}}>
+ return <div ref={viewport.ref} className="page workspace-page knowledge-graph-page" style={{height:viewport.height}}>
   <PageTitle title="知识关系网" description="以文稿为中心探索关联，保留周围的知识上下文。" actions={<>
     {focus&&<Button size="sm" variant="secondary" label="返回概览" onClick={()=>focusOn()}/>}
     <Tooltip placement="below" content={<span className="graph-help">单击文稿将其设为中心，通过详情按钮查看和管理关联。中心周围展示直接关联，外围保留其他文稿。虚线表示语义建议，点线表示同目录。{semanticMessage(semanticStatus)}</span>}>
      <IconButton label="关系网说明" variant="ghost" size="sm" icon={<Icon name="infoCircle" size="sm"/>}/>
     </Tooltip>
-    <IconButton size="sm" variant="ghost" icon={<Icon name="refresh" size="sm"/>} label="刷新" isDisabled={loading||semanticLoading} onClick={()=>void refresh()}/>
+    <IconButton size="sm" variant="ghost" icon={<Icon name="refresh" size="sm"/>} label="刷新" isDisabled={loading||semanticLoading} isLoading={loading||semanticLoading} onClick={()=>void refresh()}/>
    </>}/>
-  <div className="graph-controls">
-   <TextInput label="查找图中节点" isLabelHidden size="sm" placeholder="搜索已加载的文稿" startIcon={<Icon name="search" size="sm"/>} value={filter} onChange={setFilter}/>
+  <WorkspaceToolbar filters={<>
    <MultiSelector label="显示关联类型" isLabelHidden size="sm" variant="secondary" value={types} options={edgeOptions}
     onChange={value=>setTypes(value as KnowledgeEdge['type'][])} hasSelectAll selectAllLabel="全部类型" placeholder="隐藏全部关联"
     formatValue={items=>items.length===edgeOptions.length?'全部关联':items.length+' 类关联'} startIcon={<Icon name="filter" size="sm"/>}/>
    <CheckboxInput label="语义关联" size="sm" value={semantic} onChange={setSemantic}/>
    <Button size="sm" variant={listOpen?'secondary':'ghost'} label="文稿列表" icon={<Icon name="list" size="sm"/>}
     aria-pressed={listOpen} onClick={()=>setListOpen(open=>!open)}/>
-  </div>
+  </>} search={<WorkspaceSearch label="查找图中节点" placeholder="搜索已加载的文稿…" value={filter} onChange={setFilter}/>}/>
   <AutoResizer><AutoTransition transitionKey={error?'error':'ready'} duration={.14}>
    {error&&<Banner status="error" container="section" title="关系网加载失败" description={error.message}/>}
   </AutoTransition></AutoResizer>
@@ -94,7 +93,9 @@ export default function KnowledgeGraphPage(){
      <AutoTransition as="span" transitionKey={loading?summary+'loading':summary} duration={.14}><span role="status">{summary}{loading?' · 加载关联中…':''}</span></AutoTransition>
     </div>
     <GraphCanvas nodes={nodes} edges={edges} selected={selected} focusId={focus} onSelect={focusOn} cyRef={cy} query={filter} types={types} activation={activation} viewportReady={viewport.height!==undefined}/>
-    {!nodes.length&&!loading&&<div className="graph-empty"><EmptyState title="暂无可显示的文稿" description="添加文稿后即可查看关系网。"/></div>}
+    <AutoTransition className="graph-state" transitionKey={nodes.length?'ready':loading?'loading':error?'error':'empty'}>
+     {!nodes.length&&(loading?<div className="graph-loading"><LoadingRows kind="compact" count={5}/></div>:!error&&<div className="graph-empty"><EmptyState title="暂无可显示的文稿" description="添加文稿后即可查看关系网。"/></div>)}
+    </AutoTransition>
     <div className="graph-legend" aria-label="关联图例">{edgeOptions.filter(option=>types.includes(option.value)).map(option=><span key={option.value}><i data-relation={option.value}/>{option.label}</span>)}
      <AutoTransition as="span" transitionKey={semanticSummary} duration={.14}><span className="graph-semantic-status" title={semanticMessage(semanticStatus)}>{semanticSummary}</span></AutoTransition>
     </div>

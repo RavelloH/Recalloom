@@ -222,11 +222,6 @@
   --tasks-focus: var(--color-border-emphasized, var(--color-text-secondary));
 }
 
-.page.tasks-page {
-  max-width: none;
-  padding: 28px clamp(20px, 2.8vw, 42px) 16px;
-}
-
 /* Task-list records use the workbench width, independently of prose measure. */
 .page.record-page.workbench-tasks {
   max-width: none;
@@ -235,10 +230,6 @@
   /* The 46px desktop topbar overlays the scrolling page. Keep a 16px gap below it. */
   padding-block-start: 62px;
   padding-block-end: 16px;
-}
-
-.tasks-page .page-header {
-  margin-bottom: 26px;
 }
 
 .tasks-toolbar {
@@ -986,27 +977,11 @@
 }
 
 @media (max-width: 720px) {
-  .page.tasks-page {
-    padding: 22px var(--rk-gutter) 8px;
-  }
 
   .page.record-page.workbench-tasks {
     padding-inline: var(--rk-gutter);
     padding-block-start: 16px;
     padding-block-end: 8px;
-  }
-
-  .tasks-page .page-header {
-    margin-bottom: 22px;
-  }
-
-  .tasks-page .page-title-copy {
-    flex: 1 1 160px;
-    width: auto;
-  }
-
-  .tasks-page .page-actions {
-    width: auto;
   }
 
   .tasks-toolbar {

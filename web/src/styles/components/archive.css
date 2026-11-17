@@ -1,7 +1,4 @@
-.page.archive-page { max-width: 1260px; padding-bottom: 16px; }
-.archive-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--rk-border-soft); }
-.archive-search { flex: 1; min-width: 220px; max-width: 420px; }
-.archive-count { margin-inline-start: auto; white-space: nowrap; }
+.archive-count { white-space: nowrap; }
 .archive-content { min-height: 180px; }
 .archive-scroll { height: 100%; }
 .archive-feedback:empty { display: none; }
@@ -37,8 +34,6 @@
 .archive-task-summary > div { display: grid; gap: 6px; padding-block: 14px; border-bottom: 1px solid var(--rk-border-soft); overflow-wrap: anywhere; }
 .archive-task-summary p { white-space: pre-wrap; }
 @media (max-width: 760px) {
- .archive-toolbar { gap: 10px; }
- .archive-search { flex-basis: 100%; max-width: none; }
  .archive-table, .archive-table tbody { display: block; }
  .archive-table thead { display: block; }
  .archive-table thead tr { display: block; }
@@ -52,7 +47,5 @@
  .archive-mobile-meta time { flex: none; }
  .archive-mobile-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
  .archive-mobile-select-label { display: inline; }
- .archive-page .page-actions { width: 100%; }
- .archive-count { margin-inline: 0 auto; }
  .archive-panel-body { padding-inline: 16px; }
 }

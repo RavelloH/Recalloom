@@ -81,7 +81,7 @@ try{
   await page.locator('.graph-workspace').waitFor({state:'visible',timeout:20000});
   const graph=await page.evaluate(()=>{
    const box=(selector)=>{const el=document.querySelector(selector);if(!el)return null;const r=el.getBoundingClientRect();return {x:r.x,w:r.width,right:r.right}};
-   return {page:box('.knowledge-graph-page'),workspace:box('.workspace'),graph:box('.graph-workspace'),stage:box('.graph-stage'),controls:box('.graph-controls'),scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,paddingInline:getComputedStyle(document.querySelector('.knowledge-graph-page')).paddingLeft};
+   return {page:box('.knowledge-graph-page'),workspace:box('.workspace'),graph:box('.graph-workspace'),stage:box('.graph-stage'),controls:box('.workspace-toolbar'),scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,paddingInline:getComputedStyle(document.querySelector('.knowledge-graph-page')).paddingLeft};
   });
   assert.ok(graph.page&&graph.workspace&&graph.graph&&graph.stage,mode.name+' graph workspace did not render');
   assert.ok(graph.graph.w>0&&graph.stage.w>0,mode.name+' graph stage collapsed '+JSON.stringify(graph));

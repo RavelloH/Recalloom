@@ -30,7 +30,7 @@ const TasksPage=lazyRouteComponent(importTasks,'TasksPage');
 const SearchPage=lazyRouteComponent(importSearch,'SearchPage');
 const ActivityPage=lazyRouteComponent(importActivity,'ActivityPage');
 const SettingsPage=lazyRouteComponent(importSettings,'SettingsPage');
-import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,isSearchMode,type SearchMode} from './queries';
+import {queryClient,recordQuery,folderQuery,folderPagesQuery,archivedRecordsQuery,tasksQuery,activityQuery,graphQuery,isSearchMode,type SearchMode} from './queries';
 import {preloadEditor} from './editor-chunks';
 import {taskListPages,taskPages,taskItemQuery,readTaskPreferences} from './tasks/data';
 const prepareTasks=(recordId?:string)=>{
@@ -40,10 +40,9 @@ const prepareTasks=(recordId?:string)=>{
 };
 const importGraph=()=>import('./knowledge-graph');
 const importHelp=()=>import('./rmd-help-page');
-const KnowledgeGraphPage=React.lazy(importGraph);
+const KnowledgeGraphPage=lazyRouteComponent(importGraph,'default');
 const RmdHelpPage=React.lazy(importHelp);
 const HelpRoute=()=> <React.Suspense fallback={<div className="page" role="status">正在加载 RMD 语法帮助…</div>}><RmdHelpPage/></React.Suspense>;
-const GraphRoute=()=> <React.Suspense fallback={<div className="page graph-loading" role="status">正在准备关系网…</div>}><KnowledgeGraphPage/></React.Suspense>;
 // Navigation and its gesture/resize engine belong to the authenticated shell.
 // Warm it alongside session lookup without adding that code to the login entry.
 const loadShell=()=>import('./shell');
@@ -92,7 +91,9 @@ const list=[
   }}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),prepareTasks())}),
  createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>ready(importArchive(),queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
- createRoute({getParentRoute:()=>root,path:'/graph',component:GraphRoute,loader:()=>ready(importGraph()),
+ createRoute({getParentRoute:()=>root,path:'/graph',component:KnowledgeGraphPage,
+  loaderDeps:({search})=>({focus:search.focus}),
+  loader:({deps})=>ready(importGraph(),queryClient.ensureQueryData(graphQuery(undefined,false)),...(deps.focus?[queryClient.ensureQueryData(graphQuery(deps.focus,false))]:[])),
   validateSearch:(search:Record<string,unknown>):{focus?:string}=>typeof search.focus==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(search.focus)?{focus:search.focus}:{}}),
  createRoute({getParentRoute:()=>root,path:'/search',component:SearchPage,
   validateSearch:(search:Record<string,unknown>):{q?:string;mode?:SearchMode}=>({

@@ -3,6 +3,7 @@
 @import "./foundation/base.css";
 @import "./layout/shell.css";
 @import "./layout/pages.css";
+@import "./components/workspace.css";
 @import "./components/library.css";
 @import "./components/archive.css";
 @import "./components/search.css";

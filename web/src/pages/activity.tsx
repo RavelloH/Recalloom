@@ -4,7 +4,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Selector} from '@astryxdesign/core/Selector';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
-import {TextInput} from '@astryxdesign/core/TextInput';
+import {WorkspaceToolbar,WorkspaceSearch} from '../workspace-toolbar';
 import {DateInput} from '@astryxdesign/core/DateInput';
 import type {ISODateString} from '@astryxdesign/core/Calendar';
 import {Skeleton} from '@astryxdesign/core/Skeleton';
@@ -52,15 +52,14 @@ export function ActivityPage(){
  const coverage=summary.data?.coverage,coverageStart=coverage?.taskTrackingSince?dayString(new Date(coverage.taskTrackingSince)):null;
  const partialTasks=Boolean(coverageStart&&(range.from<coverageStart||coverage?.incompleteTaskEvents));
  const contentKey=feed.isPending?'pending':feed.isError&&!items.length?'error':groups.length?'ready':'empty';
- return <div className="page activity-page" data-activity-page>
+ return <div className="page workspace-page activity-page" data-activity-page>
   <PageTitle title="活动" description="回顾知识库的变化，了解每一步进展。" actions={<IconButton label="刷新活动" variant="ghost" size="sm" icon={<Icon name="refresh" size="sm"/>} onClick={refresh} isLoading={summary.isFetching||feed.isRefetching}/>}/>
-  <div className="activity-toolbar">
-   <Selector label="时间范围" isLabelHidden size="sm" variant="input" value={preset} onChange={choosePreset} options={[{value:'1',label:'今天'},{value:'7',label:'最近 7 天'},{value:'30',label:'最近 30 天'},{value:'custom',label:'自定义时间'}]} presentation="adaptive"/>
-   <Selector label="操作方" isLabelHidden size="sm" variant="input" value={actor} onChange={value=>{setActor(value);setSelectedDay(null);}} hasSearch options={[{value:'all',label:'所有操作方'},{value:'user',label:'本人'},{value:'agent',label:'全部 Agent'},{value:'system',label:'系统'},{value:'unknown',label:'历史操作方'},...(summary.data?.actors??[]).map(item=>({value:item.actorKey,label:item.actorName}))]} presentation="adaptive"/>
-   <MultiSelector label="活动类型" isLabelHidden size="sm" variant="input" value={selectedCategories} onChange={values=>{setCategories(categories.filter(value=>values.includes(value)));setSelectedDay(null);}} options={categories.map(value=>({value,label:categoryLabels[value]}))} hasSelectAll hasClear selectAllLabel="全部类型" placeholder="未选择类型" formatValue={values=>values.length===3?'全部类型':values.length===1?values[0].label:values.length+' 种类型'} presentation="adaptive"/>
-   <div className="activity-search"><TextInput label="搜索活动" isLabelHidden size="sm" placeholder="搜索内容或操作方…" startIcon={<Icon name="search" size="sm"/>} value={search} onChange={value=>setSearch(value.slice(0,200))} width="100%"/></div>
+  <WorkspaceToolbar filters={<>
+   <Selector label="时间范围" isLabelHidden size="sm" variant="secondary" value={preset} onChange={choosePreset} options={[{value:'1',label:'今天'},{value:'7',label:'最近 7 天'},{value:'30',label:'最近 30 天'},{value:'custom',label:'自定义时间'}]} presentation="adaptive"/>
+   <Selector label="操作方" isLabelHidden size="sm" variant="secondary" value={actor} onChange={value=>{setActor(value);setSelectedDay(null);}} hasSearch options={[{value:'all',label:'所有操作方'},{value:'user',label:'本人'},{value:'agent',label:'全部 Agent'},{value:'system',label:'系统'},{value:'unknown',label:'历史操作方'},...(summary.data?.actors??[]).map(item=>({value:item.actorKey,label:item.actorName}))]} presentation="adaptive"/>
+   <MultiSelector label="活动类型" isLabelHidden size="sm" variant="secondary" value={selectedCategories} onChange={values=>{setCategories(categories.filter(value=>values.includes(value)));setSelectedDay(null);}} options={categories.map(value=>({value,label:categoryLabels[value]}))} hasSelectAll hasClear selectAllLabel="全部类型" placeholder="未选择类型" formatValue={values=>values.length===3?'全部类型':values.length===1?values[0].label:values.length+' 种类型'} presentation="adaptive"/>
    <IconButton label="更多筛选" variant={more||folderId!=='all'?'secondary':'ghost'} size="sm" icon={<Icon name="filter" size="sm"/>} aria-expanded={more} onClick={()=>setMore(value=>!value)}/>
-  </div>
+  </>} search={<WorkspaceSearch label="搜索活动" placeholder="搜索内容或操作方…" value={search} onChange={value=>setSearch(value.slice(0,200))}/>}/>
   <AutoResizer><AutoTransition transitionKey={preset+':'+more}>{(preset==='custom'||more)&&<div className="activity-extra-filters">
    {preset==='custom'&&<div className="activity-custom-range"><DateInput label="开始日期" size="sm" value={range.from} max={range.to} onChange={value=>updateRange('from',value)}/><span className="muted">至</span><DateInput label="结束日期" size="sm" value={range.to} min={range.from} max={dayString(new Date())} onChange={value=>updateRange('to',value)}/><span className="tiny muted">最多选择 366 天</span></div>}
    {more&&<div className="activity-scope-filter"><Selector label="文件夹范围" size="sm" value={folderId} onChange={value=>{setFolderId(value);setSelectedDay(null);}} hasSearch options={[{value:'all',label:'整个知识库'},...folderOptions.map(folder=>({value:folder.id,label:folder.path}))]} presentation="adaptive"/>{folders.isError&&<Button label="重新加载文件夹" variant="ghost" size="sm" onClick={()=>void folders.refetch()}/>}</div>}

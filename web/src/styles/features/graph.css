@@ -24,23 +24,10 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  max-width: none;
-  width: 100%;
   min-width: 0;
   min-height: 260px;
-  margin: 0;
-  padding: 28px clamp(20px,2.8vw,42px) 0;
 }
 
-.knowledge-graph-page .page-header {
-  margin-bottom: 26px;
-  flex: none;
-}
-
-.graph-controls {
-  display: flex;
-  align-items: center;
-}
 
 .graph-help {
   display: block;
@@ -48,24 +35,7 @@
   line-height: 1.65;
 }
 
-.graph-controls {
-  gap: 12px;
-  flex-wrap: wrap;
-  min-width: 0;
-  flex: none;
-  padding-block-end: 16px;
-  margin-block-end: 16px;
-  border-bottom: 1px solid var(--rk-border-soft);
-}
 
-.graph-controls > :first-child {
-  flex: 1 1 200px;
-  max-width: 320px;
-}
-
-.graph-controls > :last-child {
-  margin-inline-start: auto;
-}
 
 .graph-workspace {
   display: flex;
@@ -184,9 +154,10 @@
   box-shadow: 0 2px 6px rgb(0 0 0 / 5%);
 }
 
+.graph-state { position: absolute; inset: 45px 12px 65px; pointer-events: none; }
+.graph-loading { padding: 20px; max-width: 600px; margin: auto; }
 .graph-empty {
-  position: absolute;
-  inset: 45px 12px 65px;
+  height: 100%;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -284,40 +255,11 @@
   padding-block-start: 16px;
 }
 
-@media (min-width: 721px) {
-  .sidebar-collapsed .page.knowledge-graph-page {
-    padding-block-start: 74px;
-  }
-}
 
 @media (max-width: 720px) {
-  .page.knowledge-graph-page {
-    padding: 22px var(--rk-gutter) 0;
-  }
 
-  .knowledge-graph-page .page-header {
-    margin-bottom: 22px;
-  }
 
-  .knowledge-graph-page .page-title-copy {
-    flex: 1 1 160px;
-    width: auto;
-  }
 
-  .knowledge-graph-page .page-actions {
-    width: auto;
-  }
-
-  .graph-controls {
-    gap: 8px;
-    margin-block-end: 12px;
-    padding-block-end: 12px;
-  }
-
-  .graph-controls > :first-child {
-    max-width: none;
-    flex-basis: 100%;
-  }
 
   .graph-topline {
     padding: 9px 10px;

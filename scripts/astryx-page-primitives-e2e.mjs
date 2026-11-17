@@ -430,6 +430,48 @@ try{
  emptyGraph=false;
  await page.goto(base+'/graph?focus='+record.id,{waitUntil:'networkidle'});
  await page.getByRole('img',{name:/交互式文档关系图/}).waitFor();
+ console.log('PAGE STEP graph refresh keeps its canvas');
+ assert.equal(await page.getByText('正在准备关系网…',{exact:true}).count(),0,'Graph uses the shared route loading path');
+ await page.evaluate(()=>{window.__retainedGraphCanvas=document.querySelector('.knowledge-graph-canvas');});
+ const delayGraph=async route=>{await new Promise(resolve=>setTimeout(resolve,750));await route.fallback();};
+ await page.route('**/api/graph?**',delayGraph);
+ await page.getByRole('button',{name:'刷新',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.graph-stage')?.getAttribute('aria-busy')==='true');
+ assert.ok(await page.evaluate(()=>window.__retainedGraphCanvas===document.querySelector('.knowledge-graph-canvas')),'Refreshing keeps the existing graph canvas mounted');
+ assert.equal(await page.locator('.graph-loading').count(),0,'Refreshing an existing graph preserves its content');
+ await page.waitForFunction(()=>document.querySelector('.graph-stage')?.getAttribute('aria-busy')==='false');
+ await page.unroute('**/api/graph?**',delayGraph);
+ console.log('PAGE STEP shared workspace headers');
+ for(const width of [1365,820,390]){
+  // Start each viewport without a live canvas so WebKit can release its buffers.
+  await page.goto('about:blank');
+  await page.setViewportSize({width,height:900});
+  let baseline;
+  for(const path of ['/tasks','/activity','/archive','/graph']){
+   await page.goto(base+path,{waitUntil:'networkidle'});
+   await page.locator('.workspace-toolbar-search input').waitFor();
+   const geometry=await page.evaluate(()=>{
+    const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+    return {header:box('.workspace-page > .page-header'),search:box('.workspace-toolbar-search'),filters:box('.workspace-toolbar-filters'),input:box('.workspace-toolbar-search input'),icon:document.querySelector('.workspace-toolbar-search svg')!==null};
+   });
+   assert.ok(geometry.icon,'Every workspace search uses the same icon '+path);
+   assert.ok(geometry.search.height>=28&&geometry.search.height<=40,JSON.stringify({path,geometry}));
+   assert.ok(geometry.search.top>=geometry.header.bottom,'Controls follow the page header '+path);
+   if(width<=720){
+    assert.ok(geometry.search.bottom<=geometry.filters.top,'Mobile search leads the filters '+path);
+    assert.ok(Math.abs(geometry.search.left-geometry.header.left)<2&&Math.abs(geometry.search.right-geometry.header.right)<2,'Mobile search spans the shared header '+path);
+   }else{
+    assert.ok(geometry.filters.right<=geometry.search.left,'Desktop filters precede the right-hand search '+path);
+    assert.ok(Math.abs(geometry.search.right-geometry.header.right)<2,'Search is aligned to the page right edge '+path);
+   }
+   if(baseline){
+    assert.ok(Math.abs(geometry.header.left-baseline.header.left)<2&&Math.abs(geometry.header.top-baseline.header.top)<2,'Shared page header origin '+path);
+    assert.ok(Math.abs(geometry.search.width-baseline.search.width)<2&&Math.abs(geometry.input.height-baseline.input.height)<2&&Math.abs(geometry.input.width-baseline.input.width)<2,'Shared search dimensions '+path);
+   }else baseline=geometry;
+   await noPageOverflow();
+   if(width!==820)await page.screenshot({path:'tmp/workspace-header-'+path.slice(1)+'-'+width+'-'+engine+'.png'});
+  }
+ }
  assert.ok(resizeNotices.length<=2,'Settings viewport changes must not cause repeated ResizeObserver notifications');
  if(resizeNotices.length)console.log('NOTE finite WebKit resize-delivery notifications during settings viewport changes:',JSON.stringify(resizeNotices));
  assert.deepEqual(faults,[],'No browser runtime errors');

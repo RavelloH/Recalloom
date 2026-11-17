@@ -3,7 +3,7 @@ import {useInfiniteQuery} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
 import {Selector} from '@astryxdesign/core/Selector';
-import {TextInput} from '@astryxdesign/core/TextInput';
+import {WorkspaceToolbar,WorkspaceSearch} from '../workspace-toolbar';
 import {Spinner} from '@astryxdesign/core/Spinner';
 import {Icon} from '../icon';
 import {taskListPages,emptyCounts,taskStatuses,statusLabels,readTaskPreferences,writeTaskPreferences,type TaskItem,type TaskList,type TaskStatus} from '../tasks/data';
@@ -52,18 +52,19 @@ export function TasksPage({recordId,focusTaskId,recordActions}:{recordId?:string
  const canColumnDrop=useCallback(()=>Boolean(dragged.current),[]);
  const interactions=useMemo<TaskInteractions>(()=>({pending:actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop,onBoardDrop}),[actions.pending,onEdit,onCreate,onStatus,onDrag,onDrop,canDrop,onColumnDrop,canColumnDrop,onBoardDrop]);
  const createButton=<Button data-task-create label="新建任务" icon={<Icon name="plus" size="sm"/>} variant="primary" size="sm" onClick={()=>onCreate()}/>;
+ const statusFilter=<div className="tasks-filter-status" data-task-status-filter><MultiSelector label="显示的状态" isLabelHidden size="sm" variant="secondary" width="100%" value={statuses} options={taskStatuses.map(status=>({value:status,label:statusLabels[status],description:String(counts[status])+' 项',icon:<TaskStatusIcon status={status}/>}))} onChange={value=>setStatuses(taskStatuses.filter(s=>value.includes(s)))} presentation="adaptive" hasSelectAll hasClear selectAllLabel="全部状态" placeholder="未选择状态" formatValue={items=>items.length===5?'全部状态':items.length===1?items[0].label:items.length+' 种状态'}/></div>;
+ const sourceFilter=!recordId&&<div className="tasks-filter-source"><Selector label="所属任务列表" isLabelHidden size="sm" variant="secondary" width="100%" value={source} onChange={setSource} onFocus={()=>setCatalogNeeded(true)} onClick={()=>setCatalogNeeded(true)} hasSearch presentation="adaptive" options={[{value:'all',label:'所有任务列表'},...catalogLists.map(list=>({value:list.id,label:list.name,description:list.path}))]}/></div>;
+ const searchField=<div className={recordId?'tasks-filter-search':undefined} data-task-search><WorkspaceSearch label="搜索任务" value={search} onChange={value=>setSearch(value.slice(0,200))} placeholder="搜索任务…"/></div>;
  const contentState=listsQuery.isError&&!lists.length?'error':!statuses.length?'no-status':view==='board'?'board':listsQuery.isPending?'list-loading':lists.length?'list-ready':'list-empty';
- return <div className={recordId?'tasks-workspace embedded-tasks':'page tasks-page tasks-workspace'} data-task-workspace>
+ return <div className={recordId?'tasks-workspace embedded-tasks':'page workspace-page tasks-page tasks-workspace'} data-task-workspace>
   {!recordId&&<PageTitle title="任务" description="按状态推进任务，按列表保留上下文。" actions={createButton}/>}
-  <div className="tasks-toolbar">
+  {recordId?<div className="tasks-toolbar">
    <TasksViewSwitcher view={view} onChange={setView}/>
    <div className="tasks-filters">
-    <div className="tasks-filter-status" data-task-status-filter><MultiSelector label="显示的状态" isLabelHidden size="sm" variant="secondary" width="100%" value={statuses} options={taskStatuses.map(status=>({value:status,label:statusLabels[status],description:String(counts[status])+' 项',icon:<TaskStatusIcon status={status}/>}))} onChange={value=>setStatuses(taskStatuses.filter(s=>value.includes(s)))} presentation="adaptive" hasSelectAll hasClear selectAllLabel="全部状态" placeholder="未选择状态" formatValue={items=>items.length===5?'全部状态':items.length===1?items[0].label:items.length+' 种状态'}/></div>
-    {!recordId&&<div className="tasks-filter-source"><Selector label="所属任务列表" isLabelHidden size="sm" variant="secondary" width="100%" value={source} onChange={setSource} onFocus={()=>setCatalogNeeded(true)} onClick={()=>setCatalogNeeded(true)} hasSearch presentation="adaptive" options={[{value:'all',label:'所有任务列表'},...catalogLists.map(list=>({value:list.id,label:list.name,description:list.path}))]}/></div>}
-    <div className="tasks-filter-search" data-task-search><TextInput label="搜索任务" isLabelHidden size="sm" value={search} onChange={value=>setSearch(value.slice(0,200))} placeholder="搜索任务…" startIcon={<Icon name="search" size="sm"/>} width="100%"/></div>
+    {statusFilter}{sourceFilter}{searchField}
    </div>
    <TasksResultCount pending={listsQuery.isPending} total={total}/>{recordId&&<div className="tasks-toolbar-actions">{recordActions}{createButton}</div>}
-  </div>
+  </div>:<WorkspaceToolbar filters={<><TasksViewSwitcher view={view} onChange={setView}/>{statusFilter}{sourceFilter}</>} search={searchField} meta={<TasksResultCount pending={listsQuery.isPending} total={total}/>}/>}
   <TasksStateTransition stateKey={actions.error?String(actions.error):'none'}>{Boolean(actions.error)&&<ErrorText error={actions.error}/>}</TasksStateTransition>
   <TasksStateTransition stateKey={catalog.isFetchNextPageError&&catalogNeeded?'error':'none'}>{catalog.isFetchNextPageError&&catalogNeeded&&<div className="tasks-error"><ErrorText error={catalog.error}/><Button label="重新加载任务列表" variant="ghost" size="sm" onClick={()=>void catalog.fetchNextPage()}/></div>}</TasksStateTransition>
   <TasksContentTransition transitionKey={contentState}>
