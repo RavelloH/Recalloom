@@ -5,6 +5,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Selector } from '@astryxdesign/core/Selector';
 import { MultiSelector } from '@astryxdesign/core/MultiSelector';
 import { Token } from '@astryxdesign/core/Token';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
 import { Icon } from '../icon';
 import { api, queryString } from '../api';
 import { WorkspaceSearch, WorkspaceToolbar } from '../workspace-toolbar';
@@ -24,19 +25,46 @@ export function TagsPage() {
   );
 }
 
+function TagCloud({ tags, usage }: { tags: Tag[]; usage: TagFilter['usage'] }) {
+  return (
+    <div className="tag-cloud" aria-label="标签索引">
+      {tags.map((tag) => {
+        const count =
+          usage === 'active'
+            ? tag.activeCount
+            : usage === 'archived'
+              ? tag.archivedCount
+              : tag.count;
+        return (
+          <Token
+            key={tag.id}
+            className="tag-cloud-token"
+            label={tag.name}
+            color={tag.color}
+            size="md"
+            href={'/tags/' + tag.id}
+            description={'有效内容 ' + tag.activeCount + ' · 归档内容 ' + tag.archivedCount}
+            endContent={<span className="tag-cloud-count">{count}</span>}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function TagCatalog({ managing }: { managing: boolean }) {
   const [query, setQuery] = useState('');
   const [usage, setUsage] = useState<TagFilter['usage']>('all');
   const [sort, setSort] = useState<TagFilter['sort']>('name');
   const [editing, setEditing] = useState<Tag | null | undefined>();
   const search = useDeferredValue(query);
-  const results = useInfiniteQuery(tagPages({ query: search, usage, sort }));
+  const results = useInfiniteQuery(tagPages({ query: search, usage, sort }, managing ? 60 : 200));
   const tags = results.data?.pages.flatMap((page) => page.items) ?? [];
   return (
     <div className="page workspace-page tags-page">
       <PageTitle
         title={managing ? '标签管理' : '标签'}
-        description="按标签浏览知识库，使用别名统一相近名称。"
+        description={managing ? '维护标签名称、别名和关联。' : '按标签查找文档和任务列表。'}
         actions={
           <>
             <Link to={managing ? '/tags' : '/tags/manage'} className="text-link">
@@ -102,12 +130,27 @@ function TagCatalog({ managing }: { managing: boolean }) {
           }
         >
           {results.isPending ? (
-            <LoadingRows kind="files" />
+            managing ? (
+              <LoadingRows kind="files" />
+            ) : (
+              <div className="tag-cloud" role="status" aria-label="正在加载标签">
+                {Array.from({ length: 40 }, (_, index) => (
+                  <Skeleton
+                    key={index}
+                    width={[72, 104, 88, 128, 64][index % 5]}
+                    height={28}
+                    radius={2}
+                  />
+                ))}
+              </div>
+            )
           ) : results.isError ? (
             <div className="tag-error">
               <ErrorText error={results.error} />
               <Button label="重新加载" onClick={() => void results.refetch()} />
             </div>
+          ) : tags.length && !managing ? (
+            <TagCloud tags={tags} usage={usage} />
           ) : tags.length ? (
             <div className="tag-catalog">
               <div className="tag-catalog-heading">

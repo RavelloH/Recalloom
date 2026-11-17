@@ -25,6 +25,7 @@ const browser = await (engine === 'webkit' ? webkit : chromium).launch({
 const page = await browser.newPage({ viewport: { width: 1365, height: 900 }, colorScheme: 'dark' });
 const faults = [];
 page.on('pageerror', (error) => faults.push(error.message));
+page.on('crash', () => console.log('Tag page renderer crashed'));
 if (engine === 'webkit') {
   let session = '';
   await page.route('**/api/**', async (route) => {
@@ -66,6 +67,34 @@ try {
   await page.waitForURL(base + '/');
   await page.goto(base + '/tags');
   await page.getByRole('heading', { name: '标签', exact: true }).waitFor();
+  const tagNames = Array.from(
+    { length: 84 },
+    (_, index) => 'dense-tag-' + String(index).padStart(2, '0')
+  );
+  for (const name of tagNames) await api('/tags', 'POST', { name });
+  await page.reload();
+  await page.locator('.tag-cloud-token').filter({ hasText: 'dense-tag-83' }).waitFor();
+  assert.equal(await page.locator('.tag-cloud-token').count(), 85);
+  const geometry = await page
+    .locator('.tags-page')
+    .evaluate((element) => ({ width: element.getBoundingClientRect().width }));
+  assert.ok(geometry.width <= 1040);
+  const positions = await page
+    .locator('.tag-cloud-token')
+    .evaluateAll((elements) =>
+      elements.slice(0, 12).map((element) => element.getBoundingClientRect().top)
+    );
+  assert.ok(new Set(positions).size < positions.length / 2, 'several tags fit on each row');
+  mkdirSync('tmp/tags', { recursive: true });
+  // Windows WebKit can crash when a screenshot precedes viewport resizing.
+  // Both engines still verify density, constrained width and mobile overflow.
+  if (engine === 'chromium')
+    await page.screenshot({ path: 'tmp/tags/' + engine + '-dense-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow();
+  if (engine === 'chromium')
+    await page.screenshot({ path: 'tmp/tags/' + engine + '-dense-mobile.png' });
+  await page.setViewportSize({ width: 1365, height: 900 });
   await page.getByRole('button', { name: '新建标签', exact: true }).click();
   await waitForPanel();
   await page.getByRole('textbox', { name: '名称', exact: true }).fill('Research');
@@ -73,7 +102,7 @@ try {
   await page.getByRole('textbox', { name: '添加别名', exact: true }).fill('研究');
   await page.getByRole('button', { name: '添加别名', exact: true }).click();
   await page.getByRole('button', { name: '创建标签', exact: true }).click();
-  await page.locator('.tag-catalog-name').filter({ hasText: 'Research' }).waitFor();
+  await page.locator('.tag-cloud-token').filter({ hasText: 'Research' }).waitFor();
   const source = (await api('/tags?query=Research')).items[0];
   const target = (await api('/tags', 'POST', { name: 'Knowledge', color: 'green' })).item;
   const record = await api('/records', 'POST', {
@@ -84,7 +113,7 @@ try {
   assert.equal((await api('/records/' + record.id)).tags.length, 2);
   await page.goto(base + '/tags/' + source.id);
   await page.locator('.tag-record-row').filter({ hasText: 'Tag test.md' }).waitFor();
-  assert.match(await page.getByRole('button', {name: /^标签组合/}).innerText(), /1 个标签/);
+  assert.match(await page.getByRole('button', { name: /^标签组合/ }).innerText(), /1 个标签/);
   await page.getByRole('button', { name: '管理标签', exact: true }).click();
   await waitForPanel();
   await page.getByRole('textbox', { name: '名称', exact: true }).fill('Research notes');
@@ -127,6 +156,7 @@ try {
   assert.equal((await api('/records/' + untagged.id)).revision, 1);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + '/tags/manage');
+  await page.getByRole('textbox', { name: '搜索标签', exact: true }).fill('Knowledge');
   await page.locator('.tag-catalog-row').filter({ hasText: 'Knowledge' }).waitFor();
   await noOverflow();
   await page.getByRole('button', { name: '管理 Knowledge', exact: true }).click();

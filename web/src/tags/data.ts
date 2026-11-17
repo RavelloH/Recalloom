@@ -18,12 +18,12 @@ export const tagQuery = (id: string) =>
     queryKey: ['tags', 'item', id],
     queryFn: () => api<{ item: Tag }>('/tags/' + id)
   });
-export const tagPages = (filter: TagFilter) =>
+export const tagPages = (filter: TagFilter, limit = 60) =>
   infiniteQueryOptions({
-    queryKey: ['tags', 'pages', filter],
+    queryKey: ['tags', 'pages', filter, limit],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
-      api<TagPage>('/tags?' + queryString({ ...filter, cursor: pageParam, limit: 60 })),
+      api<TagPage>('/tags?' + queryString({ ...filter, cursor: pageParam, limit })),
     getNextPageParam: (page) => page.page.nextCursor ?? undefined
   });
 export const tagDictionary = () =>
