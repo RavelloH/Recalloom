@@ -40,7 +40,7 @@ export function eventDescription(event:ActivityEvent){
  if(event.operation==='link_add')return '添加文档关联';
  if(event.operation==='link_remove')return '移除文档关联';
  if(event.operation==='restore'||action==='restore')return '恢复历史版本';
- return ({create:'创建',update:'更新',tag_create:'创建标签',tag_update:'修改标签',tag_merge:'合并标签',tag_delete:'删除标签',metadata:'修改信息',folder_update:'修改文件夹',kind_migrate:'转换类型'} as Record<string,string>)[event.operation??'']??'修改';
+ return ({create:'创建',update:'更新',tag_auto_update:'更新智能标签',tag_accept_all:'采纳智能标签',tag_restore_suggestion:'恢复标签推荐',tag_create:'创建标签',tag_update:'修改标签',tag_merge:'合并标签',tag_delete:'删除标签',metadata:'修改信息',folder_update:'修改文件夹',kind_migrate:'转换类型'} as Record<string,string>)[event.operation??'']??'修改';
 }
 export type ActivityGroup={key:number;day:string;events:ActivityEvent[]};
 export function groupActivity(items:ActivityEvent[],timeZone:string):ActivityGroup[]{

@@ -25,6 +25,8 @@ export async function exportTagCatalog(env: Env): Promise<TagSnapshot[]> {
     metadataRevision: row.metadata_revision,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    smartEnabled: Boolean(row.smart_enabled),
+    propagate: Boolean(row.propagate),
     mergedInto: row.merged_into,
     aliases: names.results
       .filter((name) => name.tag_id === row.id && name.normalized_name !== row.normalized_name)
@@ -60,6 +62,8 @@ export async function planSnapshotTags(env: Env, catalog: unknown[], recordNames
       typeof tag.name !== 'string' ||
       typeof tag.description !== 'string' ||
       tag.description.length > 2000 ||
+      (tag.smartEnabled !== undefined && typeof tag.smartEnabled !== 'boolean') ||
+      (tag.propagate !== undefined && typeof tag.propagate !== 'boolean') ||
       !tagColors.includes(tag.color) ||
       !Number.isInteger(tag.metadataRevision) ||
       tag.metadataRevision < 1 ||
@@ -128,6 +132,14 @@ export async function planSnapshotTags(env: Env, catalog: unknown[], recordNames
         )
       );
     }
+    if (!existing && !owner)
+      statements.push(
+        env.DB.prepare('UPDATE tags SET smart_enabled=?,propagate=? WHERE id=?').bind(
+          Number(tag.smartEnabled ?? true),
+          Number(tag.propagate ?? true),
+          id
+        )
+      );
     for (const name of [tag.name, ...tag.aliases]) {
       const normalized = validTagName(name).key,
         old = keys.get(normalized);

@@ -189,6 +189,7 @@ try {
   assert.equal((await api('/tags/' + source.id)).item.id, target.id);
   assert.equal((await api('/records/' + record.id)).tags.length, 1);
   await noOverflow();
+  await page.waitForLoadState('networkidle');
   await page.goto(base + '/records/' + record.id);
   await page.locator('.workbench-summary-tag').filter({ hasText: 'Knowledge' }).waitFor();
   await page.locator('.workbench-summary-tag').filter({ hasText: 'Knowledge' }).click();
@@ -197,6 +198,7 @@ try {
     name: 'Picker test.md',
     content: '# Picker body'
   });
+  await page.waitForLoadState('networkidle');
   await page.goto(base + '/records/' + untagged.id);
   await page.getByRole('button', { name: '信息', exact: true }).click();
   await page.getByRole('button', { name: '添加标签', exact: true }).click();

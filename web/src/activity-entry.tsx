@@ -5,7 +5,7 @@ import {Link} from '@tanstack/react-router';
 import type {Event} from './types';
 import {sharedSourceAttributes,markSharedNavigationSource} from './shared-view-transition';
 import {documentDisplayName} from './document-filename';
-const verbs:Record<string,string>={create:'创建',update:'更新',tag_create:'创建标签',tag_update:'修改标签',tag_merge:'合并标签',tag_delete:'删除标签',metadata:'修改信息',folder_update:'修改文件夹',tag_add:'添加标签',tag_remove:'移除标签',task_add:'新增任务',task_update:'更新任务',task_remove:'移除任务',restore:'恢复版本',link_add:'添加关联',link_remove:'移除关联',link_restore:'恢复关联',kind_migrate:'转换为文档'};
+const verbs:Record<string,string>={create:'创建',update:'更新',tag_auto_update:'更新智能标签',tag_accept_all:'采纳智能标签',tag_restore_suggestion:'恢复标签推荐',tag_create:'创建标签',tag_update:'修改标签',tag_merge:'合并标签',tag_delete:'删除标签',metadata:'修改信息',folder_update:'修改文件夹',tag_add:'添加标签',tag_remove:'移除标签',task_add:'新增任务',task_update:'更新任务',task_remove:'移除任务',restore:'恢复版本',link_add:'添加关联',link_remove:'移除关联',link_restore:'恢复关联',kind_migrate:'转换为文档'};
 export function ActivityEntry({item,compact=false,description,revisionLabel}:{item:Event;compact?:boolean;description?:string;revisionLabel?:string}){
  const name=item.resourceName||'已移除的资源';
  const who=item.actorName||(item.actor?.startsWith('web:')?'本人（Web）':item.actor?.startsWith('grant:')?'未识别 Agent':item.actor?.startsWith('system:')?'系统':'未识别的历史操作方');

@@ -13,8 +13,20 @@ export const tagColors = [
   'teal'
 ] as const;
 export type TagColor = (typeof tagColors)[number];
-export type TagSummary = { id: string; name: string; color: TagColor; metadataRevision: number };
+export type TagSummary = {
+  id: string;
+  name: string;
+  color: TagColor;
+  metadataRevision: number;
+  source?: 'manual' | 'auto';
+  reason?: string;
+  evidence?: string;
+  sourceRevision?: number | null;
+  generatedAt?: string | null;
+};
 export type Tag = TagSummary & {
+  smartEnabled: boolean;
+  propagate: boolean;
   description: string;
   aliases: string[];
   activeCount: number;
@@ -26,6 +38,8 @@ export type Tag = TagSummary & {
 export type TagSnapshot = {
   id: string;
   name: string;
+  smartEnabled?: boolean;
+  propagate?: boolean;
   description: string;
   color: TagColor;
   metadataRevision: number;
@@ -61,3 +75,10 @@ export function tagSimilarity(input: string, candidate: string) {
   }
   return 1 - previous[right.length]! / Math.max(left.length, right.length);
 }
+
+export type SmartSettings = {
+  enabled: boolean;
+  model: string;
+  revision: number;
+  definitionVersion: number;
+};

@@ -74,6 +74,8 @@ export const TOOL_GUIDANCE={
   description:'ONLY archived records. Requires both expectedMetadataRevision and expectedRevision; dryRun defaults true and reports impact. false irreversibly deletes content/history and queues Vectorize cleanup.',
   destructive:true
  },
+ get_tag_suggestions:{title:'Read smart tag state',description:'Read automatic tag processing, ignored tags and related evidence for a record. Without id, read settings and job counts. Automatic tags are system recommendations; read_record tagDetails includes source, reasons, evidence and sourceRevision.',destructive:false},
+ manage_tag_suggestions:{title:'Manage smart tags',description:'Refresh one/all records after their current index is done, accept all auto tags as manual, restore a previously ignored tag, or configure enabled/model with expectedRevision. Acceptance/restoration require the current record expectedMetadataRevision. Refresh is coalescing; status is available via get_tag_suggestions. tag_record add promotes an automatic tag, and remove records a persistent ignore decision.',destructive:false},
  tag_record:{
   title:'Add or remove a record tag',
   description:'Assign/remove one canonical tag by tagId or a normalized name/alias. Requires the record expectedMetadataRevision; at most 32 associations. Definitions preserve display case. Use list_tags/get_tag to discover tags.',

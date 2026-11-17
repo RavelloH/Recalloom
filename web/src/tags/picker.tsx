@@ -10,13 +10,23 @@ import { ErrorText, LoadingRows, Empty } from '../pages/shared';
 import { AutoResizer, AutoTransition } from '../motion-primitives';
 import { normalizeTagKey, tagSimilarity } from '../../../src/tag-model';
 import { tagDictionary, refreshTags, type Tag } from './data';
+import { SmartTagControls } from './smart';
+import type { TagSummary } from '../../../src/tag-model';
 import './tags.css';
 
 export function TagEditor({
   tags,
-  onChange
+  onChange,
+  recordId,
+  tagDetails,
+  revision,
+  metadataRevision
 }: {
   tags: string[];
+  recordId?: string;
+  tagDetails?: TagSummary[];
+  revision?: number;
+  metadataRevision?: number;
   onChange: (tag: string, action: 'add' | 'remove') => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -39,10 +49,37 @@ export function TagEditor({
   return (
     <div className="tag-editor">
       {tags.map((name) => {
-        const tag = dictionary.data?.find(
-          (tag) => normalizeTagKey(tag.name) === normalizeTagKey(name)
-        );
-        return (
+        const tag =
+          tagDetails?.find((tag) => tag.name === name) ??
+          dictionary.data?.find((tag) => normalizeTagKey(tag.name) === normalizeTagKey(name));
+        return tag?.source === 'auto' ? (
+          <div key={name} className="tag-auto-item">
+            <div className="tag-inline">
+              <Token
+                label={name}
+                color={tag.color}
+                size="sm"
+                icon={<Icon name="sparkles" size="sm" />}
+                href={'/tags/' + tag.id}
+                isDisabled={busy}
+                onRemove={() => void run(name, 'remove')}
+              />
+              <Button
+                label="转为手动"
+                aria-label={'将「' + name + '」转为手动标签'}
+                size="sm"
+                variant="ghost"
+                isDisabled={busy}
+                onClick={() => void run(name, 'add')}
+              />
+            </div>
+            <p className="muted small">
+              {tag.reason || '系统推荐'}
+              {tag.sourceRevision ? ' · 依据 R' + tag.sourceRevision : ''}
+            </p>
+            {tag.evidence && <blockquote>{tag.evidence}</blockquote>}
+          </div>
+        ) : (
           <Token
             key={name}
             label={name}
@@ -67,6 +104,14 @@ export function TagEditor({
           setOpen(true);
         }}
       />
+      {recordId && (
+        <SmartTagControls
+          recordId={recordId}
+          revision={revision}
+          metadataRevision={metadataRevision}
+          hasAuto={Boolean(tagDetails?.some((tag) => tag.source === 'auto'))}
+        />
+      )}
       {Boolean(error) && !open && <ErrorText error={error} />}
       {mounted && (
         <WorkspacePanel

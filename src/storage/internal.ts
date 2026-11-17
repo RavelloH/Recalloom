@@ -1,6 +1,6 @@
 import type {Env} from '../types.js';
 import {StorageError} from '../types.js';
-import {displayTagName,normalizeTagKey} from '../tag-model.js';
+import {type TagSummary,displayTagName,normalizeTagKey} from '../tag-model.js';
 
 export const now = () => new Date().toISOString();
 
@@ -12,7 +12,7 @@ export const event=(env:Env,entityType:'record'|'folder',entityId:string,operati
 
 export async function recordExtras(env:Env,folderId:string|null,recordId:string){
   const [tags,parents]=await Promise.all([
-    env.DB.prepare('SELECT t.id,t.name,t.color,t.metadata_revision AS metadataRevision FROM tags t JOIN record_tags rt ON rt.tag_id=t.id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all<{id:string;name:string;color:string;metadataRevision:number}>(),
+    env.DB.prepare('SELECT t.id,t.name,t.color,t.metadata_revision AS metadataRevision,rt.source,rt.reason,rt.evidence,rt.source_revision AS sourceRevision,rt.generated_at AS generatedAt FROM tags t JOIN record_tags rt ON rt.tag_id=t.id WHERE rt.record_id=? ORDER BY rt.source DESC,t.name').bind(recordId).all<TagSummary>(),
     folderId?env.DB.prepare('WITH RECURSIVE a(id,parent_id,name,depth) AS (SELECT id,parent_id,name,0 FROM folders WHERE id=? UNION ALL SELECT f.id,f.parent_id,f.name,a.depth+1 FROM folders f JOIN a ON f.id=a.parent_id) SELECT name FROM a ORDER BY depth DESC').bind(folderId).all<{name:string}>():Promise.resolve({results:[] as {name:string}[]})
   ]);
   return {tags:tags.results.map(t=>t.name),tagDetails:tags.results,path:'/'+[...parents.results.map(p=>p.name)].join('/')};

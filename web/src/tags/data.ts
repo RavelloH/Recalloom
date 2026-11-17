@@ -45,6 +45,7 @@ export async function refreshTags(client: QueryClient) {
   await Promise.all(
     [
       'tags',
+      'smart-tags',
       'tag-records',
       'record',
       'browse',

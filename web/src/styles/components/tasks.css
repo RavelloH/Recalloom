@@ -1152,7 +1152,9 @@
 }
 
 .workbench-tasks .workbench-summary-tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   max-width: min(220px, 100%);
   height: auto;
   min-height: 0;

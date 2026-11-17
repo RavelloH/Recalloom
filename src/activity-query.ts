@@ -73,7 +73,7 @@ export function activityQuery(filter:ActivityFilter={},ignoreActor=false){
  CASE WHEN actorKind='user' THEN '本人（Web）' WHEN actorKind='agent' THEN COALESCE(NULLIF(trim(clientName),''),'未识别 Agent') WHEN actor='system:migration' THEN '系统迁移' WHEN actorKind='system' THEN '系统' ELSE '未识别的历史操作方' END AS actorName,
  CASE WHEN actorKind='agent' AND NULLIF(trim(clientName),'') IS NOT NULL THEN 'client:'||trim(clientName) ELSE actor END AS actorKey,
  CASE WHEN json_extract(detailsJson,'$.taskActivity.version')=1 OR recordKind='task_list' OR json_extract(detailsJson,'$.kind')='task_list' OR operation LIKE 'task_%' THEN 'task'
- WHEN entityType IN ('folder','tag') OR operation IN ('metadata','folder_update','tag_add','tag_remove','link_add','link_remove','link_restore','kind_migrate') THEN 'organization' ELSE 'document' END AS category
+ WHEN entityType IN ('folder','tag') OR operation IN ('metadata','folder_update','tag_add','tag_remove','tag_auto_update','tag_accept_all','tag_restore_suggestion','link_add','link_remove','link_restore','kind_migrate') THEN 'organization' ELSE 'document' END AS category
  FROM source
  ), filtered AS (SELECT * FROM normalized ${conditions.length?'WHERE '+conditions.join(' AND '):''})`;
  return {prefix,values:[filter.folderId??'',...values],days};

@@ -9,13 +9,27 @@ import {snapshotProjections} from './snapshot-projections.js';
 import {parseWikiTarget} from './wiki-syntax.js';
 
 type AnyRow=Record<string,unknown>;
+type TagAssignment = {
+  name: string;
+  source: 'manual' | 'auto';
+  reason: string;
+  evidence: string;
+  sourceRevision: number | null;
+  generatedAt: string | null;
+};
 type SnapshotBase={
   watermark:number;
   totalRecords:number;
   cursor:string|null;
   nextCursor:string|null;
   folders:AnyRow[];
-  records:Array<{record:AnyRow;revisions:AnyRow[];tags:string[]}>;
+  records:Array<{
+    record:AnyRow;
+    revisions:AnyRow[];
+    tags:string[];
+    tagAssignments?:TagAssignment[];
+    ignoredTags?:string[];
+  }>;
   links:AnyRow[];
   pageHash:string;
 };
@@ -77,9 +91,10 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
     const recordId=id(row.id);
     const [versions,tags]=await Promise.all([
       env.DB.prepare('SELECT v.* FROM revisions v WHERE v.record_id=? ORDER BY v.revision').bind(recordId).all(),
-      env.DB.prepare('SELECT t.name FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all()
+      env.DB.prepare('SELECT t.name,rt.source,rt.reason,rt.evidence,rt.source_revision AS sourceRevision,rt.generated_at AS generatedAt FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all()
     ]);
-    records.push({record:row,revisions:versions.results,tags:tags.results.map(x=>String(x.name))});
+    const ignored=await env.DB.prepare('SELECT t.name FROM record_tag_suppressions s JOIN tags t ON t.id=s.tag_id WHERE s.record_id=? ORDER BY t.name').bind(recordId).all<{name:string}>();
+    records.push({record:row,revisions:versions.results,tags:tags.results.map(x=>String(x.name)),tagAssignments:tags.results as unknown as NonNullable<SnapshotPage['records'][number]['tagAssignments']>,ignoredTags:ignored.results.map(tag=>tag.name)});
   }
   const done=recordRows.results.length<=pageSize;
   const links=done?(await env.DB.prepare('SELECT * FROM record_links ORDER BY source_id,target_id,relation').all()).results:[];
@@ -143,7 +158,8 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   // change before those resolutions can become permanent path identities.
   const tagNames=records.flatMap(item=>{
     if(!item||!item.record||!Array.isArray(item.tags)||item.tags.some(tag=>typeof tag!=='string'))fail('INVALID_SNAPSHOT');
-    return [...item.tags,...(item.record.kind==='checkpoint'?['checkpoint']:[])];
+    if(item.ignoredTags&&(!Array.isArray(item.ignoredTags)||item.ignoredTags.some(tag=>typeof tag!=='string')))fail('INVALID_SNAPSHOT_TAGS');
+    return [...item.tags,...(item.ignoredTags??[]),...(item.record.kind==='checkpoint'?['checkpoint']:[])];
   });
   const tagPlan=await planSnapshotTags(env,format==='recalloom-snapshot-v4'?(pages[0] as Extract<SnapshotPage,{format:'recalloom-snapshot-v4'}>).tagCatalog:[],tagNames);
   const statements:D1PreparedStatement[]=[...tagPlan.statements,env.DB.prepare(`INSERT INTO task_order_state(id,version)
@@ -259,7 +275,40 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     }
     // Legacy snapshot-v2 checkpoint rows are imported as documents with the checkpoint tag.
     const tagIds=[...new Set([...item.tags,...(legacyCheckpoint?['checkpoint']:[])].map(tag=>tagPlan.idFor(tag)))];
-    for(const tagId of tagIds)statements.push(env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) VALUES(?,?)').bind(recordId,tagId));
+    const assignments=new Map<string,TagAssignment>();
+    if(item.tagAssignments!==undefined){
+      if(!Array.isArray(item.tagAssignments))fail('INVALID_SNAPSHOT_TAGS');
+      for(const assignment of item.tagAssignments){
+        if(
+          !assignment || typeof assignment.name!=='string' ||
+          !['manual','auto'].includes(assignment.source) ||
+          typeof assignment.reason!=='string' || assignment.reason.length>160 ||
+          typeof assignment.evidence!=='string' || assignment.evidence.length>200 ||
+          (assignment.sourceRevision!==null &&
+            (!Number.isInteger(assignment.sourceRevision)||assignment.sourceRevision<1)) ||
+          (assignment.generatedAt!==null &&
+            (typeof assignment.generatedAt!=='string'||!Number.isFinite(Date.parse(assignment.generatedAt))))
+        )fail('INVALID_SNAPSHOT_TAGS');
+        const tagId=tagPlan.idFor(assignment.name);
+        if(!tagIds.includes(tagId)||assignments.has(tagId))fail('INVALID_SNAPSHOT_TAGS');
+        assignments.set(tagId,assignment);
+      }
+      if(assignments.size!==tagIds.length)fail('INVALID_SNAPSHOT_TAGS');
+    }
+    for(const tagId of tagIds){
+      const assignment=assignments.get(tagId);
+      statements.push(env.DB.prepare(
+        'INSERT INTO record_tags(record_id,tag_id,source,reason,evidence,source_revision,generated_at) VALUES(?,?,?,?,?,?,?)'
+      ).bind(recordId,tagId,assignment?.source??'manual',assignment?.reason??'',
+        assignment?.evidence??'',assignment?.sourceRevision??null,assignment?.generatedAt??null));
+    }
+    for(const ignored of item.ignoredTags??[]){
+      const tagId=tagPlan.idFor(ignored);
+      if(tagIds.includes(tagId))fail('INVALID_SNAPSHOT_TAGS');
+      statements.push(env.DB.prepare(
+        'INSERT OR IGNORE INTO record_tag_suppressions(record_id,tag_id,created_at) VALUES(?,?,?)'
+      ).bind(recordId,tagId,new Date().toISOString()));
+    }
     if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT)
       .bind(crypto.randomUUID(),recordId,revision,new Date().toISOString()));
     statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:archived?null:folder,kind:restoredKind,legacyCheckpoint,archivedFromPath}));

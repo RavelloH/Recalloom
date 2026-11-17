@@ -1,3 +1,4 @@
+import {smartTagStatus,configureSmartTags,refreshSmartTags,restoreIgnoredTag,acceptAutoTags} from './tags/smart.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import {getTag,queryTags} from './tags/catalog.js';
 import {assignTag,createTag,updateTag,tagImpact,mergeTag,deleteTag} from './tags/mutations.js';
@@ -31,7 +32,7 @@ const taskFields=z.object({
 }).strict();
 const taskScope=z.object({recordId:uuid.optional(),status:taskStatuses.optional()}).strict();
 const tagId=z.string().regex(tagIdPattern);
-const tagFields={name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
+const tagFields={smartEnabled:z.boolean().optional(),propagate:z.boolean().optional(),name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
 const manageTagSchema=z.discriminatedUnion('action',[
  z.object({action:z.literal('create'),...tagFields}).strict(),
  z.object({action:z.literal('update'),id:tagId,...tagFields,expectedMetadataRevision}).strict(),
@@ -125,6 +126,13 @@ const toolSchemas={
     id:uuid,expectedMetadataRevision,expectedRevision,
     dryRun:z.boolean().describe('Defaults to true: preview permanent deletion impact. false deletes all content and history irreversibly.').optional()
   }),
+  get_tag_suggestions:z.object({id:uuid.optional()}).strict(),
+  manage_tag_suggestions:z.discriminatedUnion('action',[
+    z.object({action:z.literal('refresh'),id:uuid.optional()}).strict(),
+    z.object({action:z.literal('accept_all'),id:uuid,expectedMetadataRevision}).strict(),
+    z.object({action:z.literal('restore'),id:uuid,tagId,expectedMetadataRevision}).strict(),
+    z.object({action:z.literal('configure'),enabled:z.boolean(),model:z.string().max(128),expectedRevision:z.number().int().positive()}).strict()
+  ]),
   tag_record:z.object({id:uuid,tag:z.string().min(1).max(64).optional(),tagId:tagId.optional(),action:z.enum(['add','remove']),expectedMetadataRevision}).strict().refine(value=>Boolean(value.tag)!==Boolean(value.tagId),'Choose tag or tagId'),
   get_tag:z.object({id:tagId}).strict(),
   manage_tag:manageTagSchema,
@@ -190,6 +198,13 @@ const toolDefinitions:Record<RecalloomToolName,ToolDefinition>={
   manage_record:{schema:toolSchemas.manage_record,write:true,action:(env,actor,x)=>store.updateMeta(env,x.id,x,actor)},
   list_archived:{schema:toolSchemas.list_archived,write:false,action:(env,actor,x)=>store.archivedRecords(env,x.limit,x.cursor,x.query)},
   delete_archived_record:{schema:toolSchemas.delete_archived_record,write:true,action:(env,actor,x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor)},
+  get_tag_suggestions:{schema:toolSchemas.get_tag_suggestions,write:false,action:(env,actor,x)=>smartTagStatus(env,x.id)},
+  manage_tag_suggestions:{schema:toolSchemas.manage_tag_suggestions,write:true,action:(env,actor,x)=>{
+    if(x.action==='refresh')return refreshSmartTags(env,x.id);
+    if(x.action==='configure')return configureSmartTags(env,x);
+    if(x.action==='restore')return restoreIgnoredTag(env,x.id,x.tagId,x.expectedMetadataRevision,actor);
+    return acceptAutoTags(env,x.id,x.expectedMetadataRevision,actor);
+  }},
   tag_record:{schema:toolSchemas.tag_record,write:true,action:(env,actor,x)=>assignTag(env,x.id,x,actor)},
   get_tag:{schema:toolSchemas.get_tag,write:false,action:async(env,actor,x)=>({item:await getTag(env,x.id)})},
   query_tag_records:{schema:toolSchemas.query_tag_records,write:false,action:(env,actor,x)=>queryTaggedRecords(env,x)},

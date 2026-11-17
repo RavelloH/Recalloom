@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
@@ -74,6 +75,8 @@ function TagForm({
   const [name, setName] = useState(tag?.name ?? '');
   const [description, setDescription] = useState(tag?.description ?? '');
   const [color, setColor] = useState<TagColor>(tag?.color ?? 'gray');
+  const [smartEnabled, setSmartEnabled] = useState(tag?.smartEnabled ?? true);
+  const [propagate, setPropagate] = useState(tag?.propagate ?? true);
   const [revision, setRevision] = useState(tag?.metadataRevision);
   const [aliases, setAliases] = useState(tag?.aliases ?? []);
   const [alias, setAlias] = useState('');
@@ -98,6 +101,8 @@ function TagForm({
         tag ? '/tags/' + tag.id : '/tags',
         {
           name,
+          smartEnabled,
+          propagate,
           description,
           color,
           aliases: allAliases,
@@ -119,6 +124,8 @@ function TagForm({
     setBusy(true);
     try {
       const { item } = await api<{ item: Tag }>('/tags/' + tag.id);
+      setSmartEnabled(item.smartEnabled);
+      setPropagate(item.propagate);
       setName(item.name);
       setDescription(item.description);
       setColor(item.color);
@@ -211,6 +218,8 @@ function TagForm({
           void save();
         }}
       >
+        <CheckboxInput label="参与智能推荐" value={smartEnabled} onChange={setSmartEnabled} />
+        <CheckboxInput label="作为相似文章的推荐依据" value={propagate} onChange={setPropagate} />
         <TextInput label="名称" value={name} onChange={setName} width="100%" />
         <TextArea label="描述" value={description} onChange={setDescription} width="100%" />
         <Selector

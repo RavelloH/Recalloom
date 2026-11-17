@@ -1,3 +1,4 @@
+import {processSmartTagJobs} from './tags/smart-jobs.js';
 import {mainSecret,hasMainSecret} from './auth-secret.js';
 import OAuthProvider, { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-provider';
 import { createMcpHandler } from '@modelcontextprotocol/server';
@@ -168,7 +169,7 @@ export default {
   },
   scheduled(event:ScheduledController,env:Env,ctx:ExecutionContext){
     ctx.waitUntil(processVectorDeleteJobs(env,5).then(x=>console.log('Recalloom vector cleanup',JSON.stringify(x))).catch(e=>console.error('Recalloom vector cleanup failed',e)));
-    ctx.waitUntil(processIndexJobs(env,5).then(x=>console.log('Recalloom indexing',JSON.stringify(x))).catch(e=>console.error('Recalloom indexing failed',e)));
+    ctx.waitUntil(processIndexJobs(env,5).then(async x=>{console.log('Recalloom indexing',JSON.stringify(x));await processSmartTagJobs(env,2,Date.now()+90_000);}).catch(e=>console.error('Recalloom indexing failed',e)));
     ctx.waitUntil(cleanupIndexVectors(env).catch(e=>console.error('Index maintenance failed',e)));
     const time=new Date(event.scheduledTime);
     if(time.getUTCHours()===0&&time.getUTCMinutes()===0)ctx.waitUntil(pruneIndexRuns(env).catch(e=>console.error('Index history cleanup failed',e)));

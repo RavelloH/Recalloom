@@ -138,7 +138,7 @@ export function RecordPage(){
   outlineOpen={documentPanels.includes('outline')} onOutlineChange={setOutline}
   onDocumentPresentation={updatePresentation}/></React.Suspense>}</div>
  {item.kind==='task_list'&&<ContextPanel id="task-list-panel-info" open={metaOpen} onOpenChange={setMetaOpen} label="详细信息"><div className="record-inspector"><div className="panel-heading"><h2>详细信息</h2><IconButton variant="ghost" label="关闭" icon={<span aria-hidden="true">×</span>} onClick={()=>setMetaOpen(false)}/></div>
-  <dl><dt>记录类型</dt><dd>任务列表</dd><dt>标签</dt><dd><TagEditor tags={item.tags??[]} onChange={changeTag}/></dd><dt>更新时间</dt><dd><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></dd><dt>内容版本</dt><dd>R{item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
+  <dl><dt>记录类型</dt><dd>任务列表</dd><dt>标签</dt><dd><TagEditor recordId={item.id} revision={item.revision} metadataRevision={item.metadataRevision} tagDetails={item.tagDetails} tags={item.tags??[]} onChange={changeTag}/></dd><dt>更新时间</dt><dd><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></dd><dt>内容版本</dt><dd>R{item.revision}</dd><dt>状态</dt><dd>{statusNames[item.status??'']??item.status}</dd><dt>路径</dt><dd className="break-word">{item.path}</dd><dt>行数</dt><dd>{item.totalLines}</dd></dl>
  </div></ContextPanel>}
  {item.kind==='document'&&(['info','outline','history'] as const).map(panel=><DocumentWorkbenchPanel key={panel} open={documentPanels.includes(panel)} panel={panel}
   onClose={()=>closeDocumentPanel(panel)} item={item} outline={outline}

@@ -91,7 +91,7 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
    placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}
    transitionResource={{kind:'record',id:item.id}}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
-   {item.tags.map(name=>{const tag=item.tagDetails?.find(tag=>tag.name===name);return <Token className="workbench-summary-tag" key={name} label={name} size="sm" color={tag?.color??'gray'} href={tag?'/tags/'+tag.id:undefined}/>;})}
+   {item.tags.map(name=>{const tag=item.tagDetails?.find(tag=>tag.name===name);return <Token className="workbench-summary-tag" key={name} label={name} size="sm" color={tag?.color??'gray'} icon={tag?.source==='auto'?<Icon name="sparkles" size="sm"/>:undefined} description={tag?.reason} href={tag?'/tags/'+tag.id:undefined}/>;})}
   </div>}
   <div className="workbench-summary">
    <AutoResizer className="workbench-summary-resizer">
@@ -134,7 +134,7 @@ export function DocumentWorkbenchPanel({open,panel,onClose,item,outline,onJump,o
     {panel==='info'&&<div className="workbench-inspector-details">
      <Properties>
       <Property label="类型">Markdown 文档</Property>
-      <Property label="标签"><TagEditor tags={item.tags??[]} onChange={onChangeTag}/></Property>
+      <Property label="标签"><TagEditor recordId={item.id} revision={item.revision} metadataRevision={item.metadataRevision} tagDetails={item.tagDetails} tags={item.tags??[]} onChange={onChangeTag}/></Property>
       <Property label="更新时间"><time dateTime={item.updatedAt} title={item.updatedAt}>{ago(item.updatedAt)||'刚刚'}</time></Property>
       <Property label="编辑者"><span className="workbench-inspector-path">{editors.length?editors.join('，'):'—'}</span></Property>
       <Property label="字数">{characters.toLocaleString('zh-CN')} 字</Property>

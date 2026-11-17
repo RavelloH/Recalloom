@@ -12,6 +12,7 @@ import { WorkspaceSearch, WorkspaceToolbar } from '../workspace-toolbar';
 import { AutoResizer, AutoTransition } from '../motion-primitives';
 import { PageTitle, LoadingRows, ErrorText, Empty, fmt } from './shared';
 import { tagPages, tagQuery, tagDictionary, type Tag, type TagFilter } from '../tags/data';
+import {SmartTagSettings} from '../tags/smart';
 import { TagPanel } from '../tags/panel';
 import '../tags/tags.css';
 
@@ -80,6 +81,7 @@ function TagCatalog({ managing }: { managing: boolean }) {
           </>
         }
       />
+      {managing&&<SmartTagSettings/>}
       <WorkspaceToolbar
         search={
           <WorkspaceSearch

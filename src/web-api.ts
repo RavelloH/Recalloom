@@ -1,3 +1,4 @@
+import {smartTagStatus,configureSmartTags,refreshSmartTags,restoreIgnoredTag,acceptAutoTags} from './tags/smart.js';
 import { Hono } from 'hono';
 import { z, ZodError } from 'zod';
 import {getTag,queryTags} from './tags/catalog.js';
@@ -29,7 +30,7 @@ const taskStatus=z.enum(['todo','in_progress','blocked','done','cancelled']);
 const recordKind=z.enum(['document','task_list']);
 const tagId=z.string().regex(tagIdPattern);
 const tagParams=z.object({id:tagId});
-const tagFields={name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
+const tagFields={smartEnabled:z.boolean().optional(),propagate:z.boolean().optional(),name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
 const idSchema=z.object({id:uuid});
 const noStore={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'};
 const err=(code:string,status:400|401|403|404|405|409|413|429|500|503=400,message?:string,details?:unknown)=>Response.json({code,...(message?{message}:{}),...(details===undefined?{}:{details})},{status,headers:noStore});
@@ -321,6 +322,30 @@ webApi.get('/activity/folders',async(c)=>{
 });
 webApi.get('/activity/:seq',async(c)=>{
   return asJson(await activityDetail(c.env,z.coerce.number().int().positive().parse(c.req.param('seq'))));
+});
+webApi.get('/smart-tags',async c=>asJson(await smartTagStatus(c.env)));
+webApi.patch('/smart-tags',async c=>{
+  const input=await body(z.object({
+    enabled:z.boolean(),model:z.string().max(128),expectedRevision:z.number().int().positive()
+  }).strict())(c.req.raw);
+  return asJson(await configureSmartTags(c.env,input));
+});
+webApi.post('/smart-tags/refresh',async c=>asJson(await refreshSmartTags(c.env)));
+webApi.get('/records/:id/smart-tags',async c=>
+  asJson(await smartTagStatus(c.env,idSchema.parse(c.req.param()).id)));
+webApi.post('/records/:id/smart-tags',async c=>{
+  const id=idSchema.parse(c.req.param()).id;
+  const input=await body(z.object({
+    action:z.enum(['refresh','accept_all','restore']),
+    tagId:tagId.optional(),expectedMetadataRevision:z.number().int().positive().optional()
+  }).strict())(c.req.raw);
+  if(input.action==='refresh')return asJson(await refreshSmartTags(c.env,id));
+  if(!input.expectedMetadataRevision||input.action==='restore'&&!input.tagId)
+    throw new StorageError('INVALID_INPUT');
+  const who=actor(c.get('webSession'));
+  return asJson(input.action==='accept_all'
+    ? await acceptAutoTags(c.env,id,input.expectedMetadataRevision,who)
+    : await restoreIgnoredTag(c.env,id,input.tagId!,input.expectedMetadataRevision,who));
 });
 webApi.get('/tags',async(c)=>{
   const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional(),usage:z.enum(['all','active','archived','unused']).optional(),sort:z.enum(['name','count','updated']).optional()}));

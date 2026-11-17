@@ -46,7 +46,7 @@ export function TaskListWorkbenchHeader({item,focusTitle,onRename,onDetails,deta
 }){
  const sharedName=sharedViewTransitionName('record',item.id);
  const tags=item.tags??[];
- const tagsKey=tags.join('\u0000')||'none';
+ const tagsKey=tags.map(name=>name+':'+(item.tagDetails?.find(tag=>tag.name===name)?.source??'manual')).join('\u0000')||'none';
  return <header className="doc-header workbench-header task-list-workbench-header">
   <div className="workbench-identity">
    <span className="workbench-document-kind"><Icon name="taskList" size="sm" aria-hidden="true"/> 任务列表</span>
@@ -56,7 +56,7 @@ export function TaskListWorkbenchHeader({item,focusTitle,onRename,onDetails,deta
   <AutoResizer className="workbench-tag-resizer">
    <AutoTransition transitionKey={tagsKey} className="workbench-tag-transition" duration={.14}>
     {tags.length>0?<div className="workbench-tag-line" aria-label="任务列表标签">
-     {tags.map(tag=><Token className="workbench-summary-tag" key={tag} label={tag} size="sm"/>)}
+     {tags.map(name=>{const tag=item.tagDetails?.find(tag=>tag.name===name);return <Token className="workbench-summary-tag" key={name} label={name} size="sm" color={tag?.color??'gray'} icon={tag?.source==='auto'?<Icon name="sparkles" size="sm"/>:undefined} description={tag?.reason} href={tag?'/tags/'+tag.id:undefined}/>;})}
     </div>:null}
    </AutoTransition>
   </AutoResizer>

@@ -14,6 +14,8 @@ import {
 } from './catalog.js';
 
 export type TagChanges = {
+  smartEnabled?: boolean;
+  propagate?: boolean;
   name: string;
   description?: string;
   color?: TagColor;
@@ -85,7 +87,13 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
     .bind(canonical.key)
     .first<{ tag_id: string }>();
   if (existing) {
-    if (input.description || (input.color && input.color !== 'gray') || input.aliases?.length)
+    if (
+      input.description ||
+      (input.color && input.color !== 'gray') ||
+      input.aliases?.length ||
+      input.smartEnabled === false ||
+      input.propagate === false
+    )
       throw new StorageError('TAG_NAME_CONFLICT', '标签名称已存在');
     return { item: await getTag(env, existing.tag_id), reused: true };
   }
@@ -100,7 +108,7 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
   const statements = [
     catalogGuard(env, version),
     env.DB.prepare(
-      'INSERT INTO tags(id,name,normalized_name,description,color,created_at,updated_at) VALUES(?,?,?,?,?,?,?)'
+      'INSERT INTO tags(id,name,normalized_name,description,color,created_at,updated_at,smart_enabled,propagate) VALUES(?,?,?,?,?,?,?,?,?)'
     ).bind(
       id,
       canonical.name,
@@ -108,7 +116,9 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
       input.description ?? '',
       input.color ?? 'gray',
       ts,
-      ts
+      ts,
+      Number(input.smartEnabled ?? true),
+      Number(input.propagate ?? true)
     )
   ];
   for (const [key, name] of names)
@@ -158,8 +168,17 @@ export async function updateTag(
       input.expectedMetadataRevision
     ]),
     env.DB.prepare(
-      'UPDATE tags SET name=?,normalized_name=?,description=?,color=?,metadata_revision=metadata_revision+1,updated_at=? WHERE id=?'
-    ).bind(canonical.name, canonical.key, description, color, ts, row.id),
+      'UPDATE tags SET name=?,normalized_name=?,description=?,color=?,metadata_revision=metadata_revision+1,updated_at=?,smart_enabled=?,propagate=? WHERE id=?'
+    ).bind(
+      canonical.name,
+      canonical.key,
+      description,
+      color,
+      ts,
+      Number(input.smartEnabled ?? Boolean(row.smart_enabled)),
+      Number(input.propagate ?? Boolean(row.propagate)),
+      row.id
+    ),
     env.DB.prepare('DELETE FROM tag_names WHERE tag_id=?').bind(row.id)
   ];
   for (const [key, name] of names)
@@ -204,7 +223,15 @@ export async function tagImpact(env: Env, id: string, targetId?: string) {
     source,
     target,
     duplicates,
-    affectedRecords: source.count,
+    affectedRecords: Number(
+      (
+        await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM records WHERE id IN (SELECT record_id FROM record_tags WHERE tag_id=? UNION SELECT record_id FROM record_tag_suppressions WHERE tag_id=?)'
+        )
+          .bind(source.id, source.id)
+          .first<{ n: number }>()
+      )?.n ?? 0
+    ),
     activeCount: source.activeCount,
     archivedCount: source.archivedCount,
     catalogVersion: version
@@ -234,12 +261,25 @@ export async function mergeTag(
       [source.id, input.expectedMetadataRevision, target.id, input.expectedTargetRevision]
     ),
     env.DB.prepare(
-      'UPDATE records SET metadata_revision=metadata_revision+1,updated_at=? WHERE id IN (SELECT record_id FROM record_tags WHERE tag_id=?)'
-    ).bind(ts, source.id),
+      'UPDATE records SET metadata_revision=metadata_revision+1,updated_at=? WHERE id IN (SELECT record_id FROM record_tags WHERE tag_id=? UNION SELECT record_id FROM record_tag_suppressions WHERE tag_id=?)'
+    ).bind(ts, source.id, source.id),
     env.DB.prepare(
-      'INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT record_id,? FROM record_tags WHERE tag_id=?'
+      "UPDATE record_tags SET source='manual',reason='',evidence='',source_revision=NULL,generated_at=NULL WHERE tag_id=? AND source='auto' AND record_id IN (SELECT record_id FROM record_tags WHERE tag_id=? AND source='manual')"
+    ).bind(target.id, source.id),
+    env.DB.prepare(
+      'INSERT OR IGNORE INTO record_tags(record_id,tag_id,source,reason,evidence,source_revision,generated_at) SELECT record_id,?,source,reason,evidence,source_revision,generated_at FROM record_tags WHERE tag_id=?'
     ).bind(target.id, source.id),
     env.DB.prepare('DELETE FROM record_tags WHERE tag_id=?').bind(source.id),
+    env.DB.prepare(
+      'INSERT OR IGNORE INTO record_tag_suppressions(record_id,tag_id,created_at) SELECT record_id,?,created_at FROM record_tag_suppressions WHERE tag_id=?'
+    ).bind(target.id, source.id),
+    env.DB.prepare('DELETE FROM record_tag_suppressions WHERE tag_id=?').bind(source.id),
+    env.DB.prepare(
+      "DELETE FROM record_tags WHERE tag_id=? AND source='auto' AND record_id IN (SELECT record_id FROM record_tag_suppressions WHERE tag_id=?)"
+    ).bind(target.id, target.id),
+    env.DB.prepare(
+      "DELETE FROM record_tag_suppressions WHERE tag_id=? AND record_id IN (SELECT record_id FROM record_tags WHERE tag_id=? AND source='manual')"
+    ).bind(target.id, target.id),
     env.DB.prepare('UPDATE tag_names SET tag_id=? WHERE tag_id=?').bind(target.id, source.id),
     env.DB.prepare('UPDATE tags SET merged_into=?,updated_at=? WHERE merged_into=?').bind(
       target.id,
@@ -328,13 +368,16 @@ export async function assignTag(
     return { id: recordId, changed: false, metadataRevision: record.metadata_revision };
   if (!existing && !input.tag) throw new StorageError('INVALID_TAG');
   const linked = existing
-    ? await env.DB.prepare('SELECT 1 AS found FROM record_tags WHERE record_id=? AND tag_id=?')
+    ? await env.DB.prepare('SELECT source FROM record_tags WHERE record_id=? AND tag_id=?')
         .bind(recordId, existing.id)
-        .first()
+        .first<{ source: string }>()
     : null;
-  if ((input.action === 'add' && linked) || (input.action === 'remove' && !linked))
+  if (
+    (input.action === 'add' && linked?.source === 'manual') ||
+    (input.action === 'remove' && !linked)
+  )
     return { id: recordId, changed: false, metadataRevision: record.metadata_revision };
-  if (input.action === 'add') {
+  if (input.action === 'add' && !linked) {
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM record_tags WHERE record_id=?')
       .bind(recordId)
       .first<{ n: number }>();
@@ -347,7 +390,7 @@ export async function assignTag(
       input.expectedMetadataRevision
     ])
   ];
-  if (input.action === 'add')
+  if (input.action === 'add' && !linked)
     statements.push(
       tagGuard(env, '(SELECT COUNT(*) FROM record_tags WHERE record_id=?)<32', [recordId])
     );
@@ -365,8 +408,20 @@ export async function assignTag(
     );
   statements.push(
     input.action === 'add'
-      ? env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) VALUES(?,?)').bind(recordId, id)
+      ? env.DB.prepare(
+          "INSERT INTO record_tags(record_id,tag_id) VALUES(?,?) ON CONFLICT(record_id,tag_id) DO UPDATE SET source='manual',reason='',evidence='',source_revision=NULL,generated_at=NULL"
+        ).bind(recordId, id)
       : env.DB.prepare('DELETE FROM record_tags WHERE record_id=? AND tag_id=?').bind(recordId, id)
+  );
+  statements.push(
+    input.action === 'add'
+      ? env.DB.prepare('DELETE FROM record_tag_suppressions WHERE record_id=? AND tag_id=?').bind(
+          recordId,
+          id
+        )
+      : env.DB.prepare(
+          'INSERT INTO record_tag_suppressions(record_id,tag_id,created_at) VALUES(?,?,?) ON CONFLICT(record_id,tag_id) DO UPDATE SET created_at=excluded.created_at'
+        ).bind(recordId, id, ts)
   );
   statements.push(
     env.DB.prepare(

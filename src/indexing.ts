@@ -1,3 +1,4 @@
+import {processSmartTagJobs} from './tags/smart-jobs.js';
 import type {Env} from './types.js';
 import {StorageError} from './types.js';
 import {paragraphChunks} from './search-ranking.js';
@@ -103,4 +104,5 @@ export async function drainIndexJobs(env:Env){
  if(env.INDEX_BACKGROUND_ENABLED==='false')return;
  const deadline=Date.now()+24_000;
  do{const result=await processIndexJobs(env,1,undefined,deadline);if(!result.processed)break;}while(deadline-Date.now()>=MIN_NEXT_JOB_BUDGET_MS);
+ if(deadline-Date.now()>=5000)await processSmartTagJobs(env,1,deadline);
 }
