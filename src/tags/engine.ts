@@ -3,9 +3,9 @@ import { StorageError } from '../types.js';
 import { tagGuard } from './catalog.js';
 
 export const CLEF_MODEL = '@cf/cloudflare/clef-flash' as const;
-// 27B finds labels for the current document; Flash 9B handles propagation.
-export const CLEF_ACCURATE_MODEL = '@cf/cloudflare/clef' as const;
-export const TAG_THRESHOLD = 0.85;
+// Both document classification and relation propagation use Clef-flash 9B.
+// The threshold is calibrated against Chinese topic examples and existing manual tags.
+export const TAG_THRESHOLD = 0.70;
 const MAX_NEIGHBOURS = 10;
 const MAX_AFFECTED = 24;
 const MAX_CANDIDATES = 32;
@@ -138,8 +138,7 @@ async function storedVectors(env: Env, recordId: string) {
 /** Each noul answer is an independent P(yes), not a choice distribution. */
 async function decide(
   env: Env, state: unknown,
-  entries: Array<{ key: string; recordId: string; tagId: string; prompt: string }>,
-  model: 'clef' | 'clef-flash' = 'clef-flash'
+  entries: Array<{ key: string; recordId: string; tagId: string; prompt: string }>
 ): Promise<Decision[]> {
   if (!entries.length) return [];
   const decisions: Decision[] = [];
@@ -148,9 +147,8 @@ async function decide(
     const questions = Object.fromEntries(batch.map(item => [
       item.key, { type: 'noul', instructions: item.prompt }
     ]));
-    const binding = model === 'clef' ? CLEF_ACCURATE_MODEL : CLEF_MODEL;
-    const result = await env.AI.run(binding, {
-      model,
+    const result = await env.AI.run(CLEF_MODEL, {
+      model: 'clef-flash',
       state,
       questions
     } as never) as unknown as { answers?: Record<string, { noul?: number }> };
@@ -182,8 +180,7 @@ function question(tag: TagRow, documentId?: string) {
 function autoChanges(
   env: Env, doc: DocumentRow, before: Association[],
   desired: Map<string, number>, mode: 'all' | 'selected',
-  targetIds: string[] = [],
-  model: 'clef' | 'clef-flash' = 'clef-flash'
+  targetIds: string[] = []
 ) {
   const current = new Map(before.filter(x => x.source === 'auto').map(x => [x.tagId, x]));
   const keys = mode === 'all'
@@ -205,7 +202,7 @@ function autoChanges(
           source_revision,generated_at,confidence)
          VALUES(?,?,'auto',?,?,?,?,?)`
       ).bind(doc.id, tagId, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: model + '-noul-v1', model: model === 'clef' ? CLEF_ACCURATE_MODEL : CLEF_MODEL, probability }),
+        json({ algorithm: 'clef-flash-noul-v1', model: CLEF_MODEL, probability }),
         doc.revision, now(), probability));
       changed = true;
     } else if (probability !== undefined && existing && existing.sourceRevision !== doc.revision) {
@@ -213,7 +210,7 @@ function autoChanges(
         `UPDATE record_tags SET source_revision=?,confidence=?,reason=?,evidence=?,generated_at=?
          WHERE record_id=? AND tag_id=? AND source='auto'`
       ).bind(doc.revision, probability, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: model + '-noul-v1', model: model === 'clef' ? CLEF_ACCURATE_MODEL : CLEF_MODEL, probability }), now(), doc.id, tagId));
+        json({ algorithm: 'clef-flash-noul-v1', model: CLEF_MODEL, probability }), now(), doc.id, tagId));
     }
   }
   if (changed) {
@@ -321,7 +318,7 @@ export async function prepareDocumentTags(
     document: materialFor(source)
   }, candidates.map((tag, i) => ({
     key: 't' + i, recordId, tagId: tag.id, prompt: question(tag)
-  })), 'clef');
+  })));
   const desired = new Map(classified
     .filter(x => x.probability >= TAG_THRESHOLD)
     .sort((a, b) => b.probability - a.probability)
@@ -334,7 +331,7 @@ export async function prepareDocumentTags(
     ...[...before].filter(id => !after.has(id)),
     ...[...after].filter(id => !neighbourTags.has(id))
   ]);
-  const sourceWrites = autoChanges(env, source, sourceAssoc, desired, 'all', [], 'clef');
+  const sourceWrites = autoChanges(env, source, sourceAssoc, desired, 'all');
   const spreadResult = await spread(env, source, neighbours, after, changed,
     activeDocs, relatedAssoc, byId, ignores);
   const guards = [

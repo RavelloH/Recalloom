@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture } from './tag-fixture.js';
 import { createTag, assignTag, updateTag } from '../src/tags/mutations.js';
-import { prepareDocumentTags, TAG_THRESHOLD, CLEF_MODEL, CLEF_ACCURATE_MODEL } from '../src/tags/engine.js';
+import { prepareDocumentTags, TAG_THRESHOLD, CLEF_MODEL } from '../src/tags/engine.js';
 import { processIndexJobs } from '../src/indexing.js';
 import { smartTagStatus } from '../src/tags/smart.js';
 import type { Env } from '../src/types.js';
@@ -30,7 +30,7 @@ function fakeAI(f: F, decisions: (tagName: string, docName: string) => number, f
   const vectors = new Map<string, number[]>();
   f.env.AI = {
     run: async (name: string, input: any) => {
-      if (name !== CLEF_MODEL && name !== CLEF_ACCURATE_MODEL) {
+      if (name !== CLEF_MODEL) {
         embedCalls++;
         return { data: input.input.map(() => ({ embedding: vector() })) };
       }
@@ -162,7 +162,7 @@ test('two passes: new document gathers neighbours tags, then spreads only newly 
     }))}) as never;
     const plan=await prepareDocumentTags(f.env,d,[vector()]);
     assert.equal(ai.calls().clefCalls,2);
-    assert.deepEqual(ai.calls().models, [CLEF_ACCURATE_MODEL, CLEF_MODEL]);
+    assert.deepEqual(ai.calls().models, [CLEF_MODEL, CLEF_MODEL]);
     assert.equal(plan.decisions,5);
     await f.env.DB.batch([...plan.guards,...plan.statements]);
     assert.equal(f.db.prepare(
@@ -171,7 +171,7 @@ test('two passes: new document gathers neighbours tags, then spreads only newly 
     const sourceEvidence = f.db.prepare(
       'SELECT evidence FROM record_tags WHERE record_id=? AND tag_id=?'
     ).get(d,B.id)?.evidence as string;
-    assert.equal(JSON.parse(sourceEvidence).model, CLEF_ACCURATE_MODEL);
+    assert.equal(JSON.parse(sourceEvidence).model, CLEF_MODEL);
     const propagatedEvidence = f.db.prepare(
       'SELECT evidence FROM record_tags WHERE record_id=? AND tag_id=?'
     ).get(a,D.id)?.evidence as string;
@@ -308,4 +308,51 @@ test('fixed label conversion removes only automatic associations, preserving man
       "INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'auto')"
     ).run(a,tag.id),/FIXED_TAG_AUTOMATIC_FORBIDDEN/);
   } finally {f.db.close();}
+});
+
+test('Clef-flash threshold 0.70 applies to both document classification and propagation', async () => {
+  const f = fixture();
+  try {
+    assert.equal(TAG_THRESHOLD, 0.70);
+    const A = (await createTag(f.env, { name: 'A' })).item;
+    const B = (await createTag(f.env, { name: 'B' })).item;
+    const C = (await createTag(f.env, { name: 'C' })).item;
+    const D = (await createTag(f.env, { name: 'D' })).item;
+    const a = await f.record('甲.md', '标签 A、B'), b = await f.record('乙.md', '标签 A、C');
+    const d = await f.record('丁.md', '标签 A、D');
+    const aChunk = indexed(f, a), bChunk = indexed(f, b);
+    for (const [record, tagIds] of [
+      [a, [A.id, B.id]], [b, [A.id, C.id]], [d, [A.id, D.id]]
+    ] as Array<[string, string[]]>) {
+      for (const tagId of tagIds) {
+        f.db.prepare("INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'manual')")
+          .run(record, tagId);
+      }
+    }
+    const ai = fakeAI(f, (tag, document) => {
+      if (document === '丁') return tag === 'B' ? 0.70 : 0.6999;
+      return tag === 'D' && document === '甲' ? 0.70 : 0.6999;
+    });
+    f.env.VECTORIZE.query = async () => ({ matches: [
+      { id: aChunk, score: 0.93, metadata: { record_id: a, revision: 1 } },
+      { id: bChunk, score: 0.91, metadata: { record_id: b, revision: 1 } }
+    ] }) as never;
+    const plan = await prepareDocumentTags(f.env, d, [vector()]);
+    await f.env.DB.batch([...plan.guards, ...plan.statements]);
+    assert.deepEqual(ai.calls().models, [CLEF_MODEL, CLEF_MODEL]);
+    assert.equal(f.db.prepare(
+      'SELECT confidence FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(d, B.id)?.confidence, 0.70);
+    assert.equal(f.db.prepare(
+      'SELECT source FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(d, C.id), undefined);
+    assert.equal(f.db.prepare(
+      'SELECT confidence FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(a, D.id)?.confidence, 0.70);
+    assert.equal(f.db.prepare(
+      'SELECT source FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(b, D.id), undefined);
+  } finally {
+    f.db.close();
+  }
 });
