@@ -12,6 +12,7 @@ import {documentDisplayName} from './document-filename';
 import type {SearchHit} from './queries';
 
 const SearchSnippet=lazy(()=>import('./search-snippet'));
+const SearchTaskPreview=lazy(()=>import('./search-task-preview'));
 
 export function SearchResultCard({result,index,query}:{result:SearchHit;index:number;query:string}){
  const titleId=useId(),excerptId=useId(),viewport=useRef<HTMLDivElement>(null),content=useRef<HTMLDivElement>(null);
@@ -30,7 +31,7 @@ export function SearchResultCard({result,index,query}:{result:SearchHit;index:nu
   const observer=new ResizeObserver(measure);
   observer.observe(body);observer.observe(host);measure();
   return()=>observer.disconnect();
- },[result.snippet,result.description]);
+ },[result.kind,result.snippet,result.description]);
 
  return <Card className="search-result-card" padding={0}>
   <Link to="/records/$recordId" params={{recordId:result.id}} className="search-result" aria-labelledby={titleId} onClick={()=>markSharedNavigationSource(source)}>
@@ -44,18 +45,22 @@ export function SearchResultCard({result,index,query}:{result:SearchHit;index:nu
     {result.source==='hybrid'&&<span className="semantic-label">关键词＋语义</span>}
     {result.path&&<span className="search-result-path" title={result.path}>{result.path}</span>}
    </div>
-   {(result.description||result.snippet)&&<AutoResizer><div ref={viewport} id={excerptId} className="search-snippet small" data-truncated={overflow&&!expanded||undefined} data-expanded={expanded||undefined}>
+  </Link>
+  {(result.description||result.snippet||result.kind==='task_list')&&<div className="search-preview">
+   <AutoResizer><div ref={viewport} id={excerptId} className="search-snippet" data-truncated={overflow&&!expanded||undefined} data-expanded={expanded||undefined}>
     <div ref={content} className="search-excerpt-content">
      {result.description&&<p className="search-result-description"><SearchHighlight text={result.description} query={query} enabled={exact}/></p>}
-     {result.snippet&&<Suspense fallback={<SearchSnippetSkeleton/>}><SearchSnippet text={result.snippet} format={result.snippetFormat} query={query} enabled={exact}/></Suspense>}
+     <Suspense fallback={<SearchSnippetSkeleton/>}>{result.kind==='task_list'
+      ?<SearchTaskPreview recordId={result.id} revision={result.revision} query={query} exact={exact}/>
+      :result.snippet&&<SearchSnippet text={result.snippet} format={result.snippetFormat} query={query} enabled={exact} sourceId={result.id}/>}</Suspense>
     </div>
-   </div></AutoResizer>}
-  </Link>
-  <AutoResizer><AutoTransition transitionKey={overflow?'controls':'none'} duration={.14}>{overflow&&<div className="search-result-footer">
-   <Button label={expanded?'收起片段':'展开片段'} variant="ghost" size="sm" aria-controls={excerptId} aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)} endContent={<motion.span className="search-expand-icon" animate={{rotate:expanded?180:0}} transition={{duration:reduced?0:.18}}><Icon name="chevronDown" size="sm"/></motion.span>}>
+   </div></AutoResizer>
+  <AutoTransition transitionKey={overflow?'controls':'none'} duration={.14}>{overflow&&<div className="search-result-footer">
+   <Button label={expanded?'收起片段':'展开片段'} variant="secondary" size="sm" aria-controls={excerptId} aria-expanded={expanded} onClick={()=>setExpanded(value=>!value)} endContent={<motion.span className="search-expand-icon" animate={{rotate:expanded?180:0}} transition={{duration:reduced?0:.18}}><Icon name="chevronDown" size="sm"/></motion.span>}>
     <AutoTransition as="span" transitionKey={expanded?'expanded':'collapsed'} duration={.12}>{expanded?'收起片段':'展开片段'}</AutoTransition>
    </Button>
-  </div>}</AutoTransition></AutoResizer>
+  </div>}</AutoTransition>
+  </div>}
  </Card>;
 }
 

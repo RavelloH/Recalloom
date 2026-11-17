@@ -315,11 +315,13 @@ try{
  const result=page.locator('a.search-result[href="/records/'+fresh.id+'"]');
  console.log('PAGE STEP search result visible');
  await result.waitFor();
- await result.locator('.search-snippet').filter({hasText:'Readable link'}).waitFor();
- await result.locator('.search-snippet strong').filter({hasText:'Page primitive regression.'}).waitFor();
- assert.equal(await result.locator('.search-snippet .katex').count(),1,'Search renders formula markup');
- assert.equal(await result.locator('.search-snippet a').count(),0,'Result previews keep one navigation target');
- const summaryText=await result.locator('.search-snippet').textContent();
+ const resultCard=result.locator('..');
+ await resultCard.locator('.search-snippet').filter({hasText:'Readable link'}).waitFor();
+ await resultCard.locator('.search-snippet strong').filter({hasText:'Page primitive regression.'}).waitFor();
+ assert.equal(await resultCard.locator('.search-snippet .katex').count(),1,'Search renders formula markup');
+ assert.ok(await resultCard.locator('.search-snippet a').count()>0,'Embedded previews preserve real document links');
+ assert.equal(await result.locator('.search-snippet').count(),0,'Embedded content is outside the record navigation link');
+ const summaryText=await resultCard.locator('.search-snippet').textContent();
  assert.ok(summaryText.includes('Readable link')&&summaryText.includes('P=UI'));
  assert.ok(!summaryText.includes('**')&&!summaryText.includes('https://')&&!summaryText.includes('$'),'Search displays readable Markdown summaries');
  const preload=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/records/'+fresh.id,{timeout:10000});
@@ -347,8 +349,18 @@ try{
   await route.fulfill({json:{items:url.searchParams.get('mode')==='metadata'?[]:[
    {id:fresh.id,name:'layout-preview.md',kind:'document',source:'literal',path:'/Projects/layout-preview.md',snippetFormat:'markdown',snippet:'# Search heading\n\n'+Array.from({length:16},(_,i)=>'Paragraph '+i+' with **bold content**, a [readable link](https://example.test), and layout-preview.').join('\n\n')},
    {id:record.id,name:'Semantic preview',kind:'document',source:'semantic',snippetFormat:'text',snippet:'layout-preview semantic text. '.repeat(90)},
-   {id:record.id,name:'Description only',kind:'document',source:'metadata',description:'A long layout-preview description. '.repeat(100)}
+   {id:record.id,name:'Description only',kind:'document',source:'metadata',description:'A long layout-preview description. '.repeat(100)},
+   {id:'task-preview-fixture',name:'Task preview layout-preview',kind:'task_list',source:'literal',snippetFormat:'markdown',snippet:'{\"tasks\":[{\"title\":\"TRUNCATED_JSON'}
   ]}});
+ });
+ await page.route('**/api/tasks/view?**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.searchParams.get('recordId')!=='task-preview-fixture'){await route.fallback();return;}
+  await new Promise(resolve=>setTimeout(resolve,700));
+  await route.fulfill({json:{items:[
+   {id:'preview-task-1',recordId:'task-preview-fixture',title:'Readable layout-preview task',details:'Structured task details',status:'in_progress'},
+   {id:'preview-task-2',recordId:'task-preview-fixture',title:'Completed task',status:'done'}
+  ],page:{hasMore:false,nextCursor:null},orderVersion:1}});
  });
  await page.goto(base+'/search?q=layout-preview',{waitUntil:'domcontentloaded'});
  await page.getByRole('status',{name:'正在搜索…',exact:true}).waitFor();
@@ -358,6 +370,25 @@ try{
  const clipped=await clip.evaluate(el=>({height:el.getBoundingClientRect().height,mask:getComputedStyle(el).maskImage,truncated:el.hasAttribute('data-truncated')}));
  assert.ok(clipped.truncated&&clipped.height<=180&&clipped.mask.includes('linear-gradient'),JSON.stringify(clipped));
  assert.equal(await previewCard.locator('a a, a button').count(),0,'Preview controls are outside document links');
+ const renderedHeading=previewCard.locator('.markdown-preview h1');
+ assert.equal(await renderedHeading.evaluate(el=>getComputedStyle(el).fontSize),'25px','Search uses document heading typography');
+ assert.equal(await previewCard.locator('.markdown-preview[data-embedded]').count(),1,'Search uses the shared embedded renderer');
+ assert.ok(await previewCard.locator('.markdown-preview a[href="https://example.test"]').count()>0,'Search keeps real renderer links');
+ const assertOverlay=async()=>{
+  const geometry=await previewCard.evaluate(el=>{
+   const clip=el.querySelector('.search-snippet').getBoundingClientRect();
+   const button=el.querySelector('.search-result-footer button').getBoundingClientRect();
+   return {center:Math.abs((button.left+button.right-clip.left-clip.right)/2),top:button.top,bottom:button.bottom,clipTop:clip.top,clipBottom:clip.bottom};
+  });
+  assert.ok(geometry.center<2&&geometry.top>=geometry.clipTop&&geometry.bottom<=geometry.clipBottom,JSON.stringify(geometry));
+ };
+ await assertOverlay();
+ const taskPreview=page.locator('.search-result-card').filter({hasText:'Task preview layout-preview'});
+ await taskPreview.getByRole('status',{name:'正在加载任务',exact:true}).waitFor();
+ assert.ok(await taskPreview.getByRole('link',{name:'Task preview layout-preview',exact:true}).isVisible(),'Task list heading appears before details load');
+ await taskPreview.getByText('Readable layout-preview task',{exact:true}).waitFor();
+ assert.ok((await taskPreview.textContent()).includes('进行中')&&(await taskPreview.textContent()).includes('已完成'),'Task previews display task statuses');
+ assert.ok(!(await taskPreview.textContent()).includes('TRUNCATED_JSON'),'Task previews never display truncated JSON');
  const beforeExpand=page.url();
  await previewCard.getByRole('button',{name:'展开片段',exact:true}).click();
  await page.waitForFunction(id=>document.getElementById(id)?.hasAttribute('data-expanded'),await clip.getAttribute('id'));
@@ -379,7 +410,7 @@ try{
  await noPageOverflow();
  assert.ok(await clip.evaluate(el=>el.getBoundingClientRect().height<=140),'Mobile snippets use a compact preview height');
  await page.waitForTimeout(450);
- assert.ok(await previewCard.evaluate(el=>el.querySelector('.search-result-footer').getBoundingClientRect().top-el.querySelector('.search-snippet').getBoundingClientRect().bottom<40),'Preview footer follows the clipped content after resizing');
+ await assertOverlay();
  await page.screenshot({path:'tmp/search-compact-mobile-'+engine+'.png'});
 
  console.log('PAGE STEP graph');
