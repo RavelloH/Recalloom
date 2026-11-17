@@ -25,8 +25,7 @@ export type TagSummary = {
   generatedAt?: string | null;
 };
 export type Tag = TagSummary & {
-  smartEnabled: boolean;
-  propagate: boolean;
+  kind: 'smart' | 'fixed';
   description: string;
   aliases: string[];
   activeCount: number;
@@ -38,6 +37,8 @@ export type Tag = TagSummary & {
 export type TagSnapshot = {
   id: string;
   name: string;
+  kind?: 'smart' | 'fixed';
+  // Legacy snapshots are still accepted when importing.
   smartEnabled?: boolean;
   propagate?: boolean;
   description: string;
@@ -75,10 +76,3 @@ export function tagSimilarity(input: string, candidate: string) {
   }
   return 1 - previous[right.length]! / Math.max(left.length, right.length);
 }
-
-export type SmartSettings = {
-  enabled: boolean;
-  model: string;
-  revision: number;
-  definitionVersion: number;
-};

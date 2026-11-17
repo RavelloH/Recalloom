@@ -58,7 +58,7 @@ export async function retryIndex(env:Env,id:string,rebuild=false){
  if(!job)throw new StorageError('RECORD_NOT_FOUND');
  if(job.state==='running')throw new StorageError('INDEX_BUSY','任务正在执行，请等待完成或租约到期');
  if(job.state==='done'&&!rebuild)throw new StorageError('INDEX_ALREADY_DONE');
- const result=await env.DB.prepare("UPDATE index_jobs SET state='pending',stage='queued',generation=generation+1,attempts=0,completed_chunks=0,total_chunks=0,next_retry_at=NULL,last_error=NULL,updated_at=?,finished_at=NULL WHERE record_id=? AND state<>'running'").bind(new Date().toISOString(),id).run();
+ const result=await env.DB.prepare("UPDATE index_jobs SET state='pending',stage=CASE WHEN ?=0 AND vector_generation=generation AND indexed_revision=revision THEN 'tagging' ELSE 'queued' END,generation=generation+?,vector_generation=CASE WHEN ? THEN NULL ELSE vector_generation END,attempts=0,completed_chunks=CASE WHEN ? THEN 0 ELSE completed_chunks END,total_chunks=CASE WHEN ? THEN 0 ELSE total_chunks END,next_retry_at=NULL,last_error=NULL,updated_at=?,finished_at=NULL WHERE record_id=? AND state<>'running'").bind(Number(rebuild),Number(rebuild),Number(rebuild),Number(rebuild),Number(rebuild),new Date().toISOString(),id).run();
  if(!result.meta.changes)throw new StorageError('INDEX_BUSY');
  return {queued:true};
 }

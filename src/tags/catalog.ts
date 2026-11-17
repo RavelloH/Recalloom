@@ -6,8 +6,7 @@ export type TagRow = {
   id: string;
   name: string;
   normalized_name: string;
-  smart_enabled: number;
-  propagate: number;
+  kind: 'smart' | 'fixed';
   description: string;
   color: TagColor;
   metadata_revision: number;
@@ -16,7 +15,7 @@ export type TagRow = {
   merged_into: string | null;
 };
 export const tagFields =
-  't.id,t.name,t.normalized_name,t.description,t.color,t.metadata_revision,t.created_at,t.updated_at,t.merged_into,t.smart_enabled,t.propagate';
+  't.id,t.name,t.normalized_name,t.description,t.color,t.metadata_revision,t.created_at,t.updated_at,t.merged_into,t.kind';
 export const validTagName = (value: string) => {
   const name = displayTagName(value),
     key = normalizeTagKey(name);
@@ -155,8 +154,7 @@ export async function getTag(env: Env, id: string): Promise<Tag & { requestedId:
   return {
     id: row.id,
     requestedId: id,
-    smartEnabled: Boolean(row.smart_enabled),
-    propagate: Boolean(row.propagate),
+    kind: row.kind,
     name: row.name,
     color: row.color,
     description: row.description,
@@ -235,8 +233,7 @@ export async function queryTags(env: Env, input: TagQuery = {}) {
   const hasMore = rows.length > size;
   const items = rows.slice(0, size).map((row) => ({
     id: row.id,
-    smartEnabled: Boolean(row.smart_enabled),
-    propagate: Boolean(row.propagate),
+    kind: row.kind,
     name: row.name,
     description: row.description,
     color: row.color,

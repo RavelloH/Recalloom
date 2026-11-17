@@ -4,6 +4,7 @@ import {StorageError} from '../types.js';
 import {now,newId,event,recordExtras,nameCheck} from './internal.js';
 import {getRecord} from './record-core.js';
 import {assignTag} from '../tags/mutations.js';
+import { existingVectors, prepareDocumentTags } from '../tags/engine.js';
 export async function updateMeta(env:Env,id:string,updates:{
   name?:string;folderId?:string|null;status?:RecordStatus;description?:string;expectedMetadataRevision?:number
 },actor='agent'){
@@ -38,6 +39,19 @@ export async function updateMeta(env:Env,id:string,updates:{
    restoring?'Original folder no longer exists; choose an existing folderId (null for root)':'Folder not found');
  if(name===row.name&&folderId===row.folder_id&&status===row.status&&description===row.description)
   return {id,name,folderId,status,metadataRevision:row.metadata_revision,changed:false,archivedFromPath};
+ // A description-only edit does not invalidate vectors but does affect Clef decisions.
+ // If an index is pending, its own final tagging phase will use the latest description.
+ let tagPlan: Awaited<ReturnType<typeof prepareDocumentTags>> | null = null;
+ if (description !== row.description && name === row.name && status === row.status &&
+     status !== 'archived') {
+   const idx = await env.DB.prepare(
+     'SELECT state,indexed_revision FROM index_jobs WHERE record_id=?'
+   ).bind(id).first<{state:string;indexed_revision:number|null}>();
+   if (idx?.state === 'done' && idx.indexed_revision === row.revision) {
+     const vectors = await existingVectors(env,id);
+     tagPlan = await prepareDocumentTags(env,id,vectors,{description});
+   }
+ }
  const next=row.metadata_revision+1,ts=now();
  const stmts=[
   env.DB.prepare('UPDATE records SET name=?,folder_id=?,status=?,description=?,archived_from_path=?,archived_from_folder_id=?,archived_at=?,updated_at=?,metadata_revision=? WHERE id=? AND metadata_revision=?')
@@ -48,11 +62,17 @@ export async function updateMeta(env:Env,id:string,updates:{
  if(name!==row.name||status!==row.status)
   stmts.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) SELECT ?,?,?,? WHERE changes()>0 AND EXISTS(SELECT 1 FROM records WHERE id=? AND metadata_revision=?)'+INDEX_JOB_UPSERT)
    .bind(newId(),id,row.revision,ts,id,next));
+ if (tagPlan) {
+   stmts.unshift(...tagPlan.guards);
+   stmts.push(...tagPlan.statements);
+ }
  const result=await env.DB.batch(stmts);
  // D1 includes trigger writes in meta.changes. Task-list visibility also
  // advances the ordering version, so a successful update can report > 1.
- if((result[0]?.meta?.changes??0)<1)throw new StorageError('METADATA_CONFLICT','Current metadataRevision changed; re-read the record');
- return {id,name,folderId,status,metadataRevision:next,changed:true,archivedFromPath};
+ if((result[tagPlan?.guards.length ?? 0]?.meta?.changes??0)<1)
+   throw new StorageError('METADATA_CONFLICT','Current metadataRevision changed; re-read the record');
+ const updated = tagPlan ? await getRecord(env,id) : null;
+ return {id,name,folderId,status,metadataRevision:updated?.metadata_revision??next,changed:true,archivedFromPath};
 }
 
 export async function tagRecord(env:Env,id:string,tag:string,action:'add'|'remove',actor='agent',expectedMetadataRevision?:number){

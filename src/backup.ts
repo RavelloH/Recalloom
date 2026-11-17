@@ -16,6 +16,7 @@ type TagAssignment = {
   evidence: string;
   sourceRevision: number | null;
   generatedAt: string | null;
+  confidence?: number | null;
 };
 type SnapshotBase={
   watermark:number;
@@ -91,7 +92,7 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
     const recordId=id(row.id);
     const [versions,tags]=await Promise.all([
       env.DB.prepare('SELECT v.* FROM revisions v WHERE v.record_id=? ORDER BY v.revision').bind(recordId).all(),
-      env.DB.prepare('SELECT t.name,rt.source,rt.reason,rt.evidence,rt.source_revision AS sourceRevision,rt.generated_at AS generatedAt FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all()
+      env.DB.prepare('SELECT t.name,rt.source,rt.reason,rt.evidence,rt.source_revision AS sourceRevision,rt.generated_at AS generatedAt,rt.confidence FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? ORDER BY t.name').bind(recordId).all()
     ]);
     const ignored=await env.DB.prepare('SELECT t.name FROM record_tag_suppressions s JOIN tags t ON t.id=s.tag_id WHERE s.record_id=? ORDER BY t.name').bind(recordId).all<{name:string}>();
     records.push({record:row,revisions:versions.results,tags:tags.results.map(x=>String(x.name)),tagAssignments:tags.results as unknown as NonNullable<SnapshotPage['records'][number]['tagAssignments']>,ignoredTags:ignored.results.map(tag=>tag.name)});
@@ -286,6 +287,8 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
           typeof assignment.evidence!=='string' || assignment.evidence.length>200 ||
           (assignment.sourceRevision!==null &&
             (!Number.isInteger(assignment.sourceRevision)||assignment.sourceRevision<1)) ||
+          (assignment.confidence!==undefined && assignment.confidence!==null &&
+            (typeof assignment.confidence!=='number'||assignment.confidence<0||assignment.confidence>1)) ||
           (assignment.generatedAt!==null &&
             (typeof assignment.generatedAt!=='string'||!Number.isFinite(Date.parse(assignment.generatedAt))))
         )fail('INVALID_SNAPSHOT_TAGS');
@@ -298,9 +301,9 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     for(const tagId of tagIds){
       const assignment=assignments.get(tagId);
       statements.push(env.DB.prepare(
-        'INSERT INTO record_tags(record_id,tag_id,source,reason,evidence,source_revision,generated_at) VALUES(?,?,?,?,?,?,?)'
+        'INSERT INTO record_tags(record_id,tag_id,source,reason,evidence,source_revision,generated_at,confidence) VALUES(?,?,?,?,?,?,?,?)'
       ).bind(recordId,tagId,assignment?.source??'manual',assignment?.reason??'',
-        assignment?.evidence??'',assignment?.sourceRevision??null,assignment?.generatedAt??null));
+        assignment?.evidence??'',assignment?.sourceRevision??null,assignment?.generatedAt??null,assignment?.confidence??null));
     }
     for(const ignored of item.ignoredTags??[]){
       const tagId=tagPlan.idFor(ignored);

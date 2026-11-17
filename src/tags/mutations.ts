@@ -1,6 +1,7 @@
 import type { Env } from '../types.js';
 import { StorageError } from '../types.js';
 import { tagColors, type TagColor } from '../tag-model.js';
+import { prepareManualTagSpread, prepareTagDefinitionChanges } from './engine.js';
 import {
   catalogGuard,
   catalogVersion,
@@ -14,8 +15,7 @@ import {
 } from './catalog.js';
 
 export type TagChanges = {
-  smartEnabled?: boolean;
-  propagate?: boolean;
+  kind?: 'smart' | 'fixed';
   name: string;
   description?: string;
   color?: TagColor;
@@ -91,8 +91,7 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
       input.description ||
       (input.color && input.color !== 'gray') ||
       input.aliases?.length ||
-      input.smartEnabled === false ||
-      input.propagate === false
+      input.kind === 'fixed'
     )
       throw new StorageError('TAG_NAME_CONFLICT', '标签名称已存在');
     return { item: await getTag(env, existing.tag_id), reused: true };
@@ -108,7 +107,7 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
   const statements = [
     catalogGuard(env, version),
     env.DB.prepare(
-      'INSERT INTO tags(id,name,normalized_name,description,color,created_at,updated_at,smart_enabled,propagate) VALUES(?,?,?,?,?,?,?,?,?)'
+      'INSERT INTO tags(id,name,normalized_name,description,color,created_at,updated_at,kind) VALUES(?,?,?,?,?,?,?,?)'
     ).bind(
       id,
       canonical.name,
@@ -117,8 +116,7 @@ export async function createTag(env: Env, input: TagChanges, actor = 'agent') {
       input.color ?? 'gray',
       ts,
       ts,
-      Number(input.smartEnabled ?? true),
-      Number(input.propagate ?? true)
+      input.kind ?? 'smart'
     )
   ];
   for (const [key, name] of names)
@@ -160,7 +158,14 @@ export async function updateTag(
     throw new StorageError('TAG_NAME_CONFLICT', '名称或别名已被标签「' + conflicts.name + '」使用');
   const description = input.description ?? row.description,
     color = input.color ?? row.color,
-    ts = new Date().toISOString();
+    nextKind = input.kind ?? row.kind;
+  const reclassify = nextKind === 'smart' &&
+    (row.kind !== nextKind || canonical.name !== row.name || description !== row.description)
+    ? await prepareTagDefinitionChanges(env, {
+        id: row.id, name: canonical.name, description, kind: nextKind
+      })
+    : null;
+  const ts = new Date().toISOString();
   const statements = [
     catalogGuard(env, version),
     tagGuard(env, 'EXISTS(SELECT 1 FROM tags WHERE id=? AND metadata_revision=?)', [
@@ -168,15 +173,14 @@ export async function updateTag(
       input.expectedMetadataRevision
     ]),
     env.DB.prepare(
-      'UPDATE tags SET name=?,normalized_name=?,description=?,color=?,metadata_revision=metadata_revision+1,updated_at=?,smart_enabled=?,propagate=? WHERE id=?'
+      'UPDATE tags SET name=?,normalized_name=?,description=?,color=?,metadata_revision=metadata_revision+1,updated_at=?,kind=? WHERE id=?'
     ).bind(
       canonical.name,
       canonical.key,
       description,
       color,
       ts,
-      Number(input.smartEnabled ?? Boolean(row.smart_enabled)),
-      Number(input.propagate ?? Boolean(row.propagate)),
+      input.kind ?? row.kind,
       row.id
     ),
     env.DB.prepare('DELETE FROM tag_names WHERE tag_id=?').bind(row.id)
@@ -189,6 +193,16 @@ export async function updateTag(
         row.id
       )
     );
+  if (row.kind === 'smart' && input.kind === 'fixed') {
+    // Capture affected records before the kind update trigger removes automatic links.
+    statements.splice(2, 0,
+      env.DB.prepare("UPDATE records SET metadata_revision=metadata_revision+1 WHERE id IN (SELECT record_id FROM record_tags WHERE tag_id=? AND source='auto')").bind(row.id)
+    );
+  }
+  if (reclassify) {
+    statements.splice(2, 0, ...reclassify.guards);
+    statements.push(...reclassify.statements);
+  }
   statements.push(
     tagEvent(env, row.id, 'tag_update', actor, {
       name: canonical.name,
@@ -438,6 +452,15 @@ export async function assignTag(
       JSON.stringify({ tag: name, tagId: id })
     )
   );
+  // Only explicit manual changes propagate; automatic writes never recursively trigger.
+  if (input.action === 'add' || linked?.source === 'manual') {
+    const spread = await prepareManualTagSpread(env, recordId, {
+      id, name, description: existing?.description ?? '',
+      kind: existing?.kind ?? 'smart'
+    }, input.action === 'add');
+    statements.splice(2, 0, ...spread.guards);
+    statements.push(...spread.statements);
+  }
   await tagBatch(env, statements);
   return {
     id: recordId,

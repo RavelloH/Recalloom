@@ -103,7 +103,7 @@ try {
     expectedMetadataRevision: 1
   });
   sql(
-    `UPDATE record_tags SET source='auto',reason='讨论力学与运动',evidence='力学',source_revision=1,generated_at='2026-11-17T01:00:00.000Z' WHERE record_id='${record.id}'; UPDATE index_jobs SET state='done',indexed_revision=1 WHERE record_id='${record.id}'; UPDATE smart_tag_jobs SET state='done',revision=1 WHERE record_id='${record.id}';`
+    `UPDATE record_tags SET source='auto',reason='Clef 相关性 93%',evidence='{}',source_revision=1,generated_at='2026-11-17T01:00:00.000Z' WHERE record_id='${record.id}'; UPDATE index_jobs SET state='done',indexed_revision=1 WHERE record_id='${record.id}'`
   );
   await page.goto(base + '/records/' + record.id);
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
@@ -111,7 +111,7 @@ try {
   await page
     .getByRole('button', { name: '将「' + tag.name + '」转为手动标签', exact: true })
     .waitFor();
-  await page.getByText('讨论力学与运动 · 依据 R1', { exact: true }).waitFor();
+  await page.getByText('Clef 相关性 93% · 基于 R1 向量', { exact: true }).waitFor();
   if (engine === 'chromium') {
     await page.waitForTimeout(500);
     await page.screenshot({ path: 'tmp/smart-tag-drawer.png' });
@@ -127,7 +127,7 @@ try {
   assert.equal(updated.revision, 1, 'accepting suggestions changes metadata only');
   // Recreate a generated recommendation in the isolated fixture to exercise dismissal/recovery.
   sql(
-    `UPDATE record_tags SET source='auto',reason='讨论力学与运动',evidence='力学',source_revision=1 WHERE record_id='${record.id}';`
+    `UPDATE record_tags SET source='auto',reason='Clef 相关性 93%',evidence='{}',source_revision=1 WHERE record_id='${record.id}';`
   );
   await page.reload();
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
@@ -148,21 +148,7 @@ try {
     await noOverflow();
   }
   await page.goto(base + '/tags/manage');
-  await page.getByRole('checkbox', { name: '索引完成后自动推荐标签', exact: true }).waitFor();
-  await page.getByRole('checkbox', { name: '索引完成后自动推荐标签', exact: true }).uncheck();
-  await page.getByRole('button', { name: '保存设置', exact: true }).click();
-  await page.waitForFunction(
-    async () => !(await (await fetch('/api/smart-tags')).json()).settings.enabled
-  );
-  await page.getByRole('checkbox', { name: '索引完成后自动推荐标签', exact: true }).check();
-  await page.getByRole('button', { name: '保存设置', exact: true }).click();
-  await page.waitForFunction(
-    async () => (await (await fetch('/api/smart-tags')).json()).settings.enabled
-  );
-  await page.waitForFunction(
-    () =>
-      document.querySelector('.tag-smart-settings button')?.getAttribute('aria-disabled') !== 'true'
-  );
+  await page.getByRole('heading', { name: '标签管理' }).count();
   await noOverflow();
   mkdirSync('tmp', { recursive: true });
   await page.screenshot({ path: 'tmp/smart-tags-' + engine + '.png', fullPage: true });
@@ -170,7 +156,7 @@ try {
   console.log(
     'Smart tags PASS ' +
       engine +
-      ' — provenance, metadata-only promotion, dismissal, recovery, settings, responsive layout'
+      ' — provenance, metadata-only promotion, dismissal, recovery and responsive layout'
   );
 } finally {
   await browser.close();

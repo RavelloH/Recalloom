@@ -75,9 +75,8 @@ export function TagEditor({
             </div>
             <p className="muted small">
               {tag.reason || '系统推荐'}
-              {tag.sourceRevision ? ' · 依据 R' + tag.sourceRevision : ''}
+              {tag.sourceRevision ? ' · 基于 R' + tag.sourceRevision + ' 向量' : ''}
             </p>
-            {tag.evidence && <blockquote>{tag.evidence}</blockquote>}
           </div>
         ) : (
           <Token
