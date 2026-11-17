@@ -3,6 +3,7 @@ import type {Env,RecordStatus} from '../types.js';
 import {StorageError} from '../types.js';
 import {now,newId,event,recordExtras,nameCheck} from './internal.js';
 import {getRecord} from './record-core.js';
+import {assignTag} from '../tags/mutations.js';
 export async function updateMeta(env:Env,id:string,updates:{
   name?:string;folderId?:string|null;status?:RecordStatus;description?:string;expectedMetadataRevision?:number
 },actor='agent'){
@@ -54,24 +55,7 @@ export async function updateMeta(env:Env,id:string,updates:{
  return {id,name,folderId,status,metadataRevision:next,changed:true,archivedFromPath};
 }
 
-export async function tagRecord(env:Env,id:string,tag:string,action:'add'|'remove',actor='agent'){
-  await getRecord(env,id);
-  tag=tag.trim().toLowerCase();
-  if(!tag||tag.length>64)throw new StorageError('INVALID_TAG');
-  const existing=await env.DB.prepare('SELECT 1 AS found FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=? AND t.name=?').bind(id,tag).first();
-  if((action==='add'&&existing)||(action==='remove'&&!existing))return {id,tag,action,changed:false};
-  const ts=now();
-  if(action==='add'){
-    await env.DB.batch([
-      env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(newId(),tag),
-      env.DB.prepare('INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(id,tag),
-      event(env,'record',id,'tag_add',null,actor,{tag})
-    ]);
-  }else{
-    await env.DB.batch([
-      env.DB.prepare('DELETE FROM record_tags WHERE record_id=? AND tag_id IN (SELECT id FROM tags WHERE name=?)').bind(id,tag),
-      event(env,'record',id,'tag_remove',null,actor,{tag})
-    ]);
-  }
-  return {id,tag,action,changed:true};
+export async function tagRecord(env:Env,id:string,tag:string,action:'add'|'remove',actor='agent',expectedMetadataRevision?:number){
+ const row=await getRecord(env,id);
+ return assignTag(env,id,{tag,action,expectedMetadataRevision:expectedMetadataRevision??row.metadata_revision},actor);
 }

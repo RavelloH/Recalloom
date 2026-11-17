@@ -2,8 +2,6 @@ import {Icon} from './icon';
 import {sharedViewTransitionName,sharedTitleAttributes,type SharedResourceKind} from './shared-view-transition';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
-import {Token} from '@astryxdesign/core/Token';
-import {TextInput} from '@astryxdesign/core/TextInput';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs as BreadcrumbTrail,BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {MetadataList,MetadataListItem} from '@astryxdesign/core/MetadataList';
@@ -32,7 +30,7 @@ export function PageActions({className='',children,pinned}:{className?:string;ch
 }
 
 export const errorMessage=(error:unknown)=>error instanceof ApiError
- ?error.status===409?(error.code==='PATH_CONFLICT'?'同一目录下已有同名页面。':'内容已被其他客户端修改，请刷新后重试。'):error.message
+ ?error.status===409?(error.code==='TAG_NAME_CONFLICT'?error.message:error.code==='PATH_CONFLICT'?'同一目录下已有同名页面。':'内容已被其他客户端修改，请刷新后重试。'):error.message
  :error instanceof Error?error.message:'操作失败';
 
 type FolderNode={id:string;name:string;parentId:string|null};
@@ -108,28 +106,4 @@ export function Property({label,children}:{label:string;children:React.ReactNode
  return <MetadataListItem className="property-label" label={label}><div className="property-value">{children}</div></MetadataListItem>;
 }
 
-export function TagEditor({tags,onChange}:{tags:string[];onChange:(tag:string,action:'add'|'remove')=>Promise<void>}){
- const [adding,setAdding]=useState(false),[draft,setDraft]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const run=async(tag:string,action:'add'|'remove')=>{
-  setBusy(true);setError('');
-  try{await onChange(tag,action);}
-  catch(e){setError(errorMessage(e));}
-  finally{setBusy(false);}
- };
- const submit=async()=>{
-  const tag=draft.trim().toLowerCase();
-  setDraft('');setAdding(false);
-  if(!tag||tags.includes(tag))return;
-  if(tag.length>64){setError('标签不能超过 64 个字符。');return;}
-  await run(tag,'add');
- };
- return <div className="tag-editor">
-  {tags.map(tag=><Token key={tag} size="sm" label={tag} isDisabled={busy} onRemove={()=>void run(tag,'remove')}/>)}
-  {adding
-   ?<div className="tag-input" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))void submit();}}>
-     <TextInput label="新标签" isLabelHidden size="sm" width={160} hasAutoFocus placeholder="输入后回车" value={draft} onChange={setDraft} onEnter={()=>void submit()} onKeyDown={event=>{if(event.key==='Escape'){setDraft('');setAdding(false);}}}/>
-    </div>
-   :<Button label="添加标签" className="property-add" size="sm" variant="ghost" isIconOnly={tags.length>0} icon={<Icon name="plus" size="sm"/>} isDisabled={busy} onClick={()=>setAdding(true)}/>}
-  {error&&<span className="property-error" role="alert">{error}</span>}
- </div>;
-}
+export {TagEditor} from './tags/picker';

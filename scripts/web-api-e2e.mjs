@@ -149,9 +149,9 @@ async function main(){
   assert.equal(edit.data.revision,2);
   const stale=await post('/api/records/'+id+'/content',{expectedRevision:1,content:'stale overwrite'},'PATCH');
   assertStatus(stale,409,'conflict protected');
-  const tagged=await post('/api/records/'+id+'/tags',{action:'add',tag:'web-api-test'});
+  const tagged=await post('/api/records/'+id+'/tags',{action:'add',tag:'web-api-test',expectedMetadataRevision:1});
   assertStatus(tagged,200,'tag record');
-  const meta=await post('/api/records/'+id+'/meta',{expectedMetadataRevision:1,description:'Updated via web'},'PATCH');
+  const meta=await post('/api/records/'+id+'/meta',{expectedMetadataRevision:2,description:'Updated via web'},'PATCH');
   assertStatus(meta,200,'metadata CAS');
   const oldMeta=await post('/api/records/'+id+'/meta',{expectedMetadataRevision:1,description:'stale'},'PATCH');
   assertStatus(oldMeta,409,'metadata conflict');

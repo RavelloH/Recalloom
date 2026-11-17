@@ -2,8 +2,8 @@
 /* Canonical sources: src/help/manifest.json and src/help/*.md */
 export const HELP_META = {
   "schemaVersion": 1,
-  "helpVersion": "1.2141ef154381",
-  "contentHash": "2141ef154381ddd034dc7d7ef6265d6d2fe80c32b72d79b1ec5212fd361942a1"
+  "helpVersion": "1.f5e1ba30e0fa",
+  "contentHash": "f5e1ba30e0faf98f644b6cf3e3013bad384dd332f2af95b9eb3e609b8534125e"
 } as const;
 export const HELP_PAGES = {
   "overview": {
@@ -54,6 +54,12 @@ export const HELP_PAGES = {
     "uri": "recalloom://help/tasks",
     "content": "# 结构化任务列表\n\nRecalloom 的 task_list 是独立记录类型。Markdown 的任务复选框只是文档正文，不会自动成为结构化任务。\n\n## 查询和读取\n\n- create_record(kind=task_list)：创建空任务列表；不要直接写入任务 JSON。\n- query_tasks：按 recordId、folderId 子树、query 和多个 statuses 筛选。recordId 与 folderId 互斥；省略 statuses 时包含全部五种状态，空数组不选任何状态。默认 order=manual，也可用 updated 查看最近修改。跟随 page.nextCursor；游标只适用于原筛选及水位，顺序或数据变化后需重新开始查询。\n- read_tasks(ids)：按最多 100 个 UUID 精确读取完整详情、所属列表名称/路径/revision 和 orderVersion；missingIds 明确列出未找到的任务。\n- read_record、version_history：读取任务列表正文的当前版本与历史。该 JSON 是版本化存储内容，数组位置不代表界面顺序。\n\n状态固定为 todo（待开始）、in_progress（进行中）、blocked（阻塞）、done（已完成）、cancelled（取消）。未完成/open 是前三者的筛选集合，不是额外状态。Web 的 task-lists 查询也包含空列表及完整计数，计数不受当前已加载页数影响。\n\n## 唯一排序\n\n全局看板、单个任务列表、列表模式与 MCP 共用同一个全局总序。不同记录和状态只是这个顺序的筛选子序列；没有“内层顺序”和“外层顺序”。旧 priority 字段仅为历史数据，不再决定顺序，也不属于新的任务工具参数。\n\nplace 使用 taskId 和 beforeTaskId：非空时移动到指定任务之前，锚点可以属于其他列表，但不会改变任务归属。beforeTaskId=null 表示放在 scope 的末项之后；scope 可指定 recordId、status 或两者；省略 scope 表示全局末尾，空 scope 范围也追加至全局末尾。真实插入位置按全序中的邻居计算，隐藏的其他状态任务不会被误当成不存在。不能将任务放在自身之前。\n\n仅调整顺序不产生正文 revision。普通 status 修改保留原有位置；拖动跨列等需要一起改状态和位置时，在同一批次提交 update 与 place。新任务追加到全局末尾。\n\n## 原子批量修改\n\nmutate_tasks 接收 requestId、expectedRevisions、可选 expectedOrderVersion 和最多 50 个 operations。每项使用 op 判别：\n\n- create：recordId、title，选填 details、status、clientId；返回 created 中的 clientId → UUID 映射；同一批次后续操作可用该 clientId 引用新任务。\n- update：taskId、changes，允许 title、details、status；至少改变一个字段。\n- delete：taskId；从当前列表移除，历史仍可读取。\n- place：taskId、beforeTaskId，选填 scope；修改全局位置。\n- transfer：taskId、targetRecordId；保留 UUID 和全局位置，明确改变所属列表。\n\n先用 query_tasks/read_tasks 取得最新数据。expectedRevisions 是 `{所属列表UUID: 当前revision}`，必须覆盖所有涉及的列表（包括排序来源、锚点与 scope 的列表）；transfer 同时校验来源与目标。place 另须提供 expectedOrderVersion。每个列表在同一批次中最多生成一个内容 revision；任一校验或写入失败，整批不生效。冲突返回 applied=false、最新版本等信息，重新读取并协调后用新的 requestId 重试。\n\nrequestId 是幂等键：网络重试时必须使用完全相同的参数和 requestId，将返回第一次的结果，不会重复创建任务；不同参数不能复用同一 requestId。成功返回完整的受影响任务、deletedIds、各列表 revisions 和 orderVersion，通常无需再读取确认。\n\nrestore_record 把历史正文恢复为新版本：仍存活的任务 UUID 保留当前顺序，重新出现的 UUID 追加至末尾。整库快照 v3 则同时保存并恢复任务顺序。不要使用 edit_record 手写 task_list JSON。\n"
   },
+  "tags": {
+    "title": "标签与别名",
+    "summary": "按标签索引内容、相似名称、别名与合并管理",
+    "uri": "recalloom://help/tags",
+    "content": "# 标签与别名\n\n标签是记录的元信息，可用于组织文档和任务列表。在侧边栏打开“标签”，按名称、别名、使用情况和使用次数查找标签。进入标签后可组合多个标签，选择全部匹配或任一匹配，并筛选有效内容、归档内容及内容类型。\n\n## 添加标签\n\n在文档或任务列表的信息面板中选择“添加标签”，输入名称即可查看已有标签和相似名称。选择已有标签可直接关联，也可以将输入作为已有标签的别名。需要独立分类时选择创建新标签。每条记录最多添加 32 个标签。旧数据超过此数量时会保留，可继续移除标签。\n\n名称保留显示大小写。系统按 Unicode NFKC、首尾空白移除、连续空白合并和小写进行比较。规范化后相同的名称和别名会指向同一个标签。近似名称会提供候选项，用户决定是否复用。\n\n## 管理标签\n\n“标签管理”支持修改名称、描述、颜色与别名。重命名会保留原名称作为别名。标签的 ID 保持稳定。\n\n合并和删除前先查看影响范围，包含有效内容、归档内容和重叠关联数。合并会迁移关联并去重，旧 ID 会继续指向合并目标。删除会移除关联。标签修改通过独立的元信息版本进行并发校验，正文历史版本保持独立。\n\n## MCP 工具\n\n- list_tags 支持名称或别名查询、使用情况、排序及分页。\n- get_tag 返回标签定义、别名、使用数量与 metadataRevision。\n- manage_tag 支持 create、update、merge、delete。合并和删除默认返回预览，执行时使用预览的 catalogVersion、标签版本和目标版本。\n- query_tag_records 按稳定标签 ID 查询内容，match 支持 all/any。\n- tag_record 以 tagId 或名称添加或移除关联，并传入记录的 expectedMetadataRevision。\n\n标签关联修改会更新记录的元信息版本。标签定义修改使用标签自身的版本。相似度建议在客户端计算。自动标签属于后续功能。\n"
+  },
   "lifecycle": {
     "title": "归档与文件生命周期",
     "summary": "独立归档、不可恢复删除、文件夹递归归档和预览并发校验",
@@ -64,7 +70,7 @@ export const HELP_PAGES = {
     "title": "快照备份与恢复",
     "summary": "分页导出、SHA-256、一致性和谨慎导入",
     "uri": "recalloom://help/backup",
-    "content": "# 快照导出、校验与恢复\n\nRecalloom 使用 recalloom-snapshot-v3 格式，分页保存文档、元数据、版本历史、标签、人工关系、任务全局顺序和 Wiki 路径到 UUID 的持久绑定（包括目标已删除的绑定）。导入后按整批记录重建 Wiki 引用投影。旧 v2 快照仍可导入，但其中没有保存的任务顺序与路径绑定无法追溯恢复。快照可能包含敏感的历史正文，应按敏感数据妥善存放。\n\n## 导出\n\n1. 调用 export_snapshot，不传 cursor；可设置 limit 控制每页返回的记录数（最多 5）。\n2. 读取返回的 page.nextCursor，依次获取后续页面，直到为空。\n3. 保持原始顺序与内容，收集所有页面为 {pages:[...all pages...]}。\n4. 记录并核对变更水位、任务 orderVersion 及 SHA-256；如导出过程中数据变化导致快照失效，应重新导出，不能把不同状态的页面拼接成合法备份。\n\n## 验证和导入\n\nimport_snapshot 接收**完整** bundle={pages:[...]}，而不是其中某一页。默认 dryRun=true，只进行格式、哈希、冲突及规模校验，不修改当前数据。\n\n只有在用户明确授权真实导入、并已充分检查覆盖/冲突风险后，才将 dryRun=false；服务端会以原子性方式导入，并保护已有 UUID 和路径，且有限制条件（最多 300 条记录、2,000 个文件夹、3,000 条人工关系、100 页与 700 条事务语句，完整 bundle 序列化后的 JSON 不超过 6,000,000 个 UTF-16 代码单元）。现有 UUID 或路径冲突会被拒绝；不会覆盖原库。空库恢复时，v3 完整保留任务的全局位置；向已有任务的库合并时，按导入任务的原有相对顺序追加到末尾。验证期间目标库发生变化会拒绝整批导入，需要重新开始。切勿假设可以无条件覆盖整个知识库。\n\n## 与常规版本恢复的区别\n\n- 恢复单条记录的旧版本：使用 restore_record，并提供 expectedRevision。\n- 检查历史正文差异：使用 version_history、read_record(revision)、diff_revisions。\n- 跨实例/整库快照迁移：使用 export_snapshot/import_snapshot。\n\n快照导入并不是一项自动后台任务，也不是编辑 Markdown 的替代操作。涉及风险的真实写入应先 dryRun 和人工确认。\n"
+    "content": "# 快照导出、校验与恢复\n\nRecalloom 使用 recalloom-snapshot-v4 格式，分页保存文档、元数据、版本历史、标签定义与关联（稳定 ID、别名、颜色和描述）、人工关系、任务全局顺序和 Wiki 路径到 UUID 的持久绑定（包括目标已删除的绑定）。导入后按整批记录重建 Wiki 引用投影。旧 v2/v3 快照仍可导入，但其中没有保存的任务顺序与路径绑定无法追溯恢复。快照可能包含敏感的历史正文，应按敏感数据妥善存放。\n\n## 导出\n\n1. 调用 export_snapshot，不传 cursor；可设置 limit 控制每页返回的记录数（最多 5）。\n2. 读取返回的 page.nextCursor，依次获取后续页面，直到为空。\n3. 保持原始顺序与内容，收集所有页面为 {pages:[...all pages...]}。\n4. 记录并核对变更水位、任务 orderVersion 及 SHA-256；如导出过程中数据变化导致快照失效，应重新导出，不能把不同状态的页面拼接成合法备份。\n\n## 验证和导入\n\nimport_snapshot 接收**完整** bundle={pages:[...]}，而不是其中某一页。默认 dryRun=true，只进行格式、哈希、冲突及规模校验，不修改当前数据。\n\n只有在用户明确授权真实导入、并已充分检查覆盖/冲突风险后，才将 dryRun=false；服务端会以原子性方式导入，并保护已有 UUID 和路径，且有限制条件（最多 300 条记录、2,000 个文件夹、3,000 条人工关系、100 页与 700 条事务语句，完整 bundle 序列化后的 JSON 不超过 6,000,000 个 UTF-16 代码单元）。现有 UUID 或路径冲突会被拒绝；不会覆盖原库。空库恢复时，v4 完整保留任务的全局位置；向已有任务的库合并时，按导入任务的原有相对顺序追加到末尾。验证期间目标库发生变化会拒绝整批导入，需要重新开始。切勿假设可以无条件覆盖整个知识库。\n\n## 与常规版本恢复的区别\n\n- 恢复单条记录的旧版本：使用 restore_record，并提供 expectedRevision。\n- 检查历史正文差异：使用 version_history、read_record(revision)、diff_revisions。\n- 跨实例/整库快照迁移：使用 export_snapshot/import_snapshot。\n\n快照导入并不是一项自动后台任务，也不是编辑 Markdown 的替代操作。涉及风险的真实写入应先 dryRun 和人工确认。\n"
   }
 } as const;
 export const HELP_SYNTAX_GUIDES = {

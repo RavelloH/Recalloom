@@ -1,3 +1,4 @@
+import {queryTags} from './tags/catalog.js';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { readRecord, getRecord,revisionContent } from './storage.js';
@@ -56,20 +57,8 @@ export async function diffRevisions(env:Env,id:string,fromRevision:number,toRevi
   const diff=createTwoFilesPatch(id+'@'+fromRevision,id+'@'+toRevision,before,after,'','',{context:3});
   return {id,fromRevision,toRevision,changed:before!==after,diff:diff.slice(0,120000),truncated:diff.length>120000};
 }
-type TagCursor={count:number;name:string};
-export async function listTags(env:Env,limit=100,cursor?:string){
-  const size=capped(limit,200,100);
-  let state:TagCursor|undefined;
-  if(cursor){
-    try{state=JSON.parse(cursor) as TagCursor;if(!Number.isInteger(state.count)||state.count<0||typeof state.name!=='string')throw Error();}
-    catch{throw new StorageError('INVALID_CURSOR');}
-  }
-  const rows=(await env.DB.prepare("SELECT t.name,COUNT(rt.record_id) AS count FROM tags t LEFT JOIN record_tags rt ON rt.tag_id=t.id GROUP BY t.id HAVING (? IS NULL OR count<? OR (count=? AND t.name>?)) ORDER BY count DESC,t.name LIMIT ?")
-    .bind(state?.name??null,state?.count??0,state?.count??0,state?.name??'',size+1).all()).results;
-  const items=rows.slice(0,size),last=items.at(-1);
-  const hasMore=rows.length>size;
-  return {items,page:{hasMore,nextCursor:hasMore?JSON.stringify({count:last?.count,name:last?.name}):null}};
-}
+export async function listTags(env:Env,limit=100,cursor?:string){return queryTags(env,{limit,cursor});}
+
 type LinkCursor={relation:string;sourceId:string;targetId:string};
 export async function links(env:Env,id:string,action:'list'|'add'|'remove'='list',targetId?:string,relation='related',actor='agent',cursor?:string){
   await getRecord(env,id);

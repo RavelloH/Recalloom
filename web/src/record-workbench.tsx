@@ -91,7 +91,7 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
    placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}
    transitionResource={{kind:'record',id:item.id}}/>
   {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
-   {item.tags.map(tag=><Token className="workbench-summary-tag" key={tag} label={tag} size="sm"/>)}
+   {item.tags.map(name=>{const tag=item.tagDetails?.find(tag=>tag.name===name);return <Token className="workbench-summary-tag" key={name} label={name} size="sm" color={tag?.color??'gray'} href={tag?'/tags/'+tag.id:undefined}/>;})}
   </div>}
   <div className="workbench-summary">
    <AutoResizer className="workbench-summary-resizer">

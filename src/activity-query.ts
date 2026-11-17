@@ -62,17 +62,18 @@ export function activityQuery(filter:ActivityFilter={},ignoreActor=false){
  r.name AS recordName,COALESCE(r.kind,json_extract(CASE WHEN json_valid(e.details_json) THEN e.details_json ELSE '{}' END,'$.kind')) AS recordKind,
  CASE WHEN r.id IS NOT NULL THEN r.folder_id ELSE json_extract(CASE WHEN json_valid(e.details_json) THEN e.details_json ELSE '{}' END,'$.folderId') END AS folderId,f.name AS folderName,a.client_name AS clientName,
  CASE WHEN e.actor LIKE 'web:owner:%' THEN 'user' WHEN e.actor LIKE 'grant:%' THEN 'agent' WHEN e.actor LIKE 'system:%' THEN 'system' ELSE 'unknown' END AS actorKind,
- CASE WHEN e.entity_type='folder' THEN f.id IS NOT NULL ELSE r.id IS NOT NULL END AS resourceExists
+ CASE WHEN e.entity_type='folder' THEN f.id IS NOT NULL WHEN e.entity_type='tag' THEN t.id IS NOT NULL ELSE r.id IS NOT NULL END AS resourceExists
  FROM change_events e
  LEFT JOIN records r ON (e.entity_type='record' OR (e.entity_type IS NULL AND e.record_id IS NOT NULL)) AND r.id=COALESCE(e.entity_id,e.record_id)
  LEFT JOIN folders f ON e.entity_type='folder' AND f.id=e.entity_id
+ LEFT JOIN tags t ON e.entity_type='tag' AND t.id=e.entity_id
  LEFT JOIN oauth_actor_names a ON e.actor=('grant:'||a.actor_id)
  ), normalized AS (
  SELECT *,COALESCE(recordName,folderName,json_extract(detailsJson,'$.name'),json_extract(detailsJson,'$.title'),'已移除的资源') AS resourceName,
  CASE WHEN actorKind='user' THEN '本人（Web）' WHEN actorKind='agent' THEN COALESCE(NULLIF(trim(clientName),''),'未识别 Agent') WHEN actor='system:migration' THEN '系统迁移' WHEN actorKind='system' THEN '系统' ELSE '未识别的历史操作方' END AS actorName,
  CASE WHEN actorKind='agent' AND NULLIF(trim(clientName),'') IS NOT NULL THEN 'client:'||trim(clientName) ELSE actor END AS actorKey,
  CASE WHEN json_extract(detailsJson,'$.taskActivity.version')=1 OR recordKind='task_list' OR json_extract(detailsJson,'$.kind')='task_list' OR operation LIKE 'task_%' THEN 'task'
- WHEN entityType='folder' OR operation IN ('metadata','folder_update','tag_add','tag_remove','link_add','link_remove','link_restore','kind_migrate') THEN 'organization' ELSE 'document' END AS category
+ WHEN entityType IN ('folder','tag') OR operation IN ('metadata','folder_update','tag_add','tag_remove','link_add','link_remove','link_restore','kind_migrate') THEN 'organization' ELSE 'document' END AS category
  FROM source
  ), filtered AS (SELECT * FROM normalized ${conditions.length?'WHERE '+conditions.join(' AND '):''})`;
  return {prefix,values:[filter.folderId??'',...values],days};

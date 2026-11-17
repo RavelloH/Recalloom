@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
 import { z, ZodError } from 'zod';
+import {getTag,queryTags} from './tags/catalog.js';
+import {assignTag,createTag,updateTag,tagImpact,mergeTag,deleteTag} from './tags/mutations.js';
+import {queryTaggedRecords} from './tags/records.js';
+import {tagColors,tagIdPattern} from './tag-model.js';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import * as store from './storage.js';
@@ -23,6 +27,9 @@ const limit=z.coerce.number().int().min(1).max(200).optional();
 const status=z.enum(['draft','active','completed','superseded','archived']);
 const taskStatus=z.enum(['todo','in_progress','blocked','done','cancelled']);
 const recordKind=z.enum(['document','task_list']);
+const tagId=z.string().regex(tagIdPattern);
+const tagParams=z.object({id:tagId});
+const tagFields={name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
 const idSchema=z.object({id:uuid});
 const noStore={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'};
 const err=(code:string,status:400|401|403|404|405|409|413|429|500|503=400,message?:string,details?:unknown)=>Response.json({code,...(message?{message}:{}),...(details===undefined?{}:{details})},{status,headers:noStore});
@@ -51,8 +58,8 @@ webApi.onError((e)=>{
   if(e instanceof ZodError)return err('INVALID_ARGUMENT',400,e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ').slice(0,600));
   if(e instanceof StorageError){
     const code=e.code;
-    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND' ?404
-      :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'?409
+    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND'||code==='TAG_NOT_FOUND' ?404
+      :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'||code==='TAG_NAME_CONFLICT'||code==='SNAPSHOT_TAG_CONFLICT'?409
       :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
     return err(code,status,e.message,e.details);
   }
@@ -209,8 +216,8 @@ webApi.delete('/records/:id',async(c)=>{
 });
 webApi.post('/records/:id/tags',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
-  const v=await body(z.object({tag:z.string().trim().min(1).max(64),action:z.enum(['add','remove'])}).strict())(c.req.raw);
-  return asJson(await store.tagRecord(c.env,id,v.tag,v.action,actor(c.get('webSession'))));
+  const v=await body(z.object({tag:z.string().trim().min(1).max(64).optional(),tagId:tagId.optional(),action:z.enum(['add','remove']),expectedMetadataRevision:z.number().int().positive()}).strict().refine(value=>Boolean(value.tag)!==Boolean(value.tagId),'Choose tag or tagId'))(c.req.raw);
+  return asJson(await assignTag(c.env,id,v,actor(c.get('webSession'))));
 });
 webApi.get('/records/:id/outline',async(c)=>{
   const id=idSchema.parse(c.req.param()).id;
@@ -316,8 +323,18 @@ webApi.get('/activity/:seq',async(c)=>{
   return asJson(await activityDetail(c.env,z.coerce.number().int().positive().parse(c.req.param('seq'))));
 });
 webApi.get('/tags',async(c)=>{
-  const q=parseQuery(c.req.url,z.object({cursor:z.string().max(4096).optional(),limit}));
-  return asJson(await agent.listTags(c.env,q.limit,q.cursor));
+  const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional(),usage:z.enum(['all','active','archived','unused']).optional(),sort:z.enum(['name','count','updated']).optional()}));
+  return asJson(await queryTags(c.env,q));
+});
+webApi.post('/tags',async c=>asJson(await createTag(c.env,await body(z.object(tagFields).strict())(c.req.raw),actor(c.get('webSession'))),201));
+webApi.get('/tags/:id',async c=>asJson({item:await getTag(c.env,tagParams.parse(c.req.param()).id)}));
+webApi.patch('/tags/:id',async c=>asJson(await updateTag(c.env,tagParams.parse(c.req.param()).id,await body(z.object({...tagFields,expectedMetadataRevision:z.number().int().positive()}).strict())(c.req.raw),actor(c.get('webSession')))));
+webApi.get('/tags/:id/impact',async c=>asJson(await tagImpact(c.env,tagParams.parse(c.req.param()).id,parseQuery(c.req.url,z.object({targetId:tagId.optional()})).targetId)));
+webApi.post('/tags/:id/merge',async c=>asJson(await mergeTag(c.env,tagParams.parse(c.req.param()).id,await body(z.object({targetId:tagId,expectedMetadataRevision:z.number().int().positive(),expectedTargetRevision:z.number().int().positive(),expectedCatalogVersion:z.number().int().nonnegative()}).strict())(c.req.raw),actor(c.get('webSession')))));
+webApi.delete('/tags/:id',async c=>asJson(await deleteTag(c.env,tagParams.parse(c.req.param()).id,await body(z.object({expectedMetadataRevision:z.number().int().positive(),expectedCatalogVersion:z.number().int().nonnegative()}).strict())(c.req.raw),actor(c.get('webSession')))));
+webApi.get('/tag-records',async c=>{
+ const q=parseQuery(c.req.url,z.object({tagIds:z.string().transform(value=>value.split(',')).pipe(z.array(tagId).min(1).max(32)),match:z.enum(['all','any']).optional(),status:z.enum(['active','archived','all']).optional(),kind:recordKind.optional(),query:z.string().max(200).optional(),limit,cursor:z.string().max(4096).optional()}));
+ return asJson(await queryTaggedRecords(c.env,q));
 });
 webApi.get('/overview',async(c)=>{
   const q=parseQuery(c.req.url,z.object({folderId:uuid.optional(),depth:z.coerce.number().int().min(0).max(5).optional(),budget:z.coerce.number().int().min(1000).max(30000).optional(),cursor:z.string().max(4096).optional()}));

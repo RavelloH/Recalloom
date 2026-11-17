@@ -1,4 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/server';
+import {getTag,queryTags} from './tags/catalog.js';
+import {assignTag,createTag,updateTag,tagImpact,mergeTag,deleteTag} from './tags/mutations.js';
+import {queryTaggedRecords} from './tags/records.js';
+import {tagColors,tagIdPattern} from './tag-model.js';
 import { z } from 'zod';
 import type { Env, EditInput } from './types.js';
 import { StorageError } from './types.js';
@@ -26,6 +30,18 @@ const taskFields=z.object({
   status:taskStatuses.describe('Current task workflow state.').optional()
 }).strict();
 const taskScope=z.object({recordId:uuid.optional(),status:taskStatuses.optional()}).strict();
+const tagId=z.string().regex(tagIdPattern);
+const tagFields={name:z.string().min(1).max(64),description:z.string().max(2000).optional(),color:z.enum(tagColors).optional(),aliases:z.array(z.string().min(1).max(64)).optional()};
+const manageTagSchema=z.discriminatedUnion('action',[
+ z.object({action:z.literal('create'),...tagFields}).strict(),
+ z.object({action:z.literal('update'),id:tagId,...tagFields,expectedMetadataRevision}).strict(),
+ z.object({action:z.literal('merge'),id:tagId,targetId:tagId,dryRun:z.boolean().optional(),expectedMetadataRevision:expectedMetadataRevision.optional(),expectedTargetRevision:z.number().int().positive().optional(),expectedCatalogVersion:z.number().int().nonnegative().optional()}).strict(),
+ z.object({action:z.literal('delete'),id:tagId,dryRun:z.boolean().optional(),expectedMetadataRevision:expectedMetadataRevision.optional(),expectedCatalogVersion:z.number().int().nonnegative().optional()}).strict()
+]).superRefine((value,ctx)=>{
+ if((value.action==='merge'||value.action==='delete')&&value.dryRun===false){
+  if(value.expectedMetadataRevision===undefined||value.expectedCatalogVersion===undefined||value.action==='merge'&&value.expectedTargetRevision===undefined)ctx.addIssue({code:'custom',message:'Execution requires metadata revisions and the catalogVersion from a fresh dryRun'});
+ }
+});
 const taskRef=z.string().min(1).max(100).describe('Existing task UUID, or the clientId of a create earlier in this batch.');
 const taskMutation=z.discriminatedUnion('op',[
   z.object({op:z.literal('create'),recordId:uuid,title:z.string().trim().min(1).max(500),details:z.string().max(50000).optional(),status:taskStatuses.optional(),clientId:z.string().min(1).max(100).optional()}).strict(),
@@ -109,7 +125,10 @@ const toolSchemas={
     id:uuid,expectedMetadataRevision,expectedRevision,
     dryRun:z.boolean().describe('Defaults to true: preview permanent deletion impact. false deletes all content and history irreversibly.').optional()
   }),
-  tag_record:z.object({id:uuid,tag:z.string().min(1).max(64),action:z.enum(['add','remove'])}),
+  tag_record:z.object({id:uuid,tag:z.string().min(1).max(64).optional(),tagId:tagId.optional(),action:z.enum(['add','remove']),expectedMetadataRevision}).strict().refine(value=>Boolean(value.tag)!==Boolean(value.tagId),'Choose tag or tagId'),
+  get_tag:z.object({id:tagId}).strict(),
+  manage_tag:manageTagSchema,
+  query_tag_records:z.object({tagIds:z.array(tagId).min(1).max(32),match:z.enum(['all','any']).optional(),status:z.enum(['active','archived','all']).optional(),kind:z.enum(['document','task_list']).optional(),query:z.string().max(200).optional(),limit,cursor:pageCursor}).strict(),
   query_tasks:z.object({
     recordId:uuid.optional(),folderId:uuid.describe('Folder subtree; cannot be combined with recordId.').optional(),query:z.string().max(200).optional(),
     statuses:z.array(taskStatuses).max(5).describe('Selected workflow states; omitted means all five, [] means none.').optional(),
@@ -134,7 +153,7 @@ const toolSchemas={
   index_pending:z.object({limit:z.number().int().min(1).max(10).optional(),recordId:uuid.describe('Retry this record only; resets backoff and attempts.').optional(),rebuild:z.boolean().describe('Required true to rebuild an already completed index.').optional()}).refine(x=>!x.rebuild||Boolean(x.recordId),{message:'rebuild requires recordId'}),
   read_many:z.object({items:z.array(z.object({id:uuid,revision:z.number().int().positive().optional(),offsetChars:z.number().int().nonnegative().describe('Zero-based UTF-16 character offset from previous item.nextOffsetChars.').optional()})).min(1).max(12),maxChars:z.number().int().min(1000).max(60000).describe('Shared JSON output character budget across records.').optional()}),
   diff_revisions:z.object({id:uuid,fromRevision:z.number().int().positive(),toRevision:z.number().int().positive()}),
-  list_tags:z.object({limit:z.number().int().min(1).max(200).optional(),cursor:pageCursor}),
+  list_tags:z.object({limit:z.number().int().min(1).max(200).optional(),cursor:pageCursor,query:z.string().max(200).optional(),usage:z.enum(['all','active','archived','unused']).optional(),sort:z.enum(['name','count','updated']).optional()}),
   list_links:z.object({id:uuid,cursor:pageCursor}),
   related_records:z.object({id:uuid,semantic:z.boolean().describe('Include Vectorize semantic candidates (default true); false returns only confirmed links.').optional(),limit:z.number().int().min(1).max(25).describe('Maximum semantic candidates (1–25).').optional()}),
   get_knowledge_graph:z.object({focusId:uuid.describe('Center the graph around one record; omit to show a recent-knowledge subgraph.').optional(),limit:z.number().int().min(10).max(100).optional(),semantic:z.boolean().describe('Include semantic candidates (default true). Overview samples up to six indexed records and limits semantic degree to four per node.').optional()}),
@@ -142,7 +161,7 @@ const toolSchemas={
   get_overview:z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).describe('Descendant folder depth, 0 = selected folder only.').optional(),budget:z.number().int().min(1000).max(30000).describe('Shared character budget for record excerpts and open tasks.').optional(),cursor:pageCursor}),
   get_outline:z.object({id:uuid,revision:z.number().int().positive().optional(),limit:z.number().int().min(1).max(200).optional(),cursor:z.number().int().nonnegative().describe('Zero-based heading index from page.nextCursor; omit to start.').optional()}),
   export_snapshot:z.object({cursor:z.string().nullable().describe('Export page.nextCursor from the previous page; omit to start.').optional(),limit:z.number().int().min(1).max(5).describe('Maximum record entries in a backup page.').optional()}),
-  import_snapshot:z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v3 object shaped {pages:[...all pages...]}; v2 bundles remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()})
+  import_snapshot:z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v4 object shaped {pages:[...all pages...]}; v2/v3 bundles remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()})
 };
 
 // The SDK creates a fresh server per HTTP request. Reuse discovery projections
@@ -171,7 +190,15 @@ const toolDefinitions:Record<RecalloomToolName,ToolDefinition>={
   manage_record:{schema:toolSchemas.manage_record,write:true,action:(env,actor,x)=>store.updateMeta(env,x.id,x,actor)},
   list_archived:{schema:toolSchemas.list_archived,write:false,action:(env,actor,x)=>store.archivedRecords(env,x.limit,x.cursor,x.query)},
   delete_archived_record:{schema:toolSchemas.delete_archived_record,write:true,action:(env,actor,x)=>lifecycle.deleteArchivedRecord(env,x.id,x.expectedMetadataRevision,x.expectedRevision,x.dryRun??true,actor)},
-  tag_record:{schema:toolSchemas.tag_record,write:true,action:(env,actor,x)=>store.tagRecord(env,x.id,x.tag,x.action,actor)},
+  tag_record:{schema:toolSchemas.tag_record,write:true,action:(env,actor,x)=>assignTag(env,x.id,x,actor)},
+  get_tag:{schema:toolSchemas.get_tag,write:false,action:async(env,actor,x)=>({item:await getTag(env,x.id)})},
+  query_tag_records:{schema:toolSchemas.query_tag_records,write:false,action:(env,actor,x)=>queryTaggedRecords(env,x)},
+  manage_tag:{schema:toolSchemas.manage_tag,write:true,action:(env,actor,x)=>{
+   if(x.action==='create')return createTag(env,x,actor);
+   if(x.action==='update')return updateTag(env,x.id,x,actor);
+   if(x.dryRun!==false)return tagImpact(env,x.id,x.action==='merge'?x.targetId:undefined);
+   return x.action==='merge'?mergeTag(env,x.id,x,actor):deleteTag(env,x.id,x,actor);
+  }},
   query_tasks:{schema:toolSchemas.query_tasks,write:false,action:async (env,actor,x)=>taskResult(await queryTasks(env,x))},
   read_tasks:{schema:toolSchemas.read_tasks,write:false,action:async (env,actor,x)=>taskResult(await readTasks(env,x.ids))},
   mutate_tasks:{schema:toolSchemas.mutate_tasks,write:true,action:async (env,actor,x)=>taskResult(await mutateTasks(env,x,actor))},
@@ -187,7 +214,7 @@ const toolDefinitions:Record<RecalloomToolName,ToolDefinition>={
   index_pending:{schema:toolSchemas.index_pending,write:true,action:async (env,actor,x)=>{if(x.recordId)await retryIndex(env,x.recordId,x.rebuild);return {vectorCleanup:await processVectorDeleteJobs(env,x.limit??3),...await processIndexJobs(env,x.limit??3,x.recordId)};}},
   read_many:{schema:toolSchemas.read_many,write:false,action:(env,actor,x)=>agent.readMany(env,x.items,x.maxChars)},
   diff_revisions:{schema:toolSchemas.diff_revisions,write:false,action:(env,actor,x)=>agent.diffRevisions(env,x.id,x.fromRevision,x.toRevision)},
-  list_tags:{schema:toolSchemas.list_tags,write:false,action:(env,actor,x)=>agent.listTags(env,x.limit,x.cursor)},
+  list_tags:{schema:toolSchemas.list_tags,write:false,action:(env,actor,x)=>queryTags(env,x)},
   list_links:{schema:toolSchemas.list_links,write:false,action:(env,actor,x)=>agent.links(env,x.id,'list',undefined,undefined,actor,x.cursor)},
   related_records:{schema:toolSchemas.related_records,write:false,action:(env,actor,x)=>recordRelations(env,x.id,{semantic:x.semantic!==false,limit:x.limit})},
   get_knowledge_graph:{schema:toolSchemas.get_knowledge_graph,write:false,action:(env,actor,x)=>graphView(env,{focusId:x.focusId,limit:x.limit,semantic:x.semantic!==false})},

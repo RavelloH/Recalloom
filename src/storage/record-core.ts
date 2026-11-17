@@ -1,4 +1,6 @@
 import {INDEX_JOB_UPSERT} from '../index-queue.js';
+import {planTagNames} from '../tags/mutations.js';
+import {tagBatch} from '../tags/catalog.js';
 import type {Env,RecordKind,StoredRecord} from '../types.js';
 import {StorageError} from '../types.js';
 import {sha256,initialVersion,historicalVersion} from '../version.js';
@@ -31,6 +33,7 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
   if (folderId && !(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))
     throw new StorageError('FOLDER_NOT_FOUND');
   const content = kind==='task_list' ? JSON.stringify({tasks:[]},null,2) : (input.content??'');
+  const tagPlan=await planTagNames(env,tags);
   if (kind==='task_list' && input.content && input.content.trim()!==content)
     throw new StorageError('TASK_LIST_CONTENT_MANAGED','Use tasks to modify task lists');
   if (content.length > 500_000) throw new StorageError('CONTENT_TOO_LARGE');
@@ -41,6 +44,7 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
   const virtualPrefix=(await recordExtras(env,folderId,id)).path;
   const newPath=existingFolder?null:virtualPrefix+(folderId?'/':'')+name;
   const statements=[
+    ...tagPlan.statements,
     env.DB.prepare('INSERT INTO records(id,folder_id,name,kind,status,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)')
       .bind(id,folderId,name,kind,'active',input.description??'',ts,ts),
     env.DB.prepare('INSERT INTO record_contents(record_id,content,revision,content_sha256) VALUES(?,?,?,?)')
@@ -52,14 +56,11 @@ export async function createRecord(env: Env, input:{name:string;folderId?:string
       .bind(newId(),id,1,ts),
     ...(wikiRefs.length?[pinPathBindings(env,wikiRefs),insertProjection(env,wikiRefs)]:[]),
     ...resolveNewWikiTarget(env,id,newPath),
-    ...tags.flatMap(tag=>[
-      env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(newId(),tag),
-      env.DB.prepare('INSERT OR IGNORE INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(id,tag)
-    ]),
-    event(env,'record',id,'create',1,actor,{name,folderId,kind,tags,...(kind==='task_list'?{taskActivity:{version:1,created:0,completed:0,reopened:0,removed:0,updated:0,changes:[],totalChanges:0}}:{})})
+    ...tagPlan.ids.map(tagId=>env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) VALUES(?,?)').bind(id,tagId)),
+    event(env,'record',id,'create',1,actor,{name,folderId,kind,tags:tagPlan.names,...(kind==='task_list'?{taskActivity:{version:1,created:0,completed:0,reopened:0,removed:0,updated:0,changes:[],totalChanges:0}}:{})})
   ];
-  await env.DB.batch(statements);
-  return {id,name,kind,tags,revision:1,contentSha256:digest};
+  await tagBatch(env,statements);
+  return {id,name,kind,tags:tagPlan.names,revision:1,contentSha256:digest};
 }
 
 export async function readRecord(env:Env, id:string, options:{revision?:number;lineStart?:number;maxLines?:number;metadataOnly?:boolean}={}) {
@@ -78,7 +79,7 @@ export async function readRecord(env:Env, id:string, options:{revision?:number;l
     contentSha256=historical.content_sha256;
   }
   const extras=await recordExtras(env,row.folder_id,row.id);
-  const metadata={id:row.id,name:row.name,folderId:row.folder_id,path:row.status==='archived'?(row.archived_from_path??'/'+row.name):extras.path+(row.folder_id?'/':'')+row.name,archivedFromPath:row.archived_from_path,archivedFromFolderId:row.archived_from_folder_id,archivedAt:row.archived_at,tags:extras.tags,kind:row.kind,status:row.status,description:row.description,metadataRevision:row.metadata_revision,revision:targetRevision,currentRevision:row.revision,contentSha256,updatedAt:row.updated_at};
+  const metadata={id:row.id,name:row.name,folderId:row.folder_id,path:row.status==='archived'?(row.archived_from_path??'/'+row.name):extras.path+(row.folder_id?'/':'')+row.name,archivedFromPath:row.archived_from_path,archivedFromFolderId:row.archived_from_folder_id,archivedAt:row.archived_at,tags:extras.tags,tagDetails:extras.tagDetails,kind:row.kind,status:row.status,description:row.description,metadataRevision:row.metadata_revision,revision:targetRevision,currentRevision:row.revision,contentSha256,updatedAt:row.updated_at};
   if(options.metadataOnly)return metadata;
   let content=targetRevision!==row.revision
     ?await revisionContent(env,row,targetRevision,contentSha256)

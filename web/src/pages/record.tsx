@@ -81,7 +81,11 @@ export function RecordPage(){
  const refresh=()=>Promise.all([qc.invalidateQueries({queryKey:['record',recordId]}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']}),qc.invalidateQueries({queryKey:['archived-records']}),qc.invalidateQueries({queryKey:['recent-updates']})]);
  const saveMeta=async(fields:Record<string,unknown>)=>{if(!q.data)return;await mutate('/records/'+recordId+'/meta',{...fields,expectedMetadataRevision:q.data.metadataRevision},'PATCH');await refresh();};
  const updateMeta=async(fields:Record<string,unknown>)=>{setError(null);try{await saveMeta(fields);setMetaOpen(false);}catch(e){setError(e);}};
- const changeTag=async(tag:string,action:'add'|'remove')=>{await mutate('/records/'+recordId+'/tags',{tag,action});await refresh();};
+ const changeTag=async(tag:string,action:'add'|'remove')=>{
+  if(!q.data)return;
+  try{await mutate('/records/'+recordId+'/tags',{tag,action,expectedMetadataRevision:q.data.metadataRevision});}
+  finally{await Promise.all([refresh(),qc.invalidateQueries({queryKey:['tags']})]);}
+ };
  const archive=async()=>{if(!(await askConfirm({title:'归档此记录？',description:'归档后记录将不再显示在活动文件夹中，但内容和历史版本仍会保留。',actionLabel:'归档记录',destructive:true})))return;setArchiving(true);try{await updateMeta({status:'archived'});}finally{setArchiving(false);}};
  const deleteArchived=async()=>{
   if(!item||item.status!=='archived'||archiving)return;

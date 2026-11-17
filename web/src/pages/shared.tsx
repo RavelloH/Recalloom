@@ -10,7 +10,7 @@ import {AutoResizer,AutoTransition} from '../motion-primitives';
 
 export function PageTitle({title,description,actions}:{title:string;description?:string;actions?:React.ReactNode}){return <header className="page-header"><div className="page-title-copy"><Heading level={1}>{title}</Heading>{description&&<p className="muted">{description}</p>}</div>{actions&&<div className="page-actions">{actions}</div>}</header>;}
 
-export const ErrorText=({error}:{error:unknown})=><Banner status="error" container="section" title="操作失败" description={error instanceof ApiError?error.code==='FOLDER_NOT_EMPTY'?'文件夹中仍有文档、归档记录或子文件夹，请先处理这些内容。':error.status===409?'内容已被其他客户端修改，请刷新后重试。':error.message:error instanceof Error?error.message:'操作失败'}/>;
+export const ErrorText=({error}:{error:unknown})=><Banner status="error" container="section" title="操作失败" description={error instanceof ApiError?error.code==='FOLDER_NOT_EMPTY'?'文件夹中仍有文档、归档记录或子文件夹，请先处理这些内容。':error.code==='TAG_NAME_CONFLICT'?error.message:error.status===409?'内容已被其他客户端修改，请刷新后重试。':error.message:error instanceof Error?error.message:'操作失败'}/>;
 
 export const Loading=()=> <div className="content-loading" role="status"><Spinner size="md" shade="subtle" label="正在加载…"/></div>;
 

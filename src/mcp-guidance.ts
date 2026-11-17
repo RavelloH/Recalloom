@@ -76,7 +76,7 @@ export const TOOL_GUIDANCE={
  },
  tag_record:{
   title:'Add or remove a record tag',
-  description:'Add or remove a lowercase tag; removing a tag never deletes its record. Discover existing tags via list_tags.',
+  description:'Assign/remove one canonical tag by tagId or a normalized name/alias. Requires the record expectedMetadataRevision; at most 32 associations. Definitions preserve display case. Use list_tags/get_tag to discover tags.',
   destructive:true
  },
  query_tasks:{
@@ -136,9 +136,12 @@ export const TOOL_GUIDANCE={
  },
  list_tags:{
   title:'Discover existing tags',
-  description:'List tag names and usage counts with page.nextCursor. Assign or remove tags using tag_record.',
+  description:'List stable tag IDs, display names, colors, descriptions, aliases, metadata revisions and separate active/archived counts. Search canonical names/aliases, select usage/sort, and follow page.nextCursor. Catalog changes require restarting pagination.',
   destructive:false
  },
+ get_tag:{title:'Read a tag definition',description:'Read a stable tag ID, metadata revision, aliases and usage counts. Merged IDs resolve to the surviving tag.',destructive:false},
+ query_tag_records:{title:'Browse records by tags',description:'Browse documents/task lists matching all or any selected tag IDs, with active/archived, kind and text filters. Follow page.nextCursor. Counts cover the full matching result.',destructive:false},
+ manage_tag:{title:'Manage tag definitions and aliases',description:'Create or update tag metadata with version protection. Renaming preserves the old canonical name as an alias. merge/delete default to dryRun and preview active/archived impact; execution requires catalogVersion and source/target metadata revisions from that preview. Merge keeps surviving IDs, deduplicates associations and redirects old IDs. Tag changes belong to metadata.',destructive:true},
  related_records:{
   title:'Find confirmed and suggested record relations',
   description:'Read incoming/outgoing confirmed links and optionally Vectorize semantic candidates with snippets. Candidates are not saved links; inspect semanticStatus. Wiki references may be derived from Markdown.',
@@ -171,12 +174,12 @@ export const TOOL_GUIDANCE={
  },
  export_snapshot:{
   title:'Export a versioned snapshot',
-  description:'Read recalloom-snapshot-v3 pages (including task order and persistent Wiki path identities) with watermarks and SHA-256. Keep all pages in order until nextCursor=null; concurrent edits invalidate the export. May include sensitive history.',
+  description:'Read recalloom-snapshot-v4 pages (including tag definitions/aliases/redirects, task order and persistent Wiki path identities) with watermarks and SHA-256. Keep all pages in order until nextCursor=null; concurrent edits invalidate the export. May include sensitive history.',
   destructive:false
  },
  import_snapshot:{
   title:'Validate or restore a snapshot',
-  description:'Validate or atomically import the complete recalloom-snapshot-v3 {pages:[...]} bundle (also accepts v2). Defaults to dryRun; real imports require explicit authorization and review of collisions/limits.',
+  description:'Validate or atomically import the complete recalloom-snapshot-v4 {pages:[...]} bundle (also accepts v2/v3). Defaults to dryRun; real imports require explicit authorization and review of collisions/limits.',
   destructive:true
  }
 } as const;

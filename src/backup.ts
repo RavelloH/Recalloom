@@ -1,3 +1,6 @@
+import {ensureTagCatalog,catalogVersion,tagBatch} from './tags/catalog.js';
+import {exportTagCatalog,planSnapshotTags} from './tags/snapshot.js';
+import type {TagSnapshot} from './tag-model.js';
 import {INDEX_JOB_UPSERT} from './index-queue.js';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
@@ -18,11 +21,13 @@ type SnapshotBase={
 };
 export type SnapshotPage=SnapshotBase&(
   {format:'recalloom-snapshot-v2'}|
-  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}
+  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}|
+  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}
 );
 type SnapshotPayload=Omit<SnapshotBase,'pageHash'>&(
   {format:'recalloom-snapshot-v2'}|
-  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}
+  {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}|
+  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}
 );
 const fail=(code:string,message?:string):never=>{throw new StorageError(code,message);};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,24 +41,29 @@ const name=(value:unknown):string=>{
 const asArray=(v:unknown):unknown[]=>Array.isArray(v)?v:fail('INVALID_SNAPSHOT');
 const maxSeq=async(env:Env)=>Number((await env.DB.prepare('SELECT COALESCE(MAX(seq),0) AS value FROM change_events').first<{value:number}>())?.value??0);
 const orderVersion=async(env:Env)=>Number((await env.DB.prepare('SELECT version FROM task_order_state WHERE id=1').first<{version:number}>())?.version??0);
-type SnapshotCursor={watermark:number;lastId:string;totalRecords:number;orderVersion:number};
+type SnapshotCursor={watermark:number;lastId:string;totalRecords:number;orderVersion:number;tagVersion:number};
 const cursorEncode=(x:SnapshotCursor):string=>btoa(JSON.stringify(x));
 const cursorDecode=(c:string):SnapshotCursor=>{
   try{
     const v=JSON.parse(atob(c)) as SnapshotCursor;
-    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0||!Number.isSafeInteger(v.orderVersion)||v.orderVersion<0)throw Error();
+    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0||!Number.isSafeInteger(v.orderVersion)||v.orderVersion<0||!Number.isSafeInteger(v.tagVersion)||v.tagVersion<0)throw Error();
     return v;
   }catch{return fail('INVALID_SNAPSHOT_CURSOR');}
 };
 export const pageHash=async(page:SnapshotPayload)=>sha256(JSON.stringify({format:page.format,watermark:page.watermark,totalRecords:page.totalRecords,cursor:page.cursor,nextCursor:page.nextCursor,folders:page.folders,records:page.records,links:page.links,
-  ...(page.format==='recalloom-snapshot-v3'?{orderVersion:page.orderVersion,taskOrder:page.taskOrder,pathBindings:page.pathBindings}:{})}));
+  ...(page.format!=='recalloom-snapshot-v2'?{orderVersion:page.orderVersion,taskOrder:page.taskOrder,pathBindings:page.pathBindings}:{}),
+  ...(page.format==='recalloom-snapshot-v4'?{tagCatalogVersion:page.tagCatalogVersion,tagCatalog:page.tagCatalog}:{})}));
 
 export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Promise<SnapshotPage>{
+  await ensureTagCatalog(env);
+  const tagVersion=await catalogVersion(env);
   const pageSize=Math.min(5,Math.max(1,Math.floor(limit)));
   const state=cursor?cursorDecode(cursor):null;
+  if(state&&state.tagVersion!==tagVersion)fail('SNAPSHOT_CHANGED','Tags changed during backup');
+  const tagCatalog=state?[]:await exportTagCatalog(env);
   const watermark=state?.watermark??await maxSeq(env);
   const version=state?.orderVersion??await orderVersion(env);
-  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version)fail('SNAPSHOT_CHANGED','Library changed during backup; restart the export');
+  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version||await catalogVersion(env)!==tagVersion)fail('SNAPSHOT_CHANGED','Library changed during backup; restart the export');
   const totalRecords=state?.totalRecords??Number((await env.DB.prepare('SELECT COUNT(*) AS n FROM records').first<{n:number}>())?.n??0);
   const lastId=state?.lastId??'';
   const [folders,recordRows]=await Promise.all([
@@ -78,9 +88,9 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
     env.DB.prepare('SELECT task_id,record_id,position FROM task_board_order WHERE record_id IN (SELECT value FROM json_each(?)) ORDER BY position,task_id').bind(selectedIds).all(),
     env.DB.prepare('SELECT source_id,target_expression,target_id FROM record_path_bindings WHERE source_id IN (SELECT value FROM json_each(?)) ORDER BY source_id,target_expression').bind(selectedIds).all()
   ]);
-  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version)fail('SNAPSHOT_CHANGED','Library changed while exporting; discard all pages');
-  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords,orderVersion:version});
-  const payload={format:'recalloom-snapshot-v3' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links,orderVersion:version,taskOrder:taskOrder.results,pathBindings:pathBindings.results};
+  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version||await catalogVersion(env)!==tagVersion)fail('SNAPSHOT_CHANGED','Library changed while exporting; discard all pages');
+  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords,orderVersion:version,tagVersion});
+  const payload={tagCatalog,tagCatalogVersion:tagVersion,format:'recalloom-snapshot-v4' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links,orderVersion:version,taskOrder:taskOrder.results,pathBindings:pathBindings.results};
   return {...payload,pageHash:await pageHash(payload)};
 }
 
@@ -89,14 +99,16 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   if(!bundle||typeof bundle!=='object'||!Array.isArray((bundle as ImportInput).pages))fail('INVALID_SNAPSHOT');
   const pages=(bundle as ImportInput).pages;
   if(pages.length<1||pages.length>100||JSON.stringify(bundle).length>6_000_000)fail('SNAPSHOT_TOO_LARGE');
+  await ensureTagCatalog(env);
   const watermark=pages[0]?.watermark,expected=pages[0]?.totalRecords;
-  const format=pages[0]?.format,version=pages[0]?.format==='recalloom-snapshot-v3'?pages[0].orderVersion:undefined;
+  const format=pages[0]?.format,version=pages[0]?.format!=='recalloom-snapshot-v2'?pages[0]?.orderVersion:undefined;
   let previous:string|null=null;
   const folders:AnyRow[]=[],records:SnapshotPage['records']=[],links:AnyRow[]=[],taskOrder:AnyRow[]=[],pathBindings:AnyRow[]=[];
   for(const [index,page] of pages.entries()){
-    if(!page||(page.format!=='recalloom-snapshot-v2'&&page.format!=='recalloom-snapshot-v3')||page.format!==format||page.watermark!==watermark||page.totalRecords!==expected||
+    if(!page||(page.format!=='recalloom-snapshot-v2'&&page.format!=='recalloom-snapshot-v3'&&page.format!=='recalloom-snapshot-v4')||page.format!==format||page.watermark!==watermark||page.totalRecords!==expected||
       page.cursor!==previous||page.pageHash!==await pageHash(page))fail('SNAPSHOT_INTEGRITY_ERROR');
-    if(page.format==='recalloom-snapshot-v3'){
+    if(page.format==='recalloom-snapshot-v4'&&(!Number.isSafeInteger(page.tagCatalogVersion)||page.tagCatalogVersion!== (pages[0] as typeof page).tagCatalogVersion||!Array.isArray(page.tagCatalog)||index>0&&page.tagCatalog.length))fail('INVALID_SNAPSHOT_TAGS');
+    if(page.format!=='recalloom-snapshot-v2'){
       if(!Number.isSafeInteger(page.orderVersion)||page.orderVersion<0||page.orderVersion!==version)fail('SNAPSHOT_INTEGRITY_ERROR');
       const pageRecords=new Set(asArray(page.records).map(item=>id((item as {record:AnyRow}).record.id)));
       const ranks=asArray(page.taskOrder) as AnyRow[],pins=asArray(page.pathBindings) as AnyRow[];
@@ -129,7 +141,12 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   const key=(parent:string|null,recordName:string)=>JSON.stringify([parent,recordName]);
   // Projection planning resolves existing paths. Reject any intervening library
   // change before those resolutions can become permanent path identities.
-  const statements:D1PreparedStatement[]=[env.DB.prepare(`INSERT INTO task_order_state(id,version)
+  const tagNames=records.flatMap(item=>{
+    if(!item||!item.record||!Array.isArray(item.tags)||item.tags.some(tag=>typeof tag!=='string'))fail('INVALID_SNAPSHOT');
+    return [...item.tags,...(item.record.kind==='checkpoint'?['checkpoint']:[])];
+  });
+  const tagPlan=await planSnapshotTags(env,format==='recalloom-snapshot-v4'?(pages[0] as Extract<SnapshotPage,{format:'recalloom-snapshot-v4'}>).tagCatalog:[],tagNames);
+  const statements:D1PreparedStatement[]=[...tagPlan.statements,env.DB.prepare(`INSERT INTO task_order_state(id,version)
     SELECT 1,0 WHERE (SELECT COALESCE(MAX(seq),0) FROM change_events)<>?
       OR NOT EXISTS (SELECT 1 FROM task_order_state WHERE id=1 AND version=?)`).bind(targetSeq,targetVersion)];
   // Full validation before the first mutation. Existing DB uniqueness and foreign
@@ -241,11 +258,8 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
       }
     }
     // Legacy snapshot-v2 checkpoint rows are imported as documents with the checkpoint tag.
-    for(const tag of [...new Set([...item.tags, ...(legacyCheckpoint?['checkpoint']:[])].map(t=>typeof t==='string'?t.trim().toLowerCase():t))]){
-      if(typeof tag!=='string'||!tag.trim()||tag.length>64)fail('INVALID_TAG');
-      statements.push(env.DB.prepare('INSERT INTO tags(id,name) VALUES(?,?) ON CONFLICT(name) DO NOTHING').bind(crypto.randomUUID(),tag));
-      statements.push(env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) SELECT ?,id FROM tags WHERE name=?').bind(recordId,tag));
-    }
+    const tagIds=[...new Set([...item.tags,...(legacyCheckpoint?['checkpoint']:[])].map(tag=>tagPlan.idFor(tag)))];
+    for(const tagId of tagIds)statements.push(env.DB.prepare('INSERT INTO record_tags(record_id,tag_id) VALUES(?,?)').bind(recordId,tagId));
     if(row.status!=='archived')statements.push(env.DB.prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,?,?)'+INDEX_JOB_UPSERT)
       .bind(crypto.randomUUID(),recordId,revision,new Date().toISOString()));
     statements.push(event(env,'record',recordId,'restore',revision,actor,{name:recordName,folderId:archived?null:folder,kind:restoredKind,legacyCheckpoint,archivedFromPath}));
@@ -261,7 +275,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   }
   if(taskIds.size&&await env.DB.prepare('SELECT 1 FROM tasks WHERE id IN (SELECT value FROM json_each(?)) LIMIT 1').bind(JSON.stringify([...taskIds])).first())
     fail('IMPORT_CONFLICT','A task UUID already exists in the target library');
-  if(format==='recalloom-snapshot-v3'){
+  if(format!=='recalloom-snapshot-v2'){
     const ranked=new Set<string>();
     for(const row of taskOrder){
       const taskId=id(row.task_id),owner=id(row.record_id);
@@ -293,7 +307,7 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   if(taskIds.size)statements.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
   if(statements.length>700)fail('ATOMIC_IMPORT_LIMIT','This snapshot exceeds the single-transaction import limit; use a D1 database backup for larger libraries');
   if(!dryRun){
-    try{await env.DB.batch(statements);}
+    try{await tagBatch(env,statements);}
     catch(error){
       if(error instanceof Error&&/(?:UNIQUE|PRIMARY KEY) constraint failed:\s*task_order_state\.id/i.test(error.message))
         fail('IMPORT_CONFLICT','Target library changed during import validation; restart the import');

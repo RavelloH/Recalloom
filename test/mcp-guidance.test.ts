@@ -68,7 +68,7 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
-    assert.equal(tools.length,33);
+    assert.equal(tools.length,36);
     assert.equal(tools.length,Object.keys(TOOL_GUIDANCE).length);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){
@@ -159,9 +159,9 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     }
     assert.match(tool('browse').inputSchema.properties?.cursor?.description??'',/page\.nextCursor/);
     assert.match(tool('edit_record').inputSchema.properties?.expectedRevision?.description??'',/concurrent/);
-    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v3/);
+    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v4/);
     assert.match(tool('read_many').inputSchema.properties?.maxChars?.description??'',/budget/);
-    assert.match(tool('export_snapshot').description,/snapshot-v3/);
+    assert.match(tool('export_snapshot').description,/snapshot-v4/);
     assert.match(tool('import_snapshot').description,/complete/);
     assert.ok(tool('get_overview').description.includes('folder'));
     assert.ok(tool('get_outline').description.includes('heading'));

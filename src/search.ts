@@ -1,3 +1,5 @@
+import {ensureTagCatalog} from './tags/catalog.js';
+import {normalizeTagKey} from './tag-model.js';
 import type { Env } from './types.js';
 import { StorageError } from './types.js';
 import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, prepareSemanticIntent,prepareTitleMatch } from './search-ranking.js';
@@ -41,8 +43,9 @@ export async function search(env:Env,input:{
   if(input.folderId){filterSql.push('r.folder_id=?');bind.push(input.folderId);}
   if(input.status){filterSql.push('r.status=?');bind.push(input.status);}
   if(input.tag){
-    filterSql.push('EXISTS(SELECT 1 FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id AND t.name=?)');
-    bind.push(input.tag);
+    await ensureTagCatalog(env);
+    filterSql.push('EXISTS(SELECT 1 FROM record_tags rt JOIN tag_names n ON n.tag_id=rt.tag_id WHERE rt.record_id=r.id AND n.normalized_name=?)');
+    bind.push(normalizeTagKey(input.tag));
   }
   const lexicalTask=(async()=>{
     if(metadata){

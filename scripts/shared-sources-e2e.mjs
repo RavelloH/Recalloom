@@ -338,9 +338,10 @@ try{
  // is the particular event seq, not every matching resource title in the feed.
  await page.evaluate(async({recordId,suffix})=>{
   for(const tag of ['shared-first-'+suffix.slice(-4),'shared-second-'+suffix.slice(-4)]){
+   const current=await (await fetch('/api/records/'+recordId)).json();
    const r=await fetch('/api/records/'+recordId+'/tags',{
     method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({tag,action:'add'})
+    body:JSON.stringify({tag,action:'add',expectedMetadataRevision:current.metadataRevision})
    });
    if(!r.ok)throw Error('activity fixture '+await r.text());
   }

@@ -17,10 +17,10 @@ const examples=(doc:string)=>[
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 const flattened=(root:JSONContent):JSONContent[]=>[root,...(root.content??[]).flatMap(flattened)];
 
-test('help catalog has ten documented topics with stable resource URIs',()=>{
- assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','lifecycle','backup']);
+test('help catalog has eleven documented topics with stable resource URIs',()=>{
+ assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','tags','lifecycle','backup']);
  const resources=listHelpResources();
- assert.equal(resources.length,11);
+ assert.equal(resources.length,12);
  assert.equal(resources[0].topic,'index');
  assert.match(resources[0].content,/math.*LaTeX|math.*公式|math.*数学/);
  for(const topic of HELP_TOPICS){

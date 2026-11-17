@@ -56,7 +56,7 @@ async function backup(env:Env){
 const rows=(db:DatabaseSync,sql:string)=>db.prepare(sql).all().map(row=>({...row}));
 const fails=(code:string)=>(error:unknown)=>Boolean(error&&typeof error==='object'&&'code'in error&&error.code===code);
 
-test('snapshot v3 roundtrips interleaved task order, Wiki identities and tombstones atomically',async()=>{
+test('snapshot v4 roundtrips interleaved task order, Wiki identities and tombstones atomically',async()=>{
  const source=fixture(),restored=fixture();
  try{
   const a=await source.list('A',['A1','A2']),b=await source.list('B',['B1']),archived=await source.list('Archived',['Z'],'archived');
@@ -67,7 +67,7 @@ test('snapshot v3 roundtrips interleaved task order, Wiki identities and tombsto
   source.db.prepare('INSERT INTO record_path_bindings(source_id,target_expression,target_id) VALUES(?,?,?)').run(doc,'/dead.md',dead);
   const bundle=await backup(source.env);
   assert.ok(bundle.pages.length>1);
-  assert.ok(bundle.pages.every(page=>page.format==='recalloom-snapshot-v3'));
+  assert.ok(bundle.pages.every(page=>page.format==='recalloom-snapshot-v4'));
   const preview=await importSnapshot(restored.env,bundle,true);
   assert.equal(preview.taskOrder,4);assert.equal(preview.pathBindings,2);
   assert.equal(rows(restored.db,'SELECT id FROM records').length,0,'dryRun must leave all tables empty');
@@ -86,12 +86,12 @@ test('snapshot v3 roundtrips interleaved task order, Wiki identities and tombsto
  }finally{source.db.close();restored.db.close();}
 });
 
-test('snapshot v3 validates order coverage and bindings before any import mutation',async()=>{
+test('snapshot v4 validates order coverage and bindings before any import mutation',async()=>{
  const source=fixture(),target=fixture();
  try{
   await source.list('List',['Task']);
   const original=await backup(source.env),page=original.pages[0]!;
-  assert.equal(page.format,'recalloom-snapshot-v3');if(page.format!=='recalloom-snapshot-v3')return;
+  assert.equal(page.format,'recalloom-snapshot-v4');if(page.format!=='recalloom-snapshot-v4')return;
   const missing={...page,taskOrder:[]};missing.pageHash=await pageHash(missing);
   await assert.rejects(importSnapshot(target.env,{pages:[missing]},false),fails('INVALID_SNAPSHOT_TASK_ORDER'));
   const invalid={...page,pathBindings:[{source_id:page.records[0]!.record.id,target_expression:'/x#anchor',target_id:crypto.randomUUID()}]};
@@ -113,7 +113,7 @@ test('snapshot export invalidates continuation after a rank-only order change',a
  }finally{f.db.close();}
 });
 
-test('snapshot v3 merges tasks after existing tasks while preserving both relative orders',async()=>{
+test('snapshot v4 merges tasks after existing tasks while preserving both relative orders',async()=>{
  const source=fixture(),target=fixture();
  try{
   const imported=await source.list('Imported',['first','second','third']),existing=await target.list('Existing',['existing first','existing second']);

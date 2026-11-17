@@ -30,7 +30,7 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
  const renameFolder=async(next:string)=>{const folder=currentFolder.data;if(!folder)return;await mutate('/folders/'+folder.id,{name:next,expectedMetadataRevision:folder.metadataRevision},'PATCH');await Promise.all([qc.invalidateQueries({queryKey:['folder',folder.id]}),qc.invalidateQueries({queryKey:['folder-trail']}),qc.invalidateQueries({queryKey:['browse']})]);};
  const create=async()=>{if(!name.trim()||!creating)return;try{
   const isTemplate=creating==='checkpoint_template';
-  const tags=[...new Set([...tagInput.split(/[,，]/).map(t=>t.trim().toLowerCase()).filter(Boolean),...(isTemplate?['checkpoint']:[])])];
+  const tags=[...new Set([...tagInput.split(/[,，]/).map(t=>t.trim()).filter(Boolean),...(isTemplate?['checkpoint']:[])])];
   const data=creating==='folder'
     ?await mutate<{id:string}>('/folders',{name:name.trim(),parentId:folderId})
     :await mutate<{id:string}>('/records',{name:name.trim(),kind:creating==='task_list'?'task_list':'document',folderId,tags,

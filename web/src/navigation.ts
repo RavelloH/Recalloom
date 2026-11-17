@@ -6,6 +6,7 @@ export const menu=[
  {to:'/library',name:'知识库',icon:"library"},
  {to:'/tasks',name:'任务',icon:"taskList"},
  {to:'/search',name:'搜索',icon:"search"},
+ {to:'/tags',name:'标签',icon:"tags"},
  {to:'/activity',name:'活动',icon:"activity"},
  {to:'/archive',name:'归档',icon:"archive"},
  {to:'/graph',name:'关系网',icon:"relationGraph"},
