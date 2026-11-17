@@ -168,6 +168,14 @@ test('two passes: new document gathers neighbours tags, then spreads only newly 
     assert.equal(f.db.prepare(
       'SELECT source FROM record_tags WHERE record_id=? AND tag_id=?'
     ).get(d,B.id)?.source,'auto');
+    const sourceEvidence = f.db.prepare(
+      'SELECT evidence FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(d,B.id)?.evidence as string;
+    assert.equal(JSON.parse(sourceEvidence).model, CLEF_ACCURATE_MODEL);
+    const propagatedEvidence = f.db.prepare(
+      'SELECT evidence FROM record_tags WHERE record_id=? AND tag_id=?'
+    ).get(a,D.id)?.evidence as string;
+    assert.equal(JSON.parse(propagatedEvidence).model, CLEF_MODEL);
     assert.equal(f.db.prepare(
       'SELECT source FROM record_tags WHERE record_id=? AND tag_id=?'
     ).get(d,C.id),undefined);

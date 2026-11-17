@@ -182,7 +182,8 @@ function question(tag: TagRow, documentId?: string) {
 function autoChanges(
   env: Env, doc: DocumentRow, before: Association[],
   desired: Map<string, number>, mode: 'all' | 'selected',
-  targetIds: string[] = []
+  targetIds: string[] = [],
+  model: 'clef' | 'clef-flash' = 'clef-flash'
 ) {
   const current = new Map(before.filter(x => x.source === 'auto').map(x => [x.tagId, x]));
   const keys = mode === 'all'
@@ -204,7 +205,7 @@ function autoChanges(
           source_revision,generated_at,confidence)
          VALUES(?,?,'auto',?,?,?,?,?)`
       ).bind(doc.id, tagId, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: 'clef-flash-noul-v1', probability }),
+        json({ algorithm: model + '-noul-v1', model: model === 'clef' ? CLEF_ACCURATE_MODEL : CLEF_MODEL, probability }),
         doc.revision, now(), probability));
       changed = true;
     } else if (probability !== undefined && existing && existing.sourceRevision !== doc.revision) {
@@ -212,7 +213,7 @@ function autoChanges(
         `UPDATE record_tags SET source_revision=?,confidence=?,reason=?,evidence=?,generated_at=?
          WHERE record_id=? AND tag_id=? AND source='auto'`
       ).bind(doc.revision, probability, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: 'clef-flash-noul-v1', probability }), now(), doc.id, tagId));
+        json({ algorithm: model + '-noul-v1', model: model === 'clef' ? CLEF_ACCURATE_MODEL : CLEF_MODEL, probability }), now(), doc.id, tagId));
     }
   }
   if (changed) {
@@ -333,7 +334,7 @@ export async function prepareDocumentTags(
     ...[...before].filter(id => !after.has(id)),
     ...[...after].filter(id => !neighbourTags.has(id))
   ]);
-  const sourceWrites = autoChanges(env, source, sourceAssoc, desired, 'all');
+  const sourceWrites = autoChanges(env, source, sourceAssoc, desired, 'all', [], 'clef');
   const spreadResult = await spread(env, source, neighbours, after, changed,
     activeDocs, relatedAssoc, byId, ignores);
   const guards = [
