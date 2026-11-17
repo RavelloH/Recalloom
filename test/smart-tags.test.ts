@@ -4,7 +4,7 @@ import { fixture } from './tag-fixture.js';
 import { createTag, assignTag, updateTag } from '../src/tags/mutations.js';
 import { prepareDocumentTags, TAG_THRESHOLD, CLEF_MODEL } from '../src/tags/engine.js';
 import { processIndexJobs } from '../src/indexing.js';
-import { smartTagStatus } from '../src/tags/smart.js';
+import { acceptAutoTags, smartTagStatus } from '../src/tags/smart.js';
 import type { Env } from '../src/types.js';
 
 const vector = () => Array(512).fill(0.125) as number[];
@@ -355,4 +355,245 @@ test('Clef-flash threshold 0.70 applies to both document classification and prop
   } finally {
     f.db.close();
   }
+});
+
+test('accepting multiple tags shares neighbour capacity and keeps the five automatic label cap', async () => {
+  const f = fixture();
+  try {
+    const source = await f.record('源.md', '内容'),
+      target = await f.record('目标.md', '内容');
+    indexed(f, source);
+    const targetChunk = indexed(f, target);
+    const labels = [];
+    for (let i = 0; i < 6; i++) labels.push((await createTag(f.env, { name: '标签' + i })).item);
+    for (const tag of labels.slice(0, 2))
+      f.db
+        .prepare(
+          "INSERT INTO record_tags(record_id,tag_id,source,source_revision,confidence) VALUES(?,?,'auto',1,0.9)"
+        )
+        .run(source, tag.id);
+    for (const tag of labels.slice(2))
+      f.db
+        .prepare(
+          "INSERT INTO record_tags(record_id,tag_id,source,source_revision,confidence) VALUES(?,?,'auto',1,0.9)"
+        )
+        .run(target, tag.id);
+    const ai = fakeAI(f, (label) => (label === '标签1' ? 0.99 : 0.71));
+    f.env.VECTORIZE.query = async () =>
+      ({
+        matches: [{ id: targetChunk, score: 0.95, metadata: { record_id: target, revision: 1 } }]
+      }) as never;
+    await acceptAutoTags(f.env, source, 1);
+    assert.equal(
+      f.db
+        .prepare("SELECT COUNT(*) AS n FROM record_tags WHERE record_id=? AND source='auto'")
+        .get(target)?.n,
+      5
+    );
+    assert.equal(
+      f.db
+        .prepare("SELECT COUNT(*) AS n FROM record_tags WHERE record_id=? AND source='manual'")
+        .get(source)?.n,
+      2
+    );
+    assert.equal(ai.calls().clefCalls, 1);
+    assert.equal(
+      f.db
+        .prepare('SELECT confidence FROM record_tags WHERE record_id=? AND tag_id=?')
+        .get(target, labels[1]!.id)?.confidence,
+      0.99
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test('definition updates respect both the record and automatic association limits', async () => {
+  const f = fixture();
+  try {
+    const tag = (await createTag(f.env, { name: '主题' })).item;
+    const anchor = await f.record('来源.md', '内容'),
+      full = await f.record('32个标签.md', '内容'),
+      autoFull = await f.record('5个自动标签.md', '内容');
+    f.db
+      .prepare("INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'manual')")
+      .run(anchor, tag.id);
+    for (const target of [full, autoFull])
+      f.db
+        .prepare('INSERT INTO smart_tag_evidence(record_id,related_id) VALUES(?,?)')
+        .run(anchor, target);
+    for (let i = 0; i < 32; i++) {
+      const other = (await createTag(f.env, { name: '已有标签' + i, kind: 'fixed' })).item;
+      f.db
+        .prepare("INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'manual')")
+        .run(full, other.id);
+    }
+    for (let i = 0; i < 5; i++) {
+      const other = (await createTag(f.env, { name: '智能主题' + i })).item;
+      f.db
+        .prepare("INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'auto')")
+        .run(autoFull, other.id);
+    }
+    fakeAI(f, () => 0.95);
+    await updateTag(f.env, tag.id, {
+      name: tag.name,
+      description: '修改后的定义',
+      expectedMetadataRevision: 1
+    });
+    assert.equal(
+      f.db.prepare('SELECT COUNT(*) AS n FROM record_tags WHERE record_id=?').get(full)?.n,
+      32
+    );
+    assert.equal(
+      f.db
+        .prepare("SELECT COUNT(*) AS n FROM record_tags WHERE record_id=? AND source='auto'")
+        .get(autoFull)?.n,
+      5
+    );
+    assert.equal(
+      f.db.prepare('SELECT COUNT(*) AS n FROM record_tags WHERE tag_id=?').get(tag.id)?.n,
+      1
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test('changed classification scores and source revisions advance metadata, while identical reruns stay stable', async () => {
+  const f = fixture();
+  try {
+    const tag = (await createTag(f.env, { name: '主题' })).item;
+    const id = await f.record('笔记.md', '内容');
+    f.db
+      .prepare(
+        "INSERT INTO record_tags(record_id,tag_id,source,source_revision,confidence,reason) VALUES(?,?,'auto',1,0.75,'旧结果')"
+      )
+      .run(id, tag.id);
+    fakeAI(f, () => 0.97);
+    await updateTag(f.env, tag.id, {
+      name: tag.name,
+      description: '新定义',
+      expectedMetadataRevision: 1
+    });
+    const first = f.db
+      .prepare('SELECT confidence,evidence FROM record_tags WHERE record_id=?')
+      .get(id)!;
+    assert.equal(first.confidence, 0.97);
+    assert.equal(JSON.parse(String(first.evidence)).probability, 0.97);
+    assert.equal(
+      f.db.prepare('SELECT metadata_revision FROM records WHERE id=?').get(id)?.metadata_revision,
+      2
+    );
+    f.db.prepare('UPDATE record_contents SET revision=2 WHERE record_id=?').run(id);
+    for (let i = 0; i < 2; i++) {
+      const plan = await prepareDocumentTags(f.env, id, [vector()]);
+      await f.env.DB.batch([...plan.guards, ...plan.statements]);
+      assert.equal(
+        f.db.prepare('SELECT metadata_revision FROM records WHERE id=?').get(id)?.metadata_revision,
+        3
+      );
+    }
+    assert.equal(
+      f.db.prepare('SELECT source_revision FROM record_tags WHERE record_id=?').get(id)
+        ?.source_revision,
+      2
+    );
+    assert.equal(
+      f.db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM change_events WHERE record_id=? AND event_type='tag_auto_update'"
+        )
+        .get(id)?.n,
+      2
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test('classification and upload stalls release the lease and preserve the uploaded-vector retry stage', async () => {
+  for (const phase of ['classification', 'upload']) {
+    const f = fixture();
+    try {
+      const label = (await createTag(f.env, { name: '主题' })).item;
+      const source = await f.record('源.md', '正文'),
+        other = await f.record('相关.md', '正文');
+      const otherChunk = indexed(f, other);
+      f.db
+        .prepare("INSERT INTO record_tags(record_id,tag_id,source) VALUES(?,?,'manual')")
+        .run(other, label.id);
+      f.db
+        .prepare('INSERT INTO index_jobs(id,record_id,revision,created_at) VALUES(?,?,1,?)')
+        .run(crypto.randomUUID(), source, new Date().toISOString());
+      fakeAI(f, () => 0.95);
+      f.env.VECTORIZE.query = async () =>
+        ({
+          matches: [{ id: otherChunk, score: 0.9, metadata: { record_id: other, revision: 1 } }]
+        }) as never;
+      let resume!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const run = f.env.AI.run;
+      const upsert = f.env.VECTORIZE.upsert;
+      if (phase === 'classification')
+        f.env.AI.run = (async (name: never, input: any) => {
+          if (name === CLEF_MODEL) await gate;
+          return run(name, input);
+        }) as Env['AI']['run'];
+      else
+        f.env.VECTORIZE.upsert = async (values) => {
+          await gate;
+          return upsert(values);
+        };
+      const result = await processIndexJobs(f.env, 1, source, Date.now() + 100);
+      assert.match(String(result.results[0]?.error), /budget expired/);
+      const row = f.db
+        .prepare('SELECT state,stage,lease_token FROM index_jobs WHERE record_id=?')
+        .get(source)!;
+      assert.equal(row.state, 'retry');
+      assert.equal(row.lease_token, null);
+      assert.equal(row.stage, phase === 'classification' ? 'tagging' : 'queued');
+      resume();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.equal(
+        f.db.prepare('SELECT state FROM index_jobs WHERE record_id=?').get(source)?.state,
+        'retry'
+      );
+      assert.equal(
+        f.db.prepare('SELECT COUNT(*) AS n FROM record_tags WHERE record_id=?').get(source)?.n,
+        0
+      );
+      if (phase === 'upload')
+        assert.equal(
+          f.db.prepare('SELECT COUNT(*) AS n FROM search_chunks WHERE record_id=?').get(source)?.n,
+          0
+        );
+    } finally {
+      f.db.close();
+    }
+  }
+});
+
+
+test('batch acceptance rejects a concurrent tag-definition change atomically', async () => {
+  const f = fixture();
+  try {
+    const tag = (await createTag(f.env, { name: '主题' })).item;
+    const source = await f.record('源.md', '正文'), target = await f.record('相关.md', '正文');
+    indexed(f, source);
+    const chunk = indexed(f, target);
+    f.db.prepare("INSERT INTO record_tags(record_id,tag_id,source,source_revision) VALUES(?,?,'auto',1)")
+      .run(source, tag.id);
+    fakeAI(f, () => {
+      f.db.prepare('UPDATE tags SET description=? WHERE id=?').run('并发修改的定义', tag.id);
+      return 0.95;
+    });
+    f.env.VECTORIZE.query = async () => ({ matches: [
+      { id: chunk, score: 0.95, metadata: { record_id: target, revision: 1 } }
+    ] }) as never;
+    await assert.rejects(acceptAutoTags(f.env, source, 1), /标签已发生变化/);
+    assert.equal(f.db.prepare('SELECT source FROM record_tags WHERE record_id=?').get(source)?.source, 'auto');
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM record_tags WHERE record_id=?').get(target)?.n, 0);
+  } finally { f.db.close(); }
 });

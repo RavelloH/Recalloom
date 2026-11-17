@@ -80,6 +80,38 @@ export async function processIndexJobs(
       continue;
     }
     let total = 0;
+    let expired = false;
+    const budget = new AbortController();
+    const checkBudget = () => {
+      if (expired || Date.now() >= deadline) {
+        expired = true;
+        const error = Error('Index execution budget expired');
+        budget.abort(error);
+        throw error;
+      }
+    };
+    const withinBudget = async <T>(work: () => Promise<T>): Promise<T> => {
+      checkBudget();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          work(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => {
+                expired = true;
+                const error = Error('Index execution budget expired');
+                budget.abort(error);
+                reject(error);
+              },
+              Math.max(1, deadline - Date.now())
+            );
+          })
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
     const guardCondition =
       `EXISTS(SELECT 1 FROM index_jobs WHERE id=? AND generation=? AND lease_token=?
         AND lease_expires_at>? AND state='running')
@@ -89,6 +121,7 @@ export async function processIndexJobs(
       job.id, job.generation, token, iso(), job.record_id, name, job.revision
     ];
     const progress = async (stage: string, completed: number) => {
+      checkBudget();
       const result = await env.DB.prepare(
         `UPDATE index_jobs SET stage=?,completed_chunks=?,total_chunks=?
          WHERE id=? AND generation=? AND lease_token=? AND state='running'`
@@ -113,7 +146,7 @@ export async function processIndexJobs(
            ORDER BY chunk_index`
         ).bind(job.record_id, job.revision).all<{ id: string }>()).results;
         total = rows.length;
-        const stored = rows.length ? await env.VECTORIZE.getByIds(rows.map(row => row.id)) : [];
+        const stored = rows.length ? await withinBudget(() => env.VECTORIZE.getByIds(rows.map(row => row.id))) : [];
         const byId = new Map(stored.map(row => [row.id, row]));
         if (stored.length !== rows.length || rows.some(row => !byId.get(row.id)?.values?.length))
           throw new StorageError('INDEX_VECTORS_PENDING');
@@ -127,9 +160,9 @@ export async function processIndexJobs(
         total = chunks.length;
         await progress('embedding', 0);
         for (let i = 0; i < chunks.length; i += 8) {
-          vectors.push(...await embed(env, chunks.slice(i, i + 8).map(
+          vectors.push(...await withinBudget(() => embed(env, chunks.slice(i, i + 8).map(
             chunk => 'title: ' + record.name.replace(/\.md$/i, '') + ' | text: ' + chunk
-          )));
+          ))));
           await progress('embedding', Math.min(i + 8, total));
         }
         const prefix = (await sha256(record.id + ':' + job.generation + ':' + token)).slice(0, 40);
@@ -141,10 +174,11 @@ export async function processIndexJobs(
         const upload = async () => {
           await progress('uploading', 0);
           for (let i = 0; i < ids.length; i += 8)
-            await env.VECTORIZE.upsert(ids.slice(i, i + 8).map((id, j) => ({
+            await withinBudget(() => env.VECTORIZE.upsert(ids.slice(i, i + 8).map((id, j) => ({
               id, values: vectors[i + j]!,
               metadata: { record_id: record.id, revision: record.revision, chunk_index: i + j }
-            })));
+            }))));
+          checkBudget();
           const statements = [
             tagGuard(env, guardCondition, guardArgs(record.name)),
             env.DB.prepare('DELETE FROM search_chunks WHERE record_id=?').bind(record.id)
@@ -168,14 +202,15 @@ export async function processIndexJobs(
         // The newly embedded raw vectors can be queried while upserts proceed.
         const tagWork = record.status === 'archived'
           ? Promise.resolve(null)
-          : prepareDocumentTags(env, record.id, vectors);
-        const settled = await Promise.allSettled([upload(), tagWork]);
+          : withinBudget(() => prepareDocumentTags(env, record.id, vectors, {}, budget.signal));
+        const settled = await withinBudget(() => Promise.allSettled([upload(), tagWork]));
         const failed = settled.find((part): part is PromiseRejectedResult =>
           part.status === 'rejected');
         if (failed) throw failed.reason;
         const plan = (settled[1] as PromiseFulfilledResult<
           Awaited<ReturnType<typeof prepareDocumentTags>> | null
         >).value;
+        checkBudget();
         await completeIndex(env, job, token, record.name, guardCondition, guardArgs, plan);
         await logRun(env, token, job, 'done', total, Date.now() - start, null);
         results.push({ id: job.id, chunks: total });
@@ -183,7 +218,8 @@ export async function processIndexJobs(
       }
       // Retry after a successful upload: reuse persisted vectors, skip Embedding.
       const plan = record.status === 'archived'
-        ? null : await prepareDocumentTags(env, record.id, vectors);
+        ? null : await withinBudget(() => prepareDocumentTags(env, record.id, vectors, {}, budget.signal));
+      checkBudget();
       await completeIndex(env, job, token, record.name, guardCondition, guardArgs, plan);
       await logRun(env, token, job, 'done', total, Date.now() - start, null);
       results.push({ id: job.id, chunks: total });

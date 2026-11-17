@@ -78,7 +78,7 @@ export const TOOL_GUIDANCE={
  manage_tag_suggestions:{title:'Manage automatic labels',description:'Accept existing automatic labels as manual or clear a previously ignored label. Changes complete synchronously.',destructive:false},
  tag_record:{
   title:'Add or remove a record tag',
-  description:'Assign/remove one canonical tag by tagId or a normalized name/alias. Requires the record expectedMetadataRevision; at most 32 associations. Definitions preserve display case. Use list_tags/get_tag to discover tags.',
+  description:'Assign/remove one canonical tag by tagId or a normalized name/alias. Requires the record expectedMetadataRevision; at most 32 associations. Definitions preserve display case. add promotes an auto label to manual; remove suppresses future automatic recommendations for this record. Smart-label changes synchronously evaluate related documents. Use list_tags/get_tag to discover tags.',
   destructive:true
  },
  query_tasks:{
@@ -141,9 +141,9 @@ export const TOOL_GUIDANCE={
   description:'List stable tag IDs, display names, colors, descriptions, aliases, metadata revisions and separate active/archived counts. Search canonical names/aliases, select usage/sort, and follow page.nextCursor. Catalog changes require restarting pagination.',
   destructive:false
  },
- get_tag:{title:'Read a tag definition',description:'Read a stable tag ID, metadata revision, aliases and usage counts. Merged IDs resolve to the surviving tag.',destructive:false},
+ get_tag:{title:'Read a tag definition',description:'Read a stable tag ID, smart/fixed kind, description, color, metadata revision, aliases and usage counts. Merged IDs resolve to the surviving tag.',destructive:false},
  query_tag_records:{title:'Browse records by tags',description:'Browse documents/task lists matching all or any selected tag IDs, with active/archived, kind and text filters. Follow page.nextCursor. Counts cover the full matching result.',destructive:false},
- manage_tag:{title:'Manage tag definitions and aliases',description:'Create or update tag metadata with version protection. Renaming preserves the old canonical name as an alias. merge/delete default to dryRun and preview active/archived impact; execution requires catalogVersion and source/target metadata revisions from that preview. Merge keeps surviving IDs, deduplicates associations and redirects old IDs. Tag changes belong to metadata.',destructive:true},
+ manage_tag:{title:'Manage tag definitions and aliases',description:'Create or update name, description, color, aliases and smart/fixed kind with version protection. Smart definition changes synchronously reclassify related documents. Renaming preserves the old canonical name as an alias. merge/delete default to dryRun and preview active/archived impact; execution requires catalogVersion and source/target metadata revisions from that preview. Merge keeps surviving IDs, deduplicates associations and redirects old IDs. Tag changes belong to metadata.',destructive:true},
  related_records:{
   title:'Find confirmed and suggested record relations',
   description:'Read incoming/outgoing confirmed links and optionally Vectorize semantic candidates with snippets. Candidates are not saved links; inspect semanticStatus. Wiki references may be derived from Markdown.',

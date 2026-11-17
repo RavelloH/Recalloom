@@ -1,6 +1,6 @@
 import type { Env } from '../types.js';
 import { StorageError } from '../types.js';
-import { tagBatch, tagGuard } from './catalog.js';
+import { catalogGuard, catalogVersion, tagBatch, tagGuard } from './catalog.js';
 import { prepareManualTagSpread } from './engine.js';
 
 /** Evidence and ignore controls only: automatic labels do not have their own job queue. */
@@ -61,20 +61,21 @@ export async function restoreIgnoredTag(
 export async function acceptAutoTags(
   env: Env, id: string, expectedMetadataRevision: number, actor = 'agent'
 ) {
+  const version = await catalogVersion(env);
   const rows = (await env.DB.prepare(
     `SELECT t.id,t.name,t.description,t.kind FROM record_tags rt JOIN tags t
      ON t.id=rt.tag_id WHERE rt.record_id=? AND rt.source='auto'`
   ).bind(id).all<{
     id: string; name: string; description: string; kind: 'fixed' | 'smart';
   }>()).results;
-  const plans = await Promise.all(rows.map(tag =>
-    prepareManualTagSpread(env, id, tag, true)));
+  const plan = await prepareManualTagSpread(env, id, rows, true);
   const ts = new Date().toISOString();
   await tagBatch(env, [
+    catalogGuard(env, version),
     tagGuard(env,
       'EXISTS(SELECT 1 FROM records WHERE id=? AND metadata_revision=?)',
       [id, expectedMetadataRevision]),
-    ...plans.flatMap(plan => plan.guards),
+    ...plan.guards,
     env.DB.prepare(
       `UPDATE record_tags SET source='manual',reason='',evidence='',
        source_revision=NULL,generated_at=NULL,confidence=NULL
@@ -83,7 +84,7 @@ export async function acceptAutoTags(
     env.DB.prepare(
       'UPDATE records SET metadata_revision=metadata_revision+1,updated_at=? WHERE id=?'
     ).bind(ts, id),
-    ...plans.flatMap(plan => plan.statements),
+    ...plan.statements,
     env.DB.prepare(
       `INSERT INTO change_events(record_id,event_type,actor,created_at,entity_type,entity_id)
        VALUES(?,'tag_accept_all',?,?,'record',?)`

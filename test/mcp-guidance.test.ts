@@ -69,6 +69,17 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
     assert.equal(tools.length,38);
+    for(const name of ['list_tags','get_tag','manage_tag','query_tag_records','tag_record','get_tag_suggestions','manage_tag_suggestions']){
+      assert.ok(tools.some(tool=>tool.name===name),'Tag management tool is discoverable: '+name);
+    }
+    const tagSchema=tools.find(tool=>tool.name==='manage_tag')!.inputSchema as any;
+    const variants=tagSchema.anyOf??tagSchema.oneOf;
+    assert.deepEqual(new Set(variants.map((variant:any)=>variant.properties.action.const)),new Set(['create','update','merge','delete']));
+    assert.deepEqual(variants.find((variant:any)=>variant.properties.action.const==='create').properties.kind.enum,['smart','fixed']);
+    const suggestionSchema=tools.find(tool=>tool.name==='manage_tag_suggestions')!.inputSchema as any;
+    const actions=suggestionSchema.anyOf??suggestionSchema.oneOf;
+    assert.deepEqual(new Set(actions.map((variant:any)=>variant.properties.action.const)),new Set(['accept_all','restore']));
+
     assert.equal(tools.length,Object.keys(TOOL_GUIDANCE).length);
     assert.deepEqual(new Set(tools.map(t=>t.name)),new Set(Object.keys(TOOL_GUIDANCE)));
     for(const tool of tools){

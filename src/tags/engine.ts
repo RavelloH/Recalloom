@@ -21,7 +21,7 @@ type TagRow = {
 };
 type Association = {
   recordId: string; tagId: string; source: 'manual' | 'auto';
-  sourceRevision: number | null; confidence: number | null;
+  sourceRevision: number | null; confidence: number | null; reason:string; evidence:string;
 };
 type Neighbour = { id: string; score: number };
 type Decision = { tagId: string; recordId: string; probability: number };
@@ -52,7 +52,7 @@ async function associations(env: Env, ids: string[]): Promise<Association[]> {
   if (!ids.length) return [];
   return (await env.DB.prepare(
     `SELECT rt.record_id AS recordId,rt.tag_id AS tagId,rt.source,
-       rt.source_revision AS sourceRevision,rt.confidence
+       rt.source_revision AS sourceRevision,rt.confidence,rt.reason,rt.evidence
        FROM record_tags rt WHERE rt.record_id IN (SELECT value FROM json_each(?))`
   ).bind(json(ids)).all<Association>()).results;
 }
@@ -78,11 +78,13 @@ async function suppressed(env: Env, ids: string[]) {
 /** Use freshly computed vectors, never requiring the source's upsert to be visible.
  * Verify neighbour chunk IDs and revisions against D1 before accepting matches. */
 export async function semanticNeighbours(
-  env: Env, sourceId: string, vectors: number[][], previous = true
+  env: Env, sourceId: string, vectors: number[][], previous = true, signal?:AbortSignal
 ): Promise<{ current: Neighbour[]; affected: string[] }> {
+  signal?.throwIfAborted();
   const matches = await Promise.all(vectors.slice(0, 3).map(vector =>
     env.VECTORIZE.query(vector, { topK: 50, returnMetadata: 'all' })
   ));
+  signal?.throwIfAborted();
   const candidates = matches.flatMap(result => (result.matches ?? []).filter(hit =>
     hit.score >= 0.5 && hit.metadata &&
     typeof hit.metadata.record_id === 'string' &&
@@ -138,11 +140,13 @@ async function storedVectors(env: Env, recordId: string) {
 /** Each noul answer is an independent P(yes), not a choice distribution. */
 async function decide(
   env: Env, state: unknown,
-  entries: Array<{ key: string; recordId: string; tagId: string; prompt: string }>
+  entries: Array<{ key: string; recordId: string; tagId: string; prompt: string }>,
+  signal?:AbortSignal
 ): Promise<Decision[]> {
   if (!entries.length) return [];
   const decisions: Decision[] = [];
   for (let offset = 0; offset < entries.length; offset += MAX_QUESTIONS) {
+    signal?.throwIfAborted();
     const batch = entries.slice(offset, offset + MAX_QUESTIONS);
     const questions = Object.fromEntries(batch.map(item => [
       item.key, { type: 'noul', instructions: item.prompt }
@@ -152,6 +156,7 @@ async function decide(
       state,
       questions
     } as never) as unknown as { answers?: Record<string, { noul?: number }> };
+    signal?.throwIfAborted();
     if (!result?.answers) throw new StorageError('TAG_MODEL_INVALID_RESULT');
     for (const item of batch) {
       const probability = result.answers[item.key]?.noul;
@@ -178,49 +183,91 @@ function question(tag: TagRow, documentId?: string) {
 }
 
 function autoChanges(
-  env: Env, doc: DocumentRow, before: Association[],
-  desired: Map<string, number>, mode: 'all' | 'selected',
+  env: Env,
+  doc: DocumentRow,
+  before: Association[],
+  desired: Map<string, number>,
+  mode: 'all' | 'selected',
   targetIds: string[] = []
 ) {
-  const current = new Map(before.filter(x => x.source === 'auto').map(x => [x.tagId, x]));
-  const keys = mode === 'all'
-    ? new Set([...current.keys(), ...desired.keys()])
-    : new Set([...targetIds, ...desired.keys()]);
+  const current = new Map(before.filter((x) => x.source === 'auto').map((x) => [x.tagId, x]));
+  const manual = new Set(before.filter((x) => x.source === 'manual').map((x) => x.tagId));
+  const capacity = Math.max(0, Math.min(MAX_AUTOMATIC, 32 - manual.size));
+  const selected = new Set(mode === 'all' ? current.keys() : targetIds);
+  // Reserve existing labels outside this operation, trimming malformed legacy overflow.
+  const retained = [...current.values()]
+    .filter((row) => !selected.has(row.tagId))
+    .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0) || a.tagId.localeCompare(b.tagId))
+    .slice(0, capacity);
+  const retainedIds = new Set(retained.map((row) => row.tagId));
+  const accepted = new Map(
+    [...desired]
+      .filter(([id]) => !manual.has(id))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, capacity - retained.length)
+  );
+  const keys = new Set([...current.keys(), ...accepted.keys()]);
   const statements: D1PreparedStatement[] = [];
   let changed = false;
   for (const tagId of keys) {
+    if (retainedIds.has(tagId)) continue;
     const existing = current.get(tagId);
-    const probability = desired.get(tagId);
+    const probability = accepted.get(tagId);
     if (probability === undefined && existing) {
-      statements.push(env.DB.prepare(
-        "DELETE FROM record_tags WHERE record_id=? AND tag_id=? AND source='auto'"
-      ).bind(doc.id, tagId));
+      statements.push(
+        env.DB.prepare(
+          "DELETE FROM record_tags WHERE record_id=? AND tag_id=? AND source='auto'"
+        ).bind(doc.id, tagId)
+      );
       changed = true;
-    } else if (probability !== undefined && !existing) {
-      statements.push(env.DB.prepare(
-        `INSERT INTO record_tags(record_id,tag_id,source,reason,evidence,
+      continue;
+    }
+    if (probability === undefined) continue;
+    const reason = 'Clef 相关性 ' + Math.round(probability * 100) + '%';
+    const evidence = json({ algorithm: 'clef-flash-noul-v1', model: CLEF_MODEL, probability });
+    if (!existing) {
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO record_tags(record_id,tag_id,source,reason,evidence,
           source_revision,generated_at,confidence)
-         VALUES(?,?,'auto',?,?,?,?,?)`
-      ).bind(doc.id, tagId, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: 'clef-flash-noul-v1', model: CLEF_MODEL, probability }),
-        doc.revision, now(), probability));
+         SELECT ?,?,'auto',?,?,?,?,?
+         WHERE (SELECT COUNT(*) FROM record_tags WHERE record_id=?)<32
+           AND (SELECT COUNT(*) FROM record_tags WHERE record_id=? AND source='auto')<5`
+        ).bind(doc.id, tagId, reason, evidence, doc.revision, now(), probability, doc.id, doc.id)
+      );
       changed = true;
-    } else if (probability !== undefined && existing && existing.sourceRevision !== doc.revision) {
-      statements.push(env.DB.prepare(
-        `UPDATE record_tags SET source_revision=?,confidence=?,reason=?,evidence=?,generated_at=?
+    } else if (
+      existing.sourceRevision !== doc.revision ||
+      existing.confidence !== probability ||
+      existing.reason !== reason ||
+      existing.evidence !== evidence
+    ) {
+      statements.push(
+        env.DB.prepare(
+          `UPDATE record_tags SET source_revision=?,confidence=?,reason=?,evidence=?,generated_at=?
          WHERE record_id=? AND tag_id=? AND source='auto'`
-      ).bind(doc.revision, probability, 'Clef 相关性 ' + Math.round(probability * 100) + '%',
-        json({ algorithm: 'clef-flash-noul-v1', model: CLEF_MODEL, probability }), now(), doc.id, tagId));
+        ).bind(doc.revision, probability, reason, evidence, now(), doc.id, tagId)
+      );
+      changed = true;
     }
   }
   if (changed) {
-    statements.push(env.DB.prepare(
-      'UPDATE records SET metadata_revision=metadata_revision+1,updated_at=? WHERE id=?'
-    ).bind(now(), doc.id));
-    statements.push(env.DB.prepare(
-      `INSERT INTO change_events(record_id,event_type,actor,created_at,entity_type,entity_id,details_json)
+    statements.push(
+      env.DB.prepare(
+        'UPDATE records SET metadata_revision=metadata_revision+1,updated_at=? WHERE id=?'
+      ).bind(now(), doc.id)
+    );
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO change_events(record_id,event_type,actor,created_at,entity_type,entity_id,details_json)
        VALUES(?,'tag_auto_update','system:clef',?,'record',?,?)`
-    ).bind(doc.id, now(), doc.id, json({ tags: [...desired.keys()], revision: doc.revision })));
+      ).bind(
+        doc.id,
+        now(),
+        doc.id,
+        json({ tags: [...retainedIds, ...accepted.keys()], revision: doc.revision })
+      )
+    );
   }
   return statements;
 }
@@ -230,20 +277,21 @@ async function spread(
   neighbourInfo: { current: Neighbour[]; affected: string[] },
   sourceTags: Set<string>, changed: Set<string>,
   neighbourDocs: DocumentRow[], neighbourAssoc: Association[],
-  knownTags: Map<string, TagRow>, ignores: Set<string>
+  knownTags: Map<string, TagRow>, ignores: Set<string>, signal?:AbortSignal
 ) {
   const current = new Set(neighbourInfo.current.map(x => x.id));
   const questions: Array<{key:string;recordId:string;tagId:string;prompt:string}> = [];
   const docs = neighbourDocs.filter(d => d.status !== 'archived');
   const validTags = [...changed].map(id => knownTags.get(id)).filter((t): t is TagRow => Boolean(t));
+  const changedIds = new Set(validTags.map(tag => tag.id));
   for (const doc of docs) for (const tag of validTags) {
     const association = neighbourAssoc.find(a => a.recordId === doc.id && a.tagId === tag.id);
     if (association?.source === 'manual' || ignores.has(doc.id + ':' + tag.id)) continue;
     const allForDocument = neighbourAssoc.filter(a => a.recordId === doc.id);
-    const alreadyQueued = questions.filter(item => item.recordId === doc.id &&
-      !allForDocument.some(a => a.tagId === item.tagId)).length;
-    if (!association && (allForDocument.length + alreadyQueued >= 32 ||
-        allForDocument.filter(a => a.source === 'auto').length + alreadyQueued >= MAX_AUTOMATIC))
+    const manualCount = allForDocument.filter(a => a.source === 'manual').length;
+    const retainedCount = allForDocument.filter(a =>
+      a.source === 'auto' && !changedIds.has(a.tagId)).length;
+    if (!association && (manualCount + retainedCount >= 32 || retainedCount >= MAX_AUTOMATIC))
       continue;
     if (!current.has(doc.id) && !association) continue;
     if (!sourceTags.has(tag.id) && !association) continue;
@@ -259,7 +307,7 @@ async function spread(
     task: '逐篇独立判断。文章之间互不构成分类证据；不得串用其他文章的内容。',
     documents: scoped.map(doc => materialFor(doc, Math.max(700, Math.floor(12000 / Math.max(1, scoped.length))))),
     tags: validTags.map(tag => ({ id: tag.id, name: tag.name, description: cut(tag.description, 260) }))
-  }, questions);
+  }, questions,signal);
   const scores = new Map(result.map(d => [d.recordId + ':' + d.tagId, d.probability]));
   const guards: D1PreparedStatement[] = [];
   const statements: D1PreparedStatement[] = [];
@@ -284,14 +332,15 @@ async function spread(
 
 export async function prepareDocumentTags(
   env: Env, recordId: string, vectors: number[][],
-  overrides: Partial<Pick<DocumentRow, 'name' | 'description'>> = {}
+  overrides: Partial<Pick<DocumentRow, 'name' | 'description'>> = {},
+  signal?:AbortSignal
 ): Promise<TagPlan> {
   const catalog = await env.DB.prepare('SELECT version FROM tag_catalog_state WHERE id=1').first<{version:number}>();
   const source = (await documents(env, [recordId]))[0];
   if (!source || source.status === 'archived')
     return { guards: [], statements: [], current: [], affected: [], decisions: 0 };
   Object.assign(source, overrides);
-  const neighbours = await semanticNeighbours(env, recordId, vectors);
+  const neighbours = await semanticNeighbours(env, recordId, vectors,true,signal);
   const allDocs = await documents(env, neighbours.affected);
   const activeDocs = allDocs.filter(doc => doc.status !== 'archived');
   const docIds = [recordId, ...activeDocs.map(doc => doc.id)];
@@ -318,7 +367,7 @@ export async function prepareDocumentTags(
     document: materialFor(source)
   }, candidates.map((tag, i) => ({
     key: 't' + i, recordId, tagId: tag.id, prompt: question(tag)
-  })));
+  })),signal);
   const desired = new Map(classified
     .filter(x => x.probability >= TAG_THRESHOLD)
     .sort((a, b) => b.probability - a.probability)
@@ -333,7 +382,7 @@ export async function prepareDocumentTags(
   ]);
   const sourceWrites = autoChanges(env, source, sourceAssoc, desired, 'all');
   const spreadResult = await spread(env, source, neighbours, after, changed,
-    activeDocs, relatedAssoc, byId, ignores);
+    activeDocs, relatedAssoc, byId, ignores,signal);
   const guards = [
     tagGuard(env,'EXISTS(SELECT 1 FROM tag_catalog_state WHERE id=1 AND version=?)',[catalog?.version??0]),
     ...activeDocs.map(doc => tagGuard(env,
@@ -360,9 +409,10 @@ export async function prepareDocumentTags(
 
 /** Synchronous mutation path: evaluate only the changed smart label on nearby records. */
 export async function prepareManualTagSpread(
-  env: Env, recordId: string, tag: TagRow, presentAfter: boolean
+  env: Env, recordId: string, tag: TagRow | TagRow[], presentAfter: boolean
 ): Promise<Pick<TagPlan, 'guards' | 'statements' | 'decisions'>> {
-  if (tag.kind === 'fixed') return { guards: [], statements: [], decisions: 0 };
+  const changedTags = (Array.isArray(tag) ? tag : [tag]).filter(item => item.kind === 'smart');
+  if (!changedTags.length) return { guards: [], statements: [], decisions: 0 };
   const source = (await documents(env, [recordId]))[0];
   if (!source || source.status === 'archived')
     return { guards: [], statements: [], decisions: 0 };
@@ -374,8 +424,9 @@ export async function prepareManualTagSpread(
   const assoc = await associations(env, docs.map(d => d.id));
   const ignores = await suppressed(env, docs.map(d => d.id));
   const result = await spread(env, source, neighbours,
-    presentAfter ? new Set([tag.id]) : new Set(), new Set([tag.id]),
-    docs, assoc, new Map([[tag.id, tag]]), ignores);
+    presentAfter ? new Set(changedTags.map(item => item.id)) : new Set(),
+    new Set(changedTags.map(item => item.id)),
+    docs, assoc, new Map(changedTags.map(item => [item.id,item])), ignores);
   return result;
 }
 
