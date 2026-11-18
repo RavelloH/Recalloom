@@ -18,6 +18,9 @@ import {resolveWikiReference,listWikiReferences,backfillWikiReferences} from './
 import {recentActivity,activityDetail} from './web-activity.js';
 import {activitySummary,activityFolders} from './activity-analytics.js';
 import {recentUpdates} from './web-recent-updates.js';
+import {collectionDescription,collectionDraftSchema,collectionInputSchema} from './collection-model.js';
+import {parseCollectionDescription} from './collection-parser.js';
+import {collectionResults,deleteCollection,getCollection,listCollections,resolveCollectionDraft,saveCollection} from './collections.js';
 import {parsePublicImageUrl,proxyRemoteImage,privateImageResponse} from './link-image-proxy.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
@@ -59,9 +62,9 @@ webApi.onError((e)=>{
   if(e instanceof ZodError)return err('INVALID_ARGUMENT',400,e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ').slice(0,600));
   if(e instanceof StorageError){
     const code=e.code;
-    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND'||code==='TAG_NOT_FOUND' ?404
+    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND'||code==='TAG_NOT_FOUND'||code==='COLLECTION_NOT_FOUND' ?404
       :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'||code==='TAG_NAME_CONFLICT'||code==='SNAPSHOT_TAG_CONFLICT'?409
-      :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:400;
+      :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:code==='COLLECTION_PARSE_UNAVAILABLE'?503:400;
     return err(code,status,e.message,e.details);
   }
   if(e instanceof Error&&/UNIQUE constraint failed/.test(e.message))return err('PATH_CONFLICT',409);
@@ -308,6 +311,42 @@ webApi.get('/search',async(c)=>{
   const q=parseQuery(c.req.url,z.object({query:z.string().trim().min(1).max(4000),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).optional(),folderId:uuid.optional(),status:status.optional(),tag:z.string().max(64).optional(),limit:z.coerce.number().int().min(1).max(30).optional(),minScore:z.coerce.number().min(0).max(1).optional()}));
   const {results,...rest}=await search(c.env,{...q,includeFolderName:true});
   return asJson({...rest,items:results,page:{hasMore:false,nextCursor:null}});
+});
+const collectionCursor=z.string().max(4096).optional();
+const collectionRevision=z.number().int().positive();
+webApi.get('/collections',async c=>{
+  const q=parseQuery(c.req.url,z.object({cursor:collectionCursor}));
+  return asJson(await listCollections(c.env,q.cursor));
+});
+webApi.post('/collections/parse',async c=>{
+  const {description}=await jsonBody(c.req.raw,z.object({description:collectionDescription.min(1)}).strict(),8192);
+  return asJson(await parseCollectionDescription(c.env,description));
+});
+webApi.post('/collections/preview',async c=>{
+  const {draft,collectionId}=await jsonBody(c.req.raw,z.object({draft:collectionDraftSchema,collectionId:uuid.optional()}).strict(),8192);
+  const previous=collectionId?await getCollection(c.env,collectionId):undefined;
+  const resolved=await resolveCollectionDraft(c.env,draft,previous?.rule);
+  return asJson({...resolved,results:resolved.rule?await collectionResults(c.env,resolved.rule,undefined,12):null});
+});
+webApi.post('/collections',async c=>asJson({item:await saveCollection(c.env,await jsonBody(c.req.raw,collectionInputSchema,8192))},201));
+webApi.get('/collections/:id',async c=>asJson({item:await getCollection(c.env,idSchema.parse(c.req.param()).id)}));
+webApi.get('/collections/:id/results',async c=>{
+  const {id}=idSchema.parse(c.req.param());
+  const q=parseQuery(c.req.url,z.object({cursor:collectionCursor,revision:z.coerce.number().int().positive().optional()}));
+  const item=await getCollection(c.env,id);
+  if(q.revision!==undefined&&q.revision!==item.revision)throw new StorageError('METADATA_CONFLICT');
+  return asJson(await collectionResults(c.env,item.rule,q.cursor));
+});
+webApi.patch('/collections/:id',async c=>{
+  const {id}=idSchema.parse(c.req.param());
+  const {expectedRevision,...input}=await jsonBody(c.req.raw,collectionInputSchema.extend({expectedRevision:collectionRevision}),8192);
+  return asJson({item:await saveCollection(c.env,input,{id,revision:expectedRevision})});
+});
+webApi.delete('/collections/:id',async c=>{
+  const {id}=idSchema.parse(c.req.param());
+  const {expectedRevision}=await jsonBody(c.req.raw,z.object({expectedRevision:collectionRevision}).strict(),200);
+  await deleteCollection(c.env,id,expectedRevision);
+  return asJson({deleted:true});
 });
 webApi.get('/activity',async(c)=>{
   const {cursor,limit:size,...filter}=parseQuery(c.req.url,activityFilter.extend({cursor:z.coerce.number().int().nonnegative().optional(),limit}));

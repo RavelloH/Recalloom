@@ -5,6 +5,8 @@ import { StorageError } from './types.js';
 import { DEFAULT_MIN_SEMANTIC_SCORE, reciprocalRankFusion, prepareSemanticIntent,prepareTitleMatch } from './search-ranking.js';
 import {firstMarkdownHeading} from './outline.js';
 import {searchExcerpt,type SearchDocument} from './search-excerpt.js';
+import {documentCollectionScope} from './collection-filters.js';
+import type {DocumentCollectionRule} from './collection-model.js';
 
 export {EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,splitText,processIndexJobs} from './indexing.js';
 import {embed} from './indexing.js';
@@ -12,7 +14,7 @@ type SearchRow={id:string;name:string;kind:string;status:string;revision:number;
 
 export async function search(env:Env,input:{
   query:string;mode?:'metadata'|'literal'|'semantic'|'hybrid'|'auto';
-  folderId?:string;status?:string;tag?:string;limit?:number;minScore?:number;includeFolderName?:boolean
+  folderId?:string;status?:string;tag?:string;limit?:number;minScore?:number;includeFolderName?:boolean;collectionRule?:DocumentCollectionRule
 }) {
   const query=input.query.trim(),mode=input.mode??'auto',limit=Math.min(30,Math.max(1,input.limit??10));
   const intentScore=prepareSemanticIntent(query);
@@ -40,6 +42,11 @@ export async function search(env:Env,input:{
   const semanticById=new Map<string,SearchRow>();
   const filterSql=["r.status != 'archived'"];
   const bind:(string|number)[]=[];
+  if(input.collectionRule){
+    const scope=documentCollectionScope(input.collectionRule,new Date());
+    filterSql.push(...scope.clauses);
+    bind.push(...scope.values);
+  }
   if(input.folderId){filterSql.push('r.folder_id=?');bind.push(input.folderId);}
   if(input.status){filterSql.push('r.status=?');bind.push(input.status);}
   if(input.tag){

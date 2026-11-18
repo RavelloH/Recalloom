@@ -1,0 +1,28 @@
+.collection-list { border-top: 1px solid var(--rk-border-soft); }
+.collection-index-row, .collection-result-link { display: flex; align-items: center; min-width: 0; gap: 12px; color: inherit; text-decoration: none; }
+.collection-index-row { padding: 14px 8px; border-bottom: 1px solid var(--rk-border-soft); }
+.collection-index-row:hover, .collection-result-link:hover { background: var(--rk-hover); }
+.collection-index-row > svg, .collection-result-link > svg { flex: none; color: var(--rk-ink-soft); }
+.collection-index-row > span, .collection-result-link > span { min-width: 0; flex: 1; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.collection-index-row small, .collection-result-link small { font-size: var(--rk-font-small); }
+.collection-section-title, .collection-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.collection-section-title { margin-top: 22px; }
+.collection-section-title h2, .collection-preview h2 { margin: 0; font-size: var(--rk-font-body); }
+.collection-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.collection-chips > * { max-width: 100%; }
+.collection-form { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.collection-actions { justify-content: flex-end; }
+.collection-rules { border: 1px solid var(--rk-border-soft); border-radius: 12px; padding: 16px; margin-top: 24px; }
+.collection-rules legend { padding-inline: 5px; font-weight: 600; }
+.collection-rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.collection-result { border-bottom: 1px solid var(--rk-border-soft); }
+.collection-result-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.collection-result-link { flex: 1 1 220px; padding: 12px 8px; }
+.collection-result-snippet { padding: 0 12px 12px; min-width: 0; overflow-wrap: anywhere; }
+.collection-preview { display: grid; gap: 12px; margin-top: 22px; }
+.collection-notice { margin-block: 12px; padding: 12px; border: 1px solid var(--rk-border-soft); border-radius: 10px; overflow-wrap: anywhere; }
+.collection-notice ul { margin: 4px 0; padding-inline-start: 20px; }
+@media (max-width: 520px) {
+  .collection-rule-grid { grid-template-columns: minmax(0, 1fr); }
+  .collection-rules { padding: 12px; }
+}

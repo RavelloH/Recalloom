@@ -27,7 +27,7 @@ import {PageTransition} from './page-transition';
 import {useFullWidth} from './preferences';
 import {WorkspacePanels} from './workspace-panels';
 
-const quickLinks=menu.filter(item=>['/','/tasks','/tags','/activity','/archive','/graph'].includes(item.to));
+const quickLinks=menu.filter(item=>['/','/tasks','/tags','/collections','/activity','/archive','/graph'].includes(item.to));
 const appleShortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform);
 
 export function Shell({children}:{children:React.ReactNode}){

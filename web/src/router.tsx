@@ -22,6 +22,8 @@ const importSearch=()=>import('./pages/search');
 const importActivity=()=>import('./pages/activity');
 const importTags=()=>import('./pages/tags');
 const TagsPage=lazyRouteComponent(importTags,'TagsPage');
+const importCollections=()=>import('./pages/collections');
+const CollectionsPage=lazyRouteComponent(importCollections,'CollectionsPage');
 const importSettings=()=>import('./pages/settings');
 const LoginPage=lazyRouteComponent(importLogin,'LoginPage');
 const HomePage=lazyRouteComponent(importHome,'HomePage');
@@ -94,6 +96,8 @@ const list=[
  createRoute({getParentRoute:()=>root,path:'/tags',component:TagsPage,loader:()=>ready(importTags())}),
  createRoute({getParentRoute:()=>root,path:'/tags/manage',component:TagsPage,loader:()=>ready(importTags())}),
  createRoute({getParentRoute:()=>root,path:'/tags/$tagId',component:TagsPage,loader:()=>ready(importTags())}),
+ createRoute({getParentRoute:()=>root,path:'/collections',component:CollectionsPage,loader:()=>ready(importCollections())}),
+ createRoute({getParentRoute:()=>root,path:'/collections/$collectionId',component:CollectionsPage,loader:()=>ready(importCollections())}),
  createRoute({getParentRoute:()=>root,path:'/tasks',component:TasksPage,loader:()=>ready(importTasks(),prepareTasks())}),
  createRoute({getParentRoute:()=>root,path:'/archive',component:ArchivePage,loader:()=>ready(importArchive(),queryClient.ensureInfiniteQueryData(archivedRecordsQuery()))}),
  createRoute({getParentRoute:()=>root,path:'/graph',component:KnowledgeGraphPage,
