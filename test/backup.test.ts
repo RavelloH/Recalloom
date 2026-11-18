@@ -4,6 +4,9 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {exportSnapshot,importSnapshot,pageHash,type SnapshotPage} from '../src/backup.js';
 import {initialVersion,sha256} from '../src/version.js';
+import {saveCollection} from '../src/collections.js';
+import {collectionRuleSchema} from '../src/collection-model.js';
+import {createTag} from '../src/tags/mutations.js';
 import type {Env} from '../src/types.js';
 
 function fixture(){
@@ -56,7 +59,7 @@ async function backup(env:Env){
 const rows=(db:DatabaseSync,sql:string)=>db.prepare(sql).all().map(row=>({...row}));
 const fails=(code:string)=>(error:unknown)=>Boolean(error&&typeof error==='object'&&'code'in error&&error.code===code);
 
-test('snapshot v4 roundtrips interleaved task order, Wiki identities and tombstones atomically',async()=>{
+test('snapshot v5 roundtrips interleaved task order, Wiki identities and tombstones atomically',async()=>{
  const source=fixture(),restored=fixture();
  try{
   const a=await source.list('A',['A1','A2']),b=await source.list('B',['B1']),archived=await source.list('Archived',['Z'],'archived');
@@ -67,7 +70,7 @@ test('snapshot v4 roundtrips interleaved task order, Wiki identities and tombsto
   source.db.prepare('INSERT INTO record_path_bindings(source_id,target_expression,target_id) VALUES(?,?,?)').run(doc,'/dead.md',dead);
   const bundle=await backup(source.env);
   assert.ok(bundle.pages.length>1);
-  assert.ok(bundle.pages.every(page=>page.format==='recalloom-snapshot-v4'));
+  assert.ok(bundle.pages.every(page=>page.format==='recalloom-snapshot-v5'));
   const preview=await importSnapshot(restored.env,bundle,true);
   assert.equal(preview.taskOrder,4);assert.equal(preview.pathBindings,2);
   assert.equal(rows(restored.db,'SELECT id FROM records').length,0,'dryRun must leave all tables empty');
@@ -86,12 +89,12 @@ test('snapshot v4 roundtrips interleaved task order, Wiki identities and tombsto
  }finally{source.db.close();restored.db.close();}
 });
 
-test('snapshot v4 validates order coverage and bindings before any import mutation',async()=>{
+test('snapshot v5 validates order coverage and bindings before any import mutation',async()=>{
  const source=fixture(),target=fixture();
  try{
   await source.list('List',['Task']);
   const original=await backup(source.env),page=original.pages[0]!;
-  assert.equal(page.format,'recalloom-snapshot-v4');if(page.format!=='recalloom-snapshot-v4')return;
+  assert.equal(page.format,'recalloom-snapshot-v5');if(page.format!=='recalloom-snapshot-v5')return;
   const missing={...page,taskOrder:[]};missing.pageHash=await pageHash(missing);
   await assert.rejects(importSnapshot(target.env,{pages:[missing]},false),fails('INVALID_SNAPSHOT_TASK_ORDER'));
   const invalid={...page,pathBindings:[{source_id:page.records[0]!.record.id,target_expression:'/x#anchor',target_id:crypto.randomUUID()}]};
@@ -113,7 +116,7 @@ test('snapshot export invalidates continuation after a rank-only order change',a
  }finally{f.db.close();}
 });
 
-test('snapshot v4 merges tasks after existing tasks while preserving both relative orders',async()=>{
+test('snapshot v5 merges tasks after existing tasks while preserving both relative orders',async()=>{
  const source=fixture(),target=fixture();
  try{
   const imported=await source.list('Imported',['first','second','third']),existing=await target.list('Existing',['existing first','existing second']);
@@ -153,6 +156,135 @@ test('snapshot import rejects target path or rank changes after projection plann
    assert.equal(rows(target.db,'SELECT id FROM records').length,1);
   }finally{source.db.close();target.db.close();}
  }
+});
+
+test('snapshot v5 preserves smart collection definitions, revisions and cross-record scopes',async()=>{
+ const source=fixture(),target=fixture();
+ try{
+  const folder=crypto.randomUUID(),date='2026-11-18T08:00:00.000Z';
+  source.db.prepare('INSERT INTO folders(id,parent_id,name,description,metadata_revision,created_at,updated_at) VALUES(?,NULL,?,?,1,?,?)').run(folder,'Research','',date,date);
+  const document=await source.record('overview.md','Engineering notes');
+  source.db.prepare('UPDATE records SET folder_id=? WHERE id=?').run(folder,document);
+  const taskList=await source.list('Tasks',['Deliver']);
+  const tag=(await createTag(source.env,{name:'Research',kind:'fixed'})).item;
+  const documentRule=collectionRuleSchema.parse({version:1,target:'document',folder:{id:folder,name:'/Research'},tags:[{id:tag.id,name:tag.name}],tagMatch:'all',archive:'active',topic:'engineering'});
+  const taskRule=collectionRuleSchema.parse({version:1,target:'task',taskList:{id:taskList.id,name:'/Tasks'},statuses:['todo']});
+  const created=await saveCollection(source.env,{name:'Knowledge',description:'Document scope',rule:documentRule});
+  await saveCollection(source.env,{name:'Knowledge v2',description:'Document scope',rule:documentRule},{id:created.id,revision:1});
+  await saveCollection(source.env,{name:'Todo',description:'Task scope',rule:taskRule});
+  const bundle=await backup(source.env);
+  assert.ok(bundle.pages.length>1);
+  assert.ok(bundle.pages.every(page=>page.format==='recalloom-snapshot-v5'));
+  assert.equal(bundle.pages[0]!.format==='recalloom-snapshot-v5'&&bundle.pages[0]!.collections.length,2);
+  assert.ok(bundle.pages.slice(1).every(page=>page.format==='recalloom-snapshot-v5'&&page.collections.length===0));
+  const preview=await importSnapshot(target.env,bundle,true);
+  assert.equal(preview.collections,2);
+  assert.equal(rows(target.db,'SELECT * FROM smart_collections').length,0,'dry run must not write collections');
+  const result=await importSnapshot(target.env,bundle,false);
+  assert.equal(result.collections,2);
+  assert.deepEqual(rows(target.db,'SELECT * FROM smart_collections ORDER BY id'),rows(source.db,'SELECT * FROM smart_collections ORDER BY id'));
+ }finally{source.db.close();target.db.close();}
+});
+
+test('snapshot v5 can restore a collection-only library and keeps unresolved references stable',async()=>{
+ const source=fixture(),target=fixture();
+ try{
+  const missing=crypto.randomUUID();
+  const rule=collectionRuleSchema.parse({version:1,target:'document',folder:{id:missing,name:'/Missing'},archive:'active'});
+  const saved=await saveCollection(source.env,{name:'Orphan',description:'Preserve unresolved folder',rule});
+  const bundle=await backup(source.env);
+  assert.equal(bundle.pages.length,1);
+  assert.equal(bundle.pages[0]!.totalRecords,0);
+  assert.equal(bundle.pages[0]!.format==='recalloom-snapshot-v5'&&bundle.pages[0]!.collections.length,1);
+  await importSnapshot(target.env,bundle,false);
+  const restored=target.db.prepare('SELECT * FROM smart_collections WHERE id=?').get(saved.id)! as Record<string,unknown>;
+  assert.equal(restored.revision,1);
+  assert.equal((JSON.parse(String(restored.rule_json)) as typeof rule).folder?.id,missing);
+ }finally{source.db.close();target.db.close();}
+});
+
+test('snapshot v5 remaps imported collection tag references when target reuses a tag name',async()=>{
+ const source=fixture(),target=fixture();
+ try{
+  const sourceTag=(await createTag(source.env,{name:'Shared tag',kind:'fixed'})).item;
+  const targetTag=(await createTag(target.env,{name:'Shared tag',kind:'fixed'})).item;
+  assert.notEqual(sourceTag.id,targetTag.id);
+  const rule=collectionRuleSchema.parse({version:1,target:'document',tags:[{id:sourceTag.id,name:'Previous label'}],archive:'active'});
+  const saved=await saveCollection(source.env,{name:'Mapped',description:'',rule});
+  await importSnapshot(target.env,await backup(source.env),false);
+  const restored=target.db.prepare('SELECT rule_json FROM smart_collections WHERE id=?').get(saved.id) as {rule_json:string};
+  const tags=(JSON.parse(restored.rule_json) as {tags?:Array<{id:string}>}).tags;
+  assert.equal(tags?.[0]?.id,targetTag.id);
+  assert.equal((tags?.[0] as {name?:string})?.name,'Shared tag','stale labels should resolve through the source tag ID');
+ }finally{source.db.close();target.db.close();}
+});
+
+test('snapshot v5 invalidates paginated exports after collections are created, updated or deleted',async()=>{
+ for(const change of ['create','update','delete'] as const){
+  const f=fixture();
+  try{
+   await f.record('first.md','first');await f.record('second.md','second');
+   const rule=collectionRuleSchema.parse({version:1,target:'document',archive:'active'});
+   const saved=change==='create'?null:await saveCollection(f.env,{name:'Saved',description:'',rule});
+   const first=await exportSnapshot(f.env,null,1);
+   assert.ok(first.nextCursor);
+   if(change==='create')await saveCollection(f.env,{name:'New',description:'',rule});
+   else if(change==='update')await saveCollection(f.env,{name:'Updated',description:'',rule},{id:saved!.id,revision:saved!.revision});
+   else await f.env.DB.prepare('DELETE FROM smart_collections WHERE id=?').bind(saved!.id).run();
+   await assert.rejects(exportSnapshot(f.env,first.nextCursor,1),fails('SNAPSHOT_CHANGED'));
+  }finally{f.db.close();}
+ }
+});
+
+test('snapshot v5 checks collection integrity, rule validity and UUID conflicts before applying changes',async()=>{
+ const source=fixture(),target=fixture();
+ try{
+  await source.record('import.md','content');
+  const rule=collectionRuleSchema.parse({version:1,target:'document',archive:'active'});
+  const collection=await saveCollection(source.env,{name:'Test',description:'',rule});
+  const original=(await backup(source.env)).pages[0]!;
+  assert.equal(original.format,'recalloom-snapshot-v5');
+  if(original.format!=='recalloom-snapshot-v5')return;
+  const changed={...original,collections:original.collections.map(row=>({...row,name:'Tampered'}))};
+  changed.pageHash=await pageHash(changed);
+  await assert.rejects(importSnapshot(target.env,{pages:[changed]},false),fails('INVALID_SNAPSHOT_COLLECTIONS'));
+  const invalid={...original,collections:original.collections.map(row=>({...row,rule_json:'{"version":1,"target":"document","unexpected":true}'}))};
+  invalid.collectionHash=await sha256(JSON.stringify(invalid.collections));
+  invalid.pageHash=await pageHash(invalid);
+  await assert.rejects(importSnapshot(target.env,{pages:[invalid]},false),fails('INVALID_SNAPSHOT_COLLECTIONS'));
+  const duplicate={...original,collections:[...original.collections,...original.collections]};
+  duplicate.collectionHash=await sha256(JSON.stringify(duplicate.collections));
+  duplicate.pageHash=await pageHash(duplicate);
+  await assert.rejects(importSnapshot(target.env,{pages:[duplicate]},false),fails('DUPLICATE_SNAPSHOT_ID'));
+  const row=original.collections[0]!;
+  target.db.prepare('INSERT INTO smart_collections(id,name,description,rule_json,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
+   .run(row.id,row.name,row.description,row.rule_json,row.revision,row.created_at,row.updated_at);
+  await assert.rejects(importSnapshot(target.env,{pages:[original]},false),fails('IMPORT_CONFLICT'));
+  assert.equal(rows(target.db,'SELECT * FROM records').length,0,'conflict must not import records');
+  assert.equal(rows(target.db,'SELECT * FROM smart_collections').length,1);
+  assert.equal(collection.id,row.id);
+ }finally{source.db.close();target.db.close();}
+});
+
+test('snapshot v4 bundles remain importable without smart collections',async()=>{
+ const source=fixture(),target=fixture();
+ try{
+  const recordId=await source.record('legacy.md','legacy text');
+  const rule=collectionRuleSchema.parse({version:1,target:'document',archive:'active'});
+  await saveCollection(source.env,{name:'Not in v4',description:'',rule});
+  const current=await backup(source.env),pages:SnapshotPage[]=[];
+  for(const page of current.pages){
+   assert.equal(page.format,'recalloom-snapshot-v5');
+   if(page.format!=='recalloom-snapshot-v5')return;
+   const {collections:_collections,collectionHash:_hash,pageHash:_pageHash,...fields}=page;
+   const legacy={...fields,format:'recalloom-snapshot-v4' as const};
+   pages.push({...legacy,pageHash:await pageHash(legacy)});
+  }
+  const result=await importSnapshot(target.env,{pages},false);
+  assert.equal(result.collections,0);
+  assert.equal(rows(target.db,'SELECT id FROM smart_collections').length,0);
+  assert.ok(target.db.prepare('SELECT id FROM records WHERE id=?').get(recordId));
+ }finally{source.db.close();target.db.close();}
 });
 
 test('legacy snapshot v2 remains importable and rebuilds references against all staged records',async()=>{

@@ -167,12 +167,12 @@ export const TOOL_GUIDANCE={
  },
  export_snapshot:{
   title:'Export a versioned snapshot',
-  description:'Read recalloom-snapshot-v4 pages (including tag definitions/aliases/redirects, task order and persistent Wiki path identities) with watermarks and SHA-256. Keep all pages in order until nextCursor=null; concurrent edits invalidate the export. May include sensitive history.',
+  description:'Read recalloom-snapshot-v5 pages (including smart collection definitions, tag catalog, task order and persistent Wiki path identities) with watermarks and SHA-256. Keep all pages in order until nextCursor=null; concurrent edits invalidate the export. May include sensitive history.',
   destructive:false
  },
  import_snapshot:{
   title:'Validate or restore a snapshot',
-  description:'Validate or atomically import the complete recalloom-snapshot-v4 {pages:[...]} bundle (also accepts v2/v3). Defaults to dryRun; real imports require explicit authorization and review of collisions/limits.',
+  description:'Validate or atomically import the complete recalloom-snapshot-v5 {pages:[...]} bundle (also accepts v2/v3/v4). Defaults to dryRun; real imports require explicit authorization and review of collisions/limits.',
   destructive:true
  }
 } as const;

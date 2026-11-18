@@ -172,9 +172,9 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     }
     assert.match(tool('browse').inputSchema.properties?.cursor?.description??'',/page\.nextCursor/);
     assert.match(tool('edit_record').inputSchema.properties?.expectedRevision?.description??'',/concurrent/);
-    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v4/);
+    assert.match(tool('import_snapshot').inputSchema.properties?.bundle?.description??'',/snapshot-v5/);
     assert.match(tool('read_many').inputSchema.properties?.maxChars?.description??'',/budget/);
-    assert.match(tool('export_snapshot').description,/snapshot-v4/);
+    assert.match(tool('export_snapshot').description,/snapshot-v5/);
     assert.match(tool('import_snapshot').description,/complete/);
     assert.ok(tool('get_overview').description.includes('folder'));
     assert.ok(tool('get_outline').description.includes('heading'));

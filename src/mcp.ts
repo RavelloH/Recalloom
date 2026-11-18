@@ -167,7 +167,7 @@ const toolSchemas={
   get_overview:z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).describe('Descendant folder depth, 0 = selected folder only.').optional(),budget:z.number().int().min(1000).max(30000).describe('Shared character budget for record excerpts and open tasks.').optional(),cursor:pageCursor}),
   get_outline:z.object({id:uuid,revision:z.number().int().positive().optional(),limit:z.number().int().min(1).max(200).optional(),cursor:z.number().int().nonnegative().describe('Zero-based heading index from page.nextCursor; omit to start.').optional()}),
   export_snapshot:z.object({cursor:z.string().nullable().describe('Export page.nextCursor from the previous page; omit to start.').optional(),limit:z.number().int().min(1).max(5).describe('Maximum record entries in a backup page.').optional()}),
-  import_snapshot:z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v4 object shaped {pages:[...all pages...]}; v2/v3 bundles remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()})
+  import_snapshot:z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v5 object shaped {pages:[...all pages...]}, including smart collections; v2/v3/v4 remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()})
 };
 
 // The SDK creates a fresh server per HTTP request. Reuse discovery projections

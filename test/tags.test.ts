@@ -238,7 +238,7 @@ test('tag record browsing supports all/any, archived counts and stable paginatio
   }
 });
 
-test('v4 snapshots roundtrip aliases, colors, redirects and legacy IDs, with v3 import support', async () => {
+test('v5 snapshots roundtrip aliases, colors, redirects and legacy IDs, with v3 import support', async () => {
   const source = fixture(),
     target = fixture(),
     legacy = fixture();
@@ -262,7 +262,7 @@ test('v4 snapshots roundtrip aliases, colors, redirects and legacy IDs, with v3 
       expectedCatalogVersion: impact.catalogVersion
     });
     const snapshot = await exportSnapshot(source.env, null, 5);
-    assert.equal(snapshot.format, 'recalloom-snapshot-v4');
+    assert.equal(snapshot.format, 'recalloom-snapshot-v5');
     await importSnapshot(target.env, { pages: [snapshot] }, false);
     const checkpoint = (await queryTags(source.env, { query: 'checkpoint' })).items[0]!;
     assert.equal((await getTag(target.env, checkpoint.id)).name, 'checkpoint');

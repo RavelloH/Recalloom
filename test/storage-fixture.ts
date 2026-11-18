@@ -113,7 +113,7 @@ export default {
       const eventScan=await store.changesSince(env,0,200);
       check(eventScan.items.some(e=>e.entityType==='folder'),'structured folder changes');
       const snapshot=await agent.exportSnapshot(env,null,5);
-      check(snapshot.format==='recalloom-snapshot-v4'&&snapshot.folders.length>=1,'versioned backup export');
+      check(snapshot.format==='recalloom-snapshot-v5'&&snapshot.folders.length>=1,'versioned backup export');
       const originalRow=await store.getRecord(env,rec.id);
       const importedId=crypto.randomUUID();
       const originalVersions=(await env.DB.prepare(

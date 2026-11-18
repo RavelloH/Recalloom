@@ -7,8 +7,12 @@ import { StorageError } from './types.js';
 import { historicalVersion, sha256 } from './version.js';
 import {snapshotProjections} from './snapshot-projections.js';
 import {parseWikiTarget} from './wiki-syntax.js';
+import {collectionRuleSchema} from './collection-model.js';
 
 type AnyRow=Record<string,unknown>;
+type CollectionSnapshot={
+  id:string;name:string;description:string;rule_json:string;revision:number;created_at:string;updated_at:string;
+};
 type TagAssignment = {
   name: string;
   source: 'manual' | 'auto';
@@ -37,12 +41,14 @@ type SnapshotBase={
 export type SnapshotPage=SnapshotBase&(
   {format:'recalloom-snapshot-v2'}|
   {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}|
-  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}
+  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}|
+  {format:'recalloom-snapshot-v5';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[];collectionHash:string;collections:CollectionSnapshot[]}
 );
 type SnapshotPayload=Omit<SnapshotBase,'pageHash'>&(
   {format:'recalloom-snapshot-v2'}|
   {format:'recalloom-snapshot-v3';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[]}|
-  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}
+  {format:'recalloom-snapshot-v4';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[]}|
+  {format:'recalloom-snapshot-v5';orderVersion:number;taskOrder:AnyRow[];pathBindings:AnyRow[];tagCatalogVersion:number;tagCatalog:TagSnapshot[];collectionHash:string;collections:CollectionSnapshot[]}
 );
 const fail=(code:string,message?:string):never=>{throw new StorageError(code,message);};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -56,25 +62,32 @@ const name=(value:unknown):string=>{
 const asArray=(v:unknown):unknown[]=>Array.isArray(v)?v:fail('INVALID_SNAPSHOT');
 const maxSeq=async(env:Env)=>Number((await env.DB.prepare('SELECT COALESCE(MAX(seq),0) AS value FROM change_events').first<{value:number}>())?.value??0);
 const orderVersion=async(env:Env)=>Number((await env.DB.prepare('SELECT version FROM task_order_state WHERE id=1').first<{version:number}>())?.version??0);
-type SnapshotCursor={watermark:number;lastId:string;totalRecords:number;orderVersion:number;tagVersion:number};
+type SnapshotCursor={watermark:number;lastId:string;totalRecords:number;orderVersion:number;tagVersion:number;collectionHash:string};
 const cursorEncode=(x:SnapshotCursor):string=>btoa(JSON.stringify(x));
 const cursorDecode=(c:string):SnapshotCursor=>{
   try{
     const v=JSON.parse(atob(c)) as SnapshotCursor;
-    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0||!Number.isSafeInteger(v.orderVersion)||v.orderVersion<0||!Number.isSafeInteger(v.tagVersion)||v.tagVersion<0)throw Error();
+    if(!Number.isSafeInteger(v.watermark)||v.watermark<0||!uuid.test(v.lastId)||!Number.isSafeInteger(v.totalRecords)||v.totalRecords<0||!Number.isSafeInteger(v.orderVersion)||v.orderVersion<0||!Number.isSafeInteger(v.tagVersion)||v.tagVersion<0||!/^[a-f0-9]{64}$/.test(v.collectionHash))throw Error();
     return v;
   }catch{return fail('INVALID_SNAPSHOT_CURSOR');}
 };
 export const pageHash=async(page:SnapshotPayload)=>sha256(JSON.stringify({format:page.format,watermark:page.watermark,totalRecords:page.totalRecords,cursor:page.cursor,nextCursor:page.nextCursor,folders:page.folders,records:page.records,links:page.links,
   ...(page.format!=='recalloom-snapshot-v2'?{orderVersion:page.orderVersion,taskOrder:page.taskOrder,pathBindings:page.pathBindings}:{}),
-  ...(page.format==='recalloom-snapshot-v4'?{tagCatalogVersion:page.tagCatalogVersion,tagCatalog:page.tagCatalog}:{})}));
+  ...(page.format==='recalloom-snapshot-v4'||page.format==='recalloom-snapshot-v5'?{tagCatalogVersion:page.tagCatalogVersion,tagCatalog:page.tagCatalog}:{}),
+  ...(page.format==='recalloom-snapshot-v5'?{collectionHash:page.collectionHash,collections:page.collections}:{})}));
 
 export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Promise<SnapshotPage>{
   await ensureTagCatalog(env);
   const tagVersion=await catalogVersion(env);
+  // Collection edits do not affect change_events: hash their complete ordered
+  // definitions to reject mixed-state pages even after rename/delete/recreate.
+  const collectionRows=(await env.DB.prepare('SELECT id,name,description,rule_json,revision,created_at,updated_at FROM smart_collections ORDER BY id LIMIT 301').all<CollectionSnapshot>()).results;
+  if(collectionRows.length>300)fail('SNAPSHOT_TOO_LARGE','A snapshot can contain at most 300 smart collections');
+  const collectionHash=await sha256(JSON.stringify(collectionRows));
   const pageSize=Math.min(5,Math.max(1,Math.floor(limit)));
   const state=cursor?cursorDecode(cursor):null;
   if(state&&state.tagVersion!==tagVersion)fail('SNAPSHOT_CHANGED','Tags changed during backup');
+  if(state&&state.collectionHash!==collectionHash)fail('SNAPSHOT_CHANGED','Smart collections changed during backup');
   const tagCatalog=state?[]:await exportTagCatalog(env);
   const watermark=state?.watermark??await maxSeq(env);
   const version=state?.orderVersion??await orderVersion(env);
@@ -104,9 +117,10 @@ export async function exportSnapshot(env:Env,cursor:string|null=null,limit=2):Pr
     env.DB.prepare('SELECT task_id,record_id,position FROM task_board_order WHERE record_id IN (SELECT value FROM json_each(?)) ORDER BY position,task_id').bind(selectedIds).all(),
     env.DB.prepare('SELECT source_id,target_expression,target_id FROM record_path_bindings WHERE source_id IN (SELECT value FROM json_each(?)) ORDER BY source_id,target_expression').bind(selectedIds).all()
   ]);
-  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version||await catalogVersion(env)!==tagVersion)fail('SNAPSHOT_CHANGED','Library changed while exporting; discard all pages');
-  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords,orderVersion:version,tagVersion});
-  const payload={tagCatalog,tagCatalogVersion:tagVersion,format:'recalloom-snapshot-v4' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links,orderVersion:version,taskOrder:taskOrder.results,pathBindings:pathBindings.results};
+  const latestCollections=(await env.DB.prepare('SELECT id,name,description,rule_json,revision,created_at,updated_at FROM smart_collections ORDER BY id LIMIT 301').all<CollectionSnapshot>()).results;
+  if(await maxSeq(env)!==watermark||await orderVersion(env)!==version||await catalogVersion(env)!==tagVersion||await sha256(JSON.stringify(latestCollections))!==collectionHash)fail('SNAPSHOT_CHANGED','Library or smart collections changed while exporting; discard all pages');
+  const nextCursor=done?null:cursorEncode({watermark,lastId:id(selection.at(-1)?.id),totalRecords,orderVersion:version,tagVersion,collectionHash});
+  const payload={tagCatalog,tagCatalogVersion:tagVersion,collectionHash,collections:state?[]:collectionRows,format:'recalloom-snapshot-v5' as const,watermark,totalRecords,cursor,nextCursor,folders:folders.results,records,links,orderVersion:version,taskOrder:taskOrder.results,pathBindings:pathBindings.results};
   return {...payload,pageHash:await pageHash(payload)};
 }
 
@@ -119,11 +133,15 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
   const watermark=pages[0]?.watermark,expected=pages[0]?.totalRecords;
   const format=pages[0]?.format,version=pages[0]?.format!=='recalloom-snapshot-v2'?pages[0]?.orderVersion:undefined;
   let previous:string|null=null;
-  const folders:AnyRow[]=[],records:SnapshotPage['records']=[],links:AnyRow[]=[],taskOrder:AnyRow[]=[],pathBindings:AnyRow[]=[];
+  const folders:AnyRow[]=[],records:SnapshotPage['records']=[],links:AnyRow[]=[],taskOrder:AnyRow[]=[],pathBindings:AnyRow[]=[],collections:CollectionSnapshot[]=[];
   for(const [index,page] of pages.entries()){
-    if(!page||(page.format!=='recalloom-snapshot-v2'&&page.format!=='recalloom-snapshot-v3'&&page.format!=='recalloom-snapshot-v4')||page.format!==format||page.watermark!==watermark||page.totalRecords!==expected||
+    if(!page||(page.format!=='recalloom-snapshot-v2'&&page.format!=='recalloom-snapshot-v3'&&page.format!=='recalloom-snapshot-v4'&&page.format!=='recalloom-snapshot-v5')||page.format!==format||page.watermark!==watermark||page.totalRecords!==expected||
       page.cursor!==previous||page.pageHash!==await pageHash(page))fail('SNAPSHOT_INTEGRITY_ERROR');
-    if(page.format==='recalloom-snapshot-v4'&&(!Number.isSafeInteger(page.tagCatalogVersion)||page.tagCatalogVersion!== (pages[0] as typeof page).tagCatalogVersion||!Array.isArray(page.tagCatalog)||index>0&&page.tagCatalog.length))fail('INVALID_SNAPSHOT_TAGS');
+    if((page.format==='recalloom-snapshot-v4'||page.format==='recalloom-snapshot-v5')&&(!Number.isSafeInteger(page.tagCatalogVersion)||page.tagCatalogVersion!== (pages[0] as typeof page).tagCatalogVersion||!Array.isArray(page.tagCatalog)||index>0&&page.tagCatalog.length))fail('INVALID_SNAPSHOT_TAGS');
+    if(page.format==='recalloom-snapshot-v5'){
+      if(!/^[a-f0-9]{64}$/.test(page.collectionHash)||page.collectionHash!==(pages[0] as typeof page).collectionHash||!Array.isArray(page.collections)||index>0&&page.collections.length)fail('INVALID_SNAPSHOT_COLLECTIONS');
+      collections.push(...page.collections);
+    }
     if(page.format!=='recalloom-snapshot-v2'){
       if(!Number.isSafeInteger(page.orderVersion)||page.orderVersion<0||page.orderVersion!==version)fail('SNAPSHOT_INTEGRITY_ERROR');
       const pageRecords=new Set(asArray(page.records).map(item=>id((item as {record:AnyRow}).record.id)));
@@ -140,7 +158,8 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     if(index<pages.length-1&&!previous)fail('INVALID_SNAPSHOT');
   }
   if(previous!==null||!Number.isSafeInteger(expected)||expected<0||records.length!==expected)fail('INCOMPLETE_SNAPSHOT');
-  if(folders.length>2000||records.length>300||links.length>3000)fail('SNAPSHOT_TOO_LARGE');
+  if(folders.length>2000||records.length>300||links.length>3000||collections.length>300)fail('SNAPSHOT_TOO_LARGE');
+  if(format==='recalloom-snapshot-v5'&&await sha256(JSON.stringify(collections))!==(pages[0] as Extract<SnapshotPage,{format:'recalloom-snapshot-v5'}>).collectionHash)fail('INVALID_SNAPSHOT_COLLECTIONS');
   const targetState=await env.DB.batch<AnyRow>([
     env.DB.prepare('SELECT COALESCE(MAX(seq),0) AS value FROM change_events'),
     env.DB.prepare('SELECT version FROM task_order_state WHERE id=1'),
@@ -162,7 +181,9 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     if(item.ignoredTags&&(!Array.isArray(item.ignoredTags)||item.ignoredTags.some(tag=>typeof tag!=='string')))fail('INVALID_SNAPSHOT_TAGS');
     return [...item.tags,...(item.ignoredTags??[]),...(item.record.kind==='checkpoint'?['checkpoint']:[])];
   });
-  const tagPlan=await planSnapshotTags(env,format==='recalloom-snapshot-v4'?(pages[0] as Extract<SnapshotPage,{format:'recalloom-snapshot-v4'}>).tagCatalog:[],tagNames);
+  const snapshotTagCatalog=(format==='recalloom-snapshot-v4'||format==='recalloom-snapshot-v5')
+    ?(pages[0] as Extract<SnapshotPage,{format:'recalloom-snapshot-v4'|'recalloom-snapshot-v5'}>).tagCatalog:[];
+  const tagPlan=await planSnapshotTags(env,snapshotTagCatalog,tagNames);
   const statements:D1PreparedStatement[]=[...tagPlan.statements,env.DB.prepare(`INSERT INTO task_order_state(id,version)
     SELECT 1,0 WHERE (SELECT COALESCE(MAX(seq),0) FROM change_events)<>?
       OR NOT EXISTS (SELECT 1 FROM task_order_state WHERE id=1 AND version=?)`).bind(targetSeq,targetVersion)];
@@ -355,18 +376,56 @@ export async function importSnapshot(env:Env,bundle:unknown,dryRun=true,actor='a
     if(!knownRecords.has(source)||bindingKeys.has(key)||!target.startsWith('/')||parseWikiTarget(target,false)?.target!==target)fail('INVALID_SNAPSHOT_PATH_BINDING');
     bindingKeys.add(key);
   }
+  // Saved rules use stable folder/task-list IDs. Tags can map to an existing
+  // target definition during a merge, so rewrite only those imported tag IDs.
+  const sourceTags=new Map(snapshotTagCatalog.map(tag=>[tag.id,tag]));
+  const restoredTag=(tag:{id:string;name:string})=>{
+    let definition=sourceTags.get(tag.id);
+    const visited=new Set<string>();
+    while(definition?.mergedInto){
+      if(visited.has(definition.id))fail('INVALID_SNAPSHOT_TAGS');
+      visited.add(definition.id);
+      definition=sourceTags.get(definition.mergedInto);
+      if(!definition)fail('INVALID_SNAPSHOT_TAGS');
+    }
+    // Use the current canonical source name, not the potentially stale label
+    // saved in the collection before a tag rename or merge.
+    return definition?{id:tagPlan.idFor(definition.name),name:definition.name}:tag;
+  };
+  const collectionIds=new Set<string>();
+  for(const row of collections){
+    if(!row||typeof row!=='object')fail('INVALID_SNAPSHOT_COLLECTIONS');
+    const collectionId=id(row.id);
+    if(collectionIds.has(collectionId))fail('DUPLICATE_SNAPSHOT_ID');
+    collectionIds.add(collectionId);
+    if(typeof row.name!=='string'||!row.name.trim()||row.name!==row.name.trim()||row.name.length>100||
+      typeof row.description!=='string'||row.description.length>1200||
+      !Number.isSafeInteger(row.revision)||row.revision<1||
+      typeof row.created_at!=='string'||!Number.isFinite(Date.parse(row.created_at))||
+      typeof row.updated_at!=='string'||!Number.isFinite(Date.parse(row.updated_at)))fail('INVALID_SNAPSHOT_COLLECTIONS');
+    let rule=(()=>{
+      try{return collectionRuleSchema.parse(JSON.parse(string(row.rule_json,8192)));}
+      catch{return fail('INVALID_SNAPSHOT_COLLECTIONS','Invalid smart collection rule');}
+    })();
+    if(await env.DB.prepare('SELECT 1 FROM smart_collections WHERE id=?').bind(collectionId).first())fail('IMPORT_CONFLICT','Smart collection ID already exists');
+    if(rule.target==='document'&&rule.tags?.length){
+      rule={...rule,tags:rule.tags.map(restoredTag)};
+    }
+    statements.push(env.DB.prepare('INSERT INTO smart_collections(id,name,description,rule_json,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
+      .bind(collectionId,row.name,row.description,JSON.stringify(rule),row.revision,row.created_at,row.updated_at));
+  }
   statements.push(...await snapshotProjections(env,records.map(item=>item.record),folders,pathBindings));
   if(taskIds.size)statements.push(env.DB.prepare('UPDATE task_order_state SET version=version+1 WHERE id=1'));
   if(statements.length>700)fail('ATOMIC_IMPORT_LIMIT','This snapshot exceeds the single-transaction import limit; use a D1 database backup for larger libraries');
   if(!dryRun){
     try{await tagBatch(env,statements);}
     catch(error){
-      if(error instanceof Error&&/(?:UNIQUE|PRIMARY KEY) constraint failed:\s*task_order_state\.id/i.test(error.message))
+      if(error instanceof Error&&/(?:UNIQUE|PRIMARY KEY) constraint failed:\s*(?:task_order_state|smart_collections)\.id/i.test(error.message))
         fail('IMPORT_CONFLICT','Target library changed during import validation; restart the import');
       throw error;
     }
   }
-  return {dryRun,validated:true,folders:folders.length,records:records.length,links:links.length,taskOrder:taskOrder.length,pathBindings:pathBindings.length,statements:statements.length};
+  return {dryRun,validated:true,folders:folders.length,records:records.length,collections:collections.length,links:links.length,taskOrder:taskOrder.length,pathBindings:pathBindings.length,statements:statements.length};
 }
 function event(env:Env,entityType:'folder'|'record',entityId:string,type:string,revision:number|null,actor:string,details:unknown){
   return env.DB.prepare('INSERT INTO change_events(record_id,event_type,revision,actor,created_at,entity_type,entity_id,details_json) VALUES(?,?,?,?,?,?,?,?)')
