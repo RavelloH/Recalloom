@@ -70,12 +70,12 @@ Recalloom 不会自动保存每条对话；需要由客户端根据你的要求�
 
 ## MCP 帮助与扩展 Markdown
 
-MCP 服务提供简短的全局使用说明、每个工具的操作描述，以及按需读取的完整帮助。只读工具 `get_help` 在省略 `topic` 时列出主题；可使用 `get_help({"topic":"markdown"})`、`get_help({"topic":"math"})` 和 `get_help({"topic":"wiki"})` 阅读语法、注意事项和示例。帮助覆盖 CommonMark/GFM、KaTeX 行内与块级公式、RMD 1.0 Mark 与九色 Highlight（支持行内/块公式）、WikiLink、内容嵌入、编辑、版本、检索、任务、归档生命周期及备份。通过 `get_help({"topic":"lifecycle"})` 可查看安全归档、永久删除及递归目录删除的完整规则。
+MCP 提供精简的英文操作速查，网页 `/help` 保留中文教程。`get_help()` 返回主题目录，`topic=markdown` 返回语法入口，配合 `component` 或 `node` 查询单项语法。只有显式选择 `topic=rmd_reference` 才返回完整 RMD 参考。
 
-支持 MCP Resources 的客户端还可读取 `recalloom://help/index` 或 `recalloom://help/{topic}`；Resources 与 `get_help` 使用相同的本地 Markdown 文档，不依赖 D1，也不会为使用帮助而修改知识库。
+MCP Resources `recalloom://help/index` 和 `recalloom://help/{topic}` 提供同一份英文速查，无需访问 D1。
 
 实现细节、扩展节点的安全边界、格式回退和回归测试清单见 [Rich Markdown 开发规范](rich-markdown.md)。
 
-帮助正文的唯一来源是 `src/help/*.md` 与 `src/help/manifest.json`。`get_help` 会返回 `schemaVersion`、根据文档内容生成的 `helpVersion` 和完整 SHA-256 `contentHash`；帮助索引 Resource 也展示这些标识，以便识别过期的帮助。修改文档后运行 `pnpm help:generate` 更新编译模块，或在开发时使用 `pnpm help:watch` 自动更新。`pnpm help:check` 检查生成结果是否同步，`pnpm check`、`pnpm test` 与 `pnpm deploy` 均会执行此检查。新增 Markdown 扩展时应同时更新相应帮助文档与语法回归测试。
+英文速查维护在 `src/help/mcp-topics.json`，中文文档维护在 `src/help/*.md`，两者的 RMD 参数和示例共用 `src/rmd/registry.json`。`get_help` 在结构化响应中返回 `schemaVersion`、`helpVersion` 和 `contentHash`。修改后运行 `pnpm help:generate` 更新生成文件，或使用 `pnpm help:watch`；`pnpm help:check` 校验同步状态。
 
 网页登录会话在闲置 30 天后到期，单次登录最长保留 90 天。活跃时间及闲置到期时间每小时按需更新，Cookie 最晚在该次登录的 90 天上限到期。现有有效的旧会话在下次访问时迁移。

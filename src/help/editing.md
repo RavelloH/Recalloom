@@ -29,7 +29,7 @@ Recalloom 将 Markdown **正文**、记录**元信息**以及 text-version 历�
 - 读取历史时，`revision` 是所选历史版本，`currentRevision` 是当前正文版本。编辑与恢复的 `expectedRevision` 应取最新的当前版本。
 - `read_many` 每批最多读取 12 个记录，`maxChars` 是整批 JSON 的共享字符预算，默认 20,000、最多 60,000。正文可能分片返回，按各项的 `nextOffsetChars` 继续读取；`page.nextIndex` 指示本批尚未返回的输入项。
 
-标签使用 `tag_record` 独立增删，工具当前不接收 `expectedMetadataRevision`，也不增加正文 revision。可以先用 `list_tags` 查看已有标签。需要重命名、移动或归档记录时，使用 `manage_record` 并传入最新的 `expectedMetadataRevision`。
+标签使用 `tag_record` 独立增删，必须传入最新的 `expectedMetadataRevision`，不会增加正文 revision。可以先用 `list_tags` 查看已有标签。重命名、移动或归档使用 `manage_record`，同样需要最新的元信息版本。
 
 ## Web 的可视化、源码与预览
 

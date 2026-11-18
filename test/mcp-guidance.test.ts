@@ -64,7 +64,7 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     });
     assert.equal(init.instructions,SERVER_INSTRUCTIONS);
     assert.match(init.instructions,/expectedRevision/);
-    assert.match(init.instructions,/get_overview/);
+    assert.match(init.instructions,/get_help/);
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
@@ -106,8 +106,8 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     const badge=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'badge'}});
     assert.match(JSON.parse(badge.content[0].text).content,/variant/);
     const multi=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'mark',kind:'block'}});
-    assert.match(JSON.parse(multi.content[0].text).content,/多行块级/);
-    assert.doesNotMatch(JSON.parse(multi.content[0].text).content,/行内组件/);
+    assert.match(JSON.parse(multi.content[0].text).content,/mark \(block\)/);
+    assert.doesNotMatch(JSON.parse(multi.content[0].text).content,/mark \(inline\)/);
     const attrs=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',node:'image'}});
     assert.match(JSON.parse(attrs.content[0].text).content,/width/);
     assert.match(JSON.parse(attrs.content[0].text).content,/40–1800/);
@@ -122,7 +122,10 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     assert.match(helpFromTool.helpVersion,/^1\.[0-9a-f]{12}$/);
     assert.equal(helpFromTool.schemaVersion,1);
     const indexResource=await request('resources/read',{uri:'recalloom://help/index'});
-    assert.ok(indexResource.contents[0].text.includes(helpFromTool.contentHash));
+    assert.equal(indexResource.contents[0].text,getHelp().content);
+    const fullReference=await request('tools/call',{name:'get_help',arguments:{topic:'rmd_reference'}});
+    assert.equal(fullReference.isError,undefined);
+    assert.match(JSON.parse(fullReference.content[0].text).content,/^# RMD syntax reference/);
     const index=await request('tools/call',{name:'get_help',arguments:{}});
     assert.equal(JSON.parse(index.content[0].text).topic,'index');
     const invalid=await request('tools/call',{name:'get_help',arguments:{topic:'unknown'}});
@@ -132,24 +135,23 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
       assert.ok(t,'expected '+name);
       return t;
     };
-    assert.match(tool('get_help').description,/KaTeX/);
+    assert.match(tool('get_help').description,/rmd_reference/);
     assert.ok(tool('get_help').inputSchema.properties?.component,'component selector must be discoverable');
     assert.ok(tool('get_help').inputSchema.properties?.kind,'inline/block/leaf selector must be discoverable');
     assert.ok(tool('get_help').inputSchema.properties?.node,'node selector must be discoverable');
-    assert.match(tool('get_help').description,/hand-drawn Highlight\/Circle/);
     for(const name of ['highlight','circle','box','bracket','underline','double-underline','dotted-underline','wavy','arrow']){
      const response=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:name,kind:'inline'}});
      assert.equal(response.isError,undefined,'inline sketch MCP help '+name);
      const text=JSON.parse(response.content[0].text).content as string;
-     assert.match(text,/静态 SVG/);
+     assert.ok(text.includes(`## ${name} (inline)`));
      assert.match(text,/`color`/);
      assert.match(text,/`stroke`/);
-     assert.match(text,/~~~~rmd-example/);
+     assert.ok(text.includes(`:: ${name} `));
     }
     for(const name of ['highlight','circle','box','bracket','underline','double-underline']){
      const response=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:name,kind:'block'}});
      assert.equal(response.isError,undefined,'block sketch MCP help '+name);
-     assert.match(JSON.parse(response.content[0].text).content,/多行块级/);
+     assert.ok(JSON.parse(response.content[0].text).content.includes(`## ${name} (block)`));
     }
     const denied=await request('tools/call',{name:'get_help',arguments:{topic:'markdown',component:'wavy',kind:'block'}});
     assert.equal(denied.isError,true,'unsupported block sketch must be rejected');

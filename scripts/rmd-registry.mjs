@@ -139,3 +139,26 @@ export function registryDetailCatalog(r){
  for(const n of r.nodes)nodes[n.node]={name:n.node,title:n.label+'属性',content:'# '+n.label+'属性\n\n'+renderNode(n,r,true)};
  return {components,nodes};
 }
+
+export function mcpRegistryCatalog(r){
+ const hints={id:`letters, digits, hyphens; start with a letter; max ${r.constraints.idMaximumLength} characters`,
+  integer:`${r.constraints.integerMinimum}–${r.constraints.integerMaximum}`,
+  color:r.colors.join(', '), variant:r.variants.join(', '), 'sketch-stroke':'0.5–6',
+  'sketch-padding':'0–24 px', 'sketch-roughness':'0–3', 'sketch-opacity':'0.1–0.85'};
+ const fields=(attrs,required=[],defaults={})=>Object.entries(attrs).map(([name,type])=>
+  `- \`${name}\`: \`${type}\`${hints[type]?` (${hints[type]})`:''}${required.includes(name)?'; required':''}${Object.hasOwn(defaults,name)?`; default: \`${defaults[name]}\``:''}`);
+ const components={},nodes={};
+ for(const c of r.components){
+  const label=c.type==='inline'?'Text':c.type==='leaf'?'Target':'Title';
+  const form=[`## ${c.name} (${c.type})`,`${label}: ${c.main}.`,
+   ...(c.positions.length?[`Positional arguments: ${c.positions.join(', ')} (before named arguments).`]:[]),
+   ...(c.allowedParents?[`Parent: ${c.allowedParents.join(' or ')}.`]:[]),
+   ...(c.orderedChildren?[`Exactly one of each, in order: ${c.orderedChildren.join(' → ')}.`]:c.children?[`Children: ${c.children.join(', ')}.`]:[]),
+   ...fields(c.attributes,c.requiredAttributes,c.defaults),'',code(c.example)].join('\n');
+  (components[c.name]??={})[c.type]=form;
+ }
+ for(const n of r.nodes)nodes[n.node]=[`## ${n.node} attributes`,...fields(n.attributes),'',code(n.example)].join('\n');
+ const rules=`Separate parameters with \` | \`; use JSON double quotes for values containing separators. Put \`@ attrs\` at the end of its block or on the next line. Nest at most ${r.constraints.containerDepthMaximum} containers; use at most ${r.constraints.fenceLengthMaximum} fence colons.`;
+ const reference=[rules,...Object.values(components).flatMap(Object.values),...Object.values(nodes)].join('\n\n');
+ return {components,nodes,reference};
+}

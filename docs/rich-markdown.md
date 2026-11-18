@@ -104,6 +104,6 @@ Markdown 源码（D1/草稿）
 
 ## Help、示例与知识库记录
 
-对外 RMD 帮助以 `src/help/*.md` 为唯一来源，改动后执行 `pnpm help:generate` 更新 `catalog.generated.ts`；`get_help` 与 MCP Resources 均应得到同一正文。修改示例时在 Recalloom 的纯**语法验收文档**更新正反例，测试进度放独立研发日志，不要混入语法样本。
+网页中文教程维护在 `src/help/*.md`，MCP 英文速查维护在 `src/help/mcp-topics.json`。两者从同一 RMD 注册表生成语法参考。改动后执行 `pnpm help:generate`；`get_help` 与 MCP Resources 返回同一份英文速查。修改示例时在 Recalloom 的纯**语法验收文档**更新正反例，测试进度放独立研发日志。
 
 视觉回归约束已记录在 Recalloom 规范 Revision 3：**Mark 保持当前效果、Highlight 保持当前配色**。任何重构无法通过上述保真测试时，不得因为编译成功而宣称渲染管线完全稳定。

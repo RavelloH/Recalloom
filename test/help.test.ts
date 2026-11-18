@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import type {JSONContent} from '@tiptap/core';
 import {HELP_TOPICS,getHelp,listHelpResources} from '../src/help/index.js';
+import {HELP_PAGES} from '../src/help/catalog.generated.js';
 import {extractWikiReferences,parseWikiTarget} from '../src/wiki-syntax.js';
 import {parseRmdVisual} from '../web/src/rmd-visual';
 import {serializeRmdVisual} from '../web/src/rmd-serialize';
@@ -17,24 +18,28 @@ const examples=(doc:string)=>[
 const parser=unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 const flattened=(root:JSONContent):JSONContent[]=>[root,...(root.content??[]).flatMap(flattened)];
 
-test('help catalog has eleven documented topics with stable resource URIs',()=>{
- assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','tags','lifecycle','backup']);
+test('MCP help has compact English guides and an opt-in reference',()=>{
+ assert.deepEqual(HELP_TOPICS,['overview','markdown','math','wiki','editing','versions','search','tasks','tags','lifecycle','backup','rmd_reference']);
  const resources=listHelpResources();
- assert.equal(resources.length,12);
+ assert.equal(resources.length,13);
  assert.equal(resources[0].topic,'index');
- assert.match(resources[0].content,/math.*LaTeX|math.*公式|math.*数学/);
+ assert.match(resources[0].content,/math.*KaTeX/);
+ assert.ok(resources[0].content.length<650);
  for(const topic of HELP_TOPICS){
   const page=getHelp(topic);
   assert.equal(page.uri,'recalloom://help/'+topic);
   assert.ok(page.content.startsWith('# '));
-  assert.ok(page.content.length>400);
+  if(topic!=='rmd_reference'){
+   assert.ok(page.content.length<1000,topic);
+   assert.doesNotMatch(page.content,/\p{Script=Han}/u);
+  }
   assert.ok(page.summary.length>5);
   assert.ok(resources.some(r=>r.uri===page.uri&&r.content===page.content));
   assert.ok(parser.parse(page.content).children.length>=2,'invalid document: '+topic);
  }
 });
 test('published math help uses RMD Mark block and preserves a KaTeX formula',()=>{
- const math=getHelp('math').content;
+ const math=HELP_PAGES.math.content;
  const blocks=examples(math);
  assert.ok(blocks.length>=3,'inline, display, and highlighted formula examples expected');
  const marked=blocks.find(x=>x.includes('::: mark\n')&&x.includes('$$'));
@@ -53,7 +58,7 @@ test('published math help uses RMD Mark block and preserves a KaTeX formula',()=
  assert.ok(atom?.marks?.some(m=>m.type==='rmdMark'),'inline math must be marked, not recolored');
 });
 test('Wiki help contains real canonical link and standalone embed syntax',()=>{
- const wiki=getHelp('wiki').content;
+ const wiki=HELP_PAGES.wiki.content;
  const snippets=examples(wiki);
  assert.ok(snippets.length>=2);
  const all=snippets.flatMap(extractWikiReferences);
@@ -64,7 +69,7 @@ test('Wiki help contains real canonical link and standalone embed syntax',()=>{
  assert.equal(extractWikiReferences('~~~md\n::: embed id:550e8400-e29b-41d4-a716-446655440000 :::\n~~~').length,0);
 });
 test('Markdown help documents complete RMD schema and visual constraints',()=>{
- const md=getHelp('markdown').content;
+ const md=HELP_PAGES.markdown.content;
  for(const token of ['CommonMark/GFM','KaTeX',':: mark',':: highlight','::: embed','@ attrs','CriticMarkup','%%',':: badge'])
   assert.ok(md.includes(token),'missing RMD syntax: '+token);
  assert.ok(md.includes('文稿名称、路径和标签在文稿信息中设置'));
@@ -77,7 +82,7 @@ test('help metadata exposes deterministic version/hash across tool and resources
  assert.match(index.helpVersion,/^1\.[a-f0-9]{12}$/);
  assert.match(index.contentHash,/^[a-f0-9]{64}$/);
  assert.ok(index.helpVersion.endsWith(index.contentHash.slice(0,12)));
- assert.ok(index.content.includes(index.contentHash));
+ assert.ok(!index.content.includes(index.contentHash));
  for(const topic of HELP_TOPICS){
   const page=getHelp(topic);
   assert.equal(page.helpVersion,index.helpVersion);
@@ -86,7 +91,7 @@ test('help metadata exposes deterministic version/hash across tool and resources
  }
 });
 test('all published Mark/Highlight examples use one schema and preserve exact semantics',()=>{
- const blocks=examples(getHelp('markdown').content);
+ const blocks=examples(HELP_PAGES.markdown.content);
  const relevant=blocks.filter(x=>x.includes(':: mark')||x.includes(':: highlight'));
  assert.ok(relevant.length>0);
  for(const source of relevant){
@@ -103,7 +108,7 @@ test('all published Mark/Highlight examples use one schema and preserve exact se
  }
 });
 test('published Wiki document snippets use shared graph and visual RMD semantics',()=>{
- const snippets=examples(getHelp('wiki').content);
+ const snippets=examples(HELP_PAGES.wiki.content);
  const contents=snippets.filter(x=>x.includes('::: embed'));
  assert.ok(contents.length>=1);
  for(const source of contents){

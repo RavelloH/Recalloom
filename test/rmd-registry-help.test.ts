@@ -37,7 +37,6 @@ test('RMD component runtime schema and docs share the same registry with no miss
   assert.ok(token,component.name+'/'+type+' has an invalid published example: '+component.example);
   const detail=getHelp('markdown',{component:component.name,kind:type});
   assert.equal(detail.topic,'markdown');
-  assert.ok(detail.content.includes(component.summary));
   assert.ok(detail.content.includes(component.example));
   for(const [field,kind] of Object.entries(component.attributes)){
    assert.ok(detail.content.includes('`'+field+'`'),component.name+' missing field '+field);
@@ -53,22 +52,19 @@ test('RMD component runtime schema and docs share the same registry with no miss
    'UI field labels must be generated from every schema property');
   for(const field of Object.keys(node.attributes))
    assert.ok(help.content.includes('`'+field+'`'),node.node+' missing '+field);
-  assert.match(help.content,/240 字符/,'missing UI input limit');
-  if('editorIdPrefix' in node)assert.ok(help.content.includes('`'+node.editorIdPrefix+'`'),'missing editor ID prefix for '+node.node);
   const attr=lexRmd(node.example).find(c=>c.type==='attrs');
   assert.ok(attr,node.node+' invalid attrs example');
   assert.equal(attr!.name,node.node);
  }
 });
 
-test('MCP full markdown help includes machine-generated complete component and attrs reference',()=>{
- const page=getHelp('markdown');
- assert.match(page.content,/RMD 1\.0 完整语法参考/);
- for(const component of RMD_COMPONENT_NAMES)assert.ok(page.content.includes('`'+component+'`'),component);
- for(const node of RMD_NODE_NAMES)assert.ok(page.content.includes('`'+node+'`'),node);
- assert.equal(getHelp('markdown',{component:'mark'}).content.includes('行内'),true);
- assert.equal(getHelp('markdown',{component:'mark'}).content.includes('多行块级'),true);
- assert.equal(getHelp('markdown',{component:'mark',kind:'inline'}).content.includes('多行块级'),false);
+test('MCP separates the full registry reference from focused syntax lookup',()=>{
+ const page=getHelp('rmd_reference');
+ assert.match(page.content,/^# RMD syntax reference/);
+ for(const component of registry.components)assert.ok(page.content.includes(`## ${component.name} (${component.type})`));
+ for(const node of RMD_NODE_NAMES)assert.ok(page.content.includes(`## ${node} attributes`));
+ assert.match(getHelp('markdown',{component:'mark'}).content,/mark \(inline\)[\s\S]*mark \(block\)/);
+ assert.doesNotMatch(getHelp('markdown',{component:'mark',kind:'inline'}).content,/mark \(block\)/);
  assert.throws(()=>getHelp('math',{component:'badge'}),/topic markdown/);
  assert.throws(()=>getHelp('markdown',{component:'not-a-component'}),/Unknown RMD component/);
  assert.throws(()=>getHelp('markdown',{node:'not-a-node'}),/Unknown RMD node/);
