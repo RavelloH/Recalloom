@@ -32,13 +32,14 @@ for(const selector of [
  '.relation-panel',
  '.record-layout',
  '.bubble-menu-inner .toolbar-highlight',
- '.record-main .markdown-preview ul.contains-task-list'
+ '.markdown-preview ul.contains-task-list',
+ '.collection-preview'
 ]){
  assert.ok(!baseCss.includes(selector),'Lazy feature styles leaked into app-wide CSS: '+selector);
  assert.ok(assets.some(name=>name.endsWith('.css')&&name!==initialCss[0].slice('assets/'.length)&&
   readFileSync(join(dist,'assets',name),'utf8').includes(selector)),'Missing deferred feature style: '+selector);
 }
-const deferred=['login','home','library','archive','record','tasks','search','activity','settings','command-palette','motion-primitives','overlayscrollbars','visual-editor'];
+const deferred=['login','home','library','archive','record','tasks','search','activity','settings','collections','command-palette','motion-primitives','overlayscrollbars','visual-editor'];
 for(const name of deferred){
  assert.ok(assets.some(asset=>asset.startsWith(name+'-')&&asset.endsWith('.js')),
   'Expected an independent, on-demand '+name+' chunk');
