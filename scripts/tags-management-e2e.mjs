@@ -159,7 +159,7 @@ try {
   await page.getByRole('button', { name: '创建标签', exact: true }).click();
   await page.locator('.tag-cloud-token').filter({ hasText: 'Research' }).waitFor();
   const source = (await api('/tags?query=Research')).items[0];
-  const target = (await api('/tags', 'POST', { name: 'Knowledge', color: 'green' })).item;
+  const target = (await api('/tags', 'POST', { name: 'Knowledge', color: 'green', description: 'Shared knowledge' })).item;
   const record = await api('/records', 'POST', {
     name: 'Tag test.md',
     content: '# Tag test',
@@ -188,11 +188,26 @@ try {
   await page.getByRole('heading', { name: 'Knowledge', exact: true }).waitFor();
   assert.equal((await api('/tags/' + source.id)).item.id, target.id);
   assert.equal((await api('/records/' + record.id)).tags.length, 1);
+  const related = await api('/records', 'POST', { name: 'Related note.md', content: '# Related note', tags: ['Knowledge'] });
   await noOverflow();
   await page.waitForLoadState('networkidle');
   await page.goto(base + '/records/' + record.id);
-  await page.locator('.workbench-summary-tag').filter({ hasText: 'Knowledge' }).waitFor();
-  await page.locator('.workbench-summary-tag').filter({ hasText: 'Knowledge' }).click();
+  const token = page.locator('.workbench-summary-tag').filter({ hasText: 'Knowledge' });
+  const preview = page.locator('.tag-preview');
+  const tokenColors = locator => locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.backgroundColor, style.color];
+  });
+  await token.getByRole('button', { name: 'Knowledge' }).press('Enter');
+  await preview.getByText('Shared knowledge').waitFor();
+  await preview.getByText('当前文稿').waitFor();
+  await preview.getByRole('link', { name: /Related note\.md/ }).waitFor();
+  assert.equal(page.url(), base + '/records/' + record.id);
+  assert.deepEqual(await tokenColors(token), await tokenColors(preview.locator('.tag-token-list [data-color="green"]')));
+  await page.locator('[data-workspace-panel="document-panel-tag"]').getByRole('button', { name: '关闭', exact: true }).click();
+  await preview.waitFor({ state: 'hidden' });
+  await token.click();
+  await preview.getByRole('link', { name: '打开标签页' }).click();
   await page.waitForURL(base + '/tags/' + target.id);
   const untagged = await api('/records', 'POST', {
     name: 'Picker test.md',
@@ -223,6 +238,13 @@ try {
     assert.ok(Math.abs(actual.width - mobileHome.width) < 2, path + ' shares mobile home width');
     await noOverflow();
   }
+  await page.goto(base + '/records/' + record.id);
+  await token.click();
+  await page.getByRole('dialog', { name: '标签详情' }).waitFor();
+  await preview.getByRole('link', { name: /Related note\.md/ }).click();
+  await page.waitForURL(base + '/records/' + related.id);
+  await preview.waitFor({ state: 'hidden' });
+  await noOverflow();
   await page.goto(base + '/tags/manage');
   await page.getByRole('textbox', { name: '搜索标签', exact: true }).fill('Knowledge');
   await page.locator('.tag-catalog-row').filter({ hasText: 'Knowledge' }).waitFor();

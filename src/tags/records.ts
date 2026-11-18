@@ -46,7 +46,8 @@ export async function queryTaggedRecords(env: Env, input: TaggedRecordsQuery) {
   const tagClause =
     'r.id IN (SELECT record_id FROM record_tags WHERE tag_id IN (SELECT value FROM json_each(?)) GROUP BY record_id HAVING COUNT(DISTINCT tag_id)>=?)';
   const conditions = [tagClause];
-  const values: unknown[] = [JSON.stringify(ids), match === 'all' ? ids.length : 1];
+  const selectedTags = JSON.stringify(ids);
+  const values: unknown[] = [selectedTags, match === 'all' ? ids.length : 1];
   if (status !== 'all') {
     conditions.push(status === 'archived' ? "r.status='archived'" : "r.status<>'archived'");
   }
@@ -73,12 +74,14 @@ export async function queryTaggedRecords(env: Env, input: TaggedRecordsQuery) {
   const rows = (
     await env.DB.prepare(
       paths +
-        "SELECT r.id,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,c.revision,r.updated_at AS updatedAt,COALESCE(r.archived_from_path,p.path||'/'||r.name,'/'||r.name) AS path " +
+        "SELECT r.id,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,c.revision,r.updated_at AS updatedAt,COALESCE(r.archived_from_path,p.path||'/'||r.name,'/'||r.name) AS path, " +
+        "(SELECT CASE WHEN MIN(rt.source)=MAX(rt.source) THEN MIN(rt.source) ELSE 'mixed' END " +
+        'FROM record_tags rt WHERE rt.record_id=r.id AND rt.tag_id IN (SELECT value FROM json_each(?))) AS tagSource ' +
         from +
         pageConditions +
         ' ORDER BY r.updated_at DESC,r.id LIMIT ?'
     )
-      .bind(...values, ...(after ? [after.updatedAt, after.updatedAt, after.id] : []), limit + 1)
+      .bind(selectedTags, ...values, ...(after ? [after.updatedAt, after.updatedAt, after.id] : []), limit + 1)
       .all<{
         id: string;
         name: string;
@@ -89,6 +92,7 @@ export async function queryTaggedRecords(env: Env, input: TaggedRecordsQuery) {
         revision: number;
         updatedAt: string;
         path: string;
+        tagSource: 'manual' | 'auto' | 'mixed';
       }>()
   ).results;
   const items = rows.slice(0, limit),

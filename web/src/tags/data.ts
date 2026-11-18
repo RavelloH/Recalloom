@@ -13,6 +13,40 @@ export type TagFilter = {
   sort?: 'name' | 'count' | 'updated';
 };
 
+export type TaggedRecord = {
+  id: string;
+  name: string;
+  kind: string;
+  status: string;
+  description: string;
+  updatedAt: string;
+  path: string;
+  tagSource: 'manual' | 'auto' | 'mixed';
+};
+type TaggedRecordsPage = {
+  items: TaggedRecord[];
+  total: number;
+  page: TagPage['page'];
+};
+type TaggedRecordsFilter = {
+  tagIds: string[];
+  match?: 'all' | 'any';
+  status?: 'active' | 'archived' | 'all';
+  kind?: string;
+  query?: string;
+};
+
+export const taggedRecordsPages = ({ tagIds, ...filter }: TaggedRecordsFilter, limit = 40) =>
+  infiniteQueryOptions({
+    queryKey: ['tag-records', tagIds, filter, limit],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam, signal }) => api<TaggedRecordsPage>(
+      '/tag-records?' + queryString({ ...filter, tagIds: tagIds.join(','), limit, cursor: pageParam }),
+      { signal }
+    ),
+    getNextPageParam: (page) => page.page.nextCursor ?? undefined
+  });
+
 export const tagQuery = (id: string) =>
   queryOptions({
     queryKey: ['tags', 'item', id],

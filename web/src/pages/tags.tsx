@@ -7,11 +7,10 @@ import { MultiSelector } from '@astryxdesign/core/MultiSelector';
 import { Token } from '@astryxdesign/core/Token';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
 import { Icon } from '../icon';
-import { api, queryString } from '../api';
 import { WorkspaceSearch, WorkspaceToolbar } from '../workspace-toolbar';
 import { AutoResizer, AutoTransition } from '../motion-primitives';
 import { PageTitle, LoadingRows, ErrorText, Empty, fmt } from './shared';
-import { tagPages, tagQuery, tagDictionary, type Tag, type TagFilter } from '../tags/data';
+import { tagPages, tagQuery, tagDictionary, taggedRecordsPages, type Tag, type TagFilter, type TaggedRecord } from '../tags/data';
 import { TagPanel } from '../tags/panel';
 import '../tags/tags.css';
 
@@ -206,20 +205,36 @@ function TagCatalog({ managing }: { managing: boolean }) {
   );
 }
 
-type TaggedRecord = {
-  id: string;
-  name: string;
-  kind: string;
-  status: string;
-  description: string;
-  updatedAt: string;
-  path: string;
-};
-type RecordPage = {
-  items: TaggedRecord[];
-  total: number;
-  page: { hasMore: boolean; nextCursor: string | null };
-};
+const tagSourceGroups = [
+  ['manual', '手动添加'],
+  ['auto', '自动推荐'],
+  ['mixed', '手动与自动混合']
+] as const;
+
+function TaggedRecordGroups({ records }: { records: TaggedRecord[] }) {
+  const groups: Record<TaggedRecord['tagSource'], TaggedRecord[]> = { manual: [], auto: [], mixed: [] };
+  for (const record of records) groups[record.tagSource].push(record);
+  return <div className="tag-records">
+    {tagSourceGroups.map(([source, title]) => groups[source].length > 0 && (
+      <section className="tag-record-group" key={source} aria-labelledby={'tag-record-group-' + source}>
+        <h2 id={'tag-record-group-' + source}>{title}</h2>
+        {groups[source].map(record => (
+          <Link to="/records/$recordId" params={{ recordId: record.id }} className="tag-record-row" key={record.id}>
+            <Icon className="tag-record-icon" name={record.kind === 'task_list' ? 'taskList' : 'document'} size="md" />
+            <div>
+              <strong>{record.name}</strong>
+              <span className="muted">{record.path}</span>
+              {record.description && <span className="muted truncate">{record.description}</span>}
+            </div>
+            <span className="muted">
+              {record.status === 'archived' ? '已归档 · ' : ''}{fmt(record.updatedAt)}
+            </span>
+          </Link>
+        ))}
+      </section>
+    ))}
+  </div>;
+}
 
 function TagDetail({ id }: { id: string }) {
   const current = useQuery(tagQuery(id));
@@ -234,23 +249,8 @@ function TagDetail({ id }: { id: string }) {
   const resolvedId = current.data?.item.id ?? id;
   const ids = [...new Set(selected.map((value) => (value === id ? resolvedId : value)))].sort();
   const results = useInfiniteQuery({
-    queryKey: ['tag-records', ids, match, status, kind, search],
-    enabled: current.isSuccess,
-    initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) =>
-      api<RecordPage>(
-        '/tag-records?' +
-          queryString({
-            tagIds: ids.join(','),
-            match,
-            status,
-            kind: kind === 'all' ? undefined : kind,
-            query: search,
-            limit: 40,
-            cursor: pageParam
-          })
-      ),
-    getNextPageParam: (page: RecordPage) => page.page.nextCursor ?? undefined
+    ...taggedRecordsPages({ tagIds: ids, match, status, kind: kind === 'all' ? undefined : kind, query: search }),
+    enabled: current.isSuccess
   });
   const tag = current.data?.item,
     records = results.data?.pages.flatMap((page) => page.items) ?? [];
@@ -367,29 +367,7 @@ function TagDetail({ id }: { id: string }) {
               <Button label="重新加载" onClick={() => void results.refetch()} />
             </div>
           ) : records.length ? (
-            <div className="tag-records">
-              {records.map((record) => (
-                <Link
-                  to="/records/$recordId"
-                  params={{ recordId: record.id }}
-                  className="tag-record-row"
-                  key={record.id}
-                >
-                  <Icon name={record.kind === 'task_list' ? 'taskList' : 'document'} size="sm" />
-                  <div>
-                    <strong>{record.name}</strong>
-                    <span className="muted">{record.path}</span>
-                    {record.description && (
-                      <span className="muted truncate">{record.description}</span>
-                    )}
-                  </div>
-                  <span className="muted">
-                    {record.status === 'archived' ? '已归档 · ' : ''}
-                    {fmt(record.updatedAt)}
-                  </span>
-                </Link>
-              ))}
-            </div>
+            <TaggedRecordGroups records={records} />
           ) : (
             <Empty title="没有匹配的内容" description="可以调整标签组合和内容范围。" />
           )}

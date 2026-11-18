@@ -2,7 +2,6 @@ import React,{useLayoutEffect,useRef,useState} from 'react';
 import {Icon} from './icon';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Button} from '@astryxdesign/core/Button';
-import {Token} from '@astryxdesign/core/Token';
 import {MoreMenu} from '@astryxdesign/core/MoreMenu';
 import {WorkspacePanel} from './workspace-panels';
 import {InlineTitle,Properties,Property,TagEditor} from './page-chrome';
@@ -14,6 +13,7 @@ import {documentDisplayName} from './document-filename';
 import {AutoResizer,AutoTransition} from './motion-primitives';
 import type {DocumentOutline} from './document-outline';
 import {COMPACT_QUERY} from './use-media';
+import {RecordHeaderTags} from './tags/record-preview';
 
 export const documentPanels=[
  {id:'info',label:'信息',icon:'infoCircle'},
@@ -90,9 +90,7 @@ export function DocumentWorkbenchHeader({item,characters,editors,focusTitle,onRe
   <InlineTitle value={documentDisplayName(item.name)} onRename={onRename}
    placeholder="未命名" autoFocus={focusTitle} transitionName={sharedName}
    transitionResource={{kind:'record',id:item.id}}/>
-  {item.tags?.length>0&&<div className="workbench-tag-line" aria-label="文档标签">
-   {item.tags.map(name=>{const tag=item.tagDetails?.find(tag=>tag.name===name);return <Token className="workbench-summary-tag" key={name} label={name} size="sm" color={tag?.color??'gray'} icon={tag?.source==='auto'?<Icon name="sparkles" size="sm"/>:undefined} description={tag?.reason} href={tag?'/tags/'+tag.id:undefined}/>;})}
-  </div>}
+  <RecordHeaderTags key={item.id} recordId={item.id} names={item.tags??[]} details={item.tagDetails}/>
   <div className="workbench-summary">
    <AutoResizer className="workbench-summary-resizer">
     <div className="workbench-summary-details">

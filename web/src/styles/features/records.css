@@ -415,8 +415,6 @@
   border: 1px solid var(--rk-border-soft);
   border-radius: 8px;
   padding: 4px 9px;
-  background: color-mix(in srgb, var(--color-text-primary, #222) 12%, var(--rk-canvas));
-  color: var(--color-text-primary);
   font-size: var(--rk-font-label);
   height: auto;
   min-height: 0;

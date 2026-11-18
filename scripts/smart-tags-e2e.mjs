@@ -105,6 +105,15 @@ try {
   sql(
     `UPDATE record_tags SET source='auto',reason='Clef 相关性 93%',evidence='{}',source_revision=1,generated_at='2026-11-17T01:00:00.000Z' WHERE record_id='${record.id}'; UPDATE index_jobs SET state='done',indexed_revision=1 WHERE record_id='${record.id}'`
   );
+  await api('/records', 'POST', { name: '手动标签测试.md', content: '# 手动关联', tags: [tag.name] });
+  await page.goto(base + '/tags/' + tag.id);
+  const manual = page.getByRole('region', { name: '手动添加' });
+  const automatic = page.getByRole('region', { name: '自动推荐' });
+  await manual.getByRole('link', { name: /手动标签测试/ }).waitFor();
+  await automatic.getByRole('link', { name: /智能标签测试/ }).waitFor();
+  assert.equal(await manual.getByRole('link', { name: /智能标签测试/ }).count(), 0);
+  assert.ok(await automatic.locator('.tag-record-icon').evaluate(icon => icon.getBoundingClientRect().width >= 20));
+  await page.waitForLoadState('networkidle');
   await page.goto(base + '/records/' + record.id);
   await page.getByRole('button', { name: '详细信息', exact: true }).click();
   const panel = page.locator('[data-panel-id="document-panel-info"]');

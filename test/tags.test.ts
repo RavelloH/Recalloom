@@ -197,11 +197,12 @@ test('tag record browsing supports all/any, archived counts and stable paginatio
     await assignTag(f.env, one, { tagId: a.id, action: 'add', expectedMetadataRevision: 1 });
     await assignTag(f.env, one, { tagId: b.id, action: 'add', expectedMetadataRevision: 2 });
     await assignTag(f.env, two, { tagId: b.id, action: 'add', expectedMetadataRevision: 1 });
-    assert.equal(
-      (await queryTaggedRecords(f.env, { tagIds: [a.id, b.id], match: 'all', status: 'all' }))
-        .total,
-      1
-    );
+    f.db.prepare("UPDATE record_tags SET source='auto' WHERE record_id=? AND tag_id=?").run(one, b.id);
+    const both = await queryTaggedRecords(f.env, { tagIds: [a.id, b.id], match: 'all', status: 'all' });
+    assert.equal(both.total, 1);
+    assert.equal(both.items[0]?.tagSource, 'mixed');
+    assert.equal((await queryTaggedRecords(f.env, { tagIds: [a.id] })).items[0]?.tagSource, 'manual');
+    assert.equal((await queryTaggedRecords(f.env, { tagIds: [b.id] })).items[0]?.tagSource, 'auto');
     const page = await queryTaggedRecords(f.env, {
       tagIds: [a.id, b.id],
       match: 'any',
