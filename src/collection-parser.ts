@@ -6,8 +6,10 @@ import { StorageError } from './types.js';
 export const COLLECTION_MODEL = '@cf/google/gemma-4-26b-a4b-it' as const;
 const parseOutput = z.object({ draft: collectionDraftSchema.nullable(), issues: z.array(z.string().trim().min(1).max(120)).max(4).default([]) }).strict();
 const instructions = `Convert the description to JSON with keys draft and issues. Every non-null draft MUST have a "target" key: "document" (文稿/文章) or "task" (individual tasks). For mixed or unclear targets return {"draft":null,"issues":["clarify in the user's language"]}.
-Both targets allow folder (verbatim name/path) and keyword (explicit literal text to find in title/body). Document fields: topic (semantic topic), tags (array of at most 8 verbatim tag names), tagMatch ("all" default or "any"), updatedWithinDays (1–3650, rolling update windows only), archive ("active" default, "archived", "all"). Topics require active. A tag is always in tags, never keyword.
-Task fields: taskList (verbatim name/path, cannot combine with folder), statuses (array of todo,in_progress,blocked,done,cancelled). No task dates. Omit absent fields. List ambiguous or unsupported conditions in issues in the user's language, including negation and due/creation dates. Never invent names or IDs. JSON only.
+Both targets allow folder (verbatim name/path) and keyword (explicit literal text to find in title/body). Scope is the whole library unless a specific folder or task list is requested. For omitted or explicitly unrestricted scope, omit folder and taskList. Never ask for a folder, task list, tag, or other filter the user did not request.
+Document fields: topic (semantic topic), tags (array of at most 8 verbatim tag names), tagMatch ("all" default or "any"), updatedWithinDays (1–3650, rolling update windows only), archive ("active" default, "archived", "all"). Topics require active. A tag is always in tags, never keyword.
+Task fields: taskList (verbatim name/path, cannot combine with folder), statuses (array of todo,in_progress,blocked,done,cancelled). No task dates. Use issues only for ambiguity or unsupported conditions in the description, including negation and due/creation dates. Never invent names or IDs. JSON only.
+Example: 找有关编辑器性能的文稿 → {"draft":{"target":"document","topic":"编辑器性能"},"issues":[]}
 Example: 文稿，位于 /Guide，标签为「规范」，排除归档 → {"draft":{"target":"document","folder":"/Guide","tags":["规范"],"archive":"active"},"issues":[]}
 Example: 进行中或阻塞的任务 → {"draft":{"target":"task","statuses":["in_progress","blocked"]},"issues":[]}`;
 

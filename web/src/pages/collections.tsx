@@ -173,7 +173,7 @@ function CollectionEditor({ item, onCancel }: { item?: CollectionItem; onCancel:
       <legend>查询规则</legend>
       <div className="collection-rule-grid">
         <Selector label="内容类型" value={fields.target} options={[...targets]} width="100%" onChange={value => change('target', value as RuleFields['target'])} />
-        <TextInput label="目录" width="100%" value={fields.folder} placeholder="名称或完整路径，包含子目录" onChange={value => change('folder', value)} />
+        <TextInput label="目录" width="100%" value={fields.folder} placeholder="留空查全部目录，可填写名称或路径" onChange={value => change('folder', value)} />
         <TextInput label="包含关键词" width="100%" value={fields.keyword} placeholder="可选，匹配原文" onChange={value => change('keyword', value)} />
         {fields.target === 'task' ? <>
           <TextInput label="任务列表" width="100%" value={fields.taskList} placeholder="可选，与目录二选一" onChange={value => change('taskList', value)} />
@@ -210,6 +210,7 @@ function CollectionEditor({ item, onCancel }: { item?: CollectionItem; onCancel:
 function RuleSummary({ rule }: { rule: CollectionRule }) {
   const labels = [rule.target === 'task' ? '任务' : '文稿'];
   if (rule.folder) labels.push('目录：' + rule.folder.name);
+  else if (rule.target !== 'task' || !rule.taskList) labels.push('全部目录');
   if (rule.keyword) labels.push('关键词：' + rule.keyword);
   if (rule.target === 'task') {
     if (rule.taskList) labels.push('列表：' + rule.taskList.name);

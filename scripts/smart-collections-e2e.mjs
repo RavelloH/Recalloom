@@ -27,22 +27,26 @@ try {
   await page.waitForURL(base + '/');
   const folder = await api('/folders', 'POST', { name: '集合验收目录' });
   const document = await api('/records', 'POST', { name: '性能讨论.md', folderId: folder.id, content: '# 说明\n\n编辑器性能和内存数据。' });
+  await api('/records', 'POST', { name: '索引性能.md', content: '# 索引性能' });
   await api('/records', 'POST', { name: '不相关.md', folderId: folder.id, content: '# 课程安排' });
 
   let parses = 0;
   await page.route('**/api/collections/parse', async route => {
     parses++;
-    assert.equal(route.request().postDataJSON().description, '集合验收目录里关于性能的文稿');
-    await route.fulfill({ json: { draft: { target: 'document', folder: '集合验收目录', keyword: '性能', archive: 'active', tagMatch: 'all' }, issues: [] } });
+    assert.equal(route.request().postDataJSON().description, '包含「性能」的文稿');
+    await route.fulfill({ json: { draft: { target: 'document', keyword: '性能', archive: 'active', tagMatch: 'all' }, issues: [] } });
   });
   await page.getByRole('link', { name: '智能集合', exact: true }).click();
   await page.getByRole('button', { name: '新建集合', exact: true }).click();
   await page.getByRole('textbox', { name: '集合名称' }).fill('我的性能集合');
-  await page.getByRole('textbox', { name: '自然语言描述' }).fill('集合验收目录里关于性能的文稿');
+  await page.getByRole('textbox', { name: '自然语言描述' }).fill('包含「性能」的文稿');
   const generate = page.getByRole('button', { name: '生成规则' });
   const save = page.getByRole('button', { name: '保存集合' });
   await generate.click();
   await page.getByRole('region', { name: '集合预览' }).getByRole('link', { name: /性能讨论/ }).waitFor();
+  await page.getByRole('region', { name: '集合预览' }).getByRole('link', { name: /索引性能/ }).waitFor();
+  await page.getByRole('region', { name: '集合预览' }).getByText('全部目录', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('textbox', { name: '目录', exact: true }).inputValue(), '');
   assert.equal(await page.getByRole('region', { name: '集合预览' }).getByRole('link', { name: /不相关/ }).count(), 0);
   const previewDone = page.waitForResponse(response => response.url().endsWith('/api/collections/preview') && response.ok());
   await generate.click();

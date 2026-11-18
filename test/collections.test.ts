@@ -43,6 +43,13 @@ test('saved document rules use stable IDs, apply combined filters and return cur
       await assignTag(data.env, recordId, { tagId: stable.id, action: 'add', expectedMetadataRevision: 1 });
     }
     await assignTag(data.env, unrelated, { tagId: stable.id, action: 'add', expectedMetadataRevision: 1 });
+    for (const scope of [undefined, ' ', '/']) {
+      const global = await resolveCollectionDraft(data.env, collectionDraftSchema.parse({ target: 'document', folder: scope, tags: ['速度'] }));
+      assert.deepEqual(global.issues, []);
+      assert.ok(global.rule);
+      assert.equal(global.rule.folder, undefined);
+      assert.deepEqual(new Set((await collectionResults(data.env, global.rule)).items.map(hit => hit.id)), new Set([wanted, second, unrelated]));
+    }
     const draft = collectionDraftSchema.parse({ target: 'document', folder: '/项目', tags: ['速度'], keyword: '编辑器' });
     const { rule, issues } = await resolveCollectionDraft(data.env, draft);
     assert.deepEqual(issues, []);
