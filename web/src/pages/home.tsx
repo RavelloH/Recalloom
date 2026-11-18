@@ -55,7 +55,9 @@ export function HomePage(){
  const events=useQuery(activityQuery());
  const updated=useQuery({...recentUpdatesQuery(),enabled:recentMode==='updated'});
  const recent=useRecentPages();
- const cards=recentMode==='visited'?recent:updated.data?.items??[];
+ const cards=(recentMode==='visited'?recent:updated.data?.items??[]).slice(0,8);
+ const nameCounts=new Map<string,number>();
+ for(const page of cards){const key=page.name.toLowerCase();nameCounts.set(key,(nameCounts.get(key)??0)+1);}
  const active=todo?.items.filter(t=>!['done','cancelled'].includes(t.status))??[];
  const shortcut=/Mac|iPhone|iPad/.test(navigator.platform)?'⌘ K':'Ctrl K';
  return <div className="page home-page"><PageTitle title="概览" description={greeting()+'。从最近的页面继续，或查看待办与近期变化。'}/>
@@ -77,14 +79,17 @@ export function HomePage(){
      </div>)}
     </RecentRail>
     :recentMode==='updated'&&updated.isError?<div className="home-recent-feedback"><ErrorText error={updated.error}/></div>
-    :cards.length?<RecentRail itemCount={cards.length}>{cards.slice(0,8).map(page=>{
+    :cards.length?<RecentRail itemCount={cards.length}>{cards.map(page=>{
    const sourceKey=(recentMode==='visited'?'recent:':'updated:')+page.id;
    const timestamp=recentMode==='visited'?'visitedAt':'updatedAt';
    const meta=timestamp==='visitedAt'&&'visitedAt' in page?page.visitedAt:'updatedAt' in page?page.updatedAt:undefined;
+   const parent='path' in page?page.path?.slice(0,page.path.lastIndexOf('/')):'folderPath' in page?page.folderPath:undefined;
+   const location=parent&&parent!=='/'?parent:'知识库根目录';
    return <Link key={page.id} to="/records/$recordId" params={{recordId:page.id}} className={'recent-page'+(recentModeHasSwitched.current?' recent-page-enter':'')} onClick={()=>markSharedNavigationSource(sourceKey)}>
     <span className="recent-page-cover" aria-hidden="true"/>
     <span className="recent-page-icon" aria-hidden="true">{page.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}</span>
     <strong className="recent-page-name"><span className="rk-shared-text" {...sharedSourceAttributes('record',page.id,sourceKey)}>{page.kind==='document'?documentDisplayName(page.name):page.name}</span>{page.kind==='document'&&/\.md$/i.test(page.name)&&<span className="rk-shared-extension">{page.name.slice(-3)}</span>}</strong>
+    {(nameCounts.get(page.name.toLowerCase())??0)>1&&<small className="recent-page-location truncate" title={location}>{location.split('/').filter(Boolean).slice(-2).join(' / ')}</small>}
     <small className="recent-page-meta truncate" title={recentMode==='updated'&&'actorName' in page&&page.actorName?String(page.actorName):undefined}>{ago(meta)}{recentMode==='updated'&&'actorName' in page&&page.actorName?' · '+page.actorName:''}</small>
    </Link>;
   })}</RecentRail>

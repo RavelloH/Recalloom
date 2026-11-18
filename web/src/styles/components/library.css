@@ -174,10 +174,6 @@
   min-height: 42px;
 }
 
-.file-new {
-  justify-content: flex-start;
-}
-
 .folder-page {
   --rk-doc-measure: 900px;
   --rk-doc-pad: 0px;

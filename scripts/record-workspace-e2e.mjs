@@ -32,7 +32,8 @@ try{
  // Newly created records focus the editable document title.
  await page.goto(base+'/library/'+folder.id,{waitUntil:'networkidle'});
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
- await page.locator('.file-table').getByRole('button',{name:'新建页面'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建页面',exact:true}).click();
  await page.waitForURL(/\/records\//);
  const recordId=page.url().split('/records/')[1].split('?')[0];
  const title=page.getByRole('heading',{level:1});
@@ -52,13 +53,15 @@ try{
  await page.getByRole('alert').filter({hasText:'不能包含'}).waitFor();
  assert.equal(await title.innerText(),'Workspace note','invalid title reverts');
 
- // Tags are edited in the unified document inspector, not always visible under the title.
+ // The information panel opens the separate tag picker.
  await page.getByRole('button',{name:'信息',exact:true}).click();
- const inspector=page.locator('#document-panel');
+ const inspector=page.locator('#document-panel-info');
  await inspector.getByRole('button',{name:'添加标签'}).click();
- await inspector.getByRole('textbox',{name:'新标签'}).fill('Alpha');
- await page.keyboard.press('Enter');
+ const picker=page.locator('#record-tag-picker');
+ await picker.getByRole('textbox',{name:'查找或创建标签'}).fill('alpha');
+ await picker.getByRole('button',{name:'创建「alpha」',exact:true}).click();
  await until(async()=>(await json('/records/'+recordId)).tags.includes('alpha'),'tag added');
+ await picker.waitFor({state:'hidden'});
  await inspector.locator('.tag-editor').getByText('alpha',{exact:true}).waitFor();
  await inspector.locator('.tag-editor').getByRole('button',{name:/alpha/}).click();
  await until(async()=>!(await json('/records/'+recordId)).tags.includes('alpha'),'tag removed');

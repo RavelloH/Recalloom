@@ -36,7 +36,7 @@
 .activity-date-heading h3 { font-size: var(--rk-font-small); font-weight: 550; color: var(--rk-ink-soft); margin: 0; }
 .activity-group { border-bottom: 1px solid var(--rk-border-soft); padding: 6px 0; }
 .activity-page .activity-event-card { border: 0; border-radius: 8px; background: transparent; box-shadow: none; }
-.activity-page .activity-event-card .activity-row { border: 0; padding: 12px 10px; }
+.activity-page .activity-event-card .activity-row, .activity-page .activity-batch-summary { border: 0; padding: 12px 10px; }
 .activity-page .activity-event-card .activity-icon { color: var(--rk-ink-soft); }
 .activity-group-toggle { margin-left: 34px; }
 .activity-group-events { margin-left: 24px; border-left: 1px solid var(--rk-border-soft); padding-left: 8px; }
@@ -71,7 +71,7 @@
  .activity-chart .activity-section-heading { align-items: start; flex-direction: column; gap: 8px; }
  .activity-chart-scroll { margin-top: 14px; }
  .activity-history { margin-top: 28px; }
- .activity-page .activity-event-card .activity-row { padding-inline: 4px; }
+ .activity-page .activity-event-card .activity-row, .activity-page .activity-batch-summary { padding-inline: 4px; }
  .activity-group-toggle { margin-left: 28px; }
  .activity-group-events { margin-left: 12px; }
  .activity-extra-filters { gap: 12px; }

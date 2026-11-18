@@ -1,5 +1,5 @@
 import {Icon} from '../icon';
-import {useEffect,useState} from 'react';
+import {useDeferredValue,useEffect,useState} from 'react';
 import {Link,useNavigate,useParams} from '@tanstack/react-router';
 import {useQuery,useInfiniteQuery,useQueryClient} from '@tanstack/react-query';
 import {Button} from '@astryxdesign/core/Button';
@@ -7,6 +7,7 @@ import {Card} from '@astryxdesign/core/Card';
 import {Skeleton} from '@astryxdesign/core/Skeleton';
 import {Selector} from '@astryxdesign/core/Selector';
 import {TextInput} from '@astryxdesign/core/TextInput';
+import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {api,mutate,queryString} from '../api';
 import {useConfirmDialog} from '../confirm-dialog';
 import {TopbarPortal} from '../topbar-slot';
@@ -18,16 +19,22 @@ import {folderPagesQuery,folderQuery} from '../queries';
 import {sharedViewTransitionName,sharedSourceAttributes,markSharedNavigationSource} from '../shared-view-transition';
 import {documentDisplayName} from '../document-filename';
 import {ErrorText,LoadingRows,Empty,fmt,Swap,stateOf} from './shared';
+import {WorkspaceSearch,WorkspaceToolbar} from '../workspace-toolbar';
 
-export function LibraryPage(){const params=useParams({strict:false});const folderId=(params as {folderId?:string}).folderId||null;const qc=useQueryClient(),nav=useNavigate();const folderSharedName=folderId?sharedViewTransitionName('folder',folderId):undefined;const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null),[quickBusy,setQuickBusy]=useState(false),[deletingFolder,setDeletingFolder]=useState(false);
+export function LibraryPage(){
+ const {folderId=null}=useParams({strict:false}) as {folderId?:string|null};
+ return <FolderPage key={folderId??'root'} folderId={folderId}/>;
+}
+function FolderPage({folderId}:{folderId:string|null}){const qc=useQueryClient(),nav=useNavigate();const folderSharedName=folderId?sharedViewTransitionName('folder',folderId):undefined;const [creating,setCreating]=useState<'folder'|'document'|'checkpoint_template'|'task_list'|null>(null),[name,setName]=useState(''),[tagInput,setTagInput]=useState(''),[error,setError]=useState<unknown>(null),[quickBusy,setQuickBusy]=useState(false),[deletingFolder,setDeletingFolder]=useState(false);
  const {confirm:askConfirm,confirmation}=useConfirmDialog();
  const [focusTitle]=useState(()=>folderId?consumeTitleFocus(folderId):false);
- useEffect(()=>{setCreating(null);},[folderId]);
- const q=useInfiniteQuery(folderPagesQuery(folderId));
+ const [filter,setFilter]=useState(''),[sort,setSort]=useState<'default'|'name'|'updated'>('default');
+ const query=useDeferredValue(filter.trim());
+ const q=useInfiniteQuery(folderPagesQuery(folderId,query,sort==='default'?undefined:sort));
  const entries=q.data?.pages.flatMap(page=>page.items)??[];
  const currentFolder=useQuery({...folderQuery(folderId??''),enabled:Boolean(folderId)});
  useEffect(()=>{revealFolder(currentFolder.data?.parentId);},[currentFolder.data?.parentId]);
- const renameFolder=async(next:string)=>{const folder=currentFolder.data;if(!folder)return;await mutate('/folders/'+folder.id,{name:next,expectedMetadataRevision:folder.metadataRevision},'PATCH');await Promise.all([qc.invalidateQueries({queryKey:['folder',folder.id]}),qc.invalidateQueries({queryKey:['folder-trail']}),qc.invalidateQueries({queryKey:['browse']})]);};
+ const renameFolder=async(next:string)=>{const folder=currentFolder.data;if(!folder)return;await mutate('/folders/'+folder.id,{name:next,expectedMetadataRevision:folder.metadataRevision},'PATCH');await Promise.all([qc.invalidateQueries({queryKey:['folder',folder.id]}),qc.invalidateQueries({queryKey:['folder-trail']}),qc.invalidateQueries({queryKey:['browse']}),qc.invalidateQueries({queryKey:['browse-pages']})]);};
  const create=async()=>{if(!name.trim()||!creating)return;try{
   const isTemplate=creating==='checkpoint_template';
   const tags=[...new Set([...tagInput.split(/[,，]/).map(t=>t.trim()).filter(Boolean),...(isTemplate?['checkpoint']:[])])];
@@ -65,13 +72,19 @@ export function LibraryPage(){const params=useParams({strict:false});const folde
   <div className="page-icon" aria-hidden="true">{folderId?<Icon name="folderOpen" inline/>:<Icon name="library" inline/>}</div>
   {folderId&&currentFolder.isPending?<Skeleton width="45%" height={40} radius={2}/>:currentFolder.isError?<ErrorText error={currentFolder.error}/>:<InlineTitle value={title} onRename={folderId?renameFolder:undefined} autoFocus={focusTitle} transitionName={folderSharedName} transitionResource={folderId?{kind:'folder',id:folderId}:undefined}/>}
   {subtitle&&<p className="page-subtitle">{subtitle}</p>}
-  <div className="doc-header-actions"><Button label="新建文件夹" icon={<Icon name="folderPlus" size="sm"/>} variant="ghost" size="sm" onClick={()=>setCreating('folder')}/><Button label="新建记录" icon={<Icon name="plus" size="sm"/>} variant="secondary" size="sm" onClick={()=>setCreating('document')}/>{folderId&&<Button label="删除文件夹" variant="ghost" size="sm" isDisabled={deletingFolder||currentFolder.isPending} isLoading={deletingFolder} onClick={()=>void deleteFolder()}/>}</div>
+  <div className="doc-header-actions"><DropdownMenu presentation="adaptive" items={[
+   {label:'新建页面',icon:<Icon name="document" size="sm"/>,onClick:()=>void quickCreate()},
+   {label:'新建记录',onClick:()=>setCreating('document')},
+   {label:'新建文件夹',icon:<Icon name="folderPlus" size="sm"/>,onClick:()=>setCreating('folder')}
+  ]} renderTrigger={props=><Button {...props} label="新建" icon={<Icon name="plus" size="sm"/>} endContent={<Icon name="chevronDown" size="sm"/>} variant="secondary" size="sm" isLoading={quickBusy}/>}/>{folderId&&<Button label="删除文件夹" variant="ghost" size="sm" isDisabled={deletingFolder||currentFolder.isPending} isLoading={deletingFolder} onClick={()=>void deleteFolder()}/>}</div>
  </header>
  <AutoResizer><AutoTransition transitionKey={creating?'form':'none'} type="slideUp">{creating&&<Card className="inline-form create-surface" padding={4}><form className="create-form" onSubmit={e=>{e.preventDefault();void create();}}><div className="create-fields"><div className="inline-selector"><Selector label="类型" size="md" width="100%" value={creating} options={[{value:'folder',label:'文件夹'},{value:'document',label:'文档'},{value:'checkpoint_template',label:'阶段总结（文档模板）'},{value:'task_list',label:'任务列表'}]} onChange={value=>setCreating(value as typeof creating)}/></div><div className="inline-field"><TextInput label="名称" hasAutoFocus width="100%" placeholder="名称" value={name} onChange={setName} onEnter={create} onKeyDown={e=>{if(e.key==='Escape')setCreating(null);}}/></div>{creating!=='folder'&&<div className="inline-field"><TextInput label="标签" width="100%" placeholder="标签（逗号分隔，可选）" value={tagInput} onChange={setTagInput}/></div>}</div><div className="create-actions"><Button type="submit" label="创建" variant="primary" isDisabled={!name.trim()}/><Button label="取消" onClick={()=>setCreating(null)}/></div></form></Card>}</AutoTransition></AutoResizer>
  <AutoResizer>{Boolean(error)&&<div className="doc-notice"><ErrorText error={error}/></div>}</AutoResizer>
- {!folderId&&<div className="library-archive-link"><Link to="/archive" className="text-link"><Icon name="archive" size="sm"/>查看归档内容</Link></div>}
+ <WorkspaceToolbar filters={<><Selector label="目录排序" isLabelHidden size="sm" value={sort} options={[{value:'default',label:'默认排序'},{value:'name',label:'按名称'},{value:'updated',label:'最近修改'}]} onChange={value=>setSort(value as typeof sort)}/>
+  {!folderId&&<Link to="/archive" className="library-archive-link text-link"><Icon name="archive" size="sm"/>查看归档内容</Link>}</>}
+  search={<WorkspaceSearch label="搜索当前目录" placeholder="搜索当前目录…" value={filter} onChange={value=>setFilter(value.slice(0,200))}/>}/>
  <div className="file-table"><div className="file-table-head"><span>名称</span><span>类型</span><span>最近修改</span></div>
-  <Swap state={stateOf(q,!entries.length)}>{q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:entries.length?entries.map(item=>item.entityType==='folder'?<Link to="/library/$folderId" params={{folderId:item.id}} className="file-row" key={item.id} onClick={()=>markSharedNavigationSource('library:folder:'+item.id)}><span><Icon name="folder" size="md"/><span className="truncate file-row-title" {...sharedSourceAttributes('folder',item.id,'library:folder:'+item.id)}>{item.name}</span></span><span>文件夹</span><span>{fmt(item.updatedAt)}</span></Link>:<Link to="/records/$recordId" params={{recordId:item.id}} className={'file-row'+(item.status==='archived'?' is-archived':'')} key={item.id} onClick={()=>markSharedNavigationSource('library:record:'+item.id)}><span>{item.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}{item.kind==='document'?<span className="file-row-filename"><span className="file-row-title" {...sharedSourceAttributes('record',item.id,'library:record:'+item.id)}>{documentDisplayName(item.name)}</span><span className="file-row-extension">{/\.md$/i.test(item.name)?item.name.slice(-3):'.md'}</span></span>:<span className="truncate file-row-title" {...sharedSourceAttributes('record',item.id,'library:record:'+item.id)}>{item.name}</span>}</span><span>{item.status==='archived'?'已归档':item.kind==='task_list'?'任务':'文档'}</span><span>{fmt(item.updatedAt)}</span></Link>):<Empty title="此目录没有内容" description="创建一个文件夹或记录以开始。"/>}</Swap>
-  {!q.isPending&&!q.isError&&<Button label={quickBusy?'正在创建…':'新建页面'} variant="ghost" width="100%" className="file-new" isDisabled={quickBusy} icon={<Icon name="plus" size="sm"/>} onClick={()=>void quickCreate()}/>}</div>
+  <Swap state={stateOf(q,!entries.length)}>{q.isPending?<LoadingRows kind="files" count={5}/>:q.isError?<ErrorText error={q.error}/>:entries.length?entries.map(item=>item.entityType==='folder'?<Link to="/library/$folderId" params={{folderId:item.id}} className="file-row" key={item.id} onClick={()=>markSharedNavigationSource('library:folder:'+item.id)}><span><Icon name="folder" size="md"/><span className="truncate file-row-title" {...sharedSourceAttributes('folder',item.id,'library:folder:'+item.id)}>{item.name}</span></span><span>文件夹</span><span>{fmt(item.updatedAt)}</span></Link>:<Link to="/records/$recordId" params={{recordId:item.id}} className={'file-row'+(item.status==='archived'?' is-archived':'')} key={item.id} onClick={()=>markSharedNavigationSource('library:record:'+item.id)}><span>{item.kind==='task_list'?<Icon name="taskList" size="md"/>:<Icon name="document" size="md"/>}{item.kind==='document'?<span className="file-row-filename"><span className="file-row-title" {...sharedSourceAttributes('record',item.id,'library:record:'+item.id)}>{documentDisplayName(item.name)}</span><span className="file-row-extension">{/\.md$/i.test(item.name)?item.name.slice(-3):'.md'}</span></span>:<span className="truncate file-row-title" {...sharedSourceAttributes('record',item.id,'library:record:'+item.id)}>{item.name}</span>}</span><span>{item.status==='archived'?'已归档':item.kind==='task_list'?'任务':'文档'}</span><span>{fmt(item.updatedAt)}</span></Link>):<Empty title={query?'没有匹配的内容':'此目录没有内容'} description={query?'试试其他名称或清除搜索。':'创建一个文件夹或记录以开始。'} />}</Swap>
+ </div>
  {q.hasNextPage&&<div className="load-more"><Button label="加载更多" onClick={()=>q.fetchNextPage()} size="sm" variant="ghost" isLoading={q.isFetchingNextPage}/></div>}</div>;
 }

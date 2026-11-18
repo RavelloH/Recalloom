@@ -8,11 +8,11 @@ import {searchExcerpt,type SearchDocument} from './search-excerpt.js';
 
 export {EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,splitText,processIndexJobs} from './indexing.js';
 import {embed} from './indexing.js';
-type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;sourceText:string;chunkIndex?:number;semanticScore?:number};
+type SearchRow={id:string;name:string;kind:string;status:string;revision:number;score:number;source:string;sourceText:string;chunkIndex?:number;semanticScore?:number;folderName?:string|null};
 
 export async function search(env:Env,input:{
   query:string;mode?:'metadata'|'literal'|'semantic'|'hybrid'|'auto';
-  folderId?:string;status?:string;tag?:string;limit?:number;minScore?:number
+  folderId?:string;status?:string;tag?:string;limit?:number;minScore?:number;includeFolderName?:boolean
 }) {
   const query=input.query.trim(),mode=input.mode??'auto',limit=Math.min(30,Math.max(1,input.limit??10));
   const intentScore=prepareSemanticIntent(query);
@@ -31,10 +31,10 @@ export async function search(env:Env,input:{
       const originals=(await env.DB.prepare("SELECT r.id,r.name,c.revision,c.content FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.status<>'archived' AND r.id IN ("+missing.map(()=>'?').join(',')+")").bind(...missing.map(row=>row.id)).all()).results as Array<SearchDocument&{id:string}>;
       for(const document of originals)documents.set(document.id,document);
     }
-    return rows.flatMap(({sourceText,...row})=>{
+    return rows.flatMap(({sourceText,folderName,...row})=>{
       const document=documents.get(row.id);
       if((document&&document.revision!==row.revision)||(missing.some(candidate=>candidate.id===row.id)&&!document))return [];
-      return [{...row,...searchExcerpt(query,sourceText,document,row.chunkIndex)}];
+      return [{...row,...(input.includeFolderName?{folderName:folderName??null}:{}),...searchExcerpt(query,sourceText,document,row.chunkIndex)}];
     });
   };
   const semanticById=new Map<string,SearchRow>();
@@ -74,7 +74,7 @@ export async function search(env:Env,input:{
         lexicalResults.push({id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
           score:mode==='metadata'?0.8:pos<0?0.8:1,
           source:mode==='metadata'?'metadata':'literal',
-          sourceText:row.content});
+          sourceText:row.content,folderName:row.folderName});
       }
       // Own titles rank above body mentions, with recency preserved for ties.
       lexicalResults.sort((a,b)=>(titleMatches.get(b.id)!-titleMatches.get(a.id)!)||b.score-a.score);
@@ -95,11 +95,11 @@ export async function search(env:Env,input:{
         const where=["s.chunk_id IN ("+chunkIds.map(()=>'?').join(',')+")",
           's.revision=c.revision',...filterSql];
         const rows=(await env.DB.prepare(
-          'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision,s.chunk_index '+
+          'SELECT s.chunk_id,s.content,r.id,r.name,r.kind,r.status,c.revision,s.chunk_index '+(input.includeFolderName?',f.name AS folderName ':'')+
           'FROM search_chunks s JOIN records r ON r.id=s.record_id '+
-          'JOIN record_contents c ON c.record_id=r.id WHERE '+where.join(' AND ')
+          'JOIN record_contents c ON c.record_id=r.id '+(input.includeFolderName?'LEFT JOIN folders f ON f.id=r.folder_id ':'')+'WHERE '+where.join(' AND ')
         ).bind(...chunkIds,...bind).all()).results as Array<{
-          chunk_id:string;chunk_index?:number;content:string;id:string;name:string;kind:string;status:string;revision:number
+          chunk_id:string;chunk_index?:number;content:string;id:string;name:string;kind:string;status:string;revision:number;folderName?:string|null
         }>;
         const byChunk=new Map(rows.map(row=>[row.chunk_id,row]));
         for(const hit of candidates){
@@ -111,7 +111,7 @@ export async function search(env:Env,input:{
           if(prior&&prior.score>=score)continue;
           semanticById.set(row.id,{
             id:row.id,name:row.name,kind:row.kind,status:row.status,revision:row.revision,
-            score,semanticScore:hit.score,source:'semantic',sourceText:row.content,chunkIndex:row.chunk_index
+            score,semanticScore:hit.score,source:'semantic',sourceText:row.content,chunkIndex:row.chunk_index,folderName:row.folderName
           });
         }
       }

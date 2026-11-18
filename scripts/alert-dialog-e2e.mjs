@@ -17,7 +17,8 @@ try {
  await page.getByRole('button',{name:'登录',exact:true}).click();
  await page.waitForURL(base+'/');
  await page.goto(base+'/library');
- await page.getByRole('button',{name:'新建记录'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建记录',exact:true}).click();
  await page.getByRole('textbox',{name:'名称'}).fill('Astryx confirmation isolated '+Date.now());
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.waitForURL(/\/records\//);

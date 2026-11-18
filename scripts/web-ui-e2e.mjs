@@ -76,6 +76,7 @@ try{
  await page.keyboard.type(paletteQuery);
  await palette.getByRole('button',{name:'在搜索页查看全部结果',exact:true}).click();
  await page.waitForURL(next=>next.pathname==='/search'&&next.searchParams.get('q')===paletteQuery);
+ await page.waitForFunction(query=>document.querySelector('.search-form input')?.value===query,paletteQuery);
  assert.equal(await page.getByRole('textbox',{name:'搜索关键字'}).inputValue(),paletteQuery,'palette footer carries its current query into full search');
  await page.goto(url+'/');
  await page.getByRole('heading',{name:'概览'}).waitFor();
@@ -210,7 +211,8 @@ try{
  await page.goto(url+'/library');
  await page.getByRole('heading',{name:'知识库'}).waitFor();
  const folderName='UI test '+Date.now();
- await page.getByRole('button',{name:'新建文件夹'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建文件夹',exact:true}).click();
  const field=page.getByRole('textbox',{name:'名称'});
  const inputStyle=await field.evaluate(el=>({border:getComputedStyle(el).borderStyle,padding:getComputedStyle(el).padding}));
  assert.equal(inputStyle.border,'none','Astryx TextInput must not receive a duplicate native border');
@@ -220,7 +222,8 @@ try{
  await page.locator('.file-row').getByText(folderName,{exact:true}).first().click();
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
  const folderUrl=page.url();
- await page.getByRole('button',{name:'新建页面',exact:true}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建页面',exact:true}).click();
  await page.waitForURL(next=>next.pathname.startsWith('/records/'));
  await page.locator('.record-page h1.page-title').waitFor();
  const quickRecordUrl=new URL(page.url());
@@ -238,7 +241,8 @@ try{
  console.log('PASS Astryx palette full search, library quick create and folder disclosure');
  await page.goto(folderUrl);
  await page.getByRole('heading',{name:folderName,level:1}).waitFor();
- await page.getByRole('button',{name:'新建记录'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建记录',exact:true}).click();
  await page.getByRole('textbox',{name:'名称'}).fill('First note');
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.getByRole('heading',{name:'First note'}).waitFor();
@@ -346,7 +350,8 @@ try{
  await mobile.close();
  // A checkpoint is now an ordinary document template carrying regular tags.
  await page.goto(folderUrl);
- await page.getByRole('button',{name:'新建记录'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建记录',exact:true}).click();
  await chooseOption(page,'类型','阶段总结（文档模板）');
  await page.getByRole('textbox',{name:'名称'}).fill('Phase summary');
  await page.getByRole('textbox',{name:'标签'}).fill('planning, retrospective');

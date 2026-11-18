@@ -10,6 +10,17 @@ import {createRecord,getRecord} from '../src/storage/record-core.js';
 import {restoreRecord} from '../src/storage/record-revisions.js';
 import {mutateTasks} from '../src/storage/task-mutations.js';
 import type {Env,Task} from '../src/types.js';
+import {groupActivity,type ActivityEvent} from '../web/src/activity/data.js';
+
+test('timeline combines nearby runs of the same tag operation without hiding original events',()=>{
+ const entry=(seq:number,minute:string,operation='tag_auto_update',actor='system:smart-tags'):ActivityEvent=>({seq,actor,operation,entityId:'record-'+seq,category:'organization',createdAt:'2026-11-18T12:'+minute+'Z'});
+ const events=[entry(8,'05:30'),entry(7,'05:10'),entry(6,'04:45'),entry(5,'04:20'),
+  entry(4,'04:19','tag_auto_update','system:other'),entry(3,'04:18','update'),entry(2,'04:17')];
+ const groups=groupActivity(events,'Asia/Shanghai');
+ assert.deepEqual(groups.map(group=>[group.mode,group.events.map(event=>event.seq)]),[
+  ['tagBatch',[8,7,6]],['single',[5]],['single',[4]],['single',[3]],['single',[2]]
+ ]);
+});
 
 function fixture(){
  const db=new DatabaseSync(':memory:'),directory=new URL('../migrations/',import.meta.url);

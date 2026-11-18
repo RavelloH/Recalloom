@@ -8,7 +8,7 @@ export const queryClient=new QueryClient({defaultOptions:{queries:{retry:1,stale
 
 export type FolderDetail={id:string;name:string;parentId:string|null;description?:string;metadataRevision:number};
 export type SearchMode='auto'|'literal'|'metadata'|'semantic'|'hybrid';
-export type SearchHit={id:string;name:string;kind?:string;description?:string;snippet?:string;snippetFormat?:'text'|'markdown';revision?:number;chunkIndex?:number;lineStart?:number;lineEnd?:number;path?:string;score?:number;semanticScore?:number;source?:'literal'|'metadata'|'semantic'|'hybrid'};
+export type SearchHit={id:string;name:string;kind?:string;description?:string;snippet?:string;snippetFormat?:'text'|'markdown';revision?:number;chunkIndex?:number;lineStart?:number;lineEnd?:number;path?:string;folderName?:string|null;score?:number;semanticScore?:number;source?:'literal'|'metadata'|'semantic'|'hybrid'};
 export type SearchResult={items:SearchHit[];indexMayLag?:boolean;degraded?:boolean};
 
 export const recordQuery=(id:string)=>queryOptions({queryKey:['record',id],queryFn:()=>record(id)});
@@ -20,10 +20,10 @@ export const graphQuery=(focusId?:string,semantic=true)=>queryOptions({
  queryFn:()=>api<GraphResponse>('/graph?'+queryString({focusId,semantic:String(semantic),limit:80})),staleTime:45_000
 });
 export const folderQuery=(id:string)=>queryOptions({queryKey:['folder',id],queryFn:()=>api<FolderDetail>('/folders/'+id)});
-export const folderPagesQuery=(folderId:string|null)=>infiniteQueryOptions({
- queryKey:['browse-pages',folderId],
+export const folderPagesQuery=(folderId:string|null,query='',sort?:'name'|'updated')=>infiniteQueryOptions({
+ queryKey:['browse-pages',folderId,query,sort],
  initialPageParam:undefined as string|undefined,
- queryFn:({pageParam})=>browse(folderId,pageParam),
+ queryFn:({pageParam,signal})=>browse(folderId,pageParam,{query:query||undefined,sort},signal),
  getNextPageParam:last=>last.page.hasMore&&last.page.nextCursor!=null?String(last.page.nextCursor):undefined
 });
 export type ArchivedRecord={id:string;name:string;kind:'document'|'task_list';folderId:string|null;folderName:string|null;archivedFromPath:string|null;archivedAt:string|null;metadataRevision:number;revision:number;updatedAt:string};

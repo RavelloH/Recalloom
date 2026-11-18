@@ -3,12 +3,15 @@ export class ApiError extends Error {constructor(public status:number,public cod
 export async function api<T>(path:string,init:RequestInit={}):Promise<T>{
  const response=await fetch('/api'+path,{...init,method:init.method||'GET',credentials:'same-origin',headers:{...(init.body?{'content-type':'application/json'}:{}),...init.headers},cache:'no-store'});
  const data=await response.json().catch(()=>({code:'INVALID_RESPONSE'}));
- if(!response.ok)throw new ApiError(response.status,data.code||'HTTP_'+response.status,data.message||undefined);
+ if(!response.ok){
+  const error=data as {code?:string;message?:string}|null;
+  throw new ApiError(response.status,error?.code||'HTTP_'+response.status,error?.message||undefined);
+ }
  return data as T;
 }
 export const mutate=<T>(path:string,body:unknown,method='POST')=>api<T>(path,{method,body:JSON.stringify(body)});
 export const queryString=(data:Record<string,string|number|null|undefined>)=>new URLSearchParams(Object.entries(data).filter(([,v])=>v!==undefined&&v!==null).map(([k,v])=>[k,String(v)])).toString();
-export const browse=(folderId?:string|null,cursor?:string)=>api<Paged<Entry>>('/folders?'+queryString({parentId:folderId,cursor,limit:100}));
+export const browse=(folderId?:string|null,cursor?:string,filters?:{query?:string;sort?:'name'|'updated'},signal?:AbortSignal)=>api<Paged<Entry>>('/folders?'+queryString({parentId:folderId,cursor,limit:100,...filters}),{signal});
 export const record=(id:string)=>api<RecordDetail>('/records/'+encodeURIComponent(id));
 export const tasks=(filter?:{recordId?:string;status?:string})=>api<Paged<Task>>('/tasks?'+queryString({recordId:filter?.recordId,status:filter?.status,limit:200}));
 export const versions=(id:string)=>api<Paged<Version>>('/records/'+id+'/versions?limit=50');

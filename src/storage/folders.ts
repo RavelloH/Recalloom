@@ -14,35 +14,44 @@ export async function createFolder(env: Env, name: string, parentId: string|null
   return {id,parentId,name,description,metadataRevision:1};
 }
 
-type BrowseCursor={folderId:string|null;folderDone:boolean;recordDone:boolean;lastFolder?:{name:string;id:string};lastRecord?:{updatedAt:string;id:string}};
+type BrowseOptions={query?:string;sort?:'name'|'updated'};
+type BrowseCursor={folderId:string|null;scope?:string;folderDone:boolean;recordDone:boolean;lastFolder?:{name:string;id:string};lastRecord?:{updatedAt:string;id:string}};
 
-export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:string|null){
+export async function browse(env:Env,folderId:string|null=null,limit=50,cursor?:string|null,options:BrowseOptions={}){
   if(folderId&&!(await env.DB.prepare('SELECT id FROM folders WHERE id=?').bind(folderId).first()))throw new StorageError('FOLDER_NOT_FOUND');
   const size=bounded(limit,100);
-  let state:BrowseCursor={folderId,folderDone:false,recordDone:false};
+  const query=options.query?.trim()??'', sort=options.sort;
+  const scope=query||sort?JSON.stringify([query,sort??null]):undefined;
+  let state:BrowseCursor={folderId,scope,folderDone:false,recordDone:false};
   if(cursor){
     try{
       const value=JSON.parse(cursor) as BrowseCursor;
-      if(value.folderId!==folderId||typeof value.folderDone!=='boolean'||typeof value.recordDone!=='boolean')throw Error();
+      if(value.folderId!==folderId||value.scope!==scope||typeof value.folderDone!=='boolean'||typeof value.recordDone!=='boolean')throw Error();
       state=value;
     }catch{throw new StorageError('INVALID_CURSOR');}
   }
+  const folderColumn=sort==='updated'?'updated_at':sort==='name'?'name COLLATE NOCASE':'name';
+  const recordColumn=sort==='name'?'r.name COLLATE NOCASE':'r.updated_at';
+  const order=(column:string,ascending:boolean,id:string)=>`${column} ${ascending?'ASC':'DESC'},${id}`;
+  const seek=(column:string,ascending:boolean,id:string)=>`(? IS NULL OR ${column}${ascending?'>':'<'}? OR (${column}=? AND ${id}>?))`;
+  const match=(column:string)=>query?` AND instr(lower(${column}),lower(?))>0`:'';
+  const filter=query?[query]:[];
   const [folderRows,recordRows]=await Promise.all([
     state.folderDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
-      env.DB.prepare('SELECT id,parent_id AS parentId,name,description,metadata_revision AS metadataRevision,updated_at AS updatedAt FROM folders WHERE parent_id IS ? AND (? IS NULL OR name>? OR (name=? AND id>?)) ORDER BY name,id LIMIT ?')
-        .bind(folderId,state.lastFolder?.name??null,state.lastFolder?.name??'',state.lastFolder?.name??'',state.lastFolder?.id??'',size+1).all(),
+      env.DB.prepare('SELECT id,parent_id AS parentId,name,description,metadata_revision AS metadataRevision,updated_at AS updatedAt FROM folders WHERE parent_id IS ?'+match('name')+' AND '+seek(folderColumn,sort!=='updated','id')+' ORDER BY '+order(folderColumn,sort!=='updated','id')+' LIMIT ?')
+        .bind(folderId,...filter,state.lastFolder?.name??null,state.lastFolder?.name??'',state.lastFolder?.name??'',state.lastFolder?.id??'',size+1).all(),
     state.recordDone?Promise.resolve({results:[] as Array<Record<string,unknown>>}):
-      env.DB.prepare("SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND r.status!='archived' AND (? IS NULL OR r.updated_at<? OR (r.updated_at=? AND r.id>?)) ORDER BY r.updated_at DESC,r.id LIMIT ?")
-        .bind(folderId,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
+      env.DB.prepare("SELECT r.id,r.folder_id AS folderId,r.name,r.kind,r.status,r.description,r.metadata_revision AS metadataRevision,r.updated_at AS updatedAt,c.revision,(SELECT json_group_array(t.name) FROM record_tags rt JOIN tags t ON t.id=rt.tag_id WHERE rt.record_id=r.id) AS tags FROM records r JOIN record_contents c ON c.record_id=r.id WHERE r.folder_id IS ? AND r.status!='archived'"+match('r.name')+' AND '+seek(recordColumn,sort==='name','r.id')+' ORDER BY '+order(recordColumn,sort==='name','r.id')+' LIMIT ?')
+        .bind(folderId,...filter,state.lastRecord?.updatedAt??null,state.lastRecord?.updatedAt??'',state.lastRecord?.updatedAt??'',state.lastRecord?.id??'',size+1).all()
   ]);
   const folders=folderRows.results.slice(0,size) as Array<Record<string,unknown>>;
   const recordAllowance=Math.max(0,size-folders.length);
   const records=recordRows.results.slice(0,recordAllowance) as Array<Record<string,unknown>>;
   const folderDone=state.folderDone||folderRows.results.length<=size;
   const recordDone=state.recordDone||recordRows.results.length===0||(recordAllowance>0&&recordRows.results.length<=recordAllowance);
-  const next:BrowseCursor={folderId,folderDone,recordDone,
-    lastFolder:folders.length?{name:String(folders.at(-1)?.name),id:String(folders.at(-1)?.id)}:state.lastFolder,
-    lastRecord:records.length?{updatedAt:String(records.at(-1)?.updatedAt),id:String(records.at(-1)?.id)}:state.lastRecord};
+  const next:BrowseCursor={folderId,scope,folderDone,recordDone,
+    lastFolder:folders.length?{name:String(folders.at(-1)?.[sort==='updated'?'updatedAt':'name']),id:String(folders.at(-1)?.id)}:state.lastFolder,
+    lastRecord:records.length?{updatedAt:String(records.at(-1)?.[sort==='name'?'name':'updatedAt']),id:String(records.at(-1)?.id)}:state.lastRecord};
   const items:Array<Record<string,unknown>>=[
     ...folders.map(row=>({entityType:'folder',...row})),
     ...records.map(row=>({entityType:'record',...row,tags:JSON.parse(String(row.tags??'[]'))}))

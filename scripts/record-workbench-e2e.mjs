@@ -231,7 +231,8 @@ try{
  // The editor-author query is independent of the record timestamp. Delay it
  // to prove that no separator, dash or author label leaks during loading.
  const name='Knowledge Workbench '+Date.now();
- await page.getByRole('button',{name:'新建记录'}).click();
+ await page.getByRole('button',{name:'新建',exact:true}).click();
+ await page.getByRole('menuitem',{name:'新建记录',exact:true}).click();
  await page.getByRole('textbox',{name:'名称'}).fill(name);
  await page.getByRole('button',{name:'创建',exact:true}).click();
  await page.waitForURL(/\/records\//);

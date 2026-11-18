@@ -489,12 +489,6 @@
 }
 
 .library-archive-link {
-  display: flex;
-  justify-content: flex-end;
-  margin: -4px 0 14px;
-}
-
-.library-archive-link .text-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;

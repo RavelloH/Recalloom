@@ -1,4 +1,4 @@
-import {lazy,Suspense,useId,useLayoutEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useId,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import {Link} from '@tanstack/react-router';
 import {motion,useReducedMotion} from 'motion/react';
 import {Button} from '@astryxdesign/core/Button';
@@ -16,22 +16,28 @@ const SearchTaskPreview=lazy(()=>import('./search-task-preview'));
 
 export function SearchResultCard({result,index,query}:{result:SearchHit;index:number;query:string}){
  const titleId=useId(),excerptId=useId(),viewport=useRef<HTMLDivElement>(null),content=useRef<HTMLDivElement>(null);
- const [expanded,setExpanded]=useState(false),[overflow,setOverflow]=useState(false);
+ const [expanded,setExpanded]=useState(false),[preview,setPreview]=useState({overflow:false,offset:0});
  const reduced=useReducedMotion(),exact=result.source!=='semantic';
  const name=result.kind==='task_list'?result.name:documentDisplayName(result.name);
+ const folder=result.path?.slice(0,result.path.lastIndexOf('/'))||result.folderName||(result.folderName===null?'知识库根目录':null);
  const source='search:'+result.id+':'+index;
  useLayoutEffect(()=>{
   const host=viewport.current,body=content.current;
   if(!host||!body)return;
   const measure=()=>{
    const limit=parseFloat(getComputedStyle(host).getPropertyValue('--search-preview-height'))||176;
-   const next=body.getBoundingClientRect().height>limit+1;
-   setOverflow(previous=>previous===next?previous:next);
+   const bounds=body.getBoundingClientRect(),overflow=bounds.height>limit+1;
+   const mark=overflow&&result.kind!=='task_list'?body.querySelector('.search-highlight:not(:is(h1,h2,h3,h4,h5,h6) *)'):null;
+   const hit=mark?mark.getBoundingClientRect().top-bounds.top:0;
+   const offset=hit>limit-64?Math.max(0,Math.round(hit-44)):0;
+   setPreview(previous=>previous.overflow===overflow&&previous.offset===offset?previous:{overflow,offset});
   };
   const observer=new ResizeObserver(measure);
   observer.observe(body);observer.observe(host);measure();
   return()=>observer.disconnect();
- },[result.kind,result.snippet,result.description]);
+ },[result.kind,result.snippet,result.description,query]);
+ const {overflow,offset}=preview;
+ const cropped=!expanded&&offset>0;
 
  return <Card className="search-result-card" padding={0}>
   <Link to="/records/$recordId" params={{recordId:result.id}} className="search-result" aria-labelledby={titleId} onClick={()=>markSharedNavigationSource(source)}>
@@ -43,11 +49,12 @@ export function SearchResultCard({result,index,query}:{result:SearchHit;index:nu
     <span>{result.kind==='task_list'?'任务列表':'文稿'}</span>
     {result.source==='semantic'&&<span className="semantic-label">语义相关</span>}
     {result.source==='hybrid'&&<span className="semantic-label">关键词＋语义</span>}
-    {result.path&&<span className="search-result-path" title={result.path}>{result.path}</span>}
+    {folder&&<span className="search-result-path" title={result.path??folder}>{folder}</span>}
    </div>
   </Link>
   {(result.description||result.snippet||result.kind==='task_list')&&<div className="search-preview">
-   <AutoResizer><div ref={viewport} id={excerptId} className="search-snippet" data-truncated={overflow&&!expanded||undefined} data-expanded={expanded||undefined}>
+   <AutoResizer><div ref={viewport} id={excerptId} className="search-snippet" data-truncated={overflow&&!expanded||undefined} data-expanded={expanded||undefined}
+    data-offset={cropped||undefined} style={{'--search-preview-offset':cropped?offset+'px':undefined} as CSSProperties}>
     <div ref={content} className="search-excerpt-content">
      {result.description&&<p className="search-result-description"><SearchHighlight text={result.description} query={query} enabled={exact}/></p>}
      <Suspense fallback={<SearchSnippetSkeleton/>}>{result.kind==='task_list'

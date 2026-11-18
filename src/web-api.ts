@@ -151,8 +151,8 @@ webApi.get('/recent-updates',async(c)=>{
  return asJson(await recentUpdates(c.env,q.limit??8));
 });
 webApi.get('/folders',async(c)=>{
-  const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional()}));
-  return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor));
+  const q=parseQuery(c.req.url,z.object({parentId:uuid.nullable().optional(),limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional(),sort:z.enum(['name','updated']).optional()}));
+  return asJson(await store.browse(c.env,q.parentId??null,q.limit,q.cursor,{query:q.query,sort:q.sort}));
 });
 webApi.get('/archives',async(c)=>{
   const q=parseQuery(c.req.url,z.object({limit,cursor:z.string().max(4096).optional(),query:z.string().max(200).optional(),kind:recordKind.optional(),sort:z.enum(['archived','oldest','name','path']).optional()}));
@@ -306,7 +306,7 @@ webApi.get('/graph',async(c)=>{
 });
 webApi.get('/search',async(c)=>{
   const q=parseQuery(c.req.url,z.object({query:z.string().trim().min(1).max(4000),mode:z.enum(['metadata','literal','semantic','hybrid','auto']).optional(),folderId:uuid.optional(),status:status.optional(),tag:z.string().max(64).optional(),limit:z.coerce.number().int().min(1).max(30).optional(),minScore:z.coerce.number().min(0).max(1).optional()}));
-  const {results,...rest}=await search(c.env,q);
+  const {results,...rest}=await search(c.env,{...q,includeFolderName:true});
   return asJson({...rest,items:results,page:{hasMore:false,nextCursor:null}});
 });
 webApi.get('/activity',async(c)=>{

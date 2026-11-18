@@ -42,13 +42,20 @@ export function eventDescription(event:ActivityEvent){
  if(event.operation==='restore'||action==='restore')return '恢复历史版本';
  return ({create:'创建',update:'更新',tag_auto_update:'更新智能标签',tag_accept_all:'采纳智能标签',tag_restore_suggestion:'恢复标签推荐',tag_create:'创建标签',tag_update:'修改标签',tag_merge:'合并标签',tag_delete:'删除标签',metadata:'修改信息',folder_update:'修改文件夹',kind_migrate:'转换类型'} as Record<string,string>)[event.operation??'']??'修改';
 }
-export type ActivityGroup={key:number;day:string;events:ActivityEvent[]};
+export type ActivityGroup={key:number;day:string;events:ActivityEvent[];mode:'single'|'revisions'|'tagBatch'};
+const batchTagOperations=new Set(['tag_auto_update','tag_merge','tag_delete']);
 export function groupActivity(items:ActivityEvent[],timeZone:string):ActivityGroup[]{
  const date=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}),groups:ActivityGroup[]=[];
  for(const item of items){
   const day=date.format(new Date(item.createdAt)),last=groups.at(-1),previous=last?.events.at(-1);
-  if(last&&previous&&last.day===day&&item.actor===previous.actor&&item.entityId===previous.entityId&&item.operation==='update'&&previous.operation==='update'&&previous.category===item.category&&Date.parse(previous.createdAt)-Date.parse(item.createdAt)<=10*60_000)last.events.push(item);
-  else groups.push({key:item.seq,day,events:[item]});
+  if(last&&previous&&last.day===day&&item.actor&&item.actor===previous.actor&&item.operation===previous.operation&&previous.category===item.category){
+   const age=Date.parse(previous.createdAt)-Date.parse(item.createdAt);
+   const batchAge=Date.parse(last.events[0].createdAt)-Date.parse(item.createdAt);
+   const mode=item.operation==='update'&&item.entityId===previous.entityId&&age>=0&&age<=10*60_000?'revisions':
+    item.operation&&batchTagOperations.has(item.operation)&&batchAge>=0&&batchAge<=60_000?'tagBatch':null;
+   if(mode){last.mode=mode;last.events.push(item);continue;}
+  }
+  groups.push({key:item.seq,day,events:[item],mode:'single'});
  }
  return groups;
 }
