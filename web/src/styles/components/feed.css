@@ -131,8 +131,10 @@
 }
 .feed-story-footer { border-top:1px solid var(--rk-border-soft); margin-top:16px; padding-top:9px; display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
 .feed-story-reading,.feed-story-actions { display:flex; align-items:center; gap:5px; min-width:0; }
-.feed-story-reading { flex:1; }
+.feed-story-reading { flex:1; justify-content:flex-end; }
 .feed-story-actions { flex:none; }
+.feed-day-items > * { min-width:0; }
+.feed-story-actions button[aria-pressed="true"] { color:var(--color-text-primary); }
 .feed-story-external { font-size:var(--rk-font-small); color:var(--rk-ink-soft); display:inline-flex; align-items:center; gap:3px; padding:8px 4px; white-space:nowrap; text-decoration:none; border-radius:5px; }
 .feed-story-external:focus-visible { outline:2px solid var(--color-border-focus,var(--color-text-link)); outline-offset:2px; }
 .feed-story-unread { display:inline-flex; align-items:center; gap:5px; color:var(--rk-ink-soft); white-space:nowrap; font-size:var(--rk-font-caption); margin-inline-start:5px; }
@@ -196,7 +198,7 @@
 .feed-detail-relation a { color:var(--color-text-link); text-decoration:none; font-size:var(--rk-font-label); }
 .feed-detail-relation p { margin:3px 0 0; color:var(--rk-ink-soft); font-size:var(--rk-font-small); line-height:1.6; overflow-wrap:anywhere; }
 .feed-detail-actions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.feed-detail-feedback > p { font-size:var(--rk-font-label); color:var(--rk-ink-soft); line-height:1.7; margin:-4px 0 2px; }
+.feed-detail-hint { font-size:var(--rk-font-label); color:var(--rk-ink-soft); line-height:1.7; margin:-4px 0 2px; }
 
 @media (hover:hover) and (pointer:fine) {
  .feed-story:hover { border-color:var(--color-border,var(--rk-border-soft)); box-shadow:0 4px 20px -12px rgba(15,15,15,.16); }
@@ -226,8 +228,8 @@
  .feed-toolbar-filters { grid-template-columns:minmax(0,1fr) auto; }
  .feed-views { max-width:100%; }
  .feed-story-footer { flex-wrap:wrap; }
- .feed-story-reading { flex:1 1 100%; }
- .feed-story-actions { justify-content:flex-end; width:100%; }
+ .feed-story-reading { flex:1 1 100%; justify-content:flex-end; }
+ .feed-story-actions { justify-content:flex-start; width:100%; }
  .feed-story-time { font-size:var(--rk-font-caption); }
  .feed-overview-order { font-size:var(--rk-font-caption); }
 }

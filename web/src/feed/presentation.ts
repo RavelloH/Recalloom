@@ -1,4 +1,4 @@
-import type {FeedItem,FeedViewerState} from '../../../src/feed-model';
+import type {FeedItem} from '../../../src/feed-model';
 
 export type FeedGroup={key:string;label:string;items:FeedItem[]};
 
@@ -18,7 +18,7 @@ export function groupFeedItems(items:FeedItem[],now=new Date()):FeedGroup[]{
  const yesterdayKey=calendarKey(yesterday);
  const groups:FeedGroup[]=[];
  for(const item of items){
-  const date=new Date(item.firstSeenAt);
+  const date=new Date(item.publishedAt??item.firstSeenAt);
   const valid=Number.isFinite(date.getTime());
   const key=valid?calendarKey(date):'unknown';
   const label=key===today?'今天':key===yesterdayKey?'昨天':valid?
@@ -33,8 +33,4 @@ export function groupFeedItems(items:FeedItem[],now=new Date()):FeedGroup[]{
 export function feedReadLabel(item:FeedItem){
  if(item.state.readRevision>=item.revision)return null;
  return item.state.readRevision>0?'有新进展':'未读';
-}
-
-export function isFeedSnoozed(state:FeedViewerState,now=Date.now()){
- return state.snoozedUntil!==null&&Date.parse(state.snoozedUntil)>now;
 }

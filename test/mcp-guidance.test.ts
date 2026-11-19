@@ -68,8 +68,8 @@ test('MCP initialize advertises server usage instructions and tools/list exposes
     await clientTransport.send({jsonrpc:'2.0',method:'notifications/initialized'});
     const result=await request('tools/list',{});
     const tools=result.tools as Array<{name:string;title:string;description:string;inputSchema:{properties?:Record<string,{description?:string}>;required?:string[]};annotations?:{readOnlyHint?:boolean;destructiveHint?:boolean}}>;
-    assert.equal(tools.length,41);
-    for(const name of ['publish_feed','query_feed','get_feed_item']){
+    assert.equal(tools.length,42);
+    for(const name of ['publish_feed','query_feed','query_feed_feedback','get_feed_item']){
       assert.ok(tools.some(tool=>tool.name===name),'Feed intake and feedback must be discoverable: '+name);
     }
     for(const name of ['list_tags','get_tag','manage_tag','query_tag_records','tag_record','get_tag_suggestions','manage_tag_suggestions']){

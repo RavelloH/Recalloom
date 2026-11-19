@@ -31,7 +31,7 @@ const items=news.map(([kind,title,summary,whyRelevant,primaryUrl,sourceCount,rea
  kind,title,summary,whyRelevant,primaryUrl,sourceCount,revision,agentName:'GitHub Agent',sourcePublisher:'Example publisher',
  firstSeenAt:stamp(hours),lastChangedAt:stamp(hours-0.1),publishedAt:stamp(hours+1),
  expiresAt:null,lifecycle:'active',
- state:{readRevision,savedAt:null,dismissedAt:null,snoozedUntil:null,feedback:null}
+ state:{readRevision,preference:null,preferenceUpdatedAt:null}
 }));
 const actions=[];
 await page.route('**/api/feed**',async route=>{
@@ -42,11 +42,10 @@ await page.route('**/api/feed**',async route=>{
   const filtered=items.filter(item=>{
    if(kind&&item.kind!==kind)return false;
    if(query&&!item.title.toLowerCase().includes(query)&&!item.summary.toLowerCase().includes(query))return false;
-   if(view==='unread')return item.state.readRevision<item.revision&&!item.state.dismissedAt&&!item.state.snoozedUntil;
-   if(view==='saved')return Boolean(item.state.savedAt);
-   if(view==='later')return Boolean(item.state.snoozedUntil);
-   if(view==='dismissed')return Boolean(item.state.dismissedAt);
-   if(view==='inbox')return !item.state.dismissedAt&&!item.state.snoozedUntil;
+   if(view==='unread')return !item.state.preference&&item.state.readRevision<item.revision;
+   if(view==='read')return !item.state.preference&&item.state.readRevision>=item.revision;
+   if(['saved','interested','not_interested'].includes(view))return item.state.preference===view;
+   if(view==='inbox')return item.state.preference!=='not_interested';
    return true;
   });
   await route.fulfill({json:{items:filtered,page:{nextCursor:null}}});return;
@@ -67,14 +66,11 @@ await page.route('**/api/feed**',async route=>{
   const input=request.postDataJSON();actions.push({id:item.id,...input});
   const state=item.state,stampNow=new Date().toISOString();
   if(input.action==='read')state.readRevision=item.revision;
-  if(input.action==='unread')state.readRevision=0;
-  if(input.action==='save')state.savedAt=stampNow;
-  if(input.action==='unsave')state.savedAt=null;
-  if(input.action==='dismiss')state.dismissedAt=stampNow;
-  if(input.action==='restore')state.dismissedAt=null;
-  if(input.action==='snooze')state.snoozedUntil=input.until;
-  if(input.action==='unsnooze')state.snoozedUntil=null;
-  if(input.action==='feedback')state.feedback=input.value==='clear'?null:input.value;
+  if(input.action==='preference'){
+   state.preference=input.value==='clear'?null:input.value;
+   state.preferenceUpdatedAt=stampNow;
+   state.readRevision=item.revision;
+  }
   await route.fulfill({json:{item:detail()}});return;
  }
  await route.fulfill({status:405,json:{error:'Not allowed'}});
@@ -111,7 +107,7 @@ try{
  await page.getByRole('heading',{name:'信息流',level:1}).waitFor();
  assert.equal(await page.locator('.feed-story').count(),5);
  assert.equal(await page.locator('.feed-day').count(),2,'Calendar groups have today and yesterday');
- assert.equal(await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button').count(),5);
+ assert.equal(await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button').count(),6);
  assert.equal(await page.getByRole('button',{name:'动态',exact:true}).getAttribute('aria-pressed'),'true');
  assert.ok(await page.locator('.feed-story[data-unread]').count()>=3);
  await checkGeometry(1365);
@@ -129,22 +125,22 @@ try{
  await page.locator('.feed-story').first().getByRole('button',{name:/一个需要保持长标题/}).click();
  await page.locator('[data-feed-detail]').waitFor();
  assert.equal(await page.locator('.feed-detail-source').count(),2,'All original sources remain visible');
- await page.getByRole('button',{name:'有帮助'}).click();
- await page.waitForFunction(()=>document.querySelector('.feed-detail-feedback button')?.getAttribute('data-variant')==='secondary');
- assert.ok(actions.some(action=>action.action==='feedback'&&action.value==='helpful'),'Feedback actually reaches the API');
- await page.getByRole('button',{name:'关闭'}).click();
- await page.locator('.feed-story').first().getByRole('button',{name:'收藏动态'}).click();
+ assert.equal(await page.locator('[data-workspace-panel="feed-detail"]').count(),1,'Uses shared stacked WorkspacePanel');
+ await page.locator('[data-feed-detail]').getByRole('button',{name:'有兴趣'}).click();
+ assert.ok(actions.some(action=>action.action==='preference'&&action.value==='interested'),'Interest reaches the API');
+ await page.locator('[data-workspace-panel="feed-detail"]').getByRole('button',{name:'关闭'}).click();
+ await page.locator('.feed-story').first().getByRole('button',{name:'收藏',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.feed-story [aria-label="取消收藏"]')!==null);
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'收藏'}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===1);
- await page.locator('.feed-story').getByRole('button',{name:'24 小时后再看'}).click();
- await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'稍后'}).click();
- await page.locator('.feed-story').getByRole('button',{name:'取消稍后阅读'}).waitFor();
+ await page.locator('.feed-story').getByRole('button',{name:'取消收藏'}).click();
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'动态',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===5);
+ await page.locator('.feed-story').nth(1).getByRole('button',{name:'没兴趣'}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===4);
- // Restore the snoozed test entry to exercise five-card responsive layouts.
- await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'稍后'}).click();
- await page.locator('.feed-story').getByRole('button',{name:'取消稍后阅读'}).click();
+ await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'不感兴趣'}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===1);
+ await page.locator('.feed-story').getByRole('button',{name:'取消不感兴趣'}).click();
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'动态',exact:true}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===5);
  for(const width of [320,390,430,820]){
@@ -152,10 +148,17 @@ try{
   console.log('Feed layout PASS width='+width+', cards='+layout.cards.length+', minAction='+Math.min(...layout.actions.map(a=>a.width)).toFixed(1));
  }
  await page.setViewportSize({width:320,height:844});
- await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'已忽略'}).click();
- await page.getByText('没有已忽略的动态').waitFor();
+ await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'未读'}).click();
+ const unreadCard=page.locator('.feed-story[data-unread]').last();
+ const readId=await unreadCard.getAttribute('data-feed-id');
+ assert.ok(readId,'Has a card for scroll-to-read test');
+ await unreadCard.scrollIntoViewIfNeeded();
+ await page.waitForFunction(id=>{
+  const card=[...document.querySelectorAll('.feed-story')].find(element=>element.dataset.feedId===id);
+  return card&&!card.hasAttribute('data-unread');
+ },readId,{timeout:8000});
+ assert.equal(await page.locator('.feed-story[data-feed-id="'+readId+'"]').count(),1,'Read card remains in unread view this visit');
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'动态',exact:true}).click();
- await page.locator('.feed-story').first().waitFor();
  await page.setViewportSize({width:390,height:844});
  await page.emulateMedia({colorScheme:'dark'});
  await page.reload();
@@ -174,7 +177,7 @@ try{
  assert.ok(contrast.ratio>=4.5,'Dark-theme title contrast must be at least 4.5:1: '+JSON.stringify(contrast));
  await page.screenshot({path:artifacts+'/feed-dark-390.png',fullPage:true});
  assert.deepEqual(errors,[],'No browser JavaScript errors or 5xx responses');
- console.log('Feed UI PASS: editorial grouping, source details, feedback, save, snooze, 320–1365px and dark scheme');
+ console.log('Feed UI PASS: stacked panel, explicit preferences, scroll-to-read snapshot, animations, 320–1365px and dark scheme');
 }finally{
  await browser.close();
 }

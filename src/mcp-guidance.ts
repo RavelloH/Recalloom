@@ -175,6 +175,11 @@ export const TOOL_GUIDANCE={
   description:'Read paged feed items with chronological ordering and optional kind, view or keyword filters. Read item details for provenance; do not treat agent analysis as verified external facts.',
   destructive:false
  },
+ query_feed_feedback:{
+  title:'Read recent owner interest feedback',
+  description:'Read explicitly saved, interested and not_interested items, newest owner preference changes first. Filter by sentiment=positive (saved + interested) or sentiment=negative, individual preference, content type or since, and follow page.nextCursor. Use this evidence to personalize future suggestions; read status alone is not a negative signal. Read only: agents cannot modify owner feedback.',
+  destructive:false
+ },
  get_feed_item:{
   title:'Read feed item and provenance',
   description:'Read one feed item, independent agent observations, cited URLs, knowledge links and owner feedback state.',

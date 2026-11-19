@@ -39,19 +39,23 @@ export const publishFeedSchema=z.object({
 }).refine(value=>value.sourceKind!=='internal'||Boolean(value.eventKey||value.sourceUrl),{
  message:'Internal posts require a stable identity'
 });
+export const feedPreferences=['saved','interested','not_interested'] as const;
 export const feedStateInput=z.discriminatedUnion('action',[
  z.object({action:z.literal('read')}).strict(),
- z.object({action:z.literal('unread')}).strict(),
- z.object({action:z.literal('save')}).strict(),
- z.object({action:z.literal('unsave')}).strict(),
- z.object({action:z.literal('dismiss')}).strict(),
- z.object({action:z.literal('restore')}).strict(),
- z.object({action:z.literal('snooze'),until:instant}).strict(),
- z.object({action:z.literal('unsnooze')}).strict(),
- z.object({action:z.literal('feedback'),value:z.enum(['helpful','irrelevant','clear'])}).strict()
+ z.object({action:z.literal('preference'),value:z.enum([...feedPreferences,'clear'])}).strict()
 ]);
+export const feedFeedbackInput=z.object({
+ preference:z.enum(feedPreferences).optional(),
+ sentiment:z.enum(['positive','negative','all']).default('all'),
+ kind:z.enum(feedKinds).optional(),
+ since:instant.optional(),
+ cursor:z.string().max(4096).optional(),
+ limit:z.number().int().min(1).max(50).default(20)
+}).strict().refine(value=>!value.preference||value.sentiment==='all',{
+ message:'Choose a specific preference or a sentiment, not both'
+});
 export const feedListInput=z.object({
- view:z.enum(['inbox','all','unread','saved','later','dismissed']).default('inbox'),
+ view:z.enum(['inbox','all','unread','read','saved','interested','not_interested']).default('inbox'),
  kind:z.enum(feedKinds).optional(),
  query:z.string().trim().max(200).default(''),
  cursor:z.string().max(4096).optional(),
@@ -61,13 +65,15 @@ export const feedListInput=z.object({
 export type FeedPublishInput=z.infer<typeof publishFeedSchema>;
 export type FeedListInput=z.infer<typeof feedListInput>;
 export type FeedStateInput=z.infer<typeof feedStateInput>;
+export type FeedFeedbackInput=z.infer<typeof feedFeedbackInput>;
+export type FeedPreference=typeof feedPreferences[number];
 export type FeedObservation={
  id:string;itemId:string;actor:string;actorName:string;sourceKind:string;sourceUrl:string|null;publisher:string;
  evidenceExcerpt:string;observedAt:string;sourcePublishedAt:string|null;
 };
 export type FeedRelation={targetType:string;targetId:string;relation:string;reason:string};
 export type FeedViewerState={
- readRevision:number;savedAt:string|null;dismissedAt:string|null;snoozedUntil:string|null;feedback:'helpful'|'irrelevant'|null
+ readRevision:number;preference:FeedPreference|null;preferenceUpdatedAt:string|null
 };
 export type FeedItem={
  id:string;kind:typeof feedKinds[number];title:string;summary:string;whyRelevant:string;

@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {feedReadLabel,feedSourceLabel,groupFeedItems,isFeedSnoozed} from '../web/src/feed/presentation.js';
+import {feedReadLabel,feedSourceLabel,groupFeedItems} from '../web/src/feed/presentation.js';
 import type {FeedItem} from '../src/feed-model.js';
 
 const sample=(id:string,firstSeenAt:string,readRevision=0,revision=1):FeedItem=>({
  id,kind:'news',title:id,summary:'Summary',whyRelevant:'',primaryUrl:'https://example.com',
  firstSeenAt,lastChangedAt:firstSeenAt,publishedAt:null,expiresAt:null,lifecycle:'active',
  revision,sourceCount:1,agentName:null,sourcePublisher:null,
- state:{readRevision,savedAt:null,dismissedAt:null,snoozedUntil:null,feedback:null}
+ state:{readRevision,preference:null,preferenceUpdatedAt:null}
 });
 
 test('feed groups consecutive items by the viewer local calendar, including year boundaries',()=>{
@@ -31,14 +31,12 @@ test('feed presentation communicates unread and updated revisions separately',()
  assert.equal(feedReadLabel(sample('c',date,2,2)), null);
 });
 
-test('feed source badges and snoozed state are based on source metadata and time',()=>{
+test('feed source badges use canonical host, and grouping uses publish time',()=>{
  assert.equal(feedSourceLabel('https://www.example.com/article?utm_source=test'),'example.com');
  assert.equal(feedSourceLabel(null),'Agent 发现');
  assert.equal(feedSourceLabel('not a URL'),'外部来源');
- const now=Date.now();
- const item=sample('a',new Date(now).toISOString());
- assert.equal(isFeedSnoozed(item.state,now),false);
- item.state.snoozedUntil=new Date(now+60000).toISOString();
- assert.equal(isFeedSnoozed(item.state,now),true);
- assert.equal(isFeedSnoozed(item.state,now+90000),false);
+ const now=new Date(2026,10,19,12);
+ const item=sample('a',new Date(2026,10,18,18).toISOString());
+ item.publishedAt=new Date(2026,10,19,9).toISOString();
+ assert.equal(groupFeedItems([item],now)[0]?.label,'今天');
 });

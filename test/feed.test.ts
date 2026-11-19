@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture} from './tag-fixture.js';
 import {feedListInput,publishFeedSchema,feedStateInput} from '../src/feed-model.js';
-import {publishFeed,listFeed,getFeedItem,updateFeedState} from '../src/feed.js';
+import {publishFeed,listFeed,getFeedItem,updateFeedState,listFeedFeedback} from '../src/feed.js';
 
 const base={kind:'release' as const,title:'Example release',summary:'Release includes incremental indexing.',whyRelevant:'Useful to Recalloom search architecture.',sourceKind:'github' as const,sourceUrl:'https://example.com/releases/v1',publisher:'Example',evidenceExcerpt:'Version 1 released',relations:[]};
 const post=(data:Record<string,unknown>={})=>publishFeedSchema.parse({...base,submissionKey:'v1',...data});
@@ -68,7 +68,7 @@ test('feed preserves explicit knowledge relations and rejects nonexistent links 
  }finally{f.db.close();}
 });
 
-test('feed state supports revision-aware read, explicit feedback and stable filters',async()=>{
+test('feed enforces exclusive preference states, read revisions, and Agent feedback query',async()=>{
  const f=fixture();
  try{
   const first=await publishFeed(f.env,post(),'agent:A');
@@ -78,25 +78,53 @@ test('feed state supports revision-aware read, explicit feedback and stable filt
   const read=await updateFeedState(f.env,id,feedStateInput.parse({action:'read'}));
   assert.equal(read.item.state.readRevision,1);
   await updateFeedState(f.env,id,{action:'read'});
-  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM feed_feedback_events WHERE item_id=?').get(id)?.n,1,'duplicate reads are not new training signals');
-  assert.equal((await listFeed(f.env,feedListInput.parse({view:'unread'}))).items.length,1);
-  await updateFeedState(f.env,id,{action:'save'});
-  assert.deepEqual((await listFeed(f.env,feedListInput.parse({view:'saved'}))).items.map(i=>i.id),[id]);
-  await updateFeedState(f.env,id,{action:'feedback',value:'helpful'});
-  assert.equal((await getFeedItem(f.env,id)).state.feedback,'helpful');
+  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM feed_feedback_events WHERE item_id=?').get(id)?.n,1);
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'read'}))).items[0]?.id,id);
+  await updateFeedState(f.env,id,{action:'preference',value:'saved'});
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'saved'}))).items[0]?.id,id);
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'read'}))).items.length,0);
+  await updateFeedState(f.env,id,{action:'preference',value:'interested'});
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'saved'}))).items.length,0);
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'interested'}))).items[0]?.id,id);
+  assert.equal((await listFeedFeedback(f.env,{limit:20,sentiment:'all',preference:'interested'})).items[0]?.id,id);
+  assert.equal((await listFeedFeedback(f.env,{limit:20,sentiment:'all',preference:'saved'})).items.length,0);
+  assert.equal((await listFeedFeedback(f.env,{limit:20,sentiment:'positive'})).items[0]?.id,id);
   const newer=await publishFeed(f.env,post({submissionKey:'independent',sourceKind:'web'}),'agent:B');
   assert.equal(newer.item.id,id);
-  assert.deepEqual(new Set((await listFeed(f.env,feedListInput.parse({view:'unread'}))).items.map(i=>i.id)),new Set([id,second.item.id]));
-  await updateFeedState(f.env,id,{action:'dismiss'});
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'unread'}))).items.some(item=>item.id===id),false,'explicit preference retains its own category after an update');
+  await updateFeedState(f.env,id,{action:'preference',value:'not_interested'});
   assert.equal((await listFeed(f.env,feedListInput.parse({view:'inbox'}))).items.some(i=>i.id===id),false);
-  assert.equal((await listFeed(f.env,feedListInput.parse({view:'dismissed'}))).items[0]?.id,id);
-  await updateFeedState(f.env,id,{action:'restore'});
-  const until=new Date(Date.now()+86400000).toISOString();
-  await updateFeedState(f.env,id,{action:'snooze',until});
-  assert.equal((await listFeed(f.env,feedListInput.parse({view:'later'}))).items[0]?.id,id);
-  await updateFeedState(f.env,id,{action:'unsnooze'});
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'not_interested'}))).items[0]?.id,id);
+  await updateFeedState(f.env,id,{action:'preference',value:'clear'});
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'unread'}))).items.some(i=>i.id===id),false,'explicit feedback marks current revision as read');
+  assert.equal((await listFeed(f.env,feedListInput.parse({view:'read'}))).items[0]?.id,id);
   assert.equal((await listFeed(f.env,feedListInput.parse({view:'inbox'}))).items.length,2);
-  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM feed_feedback_events WHERE item_id=?').get(id)?.n,7);
+  assert.equal((await listFeedFeedback(f.env,{limit:20,sentiment:'all'})).items.length,0);
+ }finally{f.db.close();}
+});
+
+test('feed orders by publication time, falls back to discovery time and paginates without duplication',async()=>{
+ const f=fixture();
+ try{
+  const dates=['2026-11-18T11:00:00Z','2026-11-19T11:00:00Z','2026-11-17T11:00:00Z'];
+  const expected=[];
+  for(let i=0;i<3;i++){
+   const res=await publishFeed(f.env,post({submissionKey:'order-'+i,sourceUrl:'https://example.com/order/'+i,publishedAt:dates[i],title:'Order '+i}),'agent:timeline');
+   expected.push(res.item.id);
+  }
+  const seen=[];let cursor:undefined|string=undefined;
+  do{
+   const result=await listFeed(f.env,feedListInput.parse({limit:1,cursor}));
+   seen.push(...result.items.map(item=>item.id));cursor=result.page.nextCursor??undefined;
+  }while(cursor);
+  assert.deepEqual(seen,[expected[1],expected[0],expected[2]]);
+  const zoned=await publishFeed(f.env,post({
+   submissionKey:'offset',sourceUrl:'https://example.com/order/offset',
+   publishedAt:'2026-11-19T20:00:00+08:00',title:'Offset time'
+  }),'agent:timeline');
+  assert.equal(zoned.item.publishedAt,'2026-11-19T12:00:00.000Z');
+  assert.equal((await listFeed(f.env,feedListInput.parse({limit:1}))).items[0]?.id,zoned.item.id);
+
  }finally{f.db.close();}
 });
 
