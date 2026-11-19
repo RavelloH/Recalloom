@@ -25,7 +25,7 @@ const suite=[
 // temporary Worker/D1 created by this harness.
 const optionalSuites=['settings-index-storage-e2e.mjs','editor-format-library-e2e.mjs','editor-rmd-ui-composition-e2e.mjs','astryx-page-primitives-e2e.mjs','archive-management-e2e.mjs','knowledge-graph-e2e.mjs','rmd-help-web-e2e.mjs',
  'web-panels-ui-e2e.mjs','alert-dialog-e2e.mjs','web-ui-e2e.mjs','record-workspace-e2e.mjs','view-transitions-e2e.mjs','shared-title-e2e.mjs','shared-sources-e2e.mjs','mobile-sidebar-e2e.mjs','scroll-navigation-e2e.mjs','recent-card-layout-e2e.mjs','home-recent-updates-e2e.mjs','home-activity-layout-e2e.mjs','activity-analytics-e2e.mjs','editor-tablet-sticky-e2e.mjs','editor-undo-clean-e2e.mjs','editor-concurrent-session-e2e.mjs','editor-merge-e2e.mjs','editor-merge-manual-e2e.mjs','editor-performance-e2e.mjs','tasks-workspace-e2e.mjs','tasks-drag-motion-e2e.mjs'];
-optionalSuites.push('help-examples-e2e.mjs','tags-management-e2e.mjs','smart-tags-e2e.mjs','workspace-browsing-e2e.mjs','smart-collections-e2e.mjs');
+optionalSuites.push('help-examples-e2e.mjs','tags-management-e2e.mjs','smart-tags-e2e.mjs','workspace-browsing-e2e.mjs','smart-collections-e2e.mjs','feed-ui-e2e.mjs');
 const requested=process.argv.slice(2);
 const chosen=requested.length?requested.map(name=>name.replace(/^scripts[\\/]/,'')):suite;
 for(const name of chosen)

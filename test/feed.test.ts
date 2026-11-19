@@ -38,6 +38,9 @@ test('feed resolves OAuth actor display names without changing stable provenance
   const observation=(await getFeedItem(f.env,item.item.id)).observations[0]!;
   assert.equal(observation.actor,'grant:'+actorId);
   assert.equal(observation.actorName,'Research Agent');
+  const preview=(await listFeed(f.env,feedListInput.parse({}))).items[0]!;
+  assert.equal(preview.agentName,'Research Agent');
+  assert.equal(preview.sourcePublisher,'Example');
  }finally{f.db.close();}
 });
 

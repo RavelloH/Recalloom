@@ -18,10 +18,16 @@ const selectItem=`SELECT i.id,i.kind,i.title,i.summary,i.why_relevant AS whyRele
  i.primary_url AS primaryUrl,i.published_at AS publishedAt,
  i.first_seen_at AS firstSeenAt,i.last_changed_at AS lastChangedAt,
  i.expires_at AS expiresAt,i.lifecycle,i.revision,
+ NULLIF(first_observation.publisher,'') AS sourcePublisher,
+ COALESCE(NULLIF(source_agent.client_name,''),CASE WHEN first_observation.actor LIKE 'grant:%' THEN NULL ELSE first_observation.actor END) AS agentName,
  (SELECT COUNT(*) FROM feed_observations o WHERE o.item_id=i.id) AS sourceCount,
  COALESCE(s.read_revision,0) AS readRevision,s.saved_at AS savedAt,
  s.dismissed_at AS dismissedAt,s.snoozed_until AS snoozedUntil,s.feedback
- FROM feed_items i LEFT JOIN feed_states s ON s.item_id=i.id AND s.viewer_id='owner'`;
+ FROM feed_items i LEFT JOIN feed_states s ON s.item_id=i.id AND s.viewer_id='owner'
+ LEFT JOIN feed_observations first_observation ON first_observation.id=(
+  SELECT o.id FROM feed_observations o WHERE o.item_id=i.id ORDER BY o.created_at ASC,o.id ASC LIMIT 1
+ )
+ LEFT JOIN oauth_actor_names source_agent ON first_observation.actor=('grant:'||source_agent.actor_id)`;
 const itemFromRow=({readRevision,savedAt,dismissedAt,snoozedUntil,feedback,...item}:ItemRow):FeedItem=>({
  ...item,state:{readRevision,savedAt,dismissedAt,snoozedUntil,feedback}
 });

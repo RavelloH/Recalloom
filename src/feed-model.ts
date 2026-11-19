@@ -72,5 +72,6 @@ export type FeedViewerState={
 export type FeedItem={
  id:string;kind:typeof feedKinds[number];title:string;summary:string;whyRelevant:string;
  primaryUrl:string|null;publishedAt:string|null;firstSeenAt:string;lastChangedAt:string;
- expiresAt:string|null;lifecycle:string;revision:number;sourceCount:number;state:FeedViewerState
+ expiresAt:string|null;lifecycle:string;revision:number;sourceCount:number;
+ agentName:string|null;sourcePublisher:string|null;state:FeedViewerState
 };

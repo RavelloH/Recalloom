@@ -14,7 +14,7 @@ import {
   IconMessage2, IconMessageExclamation, IconMessages, IconMicrophone, IconMinus, IconNote, IconNotes, IconPencil,
   IconPhoto, IconPhotoPlus, IconPlus, IconQuote, IconRefresh, IconRss, IconRestore, IconRowInsertBottom, IconRowInsertTop, IconRowRemove, IconSchema, IconSearch,
   IconSeparatorHorizontal, IconSettings, IconShield, IconSparkles, IconSquare, IconStrikethrough, IconSubscript, IconSum,
-  IconSunMoon, IconSuperscript, IconTable, IconTableRow, IconTag, IconTags, IconTextWrap, IconTool,
+  IconSunMoon, IconSuperscript, IconTable, IconTableRow, IconTag, IconTags, IconTextWrap, IconThumbDown, IconThumbUp, IconTool,
   IconTopologyStar3, IconTrash, IconTypography, IconUnderline, IconUnlink, IconUpload, IconVocabulary, IconZoomIn,
   IconZoomOut, IconX,
   type TablerIcon
@@ -150,6 +150,8 @@ const glyphs={
   taskPending:IconCircleDashed,
   taskInProgress:IconCircleHalf2,
   textWrap:IconTextWrap,
+  thumbDown:IconThumbDown,
+  thumbUp:IconThumbUp,
   tool:IconTool,
   trash:IconTrash,
   typography:IconTypography,
