@@ -16,6 +16,7 @@
 | components/tasks.css | 任务列表及状态 |
 | components/dashboard.css | 概览、最近访问、活动与统计 |
 | components/collections.css | 集合的共用样式与其它清单组件 |
+| components/feed.css | Agent 信息流卡片、筛选与动态详情（由 Feed 路由按需加载） |
 | components/forms.css | 表单、字段、属性与创建操作 |
 | components/status.css | 错误、警告、成功与进度状态 |
 | components/controls.css | 通用按钮、标签、卡片等控件 |

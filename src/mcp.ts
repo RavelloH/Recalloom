@@ -17,6 +17,8 @@ import {processVectorDeleteJobs} from './lifecycle.js';
 import {indexOverview,retryIndex} from './index-observability.js';
 import {recordRelations,graphView} from './graph.js';
 import { SERVER_INSTRUCTIONS, TOOL_GUIDANCE, type RecalloomToolName } from './mcp-guidance.js';
+import {publishFeedSchema,feedListInput} from './feed-model.js';
+import {publishFeed,listFeed,getFeedItem} from './feed.js';
 import {getHelp,listHelpResources,HELP_TOPICS,RMD_COMPONENT_NAMES,RMD_NODE_NAMES,type HelpTopic} from './help/index.js';
 
 const uuid=z.string().uuid().describe('Stable record/folder UUID returned by browse, search, or resolve_path.');
@@ -166,6 +168,9 @@ const toolSchemas={
   manage_link:z.object({id:uuid,action:z.enum(['add','remove']),targetId:uuid,relation:z.string().min(1).max(64).optional()}),
   get_overview:z.object({folderId:uuid.nullable().optional(),depth:z.number().int().min(0).max(5).describe('Descendant folder depth, 0 = selected folder only.').optional(),budget:z.number().int().min(1000).max(30000).describe('Shared character budget for record excerpts and open tasks.').optional(),cursor:pageCursor}),
   get_outline:z.object({id:uuid,revision:z.number().int().positive().optional(),limit:z.number().int().min(1).max(200).optional(),cursor:z.number().int().nonnegative().describe('Zero-based heading index from page.nextCursor; omit to start.').optional()}),
+  publish_feed:publishFeedSchema,
+  query_feed:feedListInput,
+  get_feed_item:z.object({id:uuid}).strict(),
   export_snapshot:z.object({cursor:z.string().nullable().describe('Export page.nextCursor from the previous page; omit to start.').optional(),limit:z.number().int().min(1).max(5).describe('Maximum record entries in a backup page.').optional()}),
   import_snapshot:z.object({bundle:z.unknown().describe('Complete recalloom-snapshot-v5 object shaped {pages:[...all pages...]}, including smart collections; v2/v3/v4 remain importable. Supply every page.'),dryRun:z.boolean().describe('Defaults to true. Only false performs the atomic restore.').optional()})
 };
@@ -232,6 +237,9 @@ const toolDefinitions:Record<RecalloomToolName,ToolDefinition>={
   manage_link:{schema:toolSchemas.manage_link,write:true,action:(env,actor,x)=>agent.links(env,x.id,x.action,x.targetId,x.relation,actor)},
   get_overview:{schema:toolSchemas.get_overview,write:false,action:(env,actor,x)=>agent.getOverview(env,x.folderId??null,x.depth,x.budget,x.cursor)},
   get_outline:{schema:toolSchemas.get_outline,write:false,action:(env,actor,x)=>agent.getOutline(env,x.id,x.revision,x.limit,x.cursor)},
+  publish_feed:{schema:toolSchemas.publish_feed,write:true,action:(env,actor,x)=>publishFeed(env,x,actor)},
+  query_feed:{schema:toolSchemas.query_feed,write:false,action:(env,actor,x)=>listFeed(env,x)},
+  get_feed_item:{schema:toolSchemas.get_feed_item,write:false,action:(env,actor,x)=>getFeedItem(env,x.id)},
   export_snapshot:{schema:toolSchemas.export_snapshot,write:false,action:(env,actor,x)=>agent.exportSnapshot(env,x.cursor??null,x.limit)},
   import_snapshot:{schema:toolSchemas.import_snapshot,write:true,action:(env,actor,x)=>agent.importSnapshot(env,x.bundle,x.dryRun??true,actor)}
 };

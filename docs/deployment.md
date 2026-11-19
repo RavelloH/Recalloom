@@ -78,6 +78,6 @@ MCP Resources `recalloom://help/index` 和 `recalloom://help/{topic}` 提供同�
 
 英文速查维护在 `src/help/mcp-topics.json`，中文文档维护在 `src/help/*.md`，两者的 RMD 参数和示例共用 `src/rmd/registry.json`。`get_help` 在结构化响应中返回 `schemaVersion`、`helpVersion` 和 `contentHash`。修改后运行 `pnpm help:generate` 更新生成文件，或使用 `pnpm help:watch`；`pnpm help:check` 校验同步状态。
 
-智能集合使用 D1 保存用户确认的规则。自然语言生成通过现有 Workers AI 绑定调用 `@cf/google/gemma-4-26b-a4b-it`。访问、保存和刷新集合不会调用 Gemma 4。只有包含语义主题的规则会使用原有的向量检索。独立的集合定义目前不随知识库快照导出。
+智能集合使用 D1 保存用户确认的规则。自然语言生成通过现有 Workers AI 绑定调用 `@cf/google/gemma-4-26b-a4b-it`。访问、保存和刷新集合不会调用 Gemma 4。只有包含语义主题的规则会使用原有的向量检索。独立的集合定义现已随 recalloom-snapshot-v5 导出；Feed 信息流不属于 v5 知识快照，需依靠 D1 数据库备份进行灾备。
 
 网页登录会话在闲置 30 天后到期，单次登录最长保留 90 天。活跃时间及闲置到期时间每小时按需更新，Cookie 最晚在该次登录的 90 天上限到期。现有有效的旧会话在下次访问时迁移。

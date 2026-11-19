@@ -20,6 +20,8 @@ const importRecord=()=>import('./pages/record');
 const importTasks=()=>import('./pages/tasks');
 const importSearch=()=>import('./pages/search');
 const importActivity=()=>import('./pages/activity');
+const importFeed=()=>import('./pages/feed');
+const FeedPage=lazyRouteComponent(importFeed,'FeedPage');
 const importTags=()=>import('./pages/tags');
 const TagsPage=lazyRouteComponent(importTags,'TagsPage');
 const importCollections=()=>import('./pages/collections');
@@ -113,6 +115,7 @@ const list=[
   // Search is interactive: commit query/mode changes immediately and let the
   // page's React Query state show progress instead of blocking navigation.
   loader:()=>ready(importSearch())}),
+ createRoute({getParentRoute:()=>root,path:'/feed',component:FeedPage,loader:()=>ready(importFeed())}),
  createRoute({getParentRoute:()=>root,path:'/activity',component:ActivityPage,loader:()=>ready(importActivity())}),
  createRoute({getParentRoute:()=>root,path:'/help',component:HelpRoute,loader:()=>ready(importHelp())}),
  createRoute({getParentRoute:()=>root,path:'/settings',component:SettingsPage,loader:()=>ready(importSettings())}),

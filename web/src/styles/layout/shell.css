@@ -806,7 +806,7 @@ html[data-effective-theme="dark"] .bottom-nav {
 
 .bottom-nav {
   display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
+  grid-template-columns: repeat(5,minmax(0,1fr));
   position: fixed;
   block-size: var(--rk-mobile-tab-bar-height);
   z-index: 20;

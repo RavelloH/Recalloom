@@ -8,6 +8,10 @@
 - [本地开发、测试和质量检查](development.md)
 - [应用架构与模块边界](architecture.md)
 
+## Agent 信息流
+
+- [Feed 数据模型、投稿协议与真实数据评测](feed.md)
+
 ## 编辑器与 RMD
 
 - [Rich Markdown 实现和安全规范](rich-markdown.md)

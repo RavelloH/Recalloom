@@ -21,6 +21,8 @@ import {recentUpdates} from './web-recent-updates.js';
 import {collectionDescription,collectionDraftSchema,collectionInputSchema} from './collection-model.js';
 import {parseCollectionDescription} from './collection-parser.js';
 import {collectionResults,deleteCollection,getCollection,listCollections,resolveCollectionDraft,saveCollection} from './collections.js';
+import {feedListInput,feedStateInput} from './feed-model.js';
+import {listFeed,getFeedItem,updateFeedState} from './feed.js';
 import {parsePublicImageUrl,proxyRemoteImage,privateImageResponse} from './link-image-proxy.js';
 import { capChallenge,capRedeem,webLogin,session,logout,listWebSessions,revokeWebSession,checkOrigin,cookie,WEB_COOKIE,type WebSession } from './web-auth.js';
 
@@ -62,9 +64,9 @@ webApi.onError((e)=>{
   if(e instanceof ZodError)return err('INVALID_ARGUMENT',400,e.issues.map(i=>i.path.join('.')+': '+i.message).join('; ').slice(0,600));
   if(e instanceof StorageError){
     const code=e.code;
-    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND'||code==='TAG_NOT_FOUND'||code==='COLLECTION_NOT_FOUND' ?404
-      :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'||code==='TAG_NAME_CONFLICT'||code==='SNAPSHOT_TAG_CONFLICT'?409
-      :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:code==='COLLECTION_PARSE_UNAVAILABLE'?503:400;
+    const status=code==='RECORD_NOT_FOUND'||code==='TASK_NOT_FOUND'||code==='FOLDER_NOT_FOUND'||code==='REVISION_NOT_FOUND'||code==='PATH_NOT_FOUND'||code==='ACTIVITY_NOT_FOUND'||code==='TAG_NOT_FOUND'||code==='COLLECTION_NOT_FOUND'||code==='FEED_ITEM_NOT_FOUND'||code==='FEED_TARGET_NOT_FOUND' ?404
+      :code==='VERSION_CONFLICT'||code==='ORDER_VERSION_CONFLICT'||code==='TASK_ORDER_CONFLICT'||code==='TASK_ID_CONFLICT'||code==='IDEMPOTENCY_CONFLICT'||code==='METADATA_CONFLICT'||code==='PATH_CONFLICT'||code==='RECORD_NOT_ARCHIVED'||code==='RESTORE_DESTINATION_REQUIRED'||code==='STALE_DELETE_PREVIEW'||code==='TAG_NAME_CONFLICT'||code==='SNAPSHOT_TAG_CONFLICT'||code==='FEED_IDEMPOTENCY_CONFLICT'?409
+      :code==='CONTENT_TOO_LARGE'||code==='PAYLOAD_TOO_LARGE'?413:code==='FEED_RATE_LIMIT'?429:code==='COLLECTION_PARSE_UNAVAILABLE'?503:400;
     return err(code,status,e.message,e.details);
   }
   if(e instanceof Error&&/UNIQUE constraint failed/.test(e.message))return err('PATH_CONFLICT',409);
@@ -347,6 +349,16 @@ webApi.delete('/collections/:id',async c=>{
   const {expectedRevision}=await jsonBody(c.req.raw,z.object({expectedRevision:collectionRevision}).strict(),200);
   await deleteCollection(c.env,id,expectedRevision);
   return asJson({deleted:true});
+});
+// Feed is independent of Knowledge and Activity: reading it never creates document revisions.
+webApi.get('/feed',async c=>{
+ const q=parseQuery(c.req.url,z.object({view:z.enum(['inbox','all','unread','saved','later','dismissed']).optional(),kind:z.enum(['news','release','insight','alert','digest']).optional(),query:z.string().max(200).optional(),cursor:z.string().max(4096).optional(),limit:z.coerce.number().int().min(1).max(50).optional()}));
+ return asJson(await listFeed(c.env,feedListInput.parse(q)));
+});
+webApi.get('/feed/:id',async c=>asJson({item:await getFeedItem(c.env,idSchema.parse(c.req.param()).id)}));
+webApi.post('/feed/:id/state',async c=>{
+ const {id}=idSchema.parse(c.req.param());
+ return asJson(await updateFeedState(c.env,id,await jsonBody(c.req.raw,feedStateInput,2048)));
 });
 webApi.get('/activity',async(c)=>{
   const {cursor,limit:size,...filter}=parseQuery(c.req.url,activityFilter.extend({cursor:z.coerce.number().int().nonnegative().optional(),limit}));

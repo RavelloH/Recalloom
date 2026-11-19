@@ -165,6 +165,21 @@ export const TOOL_GUIDANCE={
   description:'Read heading titles, levels and source line ranges of current or historical Markdown. Paginate with a zero-based heading cursor; keep the returned revision for follow-up reads.',
   destructive:false
  },
+ publish_feed:{
+  title:'Submit a sourced feed update',
+  description:'Submit one high-signal observation. Supply a stable submissionKey for retries, an HTTP(S) sourceUrl or eventKey, concise factual summary and whyRelevant. Exact canonical source URLs merge across agents; evidence is kept separately. Up to 200 new observations per agent per rolling 24h. No knowledge document is modified.',
+  destructive:false
+ },
+ query_feed:{
+  title:'Browse the owner feed',
+  description:'Read paged feed items with chronological ordering and optional kind, view or keyword filters. Read item details for provenance; do not treat agent analysis as verified external facts.',
+  destructive:false
+ },
+ get_feed_item:{
+  title:'Read feed item and provenance',
+  description:'Read one feed item, independent agent observations, cited URLs, knowledge links and owner feedback state.',
+  destructive:false
+ },
  export_snapshot:{
   title:'Export a versioned snapshot',
   description:'Read recalloom-snapshot-v5 pages (including smart collection definitions, tag catalog, task order and persistent Wiki path identities) with watermarks and SHA-256. Keep all pages in order until nextCursor=null; concurrent edits invalidate the export. May include sensitive history.',

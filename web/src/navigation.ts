@@ -5,6 +5,7 @@ export const menu=[
  {to:'/',name:'概览',icon:"overview"},
  {to:'/library',name:'知识库',icon:"library"},
  {to:'/tasks',name:'任务',icon:"taskList"},
+ {to:'/feed',name:'信息流',icon:"feed"},
  {to:'/search',name:'搜索',icon:"search"},
  {to:'/tags',name:'标签',icon:"tags"},
  {to:'/collections',name:'智能集合',icon:"sparkles"},

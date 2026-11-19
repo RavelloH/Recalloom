@@ -27,7 +27,7 @@ import {PageTransition} from './page-transition';
 import {useFullWidth} from './preferences';
 import {WorkspacePanels} from './workspace-panels';
 
-const quickLinks=menu.filter(item=>['/','/tasks','/tags','/collections','/activity','/archive','/graph'].includes(item.to));
+const quickLinks=menu.filter(item=>['/','/tasks','/feed','/tags','/collections','/activity','/archive','/graph'].includes(item.to));
 const appleShortcut=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/.test(navigator.platform);
 
 export function Shell({children}:{children:React.ReactNode}){
@@ -155,7 +155,7 @@ export function Shell({children}:{children:React.ReactNode}){
    </TopbarSlotProvider>
   </OverlayScroll>
  </main></WorkspacePanels>
- <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
+ <div className="bottom-nav">{menu.filter(x=>['/library','/tasks','/feed','/search','/settings'].includes(x.to)).map(({to,name,icon})=><Link key={to} to={to} className="bottom-link" activeProps={{className:'bottom-link active'}}><Icon name={icon} size="lg"/><span>{name}</span></Link>)}</div>
  {paletteActivated&&<React.Suspense fallback={commands?<div className="palette-loading" role="status"><Spinner size="sm" label="正在打开搜索…"/></div>:null}><QuickSwitcher isOpen={commands} onOpenChange={setCommands}/></React.Suspense>}
  {confirmation}
  </div>;

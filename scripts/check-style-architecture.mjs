@@ -26,6 +26,7 @@ const importedSet=new Set(importedFiles);
 // These feature styles are shipped with their route/component chunk instead of
 // the global CSS, but still participate in the same single-owner audit.
 const routeStyles=new Map([
+ ['components/feed.css',['web/src/pages/feed.tsx']],
  ['features/index-workspace.css',['web/src/settings-indexing.tsx','web/src/settings-storage.tsx']],
  ['features/graph.css',['web/src/knowledge-graph.tsx']],
  ['features/relations.css',['web/src/knowledge-graph.tsx','web/src/record-relations.tsx']],
