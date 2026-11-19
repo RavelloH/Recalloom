@@ -163,12 +163,24 @@
 .feed-inline-error { display:grid; gap:10px; margin-block:12px; }
 
 /* Detail has a stronger reading hierarchy and keeps source evidence attributable. */
-.feed-detail { display:flex; flex-direction:column; gap:15px; min-width:0; padding-block-end:14px; }
+.feed-detail {
+ box-sizing:border-box;
+ display:flex;
+ flex-direction:column;
+ gap:16px;
+ width:100%;
+ min-width:0;
+ margin:0;
+ padding:8px 18px 20px;
+}
+.feed-panel-loading,.feed-panel-error { box-sizing:border-box; padding:16px 18px 24px; min-width:0; }
+.workspace-panel-sheet .feed-detail { padding:12px 20px 24px; }
+.workspace-panel-sheet .feed-panel-loading,.workspace-panel-sheet .feed-panel-error { padding:18px 20px 28px; }
 .feed-detail-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .feed-detail-category { display:inline-flex; align-items:center; gap:6px; font-size:var(--rk-font-small); color:var(--rk-ink-soft); font-weight:600; }
 .feed-detail h2 { margin:0; font-size:clamp(20px,2vw,24px); font-weight:680; line-height:1.45; letter-spacing:-.018em; overflow-wrap:anywhere; }
 .feed-detail-meta { display:flex; align-items:center; gap:8px 12px; flex-wrap:wrap; font-size:var(--rk-font-small); color:var(--rk-ink-faint); }
-.feed-detail-meta > span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.feed-detail-meta > span { display:inline-flex; align-items:center; gap:4px; min-width:0; flex-wrap:wrap; overflow-wrap:anywhere; }
 .feed-detail-unread { color:var(--rk-ink-soft); }
 .feed-detail-lead { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:15px; line-height:1.85; color:var(--color-text-primary); }
 .feed-detail-relevance {

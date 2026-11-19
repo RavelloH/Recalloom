@@ -25,7 +25,6 @@ export function FeedDetail({item,busy,onAction}:{item:FeedDetailItem;busy:boolea
  return <div className="feed-detail" data-feed-detail={item.id}>
   <div className="feed-detail-top">
    <span className="feed-detail-category"><Icon name={feedKindIcons[item.kind]} size="sm"/>{feedKindLabels[item.kind]}</span>
-
   </div>
   <h2>{item.title}</h2>
   <div className="feed-detail-meta">

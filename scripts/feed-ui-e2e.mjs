@@ -122,13 +122,43 @@ try{
  await page.getByRole('combobox',{name:'动态类型'}).click();
  await page.getByRole('option',{name:'全部类型',exact:true}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.feed-story').length===5);
+ const firstId=items[0].id,secondId=items[1].id;
+ const firstPanel='[data-workspace-panel="feed-detail-'+firstId+'"]';
+ const secondPanel='[data-workspace-panel="feed-detail-'+secondId+'"]';
+ const feedWidthBefore=await page.locator('.feed-story').first().evaluate(element=>element.getBoundingClientRect().width);
  await page.locator('.feed-story').first().getByRole('button',{name:/一个需要保持长标题/}).click();
- await page.locator('[data-feed-detail]').waitFor();
- assert.equal(await page.locator('.feed-detail-source').count(),2,'All original sources remain visible');
- assert.equal(await page.locator('[data-workspace-panel="feed-detail"]').count(),1,'Uses shared stacked WorkspacePanel');
- await page.locator('[data-feed-detail]').getByRole('button',{name:'有兴趣'}).click();
+ await page.locator(firstPanel+' [data-feed-detail="'+firstId+'"]').waitFor();
+ assert.equal(await page.locator(firstPanel+' .feed-detail-source').count(),2,'All original sources remain visible');
+ assert.equal(await page.locator(firstPanel).count(),1,'Each item owns its independent WorkspacePanel');
+ const feedWidthAfter=await page.locator('.feed-story').first().evaluate(element=>element.getBoundingClientRect().width);
+ assert.ok(Math.abs(feedWidthAfter-feedWidthBefore)<=1,
+  'Opening a Feed panel must not resize the main feed content: '+feedWidthBefore+' -> '+feedWidthAfter);
+ const desktopMetrics=await page.locator(firstPanel+' .feed-detail').evaluate(element=>{
+  const style=getComputedStyle(element),container=element.closest('.workspace-panel-content');
+  return {left:style.paddingLeft,right:style.paddingRight,bottom:style.paddingBottom,
+   contentWidth:element.getBoundingClientRect().width,availableWidth:container.getBoundingClientRect().width,
+   mainPadding:getComputedStyle(document.querySelector('.main-content')).paddingRight};
+ });
+ assert.equal(desktopMetrics.mainPadding,'0px','Feed panels must not reserve content width');
+ assert.equal(desktopMetrics.left,'18px','Match task-editor horizontal padding');
+ assert.equal(desktopMetrics.right,'18px');
+ assert.equal(desktopMetrics.bottom,'20px');
+ assert.ok(Math.abs(desktopMetrics.contentWidth-desktopMetrics.availableWidth)<1,'Detail must fill panel interior');
+ await page.screenshot({path:artifacts+'/feed-detail-desktop.png',fullPage:true});
+ await page.locator(firstPanel+' [data-feed-detail]').getByRole('button',{name:'有兴趣'}).click();
  assert.ok(actions.some(action=>action.action==='preference'&&action.value==='interested'),'Interest reaches the API');
- await page.locator('[data-workspace-panel="feed-detail"]').getByRole('button',{name:'关闭'}).click();
+ await page.locator('.feed-story').nth(1).getByRole('button',{name:'Cloudflare 更新 Workers AI 文档和模型调用说明'}).click();
+ await page.locator(secondPanel+' [data-feed-detail="'+secondId+'"]').waitFor();
+ assert.equal(await page.locator(firstPanel).count(),1,'First Feed panel remains mounted');
+ assert.equal(await page.locator(secondPanel).count(),1,'Second Feed panel has a distinct instance');
+ assert.equal(await page.locator('.workspace-panel[data-workspace-panel]').count(),2,'Both Feed panels stack');
+ await page.locator('.feed-story').first().getByRole('button',{name:/一个需要保持长标题/}).click();
+ assert.equal(await page.locator('.workspace-panel[data-workspace-panel]').count(),2,'Reopening an item activates its existing panel instead of duplicating');
+ await page.locator(firstPanel).getByRole('button',{name:'关闭'}).click();
+ await page.locator(firstPanel).waitFor({state:'detached'});
+ assert.equal(await page.locator(secondPanel).count(),1,'Closing the reactivated panel keeps the other');
+ await page.locator(secondPanel).getByRole('button',{name:'关闭'}).click();
+ await page.locator(secondPanel).waitFor({state:'detached'});
  await page.locator('.feed-story').first().getByRole('button',{name:'收藏',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('.feed-story [aria-label="取消收藏"]')!==null);
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'收藏'}).click();
@@ -160,6 +190,17 @@ try{
  assert.equal(await page.locator('.feed-story[data-feed-id="'+readId+'"]').count(),1,'Read card remains in unread view this visit');
  await page.getByRole('navigation',{name:'信息流视图'}).getByRole('button',{name:'动态',exact:true}).click();
  await page.setViewportSize({width:390,height:844});
+ await page.locator('.feed-story-open').first().click();
+ const mobileDetail=page.locator('.workspace-panel-sheet .feed-detail');
+ await mobileDetail.waitFor();
+ const mobileMetrics=await mobileDetail.evaluate(element=>{
+  const style=getComputedStyle(element);
+  return {left:style.paddingLeft,right:style.paddingRight,bottom:style.paddingBottom};
+ });
+ assert.deepEqual(mobileMetrics,{left:'20px',right:'20px',bottom:'24px'},'Mobile sheet follows shared panel gutters');
+ await page.screenshot({path:artifacts+'/feed-detail-mobile.png',fullPage:true});
+ await page.locator('.workspace-panel-sheet .workspace-panel-header').getByRole('button',{name:'关闭'}).click();
+ await page.locator('.workspace-panel-sheet').waitFor({state:'detached'});
  await page.emulateMedia({colorScheme:'dark'});
  await page.reload();
  await page.locator('.feed-story-open').first().waitFor();
@@ -177,7 +218,7 @@ try{
  assert.ok(contrast.ratio>=4.5,'Dark-theme title contrast must be at least 4.5:1: '+JSON.stringify(contrast));
  await page.screenshot({path:artifacts+'/feed-dark-390.png',fullPage:true});
  assert.deepEqual(errors,[],'No browser JavaScript errors or 5xx responses');
- console.log('Feed UI PASS: stacked panel, explicit preferences, scroll-to-read snapshot, animations, 320–1365px and dark scheme');
+ console.log('Feed UI PASS: independent stacked panels, stable content width, consistent panel padding, scroll-to-read and responsive layouts');
 }finally{
  await browser.close();
 }

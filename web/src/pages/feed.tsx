@@ -1,16 +1,16 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {useInfiniteQuery,useQuery,useQueryClient} from '@tanstack/react-query';
+import {useInfiniteQuery,useQueryClient} from '@tanstack/react-query';
 import {AnimatePresence,motion,useReducedMotion} from 'motion/react';
 import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Selector} from '@astryxdesign/core/Selector';
-import {WorkspacePanel} from '../workspace-panels';
 import {Icon} from '../icon';
 import {WorkspaceToolbar,WorkspaceSearch} from '../workspace-toolbar';
 import {api,mutate,queryString} from '../api';
 import {ErrorText,LoadingRows,PageTitle} from './shared';
 import {FeedCard,feedKindLabels} from '../feed/feed-card';
-import {FeedDetail,type FeedDetailItem} from '../feed/feed-detail';
+import type {FeedDetailItem} from '../feed/feed-detail';
+import {FeedPanels,type FeedPanelSession} from '../feed/feed-panels';
 import {groupFeedItems} from '../feed/presentation';
 import type {FeedItem,FeedStateInput} from '../../../src/feed-model';
 import '../styles/components/feed.css';
@@ -79,7 +79,8 @@ export function FeedPage(){
  const qc=useQueryClient();
  const reduce=useReducedMotion();
  const [view,setView]=useState<View>('inbox'),[kind,setKind]=useState<Kind|'all'>('all');
- const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[opened,setOpened]=useState<string|null>(null);
+ const [search,setSearch]=useState(''),[query,setQuery]=useState('');
+ const [panels,setPanels]=useState<FeedPanelSession[]>([]);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState<unknown>(null);
  const [version,setVersion]=useState(0);
  const sentinel=useRef<HTMLDivElement>(null),stream=useRef<HTMLDivElement>(null);
@@ -108,11 +109,6 @@ export function FeedPage(){
   return [...unreadSnapshot.current.values()].sort((a,b)=>effectiveTime(b).localeCompare(effectiveTime(a))||b.id.localeCompare(a.id));
  },[feed.data,view,version]);
  const groups=useMemo(()=>groupFeedItems(items),[items]);
- const detail=useQuery({
-  queryKey:[...queryRoot,'item',opened],
-  enabled:opened!==null,
-  queryFn:({signal})=>api<{item:FeedDetailItem}>('/feed/'+opened,{signal})
- });
  const canLoad=Boolean(feed.hasNextPage&&!feed.isFetchingNextPage&&!feed.isFetchNextPageError);
  useEffect(()=>{
   const element=sentinel.current;
@@ -147,9 +143,19 @@ export function FeedPage(){
  const autoRead=useCallback((id:string)=>{void change(id,{action:'read'});},[change]);
  useFeedAutoRead(stream,items,autoRead);
  const open=(item:FeedItem)=>{
-  setOpened(item.id);
+  setPanels(current=>{
+   const existing=current.find(panel=>panel.id===item.id);
+   return existing?current.map(panel=>panel.id===item.id
+    ?{...panel,open:true,activation:panel.activation+1}:panel)
+    :[...current,{id:item.id,open:true,activation:1}];
+  });
   if(item.state.readRevision<item.revision)void change(item.id,{action:'read'});
  };
+ const closePanel=useCallback((id:string)=>setPanels(current=>current.map(panel=>
+  panel.id===id?{...panel,open:false}:panel)),[]);
+ const removePanel=useCallback((id:string)=>setPanels(current=>current.filter(panel=>
+  panel.id!==id||panel.open)),[]);
+
  const filtered=kind!=='all'||query.length>0;
  const [emptyTitle,emptyDescription]=filtered?
   ['没有找到符合条件的动态','试试更换类型或调整搜索关键字。']:emptyViews[view];
@@ -201,12 +207,7 @@ export function FeedPage(){
       <span>{feed.isFetchNextPageError?'加载失败，刷新后重试':'已经浏览到这里了'}</span>}
     </div>
    </>}
-  <WorkspacePanel open={opened!==null} onOpenChange={next=>{if(!next)setOpened(null);}}
-   label="动态详情" id="feed-detail" reserveSpace>
-   {detail.isPending?<LoadingRows kind="activity" count={3}/>:
-    detail.isError?<ErrorText error={detail.error}/>:
-    detail.data?<FeedDetail item={detail.data.item} busy={busy!==null}
-     onAction={input=>void change(detail.data!.item.id,input)}/>:null}
-  </WorkspacePanel>
+  <FeedPanels sessions={panels} busy={busy} onClose={closePanel} onAfterClose={removePanel}
+   onAction={(id,input)=>void change(id,input)}/>
  </div>;
 }
